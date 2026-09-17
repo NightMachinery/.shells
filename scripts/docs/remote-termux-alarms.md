@@ -9,15 +9,15 @@ tealy-alarm 'tomorrow 8am' 'standup'
 tealy-alarm '+20 minutes' 'tea'
 ```
 
-The alarm belongs to the clock app, not to Termux. It therefore rings through
-Doze and silent mode, and it survives Termux being killed, the SSH connection
-dropping, and this machine going to sleep. The phone has to be reachable when
-the alarm is *set*; it does not have to be reachable when the alarm rings. This
-is why the implementation does not use `termux-notification` or
-`termux-job-scheduler`: both are batched by Doze and inexact, and
-`termux-job-scheduler` has a documented minimum period of fifteen minutes.
+The alarm belongs to the clock app, not to Termux, so it rings through Doze and
+silent mode and survives Termux being killed, the SSH connection dropping, and
+this machine sleeping. The phone must be reachable when the alarm is *set*, not
+when it rings. Verified end to end with the phone locked and idle. This is why
+the implementation avoids `termux-notification` and `termux-job-scheduler`, both
+of which are Doze-batched and inexact; the latter has a documented minimum
+period of fifteen minutes.
 
-The generic helper is `h-termux-alarm-set HOST TIMESPEC [MESSAGE...]`. The
+The generic helper is `h-termux-alarm-set HOST TIMESPEC [MESSAGE...]`, and the
 `tealy-` functions are thin wrappers over the `tealy` SSH alias, in the same
 shape as `tealy-paste` and `h-paste-from-remote-termux` in
 `./docs/remote-termux-clipboard.md`. Configure hostnames, users, ports and keys
@@ -25,65 +25,55 @@ in `~/.ssh/config` rather than in these functions.
 
 ## Time specifications
 
-`TIMESPEC` is anything GNU `date -d` accepts, so `7:30`, `23:45`,
-`tomorrow 8am` and `+20 minutes` all work. The phrasing `in 3 hours` is **not**
-accepted; write `+3 hours` instead.
+`TIMESPEC` is anything GNU `date -d` accepts. The phrasing `in 3 hours` is
+**not** accepted; write `+3 hours`.
 
-Android's `SET_ALARM` intent carries only an hour and a minute, so the system
-schedules the next occurrence of that time. A time that has already passed today
-rolls over to tomorrow on its own, and the code needs no logic for it.
+`SET_ALARM` carries only an hour and a minute, so Android schedules the next
+occurrence and a time already past today rolls over to tomorrow by itself.
 
-Repeating alarms would use the `android.intent.extra.alarm.DAYS` extra, which is
-an `ArrayList<Integer>` and would need `am`'s `--eial`. This is untested and not
-implemented.
+Repeating alarms would need the `android.intent.extra.alarm.DAYS` extra, an
+`ArrayList<Integer>` passed with `am`'s `--eial`. Untested, not implemented.
 
 ## Timezones
 
-The hour and minute are resolved **on the phone**, against Android's system
-timezone as reported by `getprop persist.sys.timezone`. Neither shell's `TZ`
-affects the result, and it costs no extra round trip because the resolution
-happens inside the SSH command that sets the alarm. Set `alarm_tz` to interpret
-the spec in some other zone.
+The hour and minute are resolved **on the phone**, against
+`getprop persist.sys.timezone`, inside the same SSH command that sets the alarm.
+Neither shell's `TZ` affects the result and it costs no extra round trip. Set
+`alarm_tz` to interpret the spec in another zone.
 
-This matters because the two clocks can disagree. `sshd` on the phone inherits
-its environment from whichever shell started it, and it was running with a `TZ`
-ninety minutes away from the system zone, so a naive `date` in an SSH session
-reported one time while the clock app scheduled alarms in another. The phone's
-`~/.zshenv` now exports `TZ` from the system property, which fixes interactive
-sessions too, but the helpers do not rely on that.
+This matters because the two clocks can disagree. `sshd` there inherits its
+environment from whichever shell started it, and was running ninety minutes off
+the system zone, so a naive `date` over SSH reported one time while the clock app
+scheduled in another. The phone's `~/.zshenv` now exports `TZ` from the system
+property, which fixes interactive sessions too, but the helpers do not rely on
+it.
 
-## When an alarm silently does not appear
+## Exit 0 means nothing
 
-This is the failure mode worth knowing, because nothing reports it.
+This is the trap. `am` reports whether an *activity started*, never what the app
+then did, so a completely failed alarm is indistinguishable from a working one.
+Read exit codes precisely:
 
-If more than one installed app handles `SET_ALARM` and none is set as the
-default, Android launches the disambiguation chooser. The chooser is an
-activity, so `ActivityManager` returns `START_SUCCESS` and `am` prints
-`Starting: Intent { act=android.intent.action.SET_ALARM (has extras) }` and
-exits zero. But the chooser knows nothing about `SKIP_UI`, and because Termux is
-in the background the dialog is invisible. The alarm is simply never created,
-and every observable signal says it worked.
+- Exit 2, `Activity class ... does not exist`: wrong or filtered component.
+- Exit 1, `unknown error code 102`: Android blocked a background activity launch.
+- Exit 0: an activity started. The alarm may or may not exist.
 
-The `tealy-` functions therefore address the clock app's API handler explicitly,
+The concrete way this bites: if several apps handle `SET_ALARM` and none is the
+default, Android launches the disambiguation chooser. The chooser is an activity,
+so `am` prints `Starting: Intent {...}` and exits 0, but it knows nothing about
+`SKIP_UI` and is invisible because Termux is in the background. No alarm is
+created and every signal says success.
+
+The `tealy-` functions therefore pin the clock app's API handler explicitly
 through `tealy_alarm_component`. An explicit component cannot reach a chooser,
-and if the class is ever renamed the call fails loudly with exit 2 and
-`Activity class ... does not exist` instead of failing silently. Set the variable
-to the empty string to go back to implicit resolution, which follows the default
+and a renamed class fails loudly with exit 2 rather than silently. Set the
+variable to the empty string for implicit resolution, which follows the default
 clock app and is portable to other phones.
 
 ### Finding the right component on another phone
 
-Pin the activity that **declares the intent filter**, not merely one that
-exists. Pinning the wrong one looks exactly like success: the launcher activity
-accepts the launch, returns zero, and quietly discards the extras.
-
-On the phone this was developed against, the clock app is a vendor fork that
-keeps the AOSP package name `com.android.deskclock` but renames AOSP's
-`HandleApiCalls` to `HandleSetAlarmActivity`. Checking for the AOSP name alone
-gives `Activity class ... does not exist` and invites the wrong conclusion that
-the app has no API handler at all.
-
-Read the manifest rather than guessing:
+Pin the activity that **declares the intent filter**, not merely one that exists:
+a launcher activity accepts the launch, returns 0, and discards the extras.
 
 ```zsh
 pkg install aapt
@@ -91,85 +81,72 @@ apk="$(pm path com.android.deskclock | sed 's/^package://')"
 aapt dump xmltree "$apk" AndroidManifest.xml | grep -B40 SET_ALARM
 ```
 
-The activity whose `intent-filter` lists `android.intent.action.SET_ALARM` is
-the one to pin. On this phone a single activity declares `SET_ALARM`,
-`SET_TIMER`, `DISMISS_ALARM` and `SHOW_ALARMS` together.
+Here the clock app is a vendor fork that keeps the AOSP package name
+`com.android.deskclock` but renames AOSP's `HandleApiCalls` to
+`HandleSetAlarmActivity`. Checking only the AOSP name yields `does not exist` and
+invites the wrong conclusion that there is no API handler at all.
 
-### Reading exit codes precisely
+One more hint: `Activity not started, intent has been delivered to currently
+running top-most instance` means the target was already foregrounded. A
+no-display API handler never produces it, so seeing it suggests a wrong pin.
 
-Exit 2 with `Activity class ... does not exist` means a wrong or filtered
-component. Exit 1 with `unknown error code 102` means Android blocked a
-background activity launch. Exit 0 means an activity started, which is **not**
-the same as an alarm having been created.
+## Timers
 
-The warning `Activity not started, intent has been delivered to currently
-running top-most instance` appears when the target activity is already
-foregrounded. A no-display API handler does not produce it; the launcher
-activity does, which is a useful hint that the wrong component is pinned.
+`tealy-timer DURATION [MESSAGE...]` starts a countdown through `SET_TIMER`.
+`DURATION` is parsed by `dur2sec`, so a bare seconds count works, as do `90s`,
+`30m`, `2h` and `3d`.
 
-## What is not supported
+Timers are **singleton**: setting one replaces any pending timer. There is no
+way to cancel silently. `LENGTH 0` does nothing at all, and `LENGTH 1` displaces
+the pending timer but then rings a second later, so it is a noisy workaround
+rather than a cancel.
 
-Alarms cannot be listed. Android exposes no read API; the only related intent is
-`SHOW_ALARMS`, which merely opens the clock app's UI.
+## What cannot be done
 
-Alarms cannot be dismissed or deleted. This was tested exhaustively: every
-search mode (`android.label`, `android.next`, `android.all`, `android.time`),
-against both the API handler and the launcher activity, and via implicit
-resolution. All return `START_SUCCESS` and remove nothing.
+Alarms cannot be listed. Android exposes no read API, and `SHOW_ALARMS` only
+opens the clock app's UI.
 
-The reason is visible in the clock app's own bytecode. Unpack its dex files and
-count the API strings:
+Alarms cannot be dismissed or deleted. Every search mode (`android.label`,
+`android.next`, `android.all`, `android.time`) was tried against both the API
+handler and the launcher activity, and via implicit resolution. All return
+`START_SUCCESS` and remove nothing. The app's own bytecode says why:
 
 ```zsh
 apk="$(pm path com.android.deskclock | sed 's/^package://')"
 unzip -o -q -j "$apk" 'classes*.dex' -d dex
-for pat in android.intent.extra.alarm.SEARCH_MODE android.all android.next \
-           android.time android.intent.extra.alarm.SKIP_UI ; do
-    printf '%s -> %s\n' "$pat" "$(cat dex/*.dex | grep -a -c -- "$pat")"
-done
+cat dex/*.dex | grep -a -c -- android.intent.extra.alarm.SEARCH_MODE   #: 0
 ```
 
 `SEARCH_MODE` occurs zero times, as do all four of its values, while `SKIP_UI`
-and `MESSAGE` occur once each. The app implements the set path and simply never
-reads the extra that says *which* alarm to dismiss, so no combination of
-arguments can work. `DISMISS_ALARM` does appear, which suggests it may dismiss an
-alarm that is currently ringing, since that requires no search; that is useless
-for clearing entries from a list.
+and `MESSAGE` occur once each. The app implements the set path and never reads
+the extra saying *which* alarm to dismiss, so no argument combination can work,
+even though its manifest advertises the `DISMISS_ALARM` filter. Declaring an
+intent filter is not evidence of implementing it. Delete alarms in the clock app.
 
-Declaring an intent filter is therefore not evidence of implementing it. This
-app's manifest advertises `DISMISS_ALARM` while its code cannot act on it.
-
-Delete alarms in the clock app.
-
-`termux-notification-list` hangs unless notification access has been granted
+`termux-notification-list` hangs unless notification access is granted
 separately, so nothing here depends on it.
 
-## Timers, notifications and toasts
+## Notifications and toasts
 
-`tealy-timer DURATION [MESSAGE...]` starts a countdown timer through
-`SET_TIMER`. `DURATION` is parsed by `dur2sec`, so a bare seconds count works,
-as do `90s`, `30m`, `2h` and `3d`.
-
-`tealy-notify TITLE [CONTENT...]` posts an Android notification, and
-`tealy-toast MESSAGE...` flashes a transient toast. Both go through the
-`termux-api` package and need the Termux:API app installed. Neither is an alarm:
-notifications are subject to Doze batching and do not ring.
+`tealy-notify TITLE [CONTENT...]` posts an Android notification and
+`tealy-toast MESSAGE...` flashes a transient toast. Both need the `termux-api`
+package and the Termux:API app. Neither is an alarm: notifications are
+Doze-batched and do not ring.
 
 ## Requirements
 
-An SSH server on the Termux device, the `termux-api` package plus the Termux:API
-add-on for the notification and toast functions, and Termux itself at version
-0.118.1 or newer. That version added `com.android.alarm.permission.SET_ALARM` to
-Termux's manifest; without it, `am start -a android.intent.action.SET_ALARM`
-fails with a `SecurityException` naming that permission. F-Droid installs
-predating mid-2024 are the usual cause.
+An SSH server on the Termux device, `termux-api` plus the Termux:API add-on for
+the notification and toast functions, and Termux 0.118.1 or newer. That version
+added `com.android.alarm.permission.SET_ALARM` to Termux's manifest; without it
+`am start -a android.intent.action.SET_ALARM` fails with a `SecurityException`
+naming that permission, and F-Droid installs predating mid-2024 are the usual
+cause.
 
 Only the `app_process` variant of `am`, from the `termux-am` package, is used.
-The socket variant `termux-am` from `termux-am-socket` fails with
-`Could not connect to socket` unless the Termux app's socket server is running.
+The socket variant from `termux-am-socket` fails with `Could not connect to
+socket` unless the Termux app's socket server is running.
 
-All user-supplied text crosses to the phone as environment variables rather than
-being interpolated into the remote shell program, so a message containing
-quotes, backticks or `$(...)` is inert. Host arguments that are empty, begin
-with `-`, or contain whitespace are rejected, so they cannot be read as SSH
-options or split into extra arguments.
+All user-supplied text crosses as environment variables rather than being
+interpolated into the remote shell program, so a message containing quotes,
+backticks or `$(...)` is inert. Host arguments that are empty, begin with `-`,
+or contain whitespace are rejected so they cannot be read as SSH options.

@@ -194,26 +194,20 @@ Flash a transient toast on HOST's screen via termux-api."
     h-termux-ssh "$host" "termux-toast -- $(gquote-sq "$msg")"
 }
 ##
-#: The phone's clock app API handler, addressed explicitly.
+#: The clock app's API handler, pinned. This is the activity that declares the
+#: SET_ALARM intent filter; it is MIUI's rename of AOSP's HandleApiCalls, and it
+#: shows no UI.
 #:
-#: This is the activity that actually declares the SET_ALARM, SET_TIMER,
-#: DISMISS_ALARM and SHOW_ALARMS intent filters. It is MIUI's rename of AOSP's
-#: com.android.deskclock.HandleApiCalls, and it is a no-display handler: it does
-#: its work and finishes without showing UI.
+#: Pinned because an implicit intent silently does nothing whenever several apps
+#: handle SET_ALARM and none is the default: Android raises an invisible chooser
+#: and every signal still reports success. An explicit component cannot reach it,
+#: and a renamed class fails loudly with exit 2 instead.
 #:
-#: Pinning it matters because an implicit intent silently does nothing whenever
-#: several apps handle SET_ALARM and none is the default; Android then launches
-#: an invisible chooser, and every observable signal still reports success. An
-#: explicit component cannot reach that chooser, and if this class is ever
-#: renamed the call fails loudly with exit 2 and "Activity class ... does not
-#: exist". A noisy wrong answer beats a silent one.
+#: Do NOT pin com.android.deskclock.AlarmClock: that is the launcher activity,
+#: declares no filter, and silently discards the extras.
 #:
-#: Do NOT pin com.android.deskclock.AlarmClock. It is the launcher activity and
-#: declares no intent filter, so it accepts the launch, returns success, and
-#: discards the extras. That mistake is indistinguishable from success.
-#:
-#: Set to the empty string for implicit resolution, which follows whatever
-#: default clock app is configured and is portable to other phones.
+#: Empty string restores implicit resolution, which is portable to other phones.
+#: See ./docs/remote-termux-alarms.md
 typeset -g tealy_alarm_component="${tealy_alarm_component-com.android.deskclock/com.android.deskclock.HandleSetAlarmActivity}"
 
 function tealy-alarm {
