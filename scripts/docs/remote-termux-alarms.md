@@ -52,6 +52,21 @@ minutes**, swallowing the `1h:` and returning a perfectly plausible wrong time.
 Claiming durations first removes the input from chrono's reach. Fractions like
 `1.5h` are supported by neither and fail loudly, as does anything unparseable.
 
+Chrono is also run with `datenat_strict=y`, which rejects two further silent
+wrongnesses rather than acting on them:
+
+- A **partial match**, where chrono understands only some of the input and
+  discards the rest. `1h:30m later` matches just `30m later`.
+- An **invented hour**. `next friday`, `monday` and `dec 25` name no time of
+  day, and chrono fills in 12:00; `tomorrow` carries the current clock time
+  instead. As an alarm that rings at a time you never specified, so it is
+  refused: write `next friday 9am`.
+
+Both are detected from `chrono.parse()`'s match span and `isCertain('hour')`,
+which `parseDate()` throws away. Strict mode is off by default for `datenat`
+itself, since its other callers pass free prose where partial matching is the
+point.
+
 ### Two traps this deliberately avoids
 
 `date -d 3h` does **not** mean three hours. GNU date reads a bare trailing
