@@ -64,10 +64,18 @@ h="${hm% *}" ; m="${hm#* }"
 #: Plain am spawns app_process and loads am.apk, which measured ~706ms of the
 #: ~1000ms an alarm takes, against ~7ms for the dispatch itself. The socket only
 #: exists on Termux app versions that create files/apps, so fall back silently.
+#: Two paths because upstream moved it: termux-am-socket 1.5.0 looks under
+#: apps/com.termux, newer app builds serve it under apps/termux-app. Checking
+#: only one silently loses the speedup on half the version combinations.
 AM=am
-if [ -S "${PREFIX:-/data/data/com.termux/files/usr}/../apps/com.termux/termux-am/am.sock" ] \
-    && command -v termux-am >/dev/null 2>&1 ; then
-    AM=termux-am
+if command -v termux-am >/dev/null 2>&1 ; then
+    for _s in "${PREFIX:-/data/data/com.termux/files/usr}/../apps/com.termux/termux-am/am.sock" \
+              "${PREFIX:-/data/data/com.termux/files/usr}/../apps/termux-app/termux-am/am.sock" ; do
+        if [ -S "$_s" ] ; then
+            AM=termux-am
+            break
+        fi
+    done
 fi
 
 set --
@@ -97,10 +105,18 @@ typeset -g h_termux_timer_script='
 #: Plain am spawns app_process and loads am.apk, which measured ~706ms of the
 #: ~1000ms an alarm takes, against ~7ms for the dispatch itself. The socket only
 #: exists on Termux app versions that create files/apps, so fall back silently.
+#: Two paths because upstream moved it: termux-am-socket 1.5.0 looks under
+#: apps/com.termux, newer app builds serve it under apps/termux-app. Checking
+#: only one silently loses the speedup on half the version combinations.
 AM=am
-if [ -S "${PREFIX:-/data/data/com.termux/files/usr}/../apps/com.termux/termux-am/am.sock" ] \
-    && command -v termux-am >/dev/null 2>&1 ; then
-    AM=termux-am
+if command -v termux-am >/dev/null 2>&1 ; then
+    for _s in "${PREFIX:-/data/data/com.termux/files/usr}/../apps/com.termux/termux-am/am.sock" \
+              "${PREFIX:-/data/data/com.termux/files/usr}/../apps/termux-app/termux-am/am.sock" ; do
+        if [ -S "$_s" ] ; then
+            AM=termux-am
+            break
+        fi
+    done
 fi
 
 set --
