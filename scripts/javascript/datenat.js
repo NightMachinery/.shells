@@ -5,7 +5,8 @@
 
 try {
     const chrono = require('chrono-node');
-    const moment = require('moment');
+    //: moment is a legacy project in maintenance mode, and it was here only for
+    //: one format call and one comparison, both one-liners on a native Date.
 
     const input = (process.argv[2] || '').trim();
     const nopast = process.env.datenat_nopast;
@@ -60,8 +61,7 @@ try {
     if (nopast) {
         tmp = new Date(res)
         tmp.setHours(0,0,0,0)
-        var resM = moment(tmp)
-        if (resM.diff(currentTime) <= 0) {
+        if (tmp.getTime() - currentTime.getTime() <= 0) {
             console.error("The requested date is in the past.")
             process.exit(1)
         }
@@ -70,8 +70,8 @@ try {
     if (unixMode) {
         resStr = String(Math.floor(res.valueOf() / 1000))
     } else {
-        var resM = moment(res)
-        resStr = resM.format("YYYY/MM/DD")
+        const pad = (n) => String(n).padStart(2, "0")
+        resStr = res.getFullYear() + "/" + pad(res.getMonth() + 1) + "/" + pad(res.getDate())
     }
     console.log(resStr);
 }
