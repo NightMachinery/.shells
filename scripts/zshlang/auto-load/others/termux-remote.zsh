@@ -60,6 +60,16 @@ hm="$(TZ="$tz" date -d "@$alarm_epoch" +"%-H %-M" 2>/dev/null)" || {
 }
 h="${hm% *}" ; m="${hm#* }"
 
+#: termux-am hands the intent to the already-running Termux app over a socket.
+#: Plain am spawns app_process and loads am.apk, which measured ~706ms of the
+#: ~1000ms an alarm takes, against ~7ms for the dispatch itself. The socket only
+#: exists on Termux app versions that create files/apps, so fall back silently.
+AM=am
+if [ -S "${PREFIX:-/data/data/com.termux/files/usr}/../apps/com.termux/termux-am/am.sock" ] \
+    && command -v termux-am >/dev/null 2>&1 ; then
+    AM=termux-am
+fi
+
 set --
 [ -n "$alarm_component" ] && set -- "$@" -n "$alarm_component"
 set -- "$@" -a android.intent.action.SET_ALARM \
@@ -69,7 +79,7 @@ set -- "$@" -a android.intent.action.SET_ALARM \
     --ez android.intent.extra.alarm.VIBRATE "$alarm_vibrate"
 [ -n "$alarm_msg" ] && set -- "$@" --es android.intent.extra.alarm.MESSAGE "$alarm_msg"
 
-out="$(am start "$@" 2>&1)" ; rc=$?
+out="$($AM start "$@" 2>&1)" ; rc=$?
 if [ "$rc" -ne 0 ] ; then
     printf "%s\n" "$out" >&2
     exit "$rc"
@@ -83,6 +93,16 @@ fi
 '
 
 typeset -g h_termux_timer_script='
+#: termux-am hands the intent to the already-running Termux app over a socket.
+#: Plain am spawns app_process and loads am.apk, which measured ~706ms of the
+#: ~1000ms an alarm takes, against ~7ms for the dispatch itself. The socket only
+#: exists on Termux app versions that create files/apps, so fall back silently.
+AM=am
+if [ -S "${PREFIX:-/data/data/com.termux/files/usr}/../apps/com.termux/termux-am/am.sock" ] \
+    && command -v termux-am >/dev/null 2>&1 ; then
+    AM=termux-am
+fi
+
 set --
 [ -n "$timer_component" ] && set -- "$@" -n "$timer_component"
 set -- "$@" -a android.intent.action.SET_TIMER \
@@ -90,7 +110,7 @@ set -- "$@" -a android.intent.action.SET_TIMER \
     --ez android.intent.extra.alarm.SKIP_UI "$timer_skip_ui"
 [ -n "$timer_msg" ] && set -- "$@" --es android.intent.extra.alarm.MESSAGE "$timer_msg"
 
-out="$(am start "$@" 2>&1)" ; rc=$?
+out="$($AM start "$@" 2>&1)" ; rc=$?
 if [ "$rc" -ne 0 ] ; then
     printf "%s\n" "$out" >&2
     exit "$rc"
