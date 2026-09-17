@@ -25,7 +25,7 @@ in `~/.ssh/config` rather than in these functions.
 
 ## Time specifications
 
-`TIMESPEC` is parsed by `datenat-v2`, which accepts compact durations and prose:
+`TIMESPEC` is parsed by `datenat-unix-v2`, which accepts compact durations and prose:
 
 ```zsh
 tealy-alarm 1h30m               tealy-alarm 'in 3 hours'
@@ -39,7 +39,22 @@ timestamp which the phone renders into an hour and minute. An epoch is
 unambiguous, so a disagreement between the two machines' timezones cannot shift
 the alarm.
 
-`datenat-v2` tries two parsers in a deliberate order:
+The resolved time is printed **before** the intent is sent, so a misparse can be
+aborted with ctrl-c rather than discovered when the alarm fails to ring. It is
+shown by `unix2human`, which drops the date when the alarm falls on today:
+
+```zsh
+$ tealy-alarm 1h30m 'tea'
+h-termux-alarm-set: 18:50:36
+$ tealy-alarm 'tomorrow 8am' 'standup'
+h-termux-alarm-set: 1405/Shahrivar6/27 Friday 18/September9/2026 08:00:00
+```
+
+`termux_alarm_dryrun=y` stops after that line and sends nothing. Use it to check
+a spec: alarms cannot be removed programmatically, so a careless test leaves
+something that will ring.
+
+`datenat-unix-v2` tries two parsers in a deliberate order:
 
 1. A duration chain, via `h-dur-nat2sec` and `dur2sec`. Units are `w d h m s`,
    and `m` always means minutes, never months. `1h30m`, `1h:30m:0s`,
