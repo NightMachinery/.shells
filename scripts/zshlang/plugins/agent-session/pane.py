@@ -97,7 +97,7 @@ def main():
             raise ValueError('no resume command configured; no new conversation was started')
         marker.touch(mode=0o600, exist_ok=True)
         command = 'source "$1" && agent-session-pane-run "$2" "$3"'
-        os.execvp('zsh', ['zsh', '-ic', command, 'agent-session', plugin, state, mode])
+        os.execvp('zsh', ['zsh', '-c', command, 'agent-session', plugin, state, mode])
     else:
         raise ValueError('unknown operation: ' + op)
 

@@ -2223,7 +2223,7 @@ function h-agent-session-tmux-dead-rows {
         h-agent-session-excluded-p "${tname}" && continue
 
         #: The script's second-run branch,
-        #: `exec <zsh> -ic 'agent-session-resume <transcript>''. Read with
+        #: `exec <zsh> -c 'agent-session-resume <transcript>''. Read with
         #: `$(<...)', which zsh answers without a fork; these are a dozen lines.
         line=''
         for w in ${(f)"$(<${script})"} ; do
@@ -2239,7 +2239,7 @@ function h-agent-session-tmux-dead-rows {
         (( ${#inner} >= 2 )) && [[ "${inner[1]}" == agent-session-resume ]] || continue
 
         #: Unquoted twice, because it was quoted twice: `${(q)}' escaped the
-        #: path and `${(qq)}' then wrapped the whole `-ic' argument. The first
+        #: path and `${(qq)}' then wrapped the whole `-c' argument. The first
         #: `${(Q)}' above took the wrapper off, this one takes the escaping off,
         #: and a path holding a space or a quote comes back byte for byte.
         transcript="${(Q)inner[2]}"

@@ -443,7 +443,7 @@ function h-agent-done-pane-script {
             #: Keep the resume line's consumed shape for the dead-pane picker.
             #: The managed runtime restores its original flags and hooks.
             test -n "${managed_state}" && print -r -- "    export AGENT_SESSION_REUSE_PANE=${(qq)managed_state}"
-            print -r -- "    exec ${(qq)zsh_path} -ic ${(qq)resume}"
+            print -r -- "    exec ${(qq)zsh_path} -c ${(qq)resume}"
         else
             #: No transcript, so nothing to resume; a shell is still better
             #: than showing the same report a second time.
