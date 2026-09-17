@@ -64,46 +64,82 @@ exits zero. But the chooser knows nothing about `SKIP_UI`, and because Termux is
 in the background the dialog is invisible. The alarm is simply never created,
 and every observable signal says it worked.
 
-The fix is to set a default clock app: run the intent once without `SKIP_UI`
-with the phone unlocked and in front of you, and the chooser appears and lets
-you choose a default.
+The `tealy-` functions therefore address the clock app's API handler explicitly,
+through `tealy_alarm_component`. An explicit component cannot reach a chooser,
+and if the class is ever renamed the call fails loudly with exit 2 and
+`Activity class ... does not exist` instead of failing silently. Set the variable
+to the empty string to go back to implicit resolution, which follows the default
+clock app and is portable to other phones.
 
-Set `termux_alarm_component` to pin the receiving activity and bypass resolution
-entirely:
+### Finding the right component on another phone
+
+Pin the activity that **declares the intent filter**, not merely one that
+exists. Pinning the wrong one looks exactly like success: the launcher activity
+accepts the launch, returns zero, and quietly discards the extras.
+
+On the phone this was developed against, the clock app is a vendor fork that
+keeps the AOSP package name `com.android.deskclock` but renames AOSP's
+`HandleApiCalls` to `HandleSetAlarmActivity`. Checking for the AOSP name alone
+gives `Activity class ... does not exist` and invites the wrong conclusion that
+the app has no API handler at all.
+
+Read the manifest rather than guessing:
 
 ```zsh
-termux_alarm_component='com.android.deskclock/com.android.deskclock.AlarmClock' \
-    tealy-alarm 7:30 'wake up'
+pkg install aapt
+apk="$(pm path com.android.deskclock | sed 's/^package://')"
+aapt dump xmltree "$apk" AndroidManifest.xml | grep -B40 SET_ALARM
 ```
 
-A pinned component cannot hit a chooser, and if the class ever disappears the
-call fails loudly with exit 2 and `Activity class ... does not exist`, rather
-than failing silently. The tradeoff is that it stops following the default clock
-app and has to be corrected by hand if the clock app changes. Note also that
-pinning the main clock activity, rather than a dedicated no-display API handler,
-means `am` reports `intent has been delivered to currently running top-most
-instance` when the clock app is already open, and handling of that is up to the
-app.
+The activity whose `intent-filter` lists `android.intent.action.SET_ALARM` is
+the one to pin. On this phone a single activity declares `SET_ALARM`,
+`SET_TIMER`, `DISMISS_ALARM` and `SHOW_ALARMS` together.
 
-Exit codes are worth reading precisely. Exit 2 with `Activity class ... does not
-exist` means a wrong or filtered component. Exit 1 with `unknown error code 102`
-means Android blocked a background activity launch. Exit 0 means an activity
-started, which is **not** the same as an alarm having been created.
+### Reading exit codes precisely
+
+Exit 2 with `Activity class ... does not exist` means a wrong or filtered
+component. Exit 1 with `unknown error code 102` means Android blocked a
+background activity launch. Exit 0 means an activity started, which is **not**
+the same as an alarm having been created.
+
+The warning `Activity not started, intent has been delivered to currently
+running top-most instance` appears when the target activity is already
+foregrounded. A no-display API handler does not produce it; the launcher
+activity does, which is a useful hint that the wrong component is pinned.
 
 ## What is not supported
 
 Alarms cannot be listed. Android exposes no read API; the only related intent is
 `SHOW_ALARMS`, which merely opens the clock app's UI.
 
-Alarms cannot be removed. `DISMISS_ALARM` was tested with the `android.label`,
-`android.next`, `android.all` and `android.time` search modes, and with an
-explicit component. Every one returns `START_SUCCESS` and removes nothing. The
-clock app on the phone this was developed against is a vendor fork that reuses
-the AOSP package name `com.android.deskclock` while omitting
-`com.android.deskclock.HandleApiCalls`, the AOSP class that implements the
-`AlarmClock` API contract, which is the likely reason. Since `am`'s exit code
-cannot distinguish "dismissed" from "ignored", no dismiss function is provided:
-it could only ever pretend to work. Delete alarms in the clock app.
+Alarms cannot be dismissed or deleted. This was tested exhaustively: every
+search mode (`android.label`, `android.next`, `android.all`, `android.time`),
+against both the API handler and the launcher activity, and via implicit
+resolution. All return `START_SUCCESS` and remove nothing.
+
+The reason is visible in the clock app's own bytecode. Unpack its dex files and
+count the API strings:
+
+```zsh
+apk="$(pm path com.android.deskclock | sed 's/^package://')"
+unzip -o -q -j "$apk" 'classes*.dex' -d dex
+for pat in android.intent.extra.alarm.SEARCH_MODE android.all android.next \
+           android.time android.intent.extra.alarm.SKIP_UI ; do
+    printf '%s -> %s\n' "$pat" "$(cat dex/*.dex | grep -a -c -- "$pat")"
+done
+```
+
+`SEARCH_MODE` occurs zero times, as do all four of its values, while `SKIP_UI`
+and `MESSAGE` occur once each. The app implements the set path and simply never
+reads the extra that says *which* alarm to dismiss, so no combination of
+arguments can work. `DISMISS_ALARM` does appear, which suggests it may dismiss an
+alarm that is currently ringing, since that requires no search; that is useless
+for clearing entries from a list.
+
+Declaring an intent filter is therefore not evidence of implementing it. This
+app's manifest advertises `DISMISS_ALARM` while its code cannot act on it.
+
+Delete alarms in the clock app.
 
 `termux-notification-list` hangs unless notification access has been granted
 separately, so nothing here depends on it.
