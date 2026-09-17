@@ -108,6 +108,15 @@ Known conversion problems and their filters are documented per-issue:
 =Learning German ^_^= sections my LLM instructions append: the =md2org=-path
 one for single answers, and the standalone one for conversation exports.
 
+* arXiv downloads
+
+[[agfi:arxiv-dl]] fetches PDFs from =export.arxiv.org= first and falls back to
+the =arxiv.org= mirror, because export currently answers 406 on a cache miss and
+truncates the PDFs it does serve. =./docs/arxiv-export-pdf.md= has the
+measurements, and the two curl traps behind the same exit code 22: a default
+=--continue-at -= getting a 416 on an already complete file, and =retry= being
+unlimited where a bounded =retry-limited= is wanted.
+
 * Codex
 
 =codex_status.py= notes are tracked in =./docs/codex_status.md=, including the
