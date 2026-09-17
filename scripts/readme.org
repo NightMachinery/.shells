@@ -194,6 +194,16 @@ with a bounded, cancellable wait; desktop and plain mobile paste are unchanged.
 Termux does not answer OSC 52 clipboard queries; its Paste action works through
 the existing terminal connection without a reverse SSH connection.
 The deferred receiver design is in =./.docs/plans/clipboard-listener.md=.
+
+=tealy-alarm TIMESPEC [MESSAGE]= sets an alarm in the phone's own clock app over
+SSH, so it rings through Doze and silent mode and survives Termux being killed;
+the generic helper is =h-termux-alarm-set HOST=. =tealy-timer=, =tealy-notify=
+and =tealy-toast= round out the set. The hour is resolved on the phone against
+Android's system timezone, not either shell's =TZ=. An alarm that silently never
+appears means the =SET_ALARM= intent hit an invisible app-chooser dialog; that
+failure reports success from every angle, and is explained along with the
+unsupported operations in =./docs/remote-termux-alarms.md=.
+
 =emc-mobile-tmux= hosts that frame in a tmux session named =emacs-mobile=, so its
 tty outlives the connection instead of dying with it, and reattaches to it later.
 =emc-tealy-tmux= does the same in a separate =emacs-tealy= session.
