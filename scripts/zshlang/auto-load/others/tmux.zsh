@@ -464,3 +464,76 @@ aliasfn tnameme-on tmux-session-autoname on
 aliasfn tnameme-off tmux-session-autoname off
 aliasfn tnameme-status tmux-session-autoname status
 ##
+#: A tmux session used as a long-running job: start it once, stop it, ask after it.
+#:
+#: [agfi:tmuxnewsh2] alone will not do, because [agfi:tmuxnew] KILLS an existing session
+#: of that name before creating the new one. For a scratch shell that is the right
+#: default; for a job it means re-running the start command silently takes down work that
+#: was in flight, and you find out later, from output that never arrived.
+#:
+#: `has-session` is not a liveness test either: with remain-on-exit set, a session whose
+#: process has died stays listed with a dead pane and has-session still says yes. So the
+#: running test asks the panes, and start treats a corpse as absent rather than as a
+#: conflict.
+#:
+#: Targets are written `=name`, tmux's exact match: without it, `foo` also selects a
+#: session named `foobar`.
+##
+function tmux-job-running-p {
+    local name="$1"
+    assert-args name @RET
+
+    command tmux has-session -t "=${name}" &>/dev/null || return 1
+    local dead
+    dead="$(command tmux list-panes -t "=${name}" -F '#{pane_dead}' 2>/dev/null)" || return 1
+    #: one line per pane; a single live pane is enough to call the job running
+    [[ "$dead" == *0* ]]
+}
+
+function tmux-job-start {
+    local name="$1" ; shift
+    assert-args name @RET
+    (( $# )) || { ecerr "$0: ${name}: no command given" ; return 1 }
+
+    if tmux-job-running-p "$name" ; then
+        ecerr "$0: ${name} is already running; tmux-job-status ${name}, or tmux-job-stop ${name} first"
+        return 1
+    fi
+    command tmux kill-session -t "=${name}" &>/dev/null || true #: a corpse is not a job
+
+    tmuxnewsh2 "$name" "$@" @RET
+    ecgray "$0: started ${name}"
+}
+
+function tmux-job-stop {
+    local name="$1"
+    assert-args name @RET
+
+    if ! command tmux has-session -t "=${name}" &>/dev/null ; then
+        ecgray "$0: ${name}: nothing to stop"
+        return 0
+    fi
+    #: With their children: killing only the pane's own process leaves a grandchild rsync
+    #: or ssh running against the files the next start will expect to own.
+    tmux-session-processes-kill "$name"
+    command tmux kill-session -t "=${name}" &>/dev/null || true
+    ecgray "$0: stopped ${name}"
+}
+
+function tmux-job-status {
+    local name="$1"
+    assert-args name @RET
+
+    if tmux-job-running-p "$name" ; then
+        local pids
+        pids="$(command tmux list-panes -t "=${name}" -F '#{pane_pid}' 2>/dev/null | command tr '\n' ' ')"
+        ec "${name}: running (pane pid ${pids% })"
+    elif command tmux has-session -t "=${name}" &>/dev/null ; then
+        ec "${name}: DEAD, session kept by remain-on-exit; a start will clear it"
+        return 1
+    else
+        ec "${name}: not running"
+        return 1
+    fi
+}
+##
