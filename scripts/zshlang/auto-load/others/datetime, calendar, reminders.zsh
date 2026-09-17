@@ -536,13 +536,19 @@ function unix2human {
 
 Print EPOCH the way [agfi:now] prints the current moment, dropping the date when
 EPOCH falls on today. A time later the same day is then just a clock time, while
-anything further out carries its full jalali and gregorian date."
+anything further out carries its full jalali and gregorian date.
+
+Set unix2human_sec=n to drop the seconds, for callers whose resolution is only
+a minute anyway and would otherwise imply a precision they do not have."
 
     local u="${1}"
     assert-args u @RET
 
+    local fmt='%H:%M:%S'
+    bool "${unix2human_sec:-y}" || fmt='%H:%M'
+
     local t
-    t="$(gdate -d "@${u}" +'%H:%M:%S')" @RET
+    t="$(gdate -d "@${u}" +"$fmt")" @RET
 
     if [[ "$(gdate -d "@${u}" +'%F')" == "$(gdate +'%F')" ]] ; then
         ec "$t"
