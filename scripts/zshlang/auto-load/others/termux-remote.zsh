@@ -96,7 +96,7 @@ printf "%ss\n" "$timer_seconds"
 function h-termux-alarm-set {
     : "usage: h-termux-alarm-set HOST TIMESPEC [MESSAGE...]
 
-Set an alarm in HOST's clock app. TIMESPEC is anything [agfi:datenat-v2]
+Set an alarm in HOST's clock app. TIMESPEC is anything [agfi:datenat-unix-v2]
 accepts: compact durations like 1h30m, 90m or '1h:30m later', and prose like
 '7:30', 'tomorrow 8am', 'in 3 hours' or 'next friday 9am'.
 
@@ -105,12 +105,18 @@ renders into a wall-clock hour and minute against Android's *system* timezone.
 An epoch is unambiguous, so a disagreement between this machine's timezone and
 the phone's cannot shift the alarm. Override the rendering zone with alarm_tz.
 
+The resolved time is printed before the intent is sent, so a misparse can be
+aborted with ctrl-c. Set termux_alarm_dryrun=y to stop there and send nothing,
+which is how to check a spec without leaving an alarm behind: alarms cannot be
+removed programmatically.
+
 SET_ALARM carries only an hour and a minute, so Android schedules the next
 occurrence; a time already past today rolls over to tomorrow by itself.
 
-Set termux_alarm_component to pin the receiving activity, e.g.
-'com.android.deskclock/com.android.deskclock.AlarmClock'. Left empty the intent
-is implicit and follows the phone's default clock app."
+Set termux_alarm_component to pin the receiving activity, which must be the one
+declaring the SET_ALARM filter: pinning a launcher activity instead succeeds and
+silently discards the extras. Left empty the intent is implicit and follows the
+phone's default clock app."
 
     local host="${1}" spec="${2}" msg="${@[3,-1]}"
     if (( $# < 2 )) || [[ -z "$spec" ]] ; then
@@ -119,7 +125,17 @@ is implicit and follows the phone's default clock app."
     fi
 
     local epoch
-    epoch="$(datenat-v2 "$spec")" @RET
+    epoch="$(datenat-unix-v2 "$spec")" @RET
+
+    #: Printed before the intent goes out, so a misparse can be caught with
+    #: ctrl-c rather than discovered when the alarm does not ring. This is local
+    #: wall-clock time; the line HOST prints afterwards is its own rendering, and
+    #: the two differ only when the machines disagree about the timezone.
+    ecgray "$0: $(unix2human "$epoch")"
+
+    if bool "${termux_alarm_dryrun}" ; then
+        return 0
+    fi
 
     local tz="${alarm_tz}"
     local component="${termux_alarm_component}"
