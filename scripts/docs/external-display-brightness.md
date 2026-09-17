@@ -81,6 +81,11 @@ Unlike the blanking family, contrast gets no selector-suffixed forms (no
 `contrast-set` takes its value first, so the suffix would sit where the value
 goes. Use `contrast-set 0.5 all`.
 
+**hyper+ctrl+F1/F2** steps it from the keyboard, the way hyper+F1/F2 steps
+brightness, with the same coalescing and the same band: see "The level band"
+below, and "Why contrast is on ctrl" in `hammerspoon/docs/hammerspoon.md` for
+why that modifier and not alt.
+
 Contrast matters more than it looks, because blanking floors it: see "Blanking"
 below. A blackout that ends without restoring contrast leaves a washed-out
 panel that `brightness-set` cannot fix, because brightness is not the axis that
@@ -428,11 +433,19 @@ A lock on its own would turn a one-second key hold into twenty seconds of
 queue, at ~600ms per locked `chg`, so the presses are coalesced at the source
 as well.
 
-## The brightness band
+## The level band
 
-hyper+F1/F2 put an alert-v2 band on every screen showing where the level is
-heading. The coalescing above had to be written regardless, and once
-Hammerspoon is accumulating the delta it may as well say what it did.
+hyper+F1/F2 (brightness) and hyper+ctrl+F1/F2 (contrast) put an alert-v2 band on
+every screen showing where the level is heading. The coalescing above had to be
+written regardless, and once Hammerspoon is accumulating the delta it may as
+well say what it did.
+
+Everything in this section is written in terms of brightness because that is
+where it was measured, but it is one implementation: `levelStepperNew` in
+`hammerspoon/core/level-stepper.lua`, instantiated once per axis. Contrast rides
+the same DDC bus under the same lock, so it gets the same accumulator, the same
+trust window, the same clamp and the same band, with `contrast-inc` /
+`contrast-get` in place of the brightness pair.
 
 The dispatch keeps exactly one garden call in flight. Presses arriving during a
 flight accumulate and leave as a single larger delta, so the total always
@@ -496,10 +509,17 @@ but these keys deliberately leave hyper entered so the level can be stepped
 repeatedly, which meant the peek faded the one band the keypress exists to
 show. See "Bands that must not fade" in `hammerspoon/docs/hammerspoon.md`.
 
-The knobs are globals in the usual `x = x or default` style:
-`hyper_brightness_step`, `hyper_brightness_band_seconds`,
-`hyper_brightness_bar_cells` and `hyper_brightness_trust_seconds`. Their values
-live in `hammerspoon/core/window-media-bindings.lua` and are not repeated here.
+The knobs are globals, one set per axis, seeded at load and read again on every
+press so a console edit takes effect on the next keystroke rather than on the
+next reload:
+
+    hyper_brightness_step           hyper_contrast_step           0.01
+    hyper_brightness_band_seconds   hyper_contrast_band_seconds   1.5
+    hyper_brightness_bar_cells      hyper_contrast_bar_cells      20
+    hyper_brightness_trust_seconds  hyper_contrast_trust_seconds  3
+
+The defaults live in `hammerspoon/core/level-stepper.lua`; the two instances are
+constructed in `hammerspoon/core/window-media-bindings.lua`.
 
 ## Install
 

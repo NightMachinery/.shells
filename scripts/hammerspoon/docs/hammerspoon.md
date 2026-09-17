@@ -602,9 +602,10 @@ extension's internals — fragile, and for nothing: v1 is down to a `require` in
 
 An alert raised with `peek = false` is exempt: `AlertEngine.peekAlpha` returns 1
 for as long as any such band is up. It exists for the hyper+F1/F2 brightness
-band, a case the peek could not have anticipated — those keys deliberately leave
-hyper *entered* so the level can be stepped repeatedly, so the peek was fading
-the one band the keypress exists to show.
+band and the hyper+ctrl+F1/F2 contrast one, a case the peek could not have
+anticipated — those keys deliberately leave hyper *entered* so the level can be
+stepped repeatedly, so the peek was fading the one band the keypress exists to
+show.
 
 The exemption is coarse on purpose: one exempt band holds the peek off for every
 band on screen, not only for itself. Exempting a single band would mean
@@ -646,6 +647,64 @@ without re-flashing, so a long task can heartbeat without strobing. A changed
 message does flash again. The banner always expires on its own, so an agent
 that crashes or forgets cannot leave the screen branded.
 
+## Stepping a display level
+
+hyper+F1/F2 steps brightness and hyper+ctrl+F1/F2 steps contrast. Both are
+`core/level-stepper.lua`, instantiated twice from
+`core/window-media-bindings.lua`, and both are dispatched by the chord tap in
+`core/blackout-lock.lua` rather than by `hs.hotkey`, because Carbon drops these
+presses like it drops the blackout chords.
+
+The stepper exists because the keys outrun the bus they drive. One DDC
+operation costs 200-380ms on this panel and a locked `chg` is a read plus a
+write, so about 600ms; key repeat is about 30ms. One detached job per press
+overlapped them ten to one, and unserialised DDC does not lose steps so much as
+invent them: ten concurrent decrements once measured *one step brighter* than
+they started. `h-ddc-lock-do` in `system.zsh` fixed the corruption, but a lock
+on its own turns a one-second key hold into twenty seconds of queue.
+
+So presses are coalesced at the source. One garden call is in flight at a time;
+presses arriving during a flight accumulate into a pending delta and leave as a
+single larger one, so the total always matches what was pressed while the number
+of round trips stays proportional to *time* rather than to keystrokes. The call
+asks for the new level in the same breath, which costs nothing extra and makes
+the optimistic level self-correcting after every flush rather than drifting.
+
+Brightness and contrast are one instance each because they are the same problem
+on the same bus under the same lock: every measurement above was taken against
+the bus, not against either axis. The knobs are per instance and live-editable
+from the console, read at press time rather than at load:
+
+    hyper_brightness_step           hyper_contrast_step           0.01
+    hyper_brightness_band_seconds   hyper_contrast_band_seconds   1.5
+    hyper_brightness_bar_cells      hyper_contrast_bar_cells      20
+    hyper_brightness_trust_seconds  hyper_contrast_trust_seconds  3
+
+`trust_seconds` is how long a reading off the panel is worth believing. The
+cache is authoritative only until something else writes, and three other things
+do: `brightness-auto-loop` on a 3s cycle, `display-black-on-loop` on a 5s one,
+and the monitor's own buttons, which we cannot see at all. Past it the band
+shows an ellipsis rather than a stale number. The reply is ~600ms behind the
+press, and being briefly uninformative beats being briefly wrong.
+
+### Why contrast is on ctrl
+
+Chosen on a live test: ctrl+F1 and ctrl+F2 do nothing on this machine. On paper
+they should. Entries 12 (turn full keyboard access on/off) and 7 (move focus to
+the menu bar) in `com.apple.symbolichotkeys.plist` are both still marked
+`enabled`, on keycodes 122 and 120 with mask `0x840000`.
+
+That `0x800000` is not the fn key. There is no fn key here: `hidutil` maps
+`0xFF00000003` (fn/globe) to `0x70000006D` (F18), which is the hyper toggle. It
+is the tag macOS puts on every function-key event, which is exactly what
+`chordFor` records measuring: "every F-key press here carries it, successes
+included". So an ordinary ctrl+F1 satisfies both masks, and the likeliest
+explanation for their inertness is that Full Keyboard Access moved to its own
+Accessibility control and left those entries dead.
+
+If one ever wakes up, nothing binds F1 or F2 with alt, and the chord is defined
+in exactly one place: the ctrl branch in `chordFor`.
+
 ## Blackout keyboard lock
 
 `core/blackout-lock.lua` makes a blacked-out screen deaf as well as dark.
@@ -675,6 +734,13 @@ leaves it up; and F1 with cmd *alone* while hyper mode is entered, which locks
 the macOS session on the spot and leaves the blackout up as well. Those last
 two are the inputs the lock passes that do not end the blackout, and neither
 can do anything but make the way out stricter.
+
+The contrast keys, hyper+ctrl+F1/F2, are deliberately *not* among them, for the
+same reason the brightness keys are not: a screen that has been blacked must
+not be adjustable from the outside any more than it is readable. They are
+dropped by falling through the lock tap's `not flags.alt and not flags.ctrl`
+guard rather than by a rule of their own, which is easy to read as an
+oversight, so the guard says so in a comment.
 
 Passed is not the same as delivered. The lock tap merely declines to drop those
 four; the chord tap below swallows the three chords itself, so none of them
@@ -747,9 +813,10 @@ exercises the rule, but it moves no window and types into nothing.
 Two taps are in play during a blackout, and they do different jobs. The lock
 tap above only ever decides what to *drop*. The chord tap is separate: it runs
 whenever hyper mode is entered, black screen or not, and it is what actually
-dispatches hyper+shift+F1, hyper+cmd+shift+F1, hyper+cmd+F1, hyper+shift+F2 and
-the bare hyper+F1/F2 brightness keys, because Carbon drops those presses — see
-"When a hyper chord does nothing" below. Since a tap that deletes an event hides
+dispatches hyper+shift+F1, hyper+cmd+shift+F1, hyper+cmd+F1, hyper+shift+F2,
+the bare hyper+F1/F2 brightness keys and the hyper+ctrl+F1/F2 contrast ones,
+because Carbon drops those presses — see "When a hyper chord does nothing"
+below. Since a tap that deletes an event hides
 it from every tap after it, the order macOS calls them in must not change the
 outcome, so the chord tap repeats the lock's own rule rather than relying on
 it: while the lock is up, the only chords that do anything are the one that

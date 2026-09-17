@@ -429,6 +429,11 @@ local function handleEvent(event)
             if keyCode == kEscapeKeyCode and flags.shift then
                 return false
             end
+            --- ctrl is the contrast chord and alt is nothing, and both stay
+            --- on the deny side of this guard on purpose: a black screen must
+            --- not be adjustable from the outside any more than it is
+            --- readable. Falling through to the `return true' below is what
+            --- drops them, so this reads as an omission unless said out loud.
             if not flags.alt and not flags.ctrl then
                 if flags.shift then
                     if keyCode == kBlackKeyCode and flags.cmd then
@@ -828,8 +833,10 @@ end
 ---
 --- A dropped blackout leaves the screen lit; a dropped escape chord leaves a
 --- locked keyboard in front of a lit screen; a dropped brightness step is
---- merely irritating, and was reported independently. All four now take the
---- delivery path this module already trusts for the lock itself.
+--- merely irritating, and was reported independently. All of them now take the
+--- delivery path this module already trusts for the lock itself, the
+--- hyper+ctrl+F1/F2 contrast pair included -- it is the same two keycodes on
+--- the same tap, so it would be dropped the same way.
 ---
 --- A side effect worth keeping: nothing modal binds bare F1/F2 any more, which
 --- is what used to shadow STT's globals on every hyper transition and fill the
@@ -864,6 +871,26 @@ local function chordFor(keyName, flags)
     --- since there the modifiers are what tells the rungs apart.
     if keyName == "f2" and flags.shift then return "restore" end
 
+    --- Contrast, on ctrl. Placed after the escape above so the way out of a
+    --- blackout keeps winning over everything, and before the blanket reject
+    --- below, which is what used to drop these.
+    ---
+    --- ctrl rather than alt was chosen on a live test: ctrl+F1 and ctrl+F2 do
+    --- nothing on this machine today. On paper they should -- entries 12 (full
+    --- keyboard access) and 7 (focus the menu bar) in
+    --- com.apple.symbolichotkeys.plist are both still `enabled', on keycodes
+    --- 122 and 120 with mask 0x840000, and that 0x800000 is not the fn key
+    --- (there is none here; hidutil maps fn to F18, the hyper toggle) but the
+    --- tag macOS puts on every function-key event, which is exactly what the
+    --- note below records. They appear to be dead entries left behind when Full
+    --- Keyboard Access moved to its own Accessibility control. If one ever
+    --- wakes up, alt binds nothing on F1/F2 and this is where to move it.
+    if flags.ctrl and not flags.alt and not flags.shift and not flags.cmd then
+        if keyName == "f1" then return "contrast-dec" end
+        if keyName == "f2" then return "contrast-inc" end
+        return nil
+    end
+
     if flags.alt or flags.ctrl then return nil end
 
     if flags.shift then
@@ -879,10 +906,10 @@ local function chordFor(keyName, flags)
     --- later may be a stranger.
     ---
     --- Without cmd: the brightness keys, dispatched here for the same reason
-    --- -- they get dropped too. Swallowed rather than passed on, so that
-    --- nothing downstream can claim them: hyper+F1 meant dictation for as long
-    --- as STT bound the bare keys globally, and the next binder would collide
-    --- the same way.
+    --- -- they get dropped too, and so is the contrast pair above. Swallowed
+    --- rather than passed on, so that nothing downstream can claim them:
+    --- hyper+F1 meant dictation for as long as STT bound the bare keys
+    --- globally, and the next binder would collide the same way.
     if flags.cmd then
         if keyName == "f1" then return "black-lock-now" end
         return nil
@@ -904,9 +931,10 @@ local kChordRung = {
 
 --- The blackout chords are one-shot and leave the mode, exactly as an
 --- auto-trigger hs.hotkey binding did -- the two cmd ones included when they
---- only act on a blackout already up rather than starting one. The brightness
---- keys deliberately do not: holding hyper and stepping the level repeatedly
---- is the point, which is why they were bound with auto_trigger_p=false.
+--- only act on a blackout already up rather than starting one. The level keys,
+--- brightness and contrast alike, deliberately do not: holding hyper and
+--- stepping repeatedly is the point, which is why they were bound with
+--- auto_trigger_p=false.
 local kChordExitsMode = {
     ["black"] = true,
     ["black-lock-first"] = true,
@@ -941,6 +969,12 @@ local function runChordNow(chord)
         blackoutLockNow()
     elseif kChordRung[chord] then
         if blackoutChordBegin then blackoutChordBegin(chord == "black-lock-first", false) end
+    elseif chord == "contrast-dec" or chord == "contrast-inc" then
+        --- Explicit, and before the brightness arm below, which is a catch-all:
+        --- anything reaching it is assumed to be a brightness step.
+        if hyperContrastStep then
+            hyperContrastStep(chord == "contrast-dec" and "dec" or "inc")
+        end
     elseif hyperBrightnessStep then
         hyperBrightnessStep(chord == "brightness-dec" and "dec" or "inc")
     end
@@ -1128,7 +1162,7 @@ local function handleChordEvent(event)
     if not keyName then return false end
 
     local chord = chordFor(keyName, event:getFlags())
-    --: Bare F1/F2 are the brightness keys, and they stay on hs.hotkey.
+    --: Anything with no chord of its own is left alone entirely.
     if not chord then return false end
 
     --- While the lock is up three chords still do something: the one that
