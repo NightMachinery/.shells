@@ -45,14 +45,28 @@ shown by `unix2human`, which drops the date when the alarm falls on today:
 
 ```zsh
 $ tealy-alarm 1h30m 'tea'
-h-termux-alarm-set: 18:50:36
+alarm @ tealy: 18:50
 $ tealy-alarm 'tomorrow 8am' 'standup'
-h-termux-alarm-set: 1405/Shahrivar6/27 Friday 18/September9/2026 08:00:00
+alarm @ tealy: 1405/Shahrivar6/27 Friday 18/September9/2026 08:00
 ```
 
-`termux_alarm_dryrun=y` stops after that line and sends nothing. Use it to check
-a spec: alarms cannot be removed programmatically, so a careless test leaves
-something that will ring.
+Seconds are dropped because `SET_ALARM` carries only an hour and a minute, so
+showing them would imply a precision the alarm does not have. With `alarm_tz`
+the time is rendered in that zone and the zone is named, since it is then not
+this machine's: `alarm @ tealy [Asia/Tehran]: ... 22:24`.
+
+That one line is the whole output. The phone stays silent on success rather than
+echoing the time back, and speaks only when its own rendering disagrees:
+
+```
+termux-alarm: phone set 18:24 (Europe/Berlin), not 99:99 as shown locally
+```
+
+which happens when the two machines disagree about the timezone.
+
+`termux_alarm_dryrun=y` stops after the local line and sends nothing. Use it to
+check a spec: alarms cannot be removed programmatically, so a careless test
+leaves something that will ring.
 
 `datenat-unix-v2` tries two parsers in a deliberate order:
 
