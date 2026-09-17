@@ -74,7 +74,12 @@ if [ "$rc" -ne 0 ] ; then
     printf "%s\n" "$out" >&2
     exit "$rc"
 fi
-printf "%02d:%02d %s\n" "$h" "$m" "$tz"
+#: Silent on success. The local side already printed the time; repeating it
+#: here is noise, except in the one case that matters, where this phone renders
+#: the epoch differently because the two machines disagree about the timezone.
+if [ -n "$alarm_expect_hm" ] && [ "$alarm_expect_hm" != "$h:$m" ] ; then
+    printf "%s\n" "termux-alarm: phone set $h:$m ($tz), not $alarm_expect_hm as shown locally" >&2
+fi
 '
 
 typeset -g h_termux_timer_script='
@@ -131,13 +136,40 @@ phone's default clock app."
     #: ctrl-c rather than discovered when the alarm does not ring. This is local
     #: wall-clock time; the line HOST prints afterwards is its own rendering, and
     #: the two differ only when the machines disagree about the timezone.
-    ecgray "$0: $(unix2human "$epoch")"
+    local tz="${alarm_tz}"
+
+    local expect_hm
+    if [[ -n "$tz" ]] ; then
+        expect_hm="$(TZ="$tz" gdate -d "@${epoch}" +'%-H:%-M')" @RET
+    else
+        expect_hm="$(gdate -d "@${epoch}" +'%-H:%-M')" @RET
+    fi
+
+    local label="alarm @ ${host}"
+    if [[ -n "$tz" ]] ; then
+        #: name the zone, since it is then not this machine's
+        label+=" [${tz}]"
+    fi
+    if bool "${termux_alarm_dryrun}" ; then
+        label+=" (dry run)"
+    fi
+
+    #: Rendered in the same zone the phone will use, or this machine's when
+    #: none is forced; showing local time for an alarm_tz alarm would name an
+    #: hour the phone is never going to ring at. Seconds dropped because
+    #: SET_ALARM carries only an hour and a minute.
+    local human
+    if [[ -n "$tz" ]] ; then
+        human="$(TZ="$tz" unix2human_sec=n unix2human "$epoch")" @RET
+    else
+        human="$(unix2human_sec=n unix2human "$epoch")" @RET
+    fi
+    ecgray "${label}: ${human}"
 
     if bool "${termux_alarm_dryrun}" ; then
         return 0
     fi
 
-    local tz="${alarm_tz}"
     local component="${termux_alarm_component}"
     local skip_ui="${termux_alarm_skip_ui:-true}"
     local vibrate="${termux_alarm_vibrate:-true}"
@@ -145,6 +177,7 @@ phone's default clock app."
     h-termux-ssh "$host" "env \
 alarm_tz=$(gquote-sq "$tz") \
 alarm_epoch=$(gquote-sq "$epoch") \
+alarm_expect_hm=$(gquote-sq "$expect_hm") \
 alarm_msg=$(gquote-sq "$msg") \
 alarm_component=$(gquote-sq "$component") \
 alarm_skip_ui=$(gquote-sq "$skip_ui") \
