@@ -96,29 +96,45 @@ function rem-comingup-v1 {
 }
 ###
 function dur2sec {
-    : "converts 90s, 30m, 2h, 3d or a bare seconds count to seconds
+    : "converts a duration to seconds: a bare seconds count, a single unit like
+90s, 30m, 2h, 3d, or a chain like 1h30m, '1h 30m' or 1h:30m:0s.
 
-The inverse of [agfi:seconds-fmt-short]. Lives here rather than in whichever
-module first needed it, so the next one does not write a fourth copy."
+The inverse of [agfi:seconds-fmt-short] and [agfi:seconds-fmt], which emit
+exactly that chained colon-separated form, so their output can be fed back in.
+Units are w d h m s; m is always minutes, never months. Lives here rather than
+in whichever module first needed it, so the next one does not write a fourth
+copy."
+
+    setopt local_options extended_glob
+
     local d="${1}"
     assert-args d @RET
 
-    local n="${d%[smhd]}" unit="${d##*[0-9]}"
-    if [[ "$n" != <-> ]] ; then
-        ectrace "$0: bad duration: ${d}"
-        return 1
+    local c="${${d//[[:space:]]/}//:/}"
+    if [[ "$c" == <-> ]] ; then
+        ec "$c"
+        return 0
     fi
 
-    case "$unit" in
-        d) ec $(( n * 86400 )) ;;
-        h) ec $(( n * 3600 )) ;;
-        m) ec $(( n * 60 )) ;;
-        s|'') ec "$n" ;;
-        *)
-            ectrace "$0: bad duration unit: ${d}"
+    local rest="${c:l}" n u
+    local -i total=0
+    while [[ -n "$rest" ]] ; do
+        if [[ "$rest" != (#b)(<->)([wdhms])(*) ]] ; then
+            ectrace "$0: bad duration: ${d}"
             return 1
-            ;;
-    esac
+        fi
+        n="$match[1]" ; u="$match[2]" ; rest="$match[3]"
+
+        case "$u" in
+            w) total+=$(( n * 604800 )) ;;
+            d) total+=$(( n * 86400 )) ;;
+            h) total+=$(( n * 3600 )) ;;
+            m) total+=$(( n * 60 )) ;;
+            s) total+=$(( n )) ;;
+        esac
+    done
+
+    ec "$total"
 }
 ##
 function seconds-fmt-short() {
@@ -488,6 +504,58 @@ function datenat {
     #: one, so this pastes into an Excel cell without spilling into the next.
     ecn "${out}" | cat-copy-if-tty
 }
+#: [agfi:dur2sec] with the conversational wrapping people actually type.
+function h-dur-nat2sec {
+    : "usage: h-dur-nat2sec TEXT
+
+Print TEXT as seconds when it is a pure duration, and return 1 when it is not.
+Accepts 'in 1h30m', '1h 30m later', '1h:30m:0s from now', 90m.
+
+Exists because chrono, behind [agfi:datenat], cannot read compact durations at
+all and misreads some of them *silently*: '1h:30m later' comes back as 30
+minutes. So durations must be claimed before chrono ever sees them."
+
+    setopt local_options extended_glob
+
+    local t="${${1:l}##[[:space:]]#}"
+    t="${t%%[[:space:]]#}"
+    t="${t##in[[:space:]]##}"
+    t="${t%%[[:space:]]##later}"
+    t="${t%%[[:space:]]##from[[:space:]]##now}"
+
+    local c="${${t//[[:space:]]/}//:/}"
+    c="${c#[+]}"
+    #: gate first, so a non-duration does not reach dur2sec and print a traceback
+    [[ -n "$c" && "$c" == -#(<->[wdhms])## ]] || return 1
+
+    dur2sec "$c"
+}
+
+function datenat-v2 {
+    : "usage: datenat-v2 SPEC...
+
+Print the unix timestamp for SPEC. Handles compact durations (1h30m, 90m, 3h,
+'1h:30m later', 1w2d3h) and everything [agfi:datenat] handles (tomorrow 8am,
+next friday 9am, in 3 hours, 7:30).
+
+Durations are tried first and deliberately so: chrono silently misreads
+'1h:30m later' as 30 minutes, and a plausible wrong time is worse than an
+error. Fails loudly when neither parser claims the input."
+
+    local inargs
+    in-or-args2 "$@" @RET
+    local text="${inargs[*]}"
+
+    local secs
+    if secs="$(h-dur-nat2sec "$text")" ; then
+        ec $(( EPOCHSECONDS + secs ))
+        return 0
+    fi
+
+    datenat_unix=y datenat "$text"
+}
+aliasfn datenat-v2-future datenat_nopast=y datenat-v2
+##
 aliasfn datenat-future datenat_nopast=y datenat
 aliasfn datenat-unix datenat_unix=y datenat
 aliasfn datenat-future-unix datenat_nopast=y datenat_unix=y datenat
