@@ -842,6 +842,28 @@ function bella_zsh_disable1 {
 function bell-zsh-start {
     if ai-agent-p ; then
         #: Skip the startup bell for shells spawned by AI agents (Claude Code, Codex, ...) — they start many shells.
+        #: Returning before the log, too: agent shells would otherwise swamp it.
+        return 0
+    fi
+
+    #: A shell nobody is looking at must not ring. [agfi:human-interactive-p]
+    #: is the gate; a skipped shell is still logged, since those are rare and
+    #: the log is what makes the next stray bell diagnosable.
+    local skip=''
+    human-interactive-p || skip='not human-interactive'
+
+    #: log starting script and invocation
+    {
+        ec $'\n'"--- $(now) "
+        print -r -- "zsh:    $(ps -ww -o command= -p $$)"
+        print -r -- "parent: $(ps -ww -o command= -p $PPID)"
+        [[ -n $ZSH_EXECUTION_STRING ]] &&
+            print -r -- "exec:   ${(q)ZSH_EXECUTION_STRING}"
+        [[ -n $skip ]] &&
+            print -r -- "skip:   $skip"
+    } >> ~/logs/bell-zsh-start 2>/dev/null || true
+
+    if test -n "$skip" ; then
         return 0
     fi
 

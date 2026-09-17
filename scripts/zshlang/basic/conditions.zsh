@@ -183,6 +183,19 @@ function isInTty {
     [ -t 0 ]
     # -t fd True if file descriptor fd is open and refers to a terminal.
 }
+
+function human-interactive-p {
+    #: Is a human actually at the other end of this shell?
+    #:
+    #: [agfi:isI] is not enough. `zsh -ic <cmd>' is interactive by every flag
+    #: zsh sets and is still a script runner; see =PE/Zsh.org=. Two things tell
+    #: it apart: it writes to no terminal once its output is captured, and zsh
+    #: sets ZSH_EXECUTION_STRING exactly when -c was used, never for a shell a
+    #: person typed into. AI agent shells are excluded too; they start many
+    #: shells, and nobody is watching any of them.
+    ##
+    ! ai-agent-p && isOutTty && test -z "${ZSH_EXECUTION_STRING}"
+}
 ##
 function isDbg {
     test -n "$DEBUGME"
