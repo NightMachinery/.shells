@@ -780,18 +780,24 @@ Resolves a selector to the matching [agfi:brightness-displays] lines.
     printf '%s\n' "$out[@]"
 }
 
-function h-brightness-dispatch {
-    : "usage: h-brightness-dispatch <selector> <get|set|inc> [<value>]
-Runs brightness-<op>-<backend> once per selected display, so each panel is
-driven through whichever API can actually reach it."
+function h-display-level-dispatch {
+    : "usage: h-display-level-dispatch <family> <selector> <get|set|inc> [<value>]
+Runs <family>-<op>-<backend> once per selected display, so each panel is driven
+through whichever API can actually reach it.
+
+\`family' is brightness or contrast. The two do not cover the same hardware:
+IOKit exposes no contrast at all, so a built-in panel has a brightness backend
+and no contrast one. Rather than keep a table of which family reaches which
+backend, the leaf is looked up by name -- absent means unsupported, and the day
+a \`contrast-set-internal' exists it starts working with no change here."
     ##
-    local sel="$1" op="$2" ; shift 2
-    assert-args sel op @RET
+    local family="$1" sel="$2" op="$3" ; shift 3
+    assert-args family sel op @RET
 
     local lines
     lines="$(h-brightness-select "$sel")" @TRET
 
-    local line ret=0
+    local line fn ret=0
     local -a f
     for line in "${(@f)lines}" ; do
         [[ -n "$line" ]] || continue
@@ -803,11 +809,27 @@ driven through whichever API can actually reach it."
             continue
         fi
 
+        fn="${family}-${op}-$f[2]"
+        if (( ! ${+functions[$fn]} )) ; then
+            local hint=''
+            [[ "$family" == contrast ]] && hint='; contrast is DDC-only, so it needs a panel reachable over DDC'
+            ecerr "$0: display $f[1] ($f[6]) has no ${family} support on backend $f[2] (no ${fn})${hint}"
+            ret=1
+            continue
+        fi
+
         #: get takes just the id; set and inc take a value first.
-        "brightness-${op}-$f[2]" "$@" "$f[3]" || ret=$?
+        "$fn" "$@" "$f[3]" || ret=$?
     done
 
     return $ret
+}
+
+function h-brightness-dispatch {
+    : "usage: h-brightness-dispatch <selector> <get|set|inc> [<value>]
+The brightness family of [agfi:h-display-level-dispatch]."
+    ##
+    h-display-level-dispatch brightness "$@"
 }
 ##
 function brightness-get-internal {
@@ -1030,6 +1052,28 @@ function contrast-set-ddc {
     silent h-m1ddc "$i" set contrast "$n"
 }
 
+function contrast-inc-ddc {
+    : "usage: contrast-inc-ddc [<delta>] [<m1ddc-display>]
+The contrast twin of [agfi:brightness-inc-ddc], and one DDC round trip for the
+same reason: m1ddc's own \`chg\` does the read-modify-write internally. The
+hyper+ctrl+F1/F2 key repeat comes through here."
+    # @appleSiliconOnly
+    ##
+    local inc="${1:-0.01}" i="${2:-1}"
+
+    assert isAppleSilicon @MRET
+    ensure-dep-m1ddc @RET
+
+    local max="${brightness_ddc_max:-100}"
+    local n
+    n="$(printf '%.0f' $((inc*max)))"
+
+    #: printf rounds a small delta to 0 (or to '-0'); skip the pointless write.
+    (( n == 0 )) && return 0
+
+    silent h-m1ddc "$i" chg contrast "$n"
+}
+
 function brightness-set-ddc {
     : "usage: brightness-set-ddc <0..1> [<m1ddc-display>]"
     # @appleSiliconOnly
@@ -1107,6 +1151,50 @@ function brightness-dec {
     local amount="${1:-0.01}" sel="${2:-${brightness_display:-main}}"
 
     brightness-inc $((amount*-1)) "$sel"
+}
+##
+#: Contrast, on the same 0..1 scale and with the same selectors as brightness.
+#: DDC-only: IOKit exposes no contrast, so a built-in panel resolves to a
+#: backend that has no contrast leaf and [agfi:h-display-level-dispatch] says
+#: so per display rather than failing the whole call.
+#:
+#: Deliberately no selector-suffixed forms (`contrast-set-all'), for the reason
+#: spelled out where the display-black ones are generated: `contrast-set' takes
+#: its value first, so the suffix would sit where the value goes.
+##
+function contrast-get {
+    : "usage: contrast-get [<selector>]
+Contrast as 0..1, one line per selected display.
+Selectors: see [agfi:h-brightness-select]."
+    ##
+    local sel="${1:-${brightness_display:-main}}"
+
+    h-display-level-dispatch contrast "$sel" get
+}
+
+function contrast-set {
+    : "usage: contrast-set <0..1> [<selector>]"
+    ##
+    local v="$1" sel="${2:-${brightness_display:-main}}"
+    assert-args v @RET
+
+    h-display-level-dispatch contrast "$sel" set "$v"
+}
+
+function contrast-inc {
+    : "usage: contrast-inc [<delta>] [<selector>]"
+    ##
+    local inc="${1:-0.01}" sel="${2:-${brightness_display:-main}}"
+
+    h-display-level-dispatch contrast "$sel" inc "$inc"
+}
+
+function contrast-dec {
+    : "usage: contrast-dec [<delta>] [<selector>]"
+    ##
+    local amount="${1:-0.01}" sel="${2:-${brightness_display:-main}}"
+
+    contrast-inc $((amount*-1)) "$sel"
 }
 ##
 #: Blanking a display takes a different route per panel, because "brightness 0"

@@ -53,10 +53,38 @@ built-in/external, name, CGDirectDisplayID:
 That last field is what `hs.screen:id()` returns, which is how blanking finds
 the right screen to gamma out.
 
-Contrast rides along on the same 0..1 scale, for external panels only:
+## Contrast
 
-    contrast-get-ddc [n]
+Contrast rides along on the same 0..1 scale, with the same selectors and the
+same shape as the brightness commands:
+
+    contrast-get     [sel]
+    contrast-set 0.5 [sel]
+    contrast-inc 0.1 [sel]
+    contrast-dec 0.1 [sel]
+
+    contrast-get-ddc [n]            # the backend leaves, by m1ddc display number
     contrast-set-ddc 0.5 [n]
+    contrast-inc-ddc 0.1 [n]
+
+It is **DDC-only**. IOKit exposes no contrast at all, so a built-in panel has a
+brightness backend and no contrast one. That is not a special case in the
+dispatch: both families go through `h-display-level-dispatch <family> <selector>
+<op>`, which looks the leaf `<family>-<op>-<backend>` up by name and reports the
+displays it cannot drive, one per line, rather than failing the whole call.
+Absent means unsupported, so the day a `contrast-set-internal` exists it starts
+working with no change to the dispatch. `h-brightness-dispatch` is now a
+one-line wrapper that passes `brightness`.
+
+Unlike the blanking family, contrast gets no selector-suffixed forms (no
+`contrast-set-all`), for the same reason `brightness-set-all` does not exist:
+`contrast-set` takes its value first, so the suffix would sit where the value
+goes. Use `contrast-set 0.5 all`.
+
+Contrast matters more than it looks, because blanking floors it: see "Blanking"
+below. A blackout that ends without restoring contrast leaves a washed-out
+panel that `brightness-set` cannot fix, because brightness is not the axis that
+moved.
 
 ## Selectors
 
