@@ -9,7 +9,7 @@
 #:
 #: WHICH paths exist, which server they are mirrored to and who may read each one are
 #: deliberately not written here, because this repository is public. They live in the
-#: deployment repository, `~/code/lilf-pages` (`site.toml`, `access.yaml`, `docs/`).
+#: deployment repository, `~/code/sites/lilf-pages` (`site.toml`, `access.yaml`, `docs/`).
 ##
 typeset -g lilf_pages_bin="${HOME}/code/skills/html-reports/skills/html-reports/bin"
 ##
