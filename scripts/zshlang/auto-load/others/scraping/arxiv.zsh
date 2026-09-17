@@ -13,6 +13,25 @@ function arxiv-unexportify {
         cat-copy-if-tty
 }
 
+function arxiv-url-alternatives {
+    #: Echoes each input URL, followed by its =arxiv.org= twin where it has one.
+    #: A no-op for URLs that are not on =export.arxiv.org=, so callers can pipe
+    #: everything through it without testing first.
+    ##
+    local urls
+    urls="$(in-or-args "$@")" @RET
+
+    local url mirror
+    for url in ${(@f)urls} ; do
+        ec "$url"
+
+        mirror="$(ec "$url" | arxiv-unexportify)" @TRET
+        if [[ "$mirror" != "$url" ]] ; then
+            ec "$mirror"
+        fi
+    done
+}
+
 function semantic-scholar-url-get {
     local urls_semantic_scholar=() doi_ids=()
     sout arxiv-url-get "$@" @TRET
@@ -203,61 +222,22 @@ function arxiv-dl {
 
 function h-arxiv-pdf-dl {
     #: Usage: $0 <url> ... <dest>
-    #: Downloads a PDF to =dest=, trying each URL in turn and falling back to
-    #: the =arxiv.org= mirror of each.
+    #: Downloads a PDF to =dest= via [agfi:curl-2dest], falling back to the
+    #: =arxiv.org= twin of each URL.
     #:
     #: =export.arxiv.org= is unreliable for =/pdf/= (seen 2026-09): a cache miss
     #: answers 406, and a cache hit truncates the body at a power-of-two
     #: boundary. See =./docs/arxiv-export-pdf.md=.
+    #:
+    #: Non-arXiv URLs are fine to pass; they simply get no fallback.
     ##
     local dest="${@[-1]}" urls=("${@[1,-2]}")
     assert-args dest urls @RET
 
-    local url mirror urls_all=()
-    for url in ${urls[@]} ; do
-        urls_all+="$url"
+    local urls_all
+    urls_all="$(arxiv-url-alternatives "${urls[@]}")" @TRET
 
-        mirror="$(ec "$url" | arxiv-unexportify)" @TRET
-        if [[ "$mirror" != "$url" ]] ; then
-            urls_all+="$mirror"
-        fi
-    done
-    urls_all=(${(u)urls_all[@]}) #: keeps the first occurrence, so the order stands
-
-    local tmp="${dest}.part"
-    local curlm_ns=''
-    isI && curlm_ns=y
-
-    local i retries retcode=1
-    for i in {1..${#urls_all}} ; do
-        url="${urls_all[$i]}"
-
-        #: Spend the retries on the last URL. A failed attempt can download
-        #: megabytes before dying, and the earlier URLs are the suspect ones.
-        retries=1
-        if (( i == ${#urls_all} )) ; then
-            retries=3
-        fi
-
-        #: =curlm_continue_p=n=: resuming an already complete file makes the
-        #: server answer 416, which =--fail= turns into exit 22. A truncated
-        #: response must not be resumed as if it were valid, either.
-        if curlm_continue_p=n reval-ec retry-limited "${retries}" curlm "$url" --output "${tmp}" ; then
-            retcode=0
-            break
-        fi
-
-        ecerr "$0: failed to download $(gq "$url")"
-    done
-
-    if (( retcode == 0 )) ; then
-        assert command mv -f -- "${tmp}" "${dest}" @RET
-    else
-        #: Leave =dest= alone when we have downloaded nothing usable.
-        command rm -f -- "${tmp}"
-    fi
-
-    return $retcode
+    curl-2dest ${(@f)urls_all} "$dest"
 }
 
 function h-arxiv-dl {
