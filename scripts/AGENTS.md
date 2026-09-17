@@ -79,7 +79,7 @@ Rules:
 BrishGarden keeps persistent zsh shells, so it does **not** see zshlang edits on
 its own. Run `brishz-restart` after changing any zsh code you intend to exercise
 through `brishz`, `brishz2.dash`, or anything driven by them (agent hooks,
-Hammerspoon bindings, iTerm triggers). Testing in a fresh `zsh -ic` proves
+Hammerspoon bindings, iTerm triggers). Testing in a fresh `zsh -c` proves
 nothing about what the garden is running.
 
 ## Hammerspoon
