@@ -199,12 +199,23 @@ multiplexing. There is nothing to batch: the cost is Android spawning a JVM to
 run `am.apk` once per alarm, and the intent dispatch inside it is only ~7ms.
 
 The helpers therefore prefer `termux-am`, which passes the intent to the running
-Termux app over a socket instead of spawning `app_process`, and fall back to `am`
-when it is unavailable. The socket lives at
-`$PREFIX/../apps/com.termux/termux-am/am.sock` and only exists on Termux app
-versions that create `files/apps`; on 0.118.1 that directory is absent, so the
-fallback is what runs and the saving is not yet realised. Nothing needs changing
-to collect it later, only a newer Termux app.
+Termux app over a socket instead of spawning `app_process`; upstream measured
+that at roughly ten times faster, since no Dalvik VM is created. They fall back
+to `am` when the socket is absent.
+
+Two socket paths are checked, because upstream moved it: `termux-am-socket`
+1.5.0 looks under `$PREFIX/../apps/com.termux/`, while newer app builds serve it
+under `$PREFIX/../apps/termux-app/`. On Termux 0.118.1 neither exists, since
+`files/apps` is not created at all, so the fallback is what runs and the saving
+is not yet realised.
+
+Collecting it means upgrading the Termux app, and that is not obviously worth
+it. F-Droid's current build is 0.119.0-beta.3, so it means moving to a beta, and
+a broken Termux takes ssh access to the phone with it. Note also that F-Droid,
+GitHub and Play Store builds are signed with different keys, so an upgrade must
+come from the same source the app was installed from; the installed versionCode
+of 1000 is F-Droid's four-digit scheme, GitHub's 0.118.1 being versionCode 118.
+Crossing sources requires uninstalling, which destroys the whole Termux prefix.
 
 ## What cannot be done
 
