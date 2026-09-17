@@ -15,11 +15,11 @@ its tmux pane, its seat), and that is how the session is found.
 
 Pick by the argument the user gave:
 
-- no argument → `zsh -ic 'agent-auto-continue-on'`
-- `--frontmost` → `zsh -ic 'agent-auto-continue-on --frontmost'` (only if the
+- no argument → `zsh -c 'agent-auto-continue-on'`
+- `--frontmost` → `zsh -c 'agent-auto-continue-on --frontmost'` (only if the
   user asked for it: it means typing wherever the keyboard focus is at the time)
-- `off` → `zsh -ic 'agent-auto-continue-off'`
-- `status` → `zsh -ic 'agent-auto-continue-status'`
+- `off` → `zsh -c 'agent-auto-continue-off'`
+- `status` → `zsh -c 'agent-auto-continue-status'`
 
 Run exactly one of them, once. Do not retry a failure with a different
 variant; report it.

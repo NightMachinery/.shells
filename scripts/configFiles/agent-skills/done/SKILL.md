@@ -57,7 +57,7 @@ timestamp: the exit command fills those in.
 Then end the session:
 
 ```sh
-zsh -ic 'agent-done' <<'SUMMARY'
+zsh -c 'agent-done' <<'SUMMARY'
 <your summary here>
 SUMMARY
 ```
@@ -69,7 +69,7 @@ once the agent is gone. The saved reports are listed by `agent-done-reports`
 and the newest is printed by `agent-done-report-last`, so nothing is lost even
 if the terminal is closed.
 
-To see what it would do without ending anything: `zsh -ic 'agent-done
+To see what it would do without ending anything: `zsh -c 'agent-done
 --dry-run'`, with the summary on stdin the same way.
 
 Expect no reply from that command. It ends the session, so its output has
