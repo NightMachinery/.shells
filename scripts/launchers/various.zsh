@@ -72,6 +72,34 @@ tmuxnew email-aggregator-bot zsh -c "API_TOKEN=${emailaggbot_api_token} DATABASE
 ##
 tmuxnew feed_updater1 env TSEND_TOKEN="${TSEND_TOKEN}" TSEND_BACKEND="${TSEND_BACKEND}" "${commands[python]}" "${commands[feed_updater1.py]}"
 ##
+#: The html-reports pages site. Two processes, both required, neither useful alone:
+#:
+#:   pages-caddy        serves ~/html-reports/site on loopback 8791. A SECOND caddy,
+#:                      separate from the serve-dl one above; `admin off` in both is what
+#:                      lets them coexist without seeing or reloading each other.
+#:   cloudflared-pages  dials OUT to Cloudflare and holds the tunnel for pages.lilf.ir
+#:                      open. This host opens no inbound port and needs no firewall
+#:                      change; the only route in is back down a connection it made.
+#:                      Cloudflare Access decides at the edge who may read which path.
+#:
+#: Start order does not matter. Caddy with no site answers 404, and the tunnel retries
+#: its origin until something answers.
+#:
+#: The site itself arrives by rsync from the laptop (`lilf-pages-push`), so a fresh
+#: server serves 404 until the first push. The guard is the Caddyfile rather than the
+#: site directory for exactly that reason: a server with the config but no content is
+#: correctly configured and waiting, not broken.
+#:
+#: Bootstrapping this from nothing: [[zf:~\[nt\]/private/configs/eva/pages/bootstrap.org]]
+if test -e "${HOME}/html-reports/Caddyfile" ; then
+    #: An absolute --config. The instance this replaced was started by hand with a
+    #: RELATIVE `--config Caddyfile`, which works only from one directory and is precisely
+    #: what a reboot forgets -- it had been running unsupervised, reparented to init, and
+    #: would not have come back.
+    tmuxnewsh2 pages-caddy caddy run --config "${HOME}/html-reports/Caddyfile" --adapter caddyfile
+    tmuxnewsh2 cloudflared-pages "${HOME}/bin/cloudflared" tunnel run
+fi
+##
 # launch-musicf.zsh
 ##
 chronic-all
