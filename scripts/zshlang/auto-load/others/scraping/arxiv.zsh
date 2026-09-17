@@ -5,6 +5,14 @@ function arxiv-exportify {
         cat-copy-if-tty
 }
 
+function arxiv-unexportify {
+    #: The inverse of [agfi:arxiv-exportify].
+    ##
+    in-or-args "$@" |
+        perl -lpe 's|^https://export\.(arxiv\.org)|https://$1|gi' |
+        cat-copy-if-tty
+}
+
 function semantic-scholar-url-get {
     local urls_semantic_scholar=() doi_ids=()
     sout arxiv-url-get "$@" @TRET
@@ -193,6 +201,65 @@ function arxiv-dl {
     return $retcode
 }
 
+function h-arxiv-pdf-dl {
+    #: Usage: $0 <url> ... <dest>
+    #: Downloads a PDF to =dest=, trying each URL in turn and falling back to
+    #: the =arxiv.org= mirror of each.
+    #:
+    #: =export.arxiv.org= is unreliable for =/pdf/= (seen 2026-09): a cache miss
+    #: answers 406, and a cache hit truncates the body at a power-of-two
+    #: boundary. See =./docs/arxiv-export-pdf.md=.
+    ##
+    local dest="${@[-1]}" urls=("${@[1,-2]}")
+    assert-args dest urls @RET
+
+    local url mirror urls_all=()
+    for url in ${urls[@]} ; do
+        urls_all+="$url"
+
+        mirror="$(ec "$url" | arxiv-unexportify)" @TRET
+        if [[ "$mirror" != "$url" ]] ; then
+            urls_all+="$mirror"
+        fi
+    done
+    urls_all=(${(u)urls_all[@]}) #: keeps the first occurrence, so the order stands
+
+    local tmp="${dest}.part"
+    local curlm_ns=''
+    isI && curlm_ns=y
+
+    local i retries retcode=1
+    for i in {1..${#urls_all}} ; do
+        url="${urls_all[$i]}"
+
+        #: Spend the retries on the last URL. A failed attempt can download
+        #: megabytes before dying, and the earlier URLs are the suspect ones.
+        retries=1
+        if (( i == ${#urls_all} )) ; then
+            retries=3
+        fi
+
+        #: =curlm_continue_p=n=: resuming an already complete file makes the
+        #: server answer 416, which =--fail= turns into exit 22. A truncated
+        #: response must not be resumed as if it were valid, either.
+        if curlm_continue_p=n reval-ec retry-limited "${retries}" curlm "$url" --output "${tmp}" ; then
+            retcode=0
+            break
+        fi
+
+        ecerr "$0: failed to download $(gq "$url")"
+    done
+
+    if (( retcode == 0 )) ; then
+        assert command mv -f -- "${tmp}" "${dest}" @RET
+    else
+        #: Leave =dest= alone when we have downloaded nothing usable.
+        command rm -f -- "${tmp}"
+    fi
+
+    return $retcode
+}
+
 function h-arxiv-dl {
     local url="${1}" #: Example: =https://arxiv.org/abs/2109.02355=
     assert-args url @RET
@@ -209,7 +276,7 @@ function h-arxiv-dl {
             dest="${title}.pdf"
         fi
 
-        revaldbg aa-2dest "${urls_pdf[1]}" "$dest" >&2 @TRET
+        revaldbg h-arxiv-pdf-dl "${urls_pdf[1]}" "$dest" >&2 @TRET
         ec "$dest"
     elif [[ "$mode" == 'vanity' ]] ; then
         web2pdf "${urls_vanity[1]}"
