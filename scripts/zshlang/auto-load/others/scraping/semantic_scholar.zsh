@@ -230,7 +230,11 @@ function semantic-scholar-dl-from-org {
 
     # reval-ec retry aa-gateway "$url" -o "${dest}" @RET
     # reval-ec retry wget "$url" -O "${dest}" @RET
-    curlm_ns=y reval-ec retry curlm "$url" --output-dir "$dir" --create-dirs -o "${dest}" @RET
+    #: =curlm_continue_p=n=: resuming an already complete file makes the server
+    #: answer 416, which =--fail= turns into exit 22.
+    #: =retry-limited=, not =retry=: the latter is =retry-limited 0=, which never
+    #: gives up, so a 4xx would loop forever.
+    curlm_continue_p=n curlm_ns=y reval-ec retry-limited 3 curlm "$url" --output-dir "$dir" --create-dirs -o "${dest}" @RET
     dest="${dir}/${dest}"
 
     if bool "${tlg_p}" ; then
