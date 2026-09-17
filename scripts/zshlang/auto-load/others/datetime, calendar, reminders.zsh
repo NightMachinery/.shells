@@ -540,7 +540,9 @@ next friday 9am, in 3 hours, 7:30).
 
 Durations are tried first and deliberately so: chrono silently misreads
 '1h:30m later' as 30 minutes, and a plausible wrong time is worse than an
-error. Fails loudly when neither parser claims the input."
+error. Chrono also invents 12:00 for a spec naming no time of day, so this runs
+it with datenat_strict, which rejects both. Pass datenat_strict= to opt out.
+Fails loudly when neither parser claims the input."
 
     local inargs
     in-or-args2 "$@" @RET
@@ -552,7 +554,9 @@ error. Fails loudly when neither parser claims the input."
         return 0
     fi
 
-    datenat_unix=y datenat "$text"
+    #: strict by default here: this feeds alarms, where a partial parse or an
+    #: invented hour is worse than an error. See [agfi:datenat].
+    datenat_strict="${datenat_strict-y}" datenat_unix=y datenat "$text"
 }
 aliasfn datenat-v2-future datenat_nopast=y datenat-v2
 ##
