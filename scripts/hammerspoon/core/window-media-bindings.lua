@@ -50,224 +50,50 @@ hyper_bind_v1("f5", function()
                   -- @needed awaysh-fast
 end)
 
--- Bare hyper+F1/F2. Dispatched from the eventtap in core/blackout-lock.lua
--- along with the blackout chords, because Carbon drops these too. Key repeat
--- comes free there: a tap sees the autorepeat keyDowns, which is what
--- bindWithRepeatV2's repeatfn was for.
+-- Bare hyper+F1/F2 steps brightness; hyper+ctrl+F1/F2 steps contrast. Both are
+-- dispatched from the eventtap in core/blackout-lock.lua along with the
+-- blackout chords, because Carbon drops these too. Key repeat comes free
+-- there: a tap sees the autorepeat keyDowns, which is what bindWithRepeatV2's
+-- repeatfn was for.
 --
--- One DDC operation costs 200-380ms on this panel and a locked `chg' is a read
--- plus a write, so ~600ms; key repeat is ~30ms. Firing one detached job per
--- press used to overlap them ten to one, and unserialised DDC does not lose
--- steps so much as invent them: ten concurrent decrements measured *one step
--- brighter* than they started. h-ddc-lock-do in system.zsh fixed the
--- corruption, but a lock alone turns a one-second key hold into twenty seconds
--- of queue. So the presses are coalesced here, at the source.
+-- The stepping itself is core/level-stepper.lua, which coalesces presses so a
+-- key hold cannot outrun the DDC bus; the measurements that forced that are in
+-- its header. Brightness and contrast are the same problem on the same bus
+-- under the same lock, so they are two instances of it rather than two copies.
 --
--- The rule is one garden call in flight at a time. Presses arriving during a
--- flight accumulate into `pending' and leave as a single larger delta, so the
--- total always matches what was pressed while the number of DDC round trips
--- stays proportional to time rather than to keystrokes. The call asks for the
--- new level in the same breath, which costs nothing extra -- the reply is what
--- the band displays, and it makes the optimistic level self-correcting after
--- every flush rather than drifting.
-hyper_brightness_step = hyper_brightness_step or 0.01
-hyper_brightness_band_seconds = hyper_brightness_band_seconds or 1.5
-hyper_brightness_bar_cells = hyper_brightness_bar_cells or 20
+-- The knobs it seeds, per instance and live-editable from the console:
+--   hyper_brightness_step           hyper_contrast_step           0.01
+--   hyper_brightness_band_seconds   hyper_contrast_band_seconds   1.5
+--   hyper_brightness_bar_cells      hyper_contrast_bar_cells      20
+--   hyper_brightness_trust_seconds  hyper_contrast_trust_seconds  3
+local brightnessStepper = levelStepperNew{
+    title = "Brightness",
+    id = "hyper-brightness",
+    family = "brightness",
+    knobPrefix = "hyper_brightness_",
+    label = "hyperBrightnessStep",
+}
 
---- How long a level read from the panel is worth believing. The cache is only
---- ever authoritative until something else writes, and three other things do:
---- brightness-auto-loop on a 3s cycle, display-black-on-loop on a 5s one, and
---- the monitor's own buttons, which we cannot see at all. Past this the band
---- shows an ellipsis rather than a stale number -- the reply is ~600ms behind
---- the press, and being briefly uninformative beats being briefly wrong.
---- Matched to the fastest of those writers.
-hyper_brightness_trust_seconds = hyper_brightness_trust_seconds or 3
+local contrastStepper = levelStepperNew{
+    title = "Contrast",
+    id = "hyper-contrast",
+    family = "contrast",
+    knobPrefix = "hyper_contrast_",
+    label = "hyperContrastStep",
+}
 
-local kBrightnessBandId = "hyper-brightness"
-
---- The last reading off the panel, one entry per selected display, written
---- only ever from a reply. nil before the first one.
-local brightnessReading = nil
---- When that came off the panel, for hyper_brightness_trust_seconds.
-local brightnessReadingAt = 0
---- The delta of the call currently out, and the delta accumulated since it
---- left. The reading plus both of those is where the panel is heading, which is
---- what the band shows: a reply only ever confirms the delta *it* carried, so
---- displaying the reading alone made the band jump back up mid-hold and then
---- down again as the next flush landed.
-local brightnessSentDelta = 0
-local brightnessPending = 0
---- True while a garden call is out. The whole serialisation is this flag.
-local brightnessInFlight = false
-
---- Nothing sent, nothing waiting: the panel is where the band says it is.
-local function brightnessSettled()
-    return brightnessSentDelta == 0 and brightnessPending == 0
-end
-
-local function brightnessOutstanding()
-    return brightnessSentDelta + brightnessPending
-end
-
---- The reading, but only while it is still worth trusting. Every consumer has
---- to ask the same question: a reading too old for the band to show is too old
---- to suppress a write on the strength of. The clamp below used to test only
---- that a reading existed, which at the top of the range made a stale 1.0
---- authoritative enough to swallow the keypress and not authoritative enough
---- to display -- so the band sat at the ellipsis and never recovered.
-local function brightnessTrusted()
-    if not brightnessReading or #brightnessReading == 0 then return nil end
-    if (hs.timer.secondsSinceEpoch() - brightnessReadingAt) > hyper_brightness_trust_seconds then
-        return nil
-    end
-    return brightnessReading
-end
-
---- Where each display is heading, or nil when there is no reading worth
---- trusting -- in which case the target is unknowable, however many presses are
---- outstanding.
-local function brightnessTargets()
-    local reading = brightnessTrusted()
-    if not reading then return nil end
-
-    local outstanding = brightnessOutstanding()
-    local targets = {}
-    for index, level in ipairs(reading) do
-        targets[index] = math.max(0, math.min(1, level + outstanding))
-    end
-    return targets
-end
-
-local function brightnessBar(level)
-    local cells = hyper_brightness_bar_cells
-    local filled = math.max(0, math.min(cells, math.floor(level * cells + 0.5)))
-    return string.rep("\u{25AE}", filled) .. string.rep("\u{25AF}", cells - filled)
-end
-
---- An arrow while the panel has not caught up, and nothing once it has. It
---- cannot be the ellipsis, which already means "no reading to trust", and it
---- cannot be a region of the bar either: at 20 cells one cell is 5%, so the one
---- to three steps typically outstanding would not move a single cell.
-local function brightnessCue()
-    if brightnessSettled() then return "" end
-    return brightnessOutstanding() < 0 and " \u{2193}" or " \u{2191}"
-end
-
-local function brightnessBandShow()
-    local targets = brightnessTargets()
-    local cue = brightnessCue()
-
-    local text
-    if not targets then
-        --- Either nothing has come back yet, or what did is old enough that
-        --- another writer may have moved the panel since. The cue still goes
-        --- on, so a press is visibly doing something even when the level is not
-        --- ours to report.
-        text = "Brightness\n" .. "\u{2026}" .. cue
-    else
-        local rows = {}
-        for _, level in ipairs(targets) do
-            rows[#rows + 1] = string.format("%s  %d%%%s",
-                brightnessBar(level), math.floor(level * 100 + 0.5), cue)
-        end
-        text = "Brightness\n" .. table.concat(rows, "\n")
-    end
-
-    --- flashSeconds 0 deliberately: a fullscreen wash on every step of a key
-    --- hold would be unusable. Same id throughout, so the band updates in place
-    --- and its deadline is pushed out rather than a second one stacking up.
-    alert_gateway(text, {
-        id = kBrightnessBandId,
-        seconds = hyper_brightness_band_seconds,
-        flashSeconds = 0,
-        screens = "all",
-        -- The whole point of this band is to be read while hyper is held: the
-        -- brightness keys leave the mode entered on purpose, so the peek would
-        -- otherwise fade the one band the keypress exists to show.
-        peek = false,
-    })
-end
-
-local function brightnessParse(out)
-    if not out or out == "" then return nil end
-
-    local levels = {}
-    for line in tostring(out):gmatch("[^\r\n]+") do
-        local n = tonumber((line:gsub("%s", "")))
-        if n then levels[#levels + 1] = math.max(0, math.min(1, n)) end
-    end
-
-    if #levels == 0 then return nil end
-    return levels
-end
-
-local brightnessFlush
-
---- `readIfIdle' asks for a bare reading when there is no delta to send and
---- nothing the band would trust. Only a keypress passes it; the tail call
---- below must not, or a read that keeps failing would spin.
-brightnessFlush = function(readIfIdle)
-    if brightnessInFlight then return end
-    if brightnessPending == 0 then
-        --- Nothing to write. Bail out if the band already has a level it would
-        --- show, or if this was not a keypress; otherwise fall through to ask.
-        if brightnessTargets() or not readIfIdle then return end
-    end
-
-    brightnessSentDelta = brightnessPending
-    brightnessPending = 0
-    brightnessInFlight = true
-
-    --- One command, one round trip: step, then report where that landed. The
-    --- shell's own lock makes the pair atomic against the blackout loop and
-    --- brightness-auto. With no step to make -- at either end of the range,
-    --- where the clamp takes the whole delta -- it is the read alone, because
-    --- the band still has to be told where the panel is.
-    local cmd = brightnessSentDelta ~= 0
-        and string.format("brightness-inc %.4f ; brightness-get", brightnessSentDelta)
-        or "brightness-get"
-    brishz_eval_out_hs(cmd, function(out)
-        brightnessInFlight = false
-        --- Whatever it carried is either in the reading below or lost with the
-        --- call; either way it is no longer outstanding.
-        brightnessSentDelta = 0
-
-        local levels = brightnessParse(out)
-        if levels then
-            brightnessReading = levels
-            brightnessReadingAt = hs.timer.secondsSinceEpoch()
-        else
-            --- The call failed, so we cannot say whether its write landed. The
-            --- old reading is no longer something to vouch for.
-            brightnessReading = nil
-        end
-
-        brightnessBandShow()
-        --- Whatever was pressed while that was out.
-        brightnessFlush()
-    end, "hyperBrightnessStep")
-end
-
+--- Globals, because core/blackout-lock.lua's chord tap calls them by name and
+--- tests them for existence first, so a half-loaded config degrades to a
+--- dropped keypress rather than an error per press.
+---
 --- `dir' is the direction, not a boolean: the shell side is brightness-dec and
 --- brightness-inc, so that is what travels.
 function hyperBrightnessStep(dir)
-    local delta = (dir == "dec") and -hyper_brightness_step or hyper_brightness_step
+    brightnessStepper.step(dir)
+end
 
-    brightnessPending = brightnessPending + delta
-
-    --- Hold the key past either end and the accumulator would otherwise run
-    --- off to -0.5 while the panel sat at 0, so the first press back up would
-    --- need forty more before anything moved. Clamped against the first
-    --- display: with one panel that is exact, and with several it is the best a
-    --- single scalar accumulator can do.
-    local reading = brightnessTrusted()
-    if reading and reading[1] then
-        local base = reading[1] + brightnessSentDelta
-        brightnessPending = math.max(-base, math.min(1 - base, brightnessPending))
-    end
-
-    brightnessBandShow()
-    brightnessFlush(true)
+function hyperContrastStep(dir)
+    contrastStepper.step(dir)
 end
 -- `-all`, so these blank every display rather than just whichever is currently
 -- main. Blanking only the main one leaves the other screen lit, which defeats
