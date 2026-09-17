@@ -201,6 +201,54 @@ of the operation. Rows for displays outside the selector are kept rather than
 overwritten, so blanking the internal panel after the external one does not
 forget how to restore the external one.
 
+### Restoring resolves by display id, not by the number in the row
+
+A saved row carries two ids: the CGDirectDisplayID it is keyed on, and the
+backend-local id the write goes through (the `m1ddc` display number, or the
+`brightness -l` index). Only the first is stable. The second is *positional*, so
+unplugging one of two monitors, docking, or opening the lid while the screen is
+black renumbers it underneath the rows that were written before.
+
+`display-black-off` therefore re-resolves every row through
+`h-display-black-attached`, a projection of `brightness-displays` down to
+display id, backend and local id, taken once per call. Without it, monitor A's
+remembered level gets written to monitor B and B's row finds no display at all,
+which is the one failure that per-display storage exists to prevent.
+
+The actual write is `h-display-black-restore-row`, shared by the saved walk and
+the pending drain below so the two cannot drift.
+
+### A display that is not there when the blackout ends
+
+If a row's display is not attached, there is nothing to write to, and the level
+does not come back on its own: DDC levels live in the monitor's own firmware, so
+it is still floored when it is plugged back in. So the row is *parked* rather
+than dropped: moved to `display_black_pending`, with a line on stderr naming
+the display and the levels it could not set.
+
+    display_black_pending_get          # what is still owed, same TSV
+
+`display-black-off` drains it first, before the blackout it was actually asked
+to end: any parked row whose display is attached now is restored and forgotten.
+That drain ignores the selector, because a parked row is an unpaid debt rather
+than part of the blackout being ended.
+
+`display-black-on` reads it too. A parked row is a genuine pre-blank level, and
+a better source than a fresh reading would be. The display it belongs to is
+still floored from last time, so reading it would produce exactly the zero that
+`h-display-black-level-usable` exists to refuse. A saved row wins where both
+exist, being the more recent blanking, and a parked row is dropped once its
+display is tracked in `display_black_saved` again.
+
+It is a second key rather than a flag inside `display_black_saved` because that
+key doubles as `display-black-p`, and `blackout-lock.lua` reads it raw over
+redis to decide whether to re-arm the keyboard lock after a Hammerspoon reload.
+A row that could never be cleared would keep arming that lock in front of a lit
+screen. Nothing is blanked on a display that is not there, so pending rows do
+not count.
+
+### Restoring a subset
+
 Restoring a subset works: `display-black-off internal` un-blanks the laptop and
 leaves the monitor black. That needs a little care, because `hs.screen.restoreGamma()`
 is global — so anything still meant to be blanked has its gamma re-applied

@@ -1211,6 +1211,41 @@ redis-defvar display_black_saved
 #: gamma-applied. Doubles as the "is anything blanked" flag for
 #: [agfi:display-black-p].
 
+redis-defvar display_black_pending
+#: The same TSV, for a display that was not attached when its blackout ended:
+#: a *pending row*. [agfi:display-black-off] parks one here and restores it the
+#: next time that display is around, so unplugging a monitor mid-blackout does
+#: not lose the level it was blanked from.
+#:
+#: A second key rather than a flag in display_black_saved, because that key is
+#: the "is anything blanked" test, and hammerspoon/core/blackout-lock.lua reads
+#: it raw over redis to decide whether to re-arm the keyboard lock after a
+#: reload. A row that cannot be cleared would keep arming that lock in front of
+#: a lit screen. Nothing is blanked on a display that is not there, so pending
+#: rows must not count.
+
+function h-display-black-attached {
+    : "TSV: display-id, backend, backend-local id, for every attached display.
+
+A projection of [agfi:brightness-displays], so the join key stays the
+CGDirectDisplayID that both backends agree on. The saved rows carry a
+backend-local id too, but that one is *positional* -- the m1ddc display number,
+or the \`brightness -l\` index -- so a display set that changed while the screen
+was black renumbers it underneath them. Restoring re-resolves through here
+instead of trusting the row, or monitor A's remembered level lands on monitor
+B."
+    ##
+    local line
+    local -a f
+    for line in "${(@f)$(brightness-displays)}" ; do
+        [[ -n "$line" ]] || continue
+        f=("${(@ps:\t:)line}")
+        #: f: 1 index  2 backend  3 local-id  4 main|-  5 built-in|external  6 name  7 display-id
+
+        printf '%s\t%s\t%s\n' "$f[7]" "$f[2]" "$f[3]"
+    done
+}
+
 function h-display-black-gamma {
     : "usage: h-display-black-gamma <display-id> on|off
 Zeroes one screen's gamma table. Matched on the CGDirectDisplayID, which is
@@ -1251,6 +1286,33 @@ unknown instead means the worst case is a level left alone."
     return 0
 }
 
+function h-display-black-restore-row {
+    : "usage: h-display-black-restore-row <backend> <local-id> <brightness> <contrast>
+Puts one display's levels back.
+
+The backend and local id are the *current* ones, re-resolved through
+[agfi:h-display-black-attached]; the levels are the remembered ones off the
+saved row. Shared by the saved walk and the pending drain in
+[agfi:display-black-off] so the two cannot drift apart."
+    ##
+    local backend="$1" i="$2" b="$3" c="$4"
+    assert-args backend i @RET
+
+    local ret=0
+
+    if [[ "$b" != '-' && "$backend" != none ]] ; then
+        brightness-set-$backend "$b" "$i" || ret=$?
+    fi
+
+    #: Contrast is DDC-only, and [agfi:display-black-on] only floors it there,
+    #: so a row from any other backend has nothing to put back.
+    if [[ "$c" != '-' && "$backend" == ddc ]] ; then
+        contrast-set-ddc "$c" "$i" || ret=$?
+    fi
+
+    return $ret
+}
+
 function display-black-on {
     : "usage: display-black-on [<selector>]
 Blanks the selected display(s), remembering their levels so
@@ -1276,6 +1338,20 @@ possible. Selectors: see [agfi:h-brightness-select]."
     for line in "${(@f)prev}" ; do
         [[ -n "$line" ]] || continue
         pf=("${(@ps:\t:)line}")
+        prev_b[$pf[1]]="$pf[4]"
+        prev_c[$pf[1]]="$pf[5]"
+    done
+
+    #: A parked row is a pre-blank level too, and the better one: the display it
+    #: belongs to has been unplugged and brought back, so it is still floored
+    #: and a fresh reading would be the zero this whole dance exists to refuse.
+    #: A saved row wins where both exist, being the more recent blanking.
+    local pending
+    pending="$(display_black_pending_get)" || pending=''
+    for line in "${(@f)pending}" ; do
+        [[ -n "$line" ]] || continue
+        pf=("${(@ps:\t:)line}")
+        (( ${+prev_b[$pf[1]]} )) && continue
         prev_b[$pf[1]]="$pf[4]"
         prev_c[$pf[1]]="$pf[5]"
     done
@@ -1333,6 +1409,23 @@ possible. Selectors: see [agfi:h-brightness-select]."
 
     (( $#saved )) && display_black_saved_set "${(pj:\n:)saved}"
 
+    #: Anything blanked just now is tracked in display_black_saved again, so its
+    #: debt is settled; the rest stays parked.
+    if [[ -n "$pending" ]] ; then
+        local -a park=()
+        for line in "${(@f)pending}" ; do
+            [[ -n "$line" ]] || continue
+            pf=("${(@ps:\t:)line}")
+            (( $seen[(Ie)$pf[1]] )) || park+=("$line")
+        done
+
+        if (( $#park )) ; then
+            display_black_pending_set "${(pj:\n:)park}"
+        else
+            display_black_pending_del
+        fi
+    fi
+
     return $ret
 }
 
@@ -1365,10 +1458,25 @@ displays it matches. Selectors: see [agfi:h-brightness-select]."
     silent hammerspoon -c 'if blackoutLockOff then blackoutLockOff() end; if blackoutEnded then blackoutEnded() end'
 
     local saved
+    local pending
     saved="$(display_black_saved_get)" || saved=''
-    if [[ -z "$saved" ]] ; then
+    pending="$(display_black_pending_get)" || pending=''
+    if [[ -z "$saved" && -z "$pending" ]] ; then
         return 0
     fi
+
+    #: Which displays are here *now*, and under which backend-local id. The
+    #: saved rows' own ids are positional and may have been renumbered by a
+    #: hotplug while the screen was black; see [agfi:h-display-black-attached].
+    local aline
+    local -a af
+    local -A cur_backend cur_local
+    for aline in "${(@f)$(h-display-black-attached)}" ; do
+        [[ -n "$aline" ]] || continue
+        af=("${(@ps:\t:)aline}")
+        cur_backend[$af[1]]="$af[2]"
+        cur_local[$af[1]]="$af[3]"
+    done
 
     #: No selector means everything. Otherwise collect the display ids it
     #: resolves to, and put back only those.
@@ -1384,7 +1492,25 @@ displays it matches. Selectors: see [agfi:h-brightness-select]."
     fi
 
     local line ret=0
-    local -a f keep=()
+    local -a f keep=() park=()
+
+    #: Pending rows first: a display that has come back since its blackout
+    #: ended is restored here and forgotten. Ones still absent stay pending.
+    #: Deliberately not filtered by the selector -- a pending row is an unpaid
+    #: debt rather than part of the blackout being ended, and `display-black-off
+    #: internal' should still settle the monitor's if the monitor is back.
+    for line in "${(@f)pending}" ; do
+        [[ -n "$line" ]] || continue
+        f=("${(@ps:\t:)line}")
+
+        if (( ! ${+cur_backend[$f[1]]} )) ; then
+            park+=("$line")
+            continue
+        fi
+
+        h-display-black-restore-row "$cur_backend[$f[1]]" "$cur_local[$f[1]]" "$f[4]" "$f[5]" || ret=$?
+    done
+
     for line in "${(@f)saved}" ; do
         [[ -n "$line" ]] || continue
         f=("${(@ps:\t:)line}")
@@ -1398,19 +1524,30 @@ displays it matches. Selectors: see [agfi:h-brightness-select]."
             continue
         fi
 
-        if [[ "$f[4]" != '-' && "$f[2]" != none ]] ; then
-            brightness-set-$f[2] "$f[4]" "$f[3]" || ret=$?
+        if (( ! ${+cur_backend[$f[1]]} )) ; then
+            #: Unplugged while black. There is nothing to write to, and the
+            #: level lives in the monitor's own firmware, so it will still be
+            #: floored when it comes back. Park it rather than drop it, and say
+            #: so: a DDC panel left at luminance 0 with contrast 0 is a screen
+            #: nobody would guess the cause of.
+            ecerr "$0: display $f[1] is not attached; parking its levels (brightness $f[4], contrast $f[5]) until it is back"
+            park+=("$line")
+            continue
         fi
 
-        if [[ "$f[5]" != '-' ]] ; then
-            contrast-set-ddc "$f[5]" "$f[3]" || ret=$?
-        fi
+        h-display-black-restore-row "$cur_backend[$f[1]]" "$cur_local[$f[1]]" "$f[4]" "$f[5]" || ret=$?
     done
 
     if (( $#keep )) ; then
         display_black_saved_set "${(pj:\n:)keep}"
     else
         display_black_saved_del
+    fi
+
+    if (( $#park )) ; then
+        display_black_pending_set "${(pj:\n:)park}"
+    else
+        display_black_pending_del
     fi
 
     return $ret
