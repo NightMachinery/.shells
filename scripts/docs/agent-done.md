@@ -69,7 +69,8 @@ Codex user skills live under `~/.agents/skills`, independent of `CODEX_HOME`.
 The linker creates a whole-directory symlink there, so sibling scripts,
 references and assets accompany `SKILL.md`. Other agents retain their existing
 file-link layout. A conflicting Codex directory or unrelated symlink is
-reported and preserved, not overwritten. This uses the documented
+reported and preserved, not overwritten, as it is on every other seat. This
+uses the documented
 [Codex discovery paths and directory-link support](https://learn.chatgpt.com/docs/build-skills#where-codex-loads-local-skills).
 
 To migrate an older installation:
@@ -87,6 +88,36 @@ empty per-skill directories, never recursively deletes anything, and preserves
 old skill directories. The tracked sources remain intact. Normal launches
 do not perform cleanup. A legacy client that only scans `CODEX_HOME/skills`
 will no longer discover these skills after cleanup; use a current client.
+
+### A target the linker does not recognise
+
+The linker only ever writes where it finds nothing. If something is already
+sitting at a skill's place, it is reported on stderr, left exactly as it is, and
+`agent-skills-link` returns non-zero. That covers three shapes, on every seat
+alike rather than on Codex alone:
+
+- a plain file, which is somebody's own skill of that name, or one an agent
+  wrote itself;
+- a symlink resolving anywhere other than the tracked source;
+- a symlink standing in for the `<name>` directory itself. The linker never
+  resolves through one of those. `mkdir -p` succeeds on a link to an existing
+  directory, so `ln -s` would otherwise plant `SKILL.md` inside whatever it
+  points at, outside the agent's skills tree entirely.
+
+The repair is always manual: look at what is there, remove it, and re-run
+`agent-skills-link`. The message names the source it expected, and
+`h-agent-skills-doctor` reports the same thing as `WRONG TARGET` or
+`UNTRACKED`. Nothing repairs itself on the launch path, because the linker
+cannot tell its own leftovers from a file you meant to keep, and guessing wrong
+loses your work.
+
+A skill that moves between roots leaves exactly this behind. Two things have to
+happen, and only the first is obvious: the old link has to go, and the **old
+source directory has to be removed from disk**. Untracked files -- a
+`__pycache__`, a stray build artifact -- keep git from taking the directory with
+the move, so the dead path stays resolvable and the old link keeps looking
+plausible. `html-reports` leaving `~/notes/skills` for its own repository on
+2026-09-17 did precisely this, and warned on every agent launch afterwards.
 
 Codex normally detects skill changes automatically. Restart the client if its
 picker remains stale; an already-running conversation's advertised skill list
