@@ -183,6 +183,29 @@ way to cancel silently. `LENGTH 0` does nothing at all, and `LENGTH 1` displaces
 the pending timer but then rings a second later, so it is a noisy workaround
 rather than a cancel.
 
+## Latency
+
+Setting an alarm takes about a second, and almost none of it is ssh. Measured:
+
+```
+am (app_process + am.apk dex load)   ~706 ms
+ssh channel (already multiplexed)    ~250 ms
+getprop + date on the phone           ~67 ms
+local parse: duration / prose       10 / 150 ms
+```
+
+One ssh call per alarm, none for a dry run, over a connection ssh is already
+multiplexing. There is nothing to batch: the cost is Android spawning a JVM to
+run `am.apk` once per alarm, and the intent dispatch inside it is only ~7ms.
+
+The helpers therefore prefer `termux-am`, which passes the intent to the running
+Termux app over a socket instead of spawning `app_process`, and fall back to `am`
+when it is unavailable. The socket lives at
+`$PREFIX/../apps/com.termux/termux-am/am.sock` and only exists on Termux app
+versions that create `files/apps`; on 0.118.1 that directory is absent, so the
+fallback is what runs and the saving is not yet realised. Nothing needs changing
+to collect it later, only a newer Termux app.
+
 ## What cannot be done
 
 Alarms cannot be listed. Android exposes no read API, and `SHOW_ALARMS` only
