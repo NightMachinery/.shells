@@ -206,8 +206,9 @@ The deferred receiver design is in =./.docs/plans/clipboard-listener.md=.
 =tealy-alarm TIMESPEC [MESSAGE]= sets an alarm in the phone's own clock app over
 SSH, so it rings through Doze and silent mode and survives Termux being killed;
 the generic helper is =h-termux-alarm-set HOST=. =tealy-timer=, =tealy-notify=
-and =tealy-toast= round out the set. The hour is resolved on the phone against
-Android's system timezone, not either shell's =TZ=. An alarm that silently never
+and =tealy-toast= round out the set. Times are parsed here by =datenat-v2=
+(compact durations like =1h30m= plus chrono prose) and cross the wire as a unix
+epoch, which the phone renders against Android's system timezone. An alarm that silently never
 appears means the =SET_ALARM= intent hit an invisible app-chooser dialog; that
 failure reports success from every angle, and is explained along with the
 unsupported operations in =./docs/remote-termux-alarms.md=.

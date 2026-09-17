@@ -25,8 +25,46 @@ in `~/.ssh/config` rather than in these functions.
 
 ## Time specifications
 
-`TIMESPEC` is anything GNU `date -d` accepts. The phrasing `in 3 hours` is
-**not** accepted; write `+3 hours`.
+`TIMESPEC` is parsed by `datenat-v2`, which accepts compact durations and prose:
+
+```zsh
+tealy-alarm 1h30m               tealy-alarm 'in 3 hours'
+tealy-alarm 90m                 tealy-alarm 'tomorrow 8am'
+tealy-alarm '1h:30m later'      tealy-alarm 'next friday 9am'
+tealy-alarm 3h                  tealy-alarm 7:30
+```
+
+Parsing happens **on this machine**, and the spec crosses the wire as a unix
+timestamp which the phone renders into an hour and minute. An epoch is
+unambiguous, so a disagreement between the two machines' timezones cannot shift
+the alarm.
+
+`datenat-v2` tries two parsers in a deliberate order:
+
+1. A duration chain, via `h-dur-nat2sec` and `dur2sec`. Units are `w d h m s`,
+   and `m` always means minutes, never months. `1h30m`, `1h:30m:0s`,
+   `'1h 30m later'`, `'in 1h30m'` and `1w2d3h` all work, and `dur2sec` is the
+   inverse of `seconds-fmt-short`, so its output round-trips.
+2. Otherwise `datenat`, which is chrono. This covers everything conversational.
+
+The order is not arbitrary. **Chrono silently misparses `1h:30m later` as thirty
+minutes**, swallowing the `1h:` and returning a perfectly plausible wrong time.
+Claiming durations first removes the input from chrono's reach. Fractions like
+`1.5h` are supported by neither and fail loudly, as does anything unparseable.
+
+### Two traps this deliberately avoids
+
+`date -d 3h` does **not** mean three hours. GNU date reads a bare trailing
+letter as a [military time
+zone](https://www.gnu.org/software/coreutils/manual/html_node/Time-zone-items.html),
+so `3h` is 03:00 at UTC+8 and does not fail. Measured on the phone at 17:04:
+`3h -> 21:00`, `1m -> 15:00`, `8p -> 13:00`. Nothing here ever passes raw user
+text to `date`, which is why `3h` now means three hours.
+
+The hour and minute are formatted with `%-H` and `%-M` rather than `%H` and
+`%M`. `am` parses `--ei` values as Java integers, so a zero-padded `08` is read
+as **octal** and rejected with `For input string: "8" under radix 8`. That broke
+`tomorrow 8am` and any `:08` or `:09` minute while leaving other times working.
 
 `SET_ALARM` carries only an hour and a minute, so Android schedules the next
 occurrence and a time already past today rolls over to tomorrow by itself.
@@ -36,10 +74,10 @@ Repeating alarms would need the `android.intent.extra.alarm.DAYS` extra, an
 
 ## Timezones
 
-The hour and minute are resolved **on the phone**, against
-`getprop persist.sys.timezone`, inside the same SSH command that sets the alarm.
-Neither shell's `TZ` affects the result and it costs no extra round trip. Set
-`alarm_tz` to interpret the spec in another zone.
+The epoch is rendered into a wall-clock hour and minute **on the phone**,
+against `getprop persist.sys.timezone`, inside the same SSH command that sets the
+alarm. Neither shell's `TZ` affects the result and it costs no extra round trip.
+Set `alarm_tz` to render in another zone.
 
 This matters because the two clocks can disagree. `sshd` there inherits its
 environment from whichever shell started it, and was running ninety minutes off
