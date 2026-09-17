@@ -207,13 +207,13 @@ The deferred receiver design is in =./.docs/plans/clipboard-listener.md=.
 SSH, so it rings through Doze and silent mode and survives Termux being killed;
 the generic helper is =h-termux-alarm-set HOST=. =tealy-timer=, =tealy-notify=
 and =tealy-toast= round out the set. Times are parsed here by =datenat-unix-v2=
-(compact durations like =1h30m= plus chrono prose) and cross the wire as a unix
-epoch, which the phone renders against Android's system timezone. The resolved
-time is printed before the intent is sent, and =termux_alarm_dryrun=y= stops
-there, which matters because alarms cannot be removed programmatically. An alarm that silently never
-appears means the =SET_ALARM= intent hit an invisible app-chooser dialog; that
-failure reports success from every angle, and is explained along with the
-unsupported operations in =./docs/remote-termux-alarms.md=.
+and cross the wire as a unix epoch, which the phone renders against Android's
+system timezone. The resolved time prints before the intent is sent, and
+=termux_alarm_dryrun=y= stops there, which matters because alarms cannot be
+removed programmatically. =am= reports that an activity started, never what the
+app did with the intent, so a failed alarm looks exactly like a working one;
+that trap and the unsupported operations are in
+=./docs/remote-termux-alarms.md=.
 
 =emc-mobile-tmux= hosts that frame in a tmux session named =emacs-mobile=, so its
 tty outlives the connection instead of dying with it, and reattaches to it later.

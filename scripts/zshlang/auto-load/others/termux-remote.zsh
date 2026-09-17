@@ -289,7 +289,7 @@ Flash a transient toast on HOST's screen via termux-api."
 }
 ##
 #: The clock app's API handler, pinned. This is the activity that declares the
-#: SET_ALARM intent filter; it is MIUI's rename of AOSP's HandleApiCalls, and it
+#: SET_ALARM intent filter; it is a vendor rename of AOSP's HandleApiCalls, and it
 #: shows no UI.
 #:
 #: Pinned because an implicit intent silently does nothing whenever several apps
