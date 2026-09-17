@@ -1,13 +1,17 @@
 ##
 #: Publishing the html-reports site: interactive HTML served to the phone over Tailscale,
-#: and mirrored to eva behind a Cloudflare Access login for everyone else.
+#: and mirrored to a server behind a Cloudflare Access login for everyone else.
 #:
-#: The registry, the builder and the Access policies are documented in
-#: [[zf:~\[nt\]/skills/html-reports/SKILL.md][the skill]]. The one rule worth repeating
-#: here: Access matches on hostname *plus path*, so the section a page sits in decides who
-#: may read it. `LMU/` is shared with the supervisor; `pv/` is not shared with anyone.
+#: The manifest, the builder and the Access policies are documented in
+#: [[zf:~\[cod\]/skills/html-reports/skills/html-reports/SKILL.md][the skill]]. The one
+#: rule worth repeating here: Access matches on hostname *plus path*, so the section a
+#: page sits in decides who may read it -- the path IS the permission.
+#:
+#: WHICH paths exist, which server they are mirrored to and who may read each one are
+#: deliberately not written here, because this repository is public. They live in the
+#: deployment repository, `~/code/lilf-pages` (`site.toml`, `access.yaml`, `docs/`).
 ##
-typeset -g lilf_pages_bin="${HOME}/notes/skills/html-reports/bin"
+typeset -g lilf_pages_bin="${HOME}/code/skills/html-reports/skills/html-reports/bin"
 ##
 function lilf-pages-build {
     : "usage: lilf-pages-build
@@ -104,7 +108,7 @@ show-error" | command curl --config - "https://api.cloudflare.com/client/v4/${en
 ##
 #: Said in three places, so it is written once. The tunnel credentials are the offline
 #: answer: cloudflared stamps the account into every credentials file it writes.
-typeset -g h_cloudflare_account_hint='It is in the dashboard URL after /accounts/ , or: ssh eva '"'"'jq -r .AccountTag ~/.cloudflared/*.json'"'"
+typeset -g h_cloudflare_account_hint='It is in the dashboard URL after /accounts/ , or, on the host running the tunnel: jq -r .AccountTag ~/.cloudflared/*.json'
 
 function h-cloudflare-account-id {
     : "usage: h-cloudflare-account-id
