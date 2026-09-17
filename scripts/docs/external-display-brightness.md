@@ -121,6 +121,9 @@ Environment variables, overridable per call.
     brightness_ddc_max       100    denominator for the 0..1 <-> luminance conversion
     brightness_ddc_retries   3      re-reads allowed for a corrupt DDC reading
 
+    display_black_fallback_brightness   0.5    where an unknown level lands on restore
+    display_black_fallback_contrast     0.75
+
 `m1ddc` can report a panel's own ceiling, but that is an extra DDC round trip on
 every call and virtually every monitor answers 100. `brightness-ddc-max` asks,
 if you want to check yours and pin the variable.
@@ -300,14 +303,41 @@ remembering *that* would make `display-black-off` "restore" the screen to black.
 
 The same trap reaches past the loop, though. `display-black-off` deletes the
 remembered row when it restores, so a blackout started again straight after one
-ends finds nothing remembered and falls through to a fresh reading — taken
+ends finds nothing remembered and falls through to a fresh reading, taken
 while the restore it just issued has not landed, because DDC writes are slow.
 Pressing F1 again right after F2 hits that window exactly, and each round of
 on-off ratchets the level down a little further. That was a real bug, and it is
 why `h-display-black-level-usable` refuses to remember a reading of zero in any
-of its spellings, recording `-` (unknown) instead. `display-black-off` leaves an
-unknown level alone, so the worst case became a brightness that did not change
-rather than one that walks towards black.
+of its spellings, recording `-` (unknown) instead.
+
+### An unknown level is not "leave it alone"
+
+`display-black-off` used to skip a row whose level was `-`, on the grounds that
+the worst case was then a brightness that did not change rather than one that
+walks towards black. That reasoning does not survive contact with an external
+panel.
+
+A row exists *only* because `display-black-on` floored that display. So `-` never
+means "this display was left alone"; it means "we floored it and lost the
+reading". Skipping the write leaves a built-in backlight off, or an external
+panel at DDC luminance 0 with contrast 0: an image that is technically back,
+because gamma was restored, on a washed-out screen with nothing on it to say
+why. `brightness-set 1.0` does not fix that one, because brightness is not the
+axis that moved. This was observed in the wild, not theorised: a blackout ended
+leaving contrast pinned at `0.000000`, and the F1-straight-after-F2 window above
+is enough to produce it.
+
+So an unknown level lands on a configured fallback instead:
+
+    display_black_fallback_brightness   0.5
+    display_black_fallback_contrast     0.75
+
+Two guards keep that safe. It applies only when the *saved* backend is not
+`none` — a gamma-only row floored nothing, so it is left strictly alone — and
+contrast only when both the saved and the current backend are `ddc`. That is why
+`h-display-black-restore-row` takes both backends: the saved one says what was
+floored and therefore what is owed, the current one says how to pay, and they
+disagree whenever `m1ddc` appeared or went away in between.
 
 ### Waking always ends it
 

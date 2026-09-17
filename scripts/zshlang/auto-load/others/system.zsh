@@ -1206,6 +1206,12 @@ function contrast-dec {
 #:             zero gamma table and the DDC levels are floored underneath it.
 #: Neither one powers the monitor down — see `display-off` for that.
 ##
+display_black_fallback_brightness="${display_black_fallback_brightness:-0.5}"
+display_black_fallback_contrast="${display_black_fallback_contrast:-0.75}"
+#: Where [agfi:display-black-off] lands a display whose remembered level is
+#: unknown. See [agfi:h-display-black-restore-row] for why an unknown level is
+#: never "leave it alone".
+
 redis-defvar display_black_saved
 #: TSV lines: display-id, backend, backend-local id, brightness, contrast,
 #: gamma-applied. Doubles as the "is anything blanked" flag for
@@ -1287,26 +1293,48 @@ unknown instead means the worst case is a level left alone."
 }
 
 function h-display-black-restore-row {
-    : "usage: h-display-black-restore-row <backend> <local-id> <brightness> <contrast>
-Puts one display's levels back.
+    : "usage: h-display-black-restore-row <saved-backend> <current-backend> <local-id> <brightness> <contrast>
+Puts one display's levels back. Shared by the saved walk and the pending drain
+in [agfi:display-black-off] so the two cannot drift apart.
 
-The backend and local id are the *current* ones, re-resolved through
-[agfi:h-display-black-attached]; the levels are the remembered ones off the
-saved row. Shared by the saved walk and the pending drain in
-[agfi:display-black-off] so the two cannot drift apart."
+Two backends, and they answer different questions. The *saved* one is what
+could drive the display when it was blanked, so it says what was floored and
+therefore what is owed. The *current* one, re-resolved through
+[agfi:h-display-black-attached] along with the local id, says how to pay. They
+disagree when m1ddc appeared or went away in between, and reading the current
+one for both would let a gamma-only row -- which floored nothing -- push a panel
+to the fallback level.
+
+An unknown level is not \"leave it alone\". A row exists only because
+[agfi:display-black-on] floored that display, so \`-' means \"we floored it and
+lost the reading\": leaving it alone leaves a built-in backlight off, or an
+external panel at DDC luminance 0 with contrast 0, washed out with nothing on
+screen to say why -- and \`brightness-set 1' does not fix that one, because
+brightness is not the axis that moved. Landing on \$display_black_fallback_*
+is always closer to right than staying floored, and the \`none' guard is what
+makes that true."
     ##
-    local backend="$1" i="$2" b="$3" c="$4"
-    assert-args backend i @RET
+    local was="$1" now="$2" i="$3" b="$4" c="$5"
+    assert-args was now i @RET
+
+    #: A gamma-only row floored nothing, so there is nothing to put back. The
+    #: unconditional gamma restore in [agfi:display-black-off] has already
+    #: un-blacked it.
+    [[ "$was" == none ]] && return 0
+
+    if [[ "$now" == none ]] ; then
+        ecerr "$0: display can no longer be driven (was ${was}, now none); levels ${b} / ${c} left unset. For an external panel on Apple Silicon, run: ensure-dep-m1ddc"
+        return 1
+    fi
 
     local ret=0
 
-    if [[ "$b" != '-' && "$backend" != none ]] ; then
-        brightness-set-$backend "$b" "$i" || ret=$?
-    fi
+    [[ "$b" == '-' ]] && b="$display_black_fallback_brightness"
+    brightness-set-$now "$b" "$i" || ret=$?
 
-    #: Contrast is DDC-only, and [agfi:display-black-on] only floors it there,
-    #: so a row from any other backend has nothing to put back.
-    if [[ "$c" != '-' && "$backend" == ddc ]] ; then
+    #: Contrast is DDC-only, and [agfi:display-black-on] only floors it there.
+    if [[ "$was" == ddc && "$now" == ddc ]] ; then
+        [[ "$c" == '-' ]] && c="$display_black_fallback_contrast"
         contrast-set-ddc "$c" "$i" || ret=$?
     fi
 
@@ -1508,7 +1536,7 @@ displays it matches. Selectors: see [agfi:h-brightness-select]."
             continue
         fi
 
-        h-display-black-restore-row "$cur_backend[$f[1]]" "$cur_local[$f[1]]" "$f[4]" "$f[5]" || ret=$?
+        h-display-black-restore-row "$f[2]" "$cur_backend[$f[1]]" "$cur_local[$f[1]]" "$f[4]" "$f[5]" || ret=$?
     done
 
     for line in "${(@f)saved}" ; do
@@ -1535,7 +1563,7 @@ displays it matches. Selectors: see [agfi:h-brightness-select]."
             continue
         fi
 
-        h-display-black-restore-row "$cur_backend[$f[1]]" "$cur_local[$f[1]]" "$f[4]" "$f[5]" || ret=$?
+        h-display-black-restore-row "$f[2]" "$cur_backend[$f[1]]" "$cur_local[$f[1]]" "$f[4]" "$f[5]" || ret=$?
     done
 
     if (( $#keep )) ; then
