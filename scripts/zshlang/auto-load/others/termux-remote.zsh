@@ -670,7 +670,8 @@ See [agfi:termux-ssh-log] for what happened before now, which needs
 ##
 typeset -g h_termux_ssh_log_script='
 prefix=${PREFIX:-/data/data/com.termux/files/usr}
-log=$prefix/var/log/sv/sshd/current
+dir=$prefix/var/log/sv/sshd
+log=$dir/current
 
 if test ! -s "$log" ; then
     printf "%s\n" "termux-ssh-log: $log is empty or missing." >&2
@@ -678,10 +679,22 @@ if test ! -s "$log" ; then
     exit 1
 fi
 
-printf "%s\n" "== last $log_lines lines =="
-tail -n "$log_lines" "$log"
+#: svlogd rotates current into @<tai64n>.s, or .u when it was restarted rather
+#: than hitting a size limit - and it restarts whenever the service daemon is
+#: cycled, which happens far more often than a megabyte of logs accumulates.
+#: Reading only current therefore shows a slice of history while looking like
+#: the whole of it, which for an audit log is worse than showing nothing. The
+#: tai64n names sort lexicographically into chronological order.
+logs=
+for f in "$dir"/@*.s "$dir"/@*.u ; do
+    test -f "$f" && logs="$logs $f"
+done
+logs="$logs $log"
 
-printf "\n%s\n" "== tally by source =="
+printf "%s\n" "== last $log_lines lines =="
+cat $logs | tail -n "$log_lines"
+
+printf "\n%s\n" "== tally by source, over $(printf "%s" "$logs" | wc -w) log file(s) =="
 awk "
 #: Match the outcome lines only. A bare /Accepted/ also catches
 #: \"Accepted key ED25519 ... found at ...\", which is the key-match record
@@ -701,7 +714,7 @@ END {
     if (length(n) == 0) { print \"no authentication events recorded yet\" ; exit 0 }
     for (k in n) printf \"%6d  %s\n\", n[k], k
 }
-" "$log" | sort -rn
+" $logs | sort -rn
 '
 
 function termux-ssh-log {

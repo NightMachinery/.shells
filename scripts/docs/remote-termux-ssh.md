@@ -74,6 +74,14 @@ so the daemon returns after a reboot.
 An empty `termux-ssh-log` is therefore a finding, not a quiet day, and it says
 so.
 
+`svlogd` rotates `current` into `@<tai64n>.s`, or `.u` when it was restarted
+rather than hitting a size limit — and it restarts whenever the service daemon
+is cycled, which happens far more often than a megabyte of logs accumulates. So
+rotation here is routine, not rare. `termux-ssh-log` reads the rotated files
+too, and prints how many it covered: reading only `current` shows a slice of
+history while looking like the whole of it, which for an audit log is worse
+than showing nothing at all.
+
 ## Why these read /proc directly
 
 `ss`, `netstat` and `/proc/net/tcp` are all denied to apps from Android 10 on,
