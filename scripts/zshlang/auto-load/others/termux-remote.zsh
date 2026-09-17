@@ -51,8 +51,11 @@ tz="$alarm_tz"
 [ -n "$tz" ] || tz="$(getprop persist.sys.timezone 2>/dev/null)"
 [ -n "$tz" ] || tz=UTC
 
-hm="$(TZ="$tz" date -d "$alarm_spec" +"%H %M" 2>/dev/null)" || {
-    printf "%s\n" "termux-alarm: unparsable time spec: $alarm_spec" >&2
+#: %-H and %-M drop the zero padding on purpose: am parses --ei values as Java
+#: integers, so a padded 08 is read as octal and rejected with
+#: For input string: 8 under radix 8.
+hm="$(TZ="$tz" date -d "@$alarm_epoch" +"%-H %-M" 2>/dev/null)" || {
+    printf "%s\n" "termux-alarm: could not render epoch: $alarm_epoch" >&2
     exit 2
 }
 h="${hm% *}" ; m="${hm#* }"
@@ -71,7 +74,7 @@ if [ "$rc" -ne 0 ] ; then
     printf "%s\n" "$out" >&2
     exit "$rc"
 fi
-printf "%s:%s %s\n" "$h" "$m" "$tz"
+printf "%02d:%02d %s\n" "$h" "$m" "$tz"
 '
 
 typeset -g h_termux_timer_script='
@@ -93,11 +96,14 @@ printf "%ss\n" "$timer_seconds"
 function h-termux-alarm-set {
     : "usage: h-termux-alarm-set HOST TIMESPEC [MESSAGE...]
 
-Set an alarm in HOST's clock app. TIMESPEC is anything GNU date -d accepts:
-'7:30', 'tomorrow 8am', '+20 minutes'. Note that 'in 3 hours' is *not* accepted.
+Set an alarm in HOST's clock app. TIMESPEC is anything [agfi:datenat-v2]
+accepts: compact durations like 1h30m, 90m or '1h:30m later', and prose like
+'7:30', 'tomorrow 8am', 'in 3 hours' or 'next friday 9am'.
 
-The hour and minute are resolved on the phone against Android's *system*
-timezone, so neither shell's TZ can skew the result. Override with alarm_tz.
+The spec is parsed here and crosses the wire as a unix timestamp, which HOST
+renders into a wall-clock hour and minute against Android's *system* timezone.
+An epoch is unambiguous, so a disagreement between this machine's timezone and
+the phone's cannot shift the alarm. Override the rendering zone with alarm_tz.
 
 SET_ALARM carries only an hour and a minute, so Android schedules the next
 occurrence; a time already past today rolls over to tomorrow by itself.
@@ -112,6 +118,9 @@ is implicit and follows the phone's default clock app."
         return 2
     fi
 
+    local epoch
+    epoch="$(datenat-v2 "$spec")" @RET
+
     local tz="${alarm_tz}"
     local component="${termux_alarm_component}"
     local skip_ui="${termux_alarm_skip_ui:-true}"
@@ -119,7 +128,7 @@ is implicit and follows the phone's default clock app."
 
     h-termux-ssh "$host" "env \
 alarm_tz=$(gquote-sq "$tz") \
-alarm_spec=$(gquote-sq "$spec") \
+alarm_epoch=$(gquote-sq "$epoch") \
 alarm_msg=$(gquote-sq "$msg") \
 alarm_component=$(gquote-sq "$component") \
 alarm_skip_ui=$(gquote-sq "$skip_ui") \
