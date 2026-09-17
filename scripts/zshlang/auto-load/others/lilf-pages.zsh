@@ -220,3 +220,33 @@ Set json_p to print the raw API objects instead."
     done
 }
 ##
+#: Editing who may read what.
+#:
+#: The allow list is a file, not a sequence of API calls: one person per line, under the
+#: path they may read. Granting is adding a line and revoking is deleting one, and the git
+#: diff in the notes repo is then a record of the decision, which is the part no dashboard
+#: keeps. `lilf-pages-access` reads Cloudflare; this writes the file's statement back to it.
+##
+function lilf-pages-access-edit {
+    : "usage: lilf-pages-access-edit
+Open the allow list. Nothing changes until lilf-pages-access-apply."
+
+    local file="${lilf_pages_access_file:-${nightNotesPrivate}/configs/eva/pages/access.conf}"
+    assert ensure-dir "${file}" @RET
+    reval-ec "${EDITOR:-vim}" "${file}"
+}
+##
+function lilf-pages-access-apply {
+    : "usage: lilf-pages-access-apply [--apply]
+Show what Cloudflare would have to change to match the allow list. With --apply, and one
+confirmation, make those changes.
+
+Reading the plan needs only the read token; applying it needs CLOUDFLARE_ACCESS_WRITE_TOKEN,
+which is a separate credential on purpose."
+
+    local file="${lilf_pages_access_file:-${nightNotesPrivate}/configs/eva/pages/access.conf}"
+    assert "${lilf_pages_bin}/access.py" --file "${file}" "$@" @RET
+}
+
+aliasfn lilf-pages-access-plan lilf-pages-access-apply
+##
