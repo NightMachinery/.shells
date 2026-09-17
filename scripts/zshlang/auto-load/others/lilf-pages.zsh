@@ -102,6 +102,10 @@ show-error" | command curl --config - "https://api.cloudflare.com/client/v4/${en
     print -r -- "${out}"
 }
 ##
+#: Said in three places, so it is written once. The tunnel credentials are the offline
+#: answer: cloudflared stamps the account into every credentials file it writes.
+typeset -g h_cloudflare_account_hint='It is in the dashboard URL after /accounts/ , or: ssh eva '"'"'jq -r .AccountTag ~/.cloudflared/*.json'"'"
+
 function h-cloudflare-account-id {
     : "usage: h-cloudflare-account-id
 \$CLOUDFLARE_ACCOUNT_ID if set, else the only account the token can see."
@@ -111,13 +115,15 @@ function h-cloudflare-account-id {
         return 0
     fi
 
-    #: Discovering it needs a second permission the Access-read token may not have, which
-    #: is fine: the id is not a secret, and naming it in the environment costs one line and
-    #: one round trip less. The error says so rather than leaving you guessing.
+    #: Discovery is a convenience that a correctly scoped token cannot have. GET /accounts
+    #: lists the accounts the token can read the SETTINGS of, so a token holding nothing
+    #: but Access:Read gets an empty list -- not an error, and not a sign of a bad token.
+    #: Hence the hint below, and hence naming the id in the environment being the normal
+    #: way round rather than the fallback.
     local json
     json="$(h-cloudflare-api accounts)" || {
         ecerr "$0: could not list accounts; set CLOUDFLARE_ACCOUNT_ID instead."
-        ecerr "  It is in the URL of the Cloudflare dashboard, after /accounts/ ."
+        ecerr "  ${h_cloudflare_account_hint}"
         return 1
     }
 
@@ -126,6 +132,14 @@ function h-cloudflare-account-id {
     if (( ${#ids} == 1 )) ; then
         print -r -- "${ids[1]}"
         return 0
+    fi
+
+    if (( ${#ids} == 0 )) ; then
+        ecerr "$0: this token can see no accounts, which is what a token scoped to Access"
+        ecerr "  alone looks like -- listing accounts is a separate permission it does not"
+        ecerr "  need. Set CLOUDFLARE_ACCOUNT_ID rather than widening the token."
+        ecerr "  ${h_cloudflare_account_hint}"
+        return 1
     fi
 
     ecerr "$0: the token sees ${#ids} accounts; set CLOUDFLARE_ACCOUNT_ID to one of:"
