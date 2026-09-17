@@ -51,10 +51,7 @@ function chronic-backup {
         backup-private-common
     fi
 
-    #: html-reports' registry is the only hand-written part of that site -- the Caddyfile
-    #: and the whole symlink tree are regenerated from it -- and it lives in ~/.config,
-    #: outside any repo. [agfi:backup-file] no-ops on hosts where it does not exist.
-    re backup-file $timetracker_db $HISTFILE ~/.config/html-reports/registry.json
+    re backup-file $timetracker_db $HISTFILE
     backup-cron
 
     if isLocal && isMe ; then

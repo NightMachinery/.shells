@@ -90,7 +90,7 @@ tmuxnew feed_updater1 env TSEND_TOKEN="${TSEND_TOKEN}" TSEND_BACKEND="${TSEND_BA
 #: site directory for exactly that reason: a server with the config but no content is
 #: correctly configured and waiting, not broken.
 #:
-#: Bootstrapping this from nothing: [[zf:~\[nt\]/private/configs/eva/pages/bootstrap.org]]
+#: Bootstrapping this from nothing: [[nightNotesPrivate:configs/eva/pages/bootstrap.org]]
 if test -e "${HOME}/html-reports/Caddyfile" ; then
     #: An absolute --config. The instance this replaced was started by hand with a
     #: RELATIVE `--config Caddyfile`, which works only from one directory and is precisely

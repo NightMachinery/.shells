@@ -231,22 +231,33 @@ function lilf-pages-access-edit {
     : "usage: lilf-pages-access-edit
 Open the allow list. Nothing changes until lilf-pages-access-apply."
 
-    local file="${lilf_pages_access_file:-${nightNotesPrivate}/configs/eva/pages/access.conf}"
+    local file="${lilf_pages_access_file:-${HOME}/.config/html-reports/access.yaml}"
     assert ensure-dir "${file}" @RET
     reval-ec "${EDITOR:-vim}" "${file}"
 }
 ##
 function lilf-pages-access-apply {
-    : "usage: lilf-pages-access-apply [--apply]
-Show what Cloudflare would have to change to match the allow list. With --apply, and one
-confirmation, make those changes.
+    : "usage: lilf-pages-access-apply
+Make Cloudflare match the allow list, after printing what it would change and asking once.
+Needs CLOUDFLARE_ACCESS_WRITE_TOKEN, which is a separate credential on purpose."
 
-Reading the plan needs only the read token; applying it needs CLOUDFLARE_ACCESS_WRITE_TOKEN,
-which is a separate credential on purpose."
-
-    local file="${lilf_pages_access_file:-${nightNotesPrivate}/configs/eva/pages/access.conf}"
-    assert "${lilf_pages_bin}/access.py" --file "${file}" "$@" @RET
+    #: The confirmation is read from /dev/tty, so a context without one (a script, an
+    #: agent) refuses rather than hanging. `yes_p` is how such a caller says it meant it.
+    local opts=(--apply)
+    bool "${lilf_pages_access_apply_yes_p:-}" && opts+=(--yes)
+    h-lilf-pages-access-py "${opts[@]}"
 }
 
-aliasfn lilf-pages-access-plan lilf-pages-access-apply
+function lilf-pages-access-apply-dryrun {
+    : "usage: lilf-pages-access-apply-dryrun
+The same, stopping after the plan. Needs only the read token, so you can always see what
+would change without holding a credential that could carry it out."
+
+    h-lilf-pages-access-py
+}
+
+function h-lilf-pages-access-py {
+    local file="${lilf_pages_access_file:-${HOME}/.config/html-reports/access.yaml}"
+    assert "${lilf_pages_bin}/access.py" --file "${file}" "$@" @RET
+}
 ##
