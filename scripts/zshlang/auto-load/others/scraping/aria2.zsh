@@ -328,9 +328,15 @@ function aa-2stdout {
     fhMode=aa full-html2 "$@"
 }
 
-function aa-2dest {
+function aa-2dest-v1 {
+    #: Buffers the whole response in a shell variable, so it is for HTML, not
+    #: binaries: =ec= restores exactly one trailing newline regardless of how
+    #: many the response ended with. It also has no retry and no fallback.
+    #: [agfi:curl-2dest] is the downloader you want.
+    ##
     fhMode=curl full-html "$@"
 }
+aliasfn aa-2dest curl-2dest
 ##
 function aa2tlg-book {
     local aaMark="$(uuidm)"

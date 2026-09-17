@@ -114,6 +114,60 @@ function curl-dl() {
     fi
     return $r
 }
+
+function curl-2dest {
+    #: Usage: [curl_2dest_retries=] $0 <url> ... <dest>
+    #:
+    #: Downloads to =dest=, trying each URL in turn until one succeeds.
+    #: Duplicates are dropped, so callers can pass mirrors unconditionally.
+    #:
+    #: The transfer goes to =${dest}.part= and is moved into place only on
+    #: success, so a failure leaves an existing =dest= untouched.
+    ##
+    local dest="${@[-1]}" urls=("${@[1,-2]}")
+    assert-args dest urls @RET
+    urls=(${(u)urls[@]}) #: keeps the first occurrence, so the order stands
+
+    local retries="${curl_2dest_retries:-3}"
+
+    local tmp="${dest}.part"
+    local curlm_ns=''
+    isI && curlm_ns=y
+
+    local i url attempts n="${#urls}" retcode=1
+    for i in {1..${n}} ; do
+        url="${urls[$i]}"
+
+        #: Spend the retries on the last URL. A failed attempt can download
+        #: megabytes before dying, and the earlier URLs are the suspect ones.
+        attempts=1
+        if (( i == n )) ; then
+            attempts="${retries}"
+        fi
+
+        #: =curlm_continue_p=n=: resuming an already complete file makes the
+        #: server answer 416, which =--fail= turns into exit 22. A truncated
+        #: response must not be resumed as if it were valid, either.
+        #: =retry-limited=, not =retry=: the latter is =retry-limited 0=, i.e.
+        #: unlimited, so the remaining URLs would never be reached.
+        if curlm_continue_p=n reval-ec retry-limited "${attempts}" curlm "$url" --output "${tmp}" ; then
+            retcode=0
+            break
+        fi
+
+        ecerr "$0: failed to download $(gq "$url")"
+    done
+
+    if (( retcode == 0 )) ; then
+        assert command mv -f -- "${tmp}" "${dest}" @RET
+    else
+        #: Leave =dest= alone when we have downloaded nothing usable.
+        command rm -f -- "${tmp}"
+    fi
+
+    return $retcode
+}
+
 function curl-cookies() {
     # cookies-auto takes ~0.5s
     curlm --header "$(cookies-auto "$@")" "$@"
