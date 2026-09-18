@@ -478,7 +478,6 @@ aliasfn tnameme-status tmux-session-autoname status
 #:
 #: Targets are written `=name`, tmux's exact match: without it, `foo` also selects a
 #: session named `foobar`.
-##
 function tmux-job-running-p {
     local name="$1"
     assert-args name @RET
