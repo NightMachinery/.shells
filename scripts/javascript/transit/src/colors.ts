@@ -1,37 +1,45 @@
+import generated from '../data/line-colors.json';
 import type { Departure, Mode } from './model.ts';
 
 // One source of line colour for both renderers. The terminal formatter turns
 // these into 24-bit escape sequences and the browser page turns them into CSS
 // custom properties, so a badge is the same colour in both places.
 
+/** One line's artwork: a background, and a foreground when the operator names one. */
+interface LineColor {
+  bg: string;
+  fg?: string;
+}
+
+interface ColorTable {
+  source: string;
+  feed_version: string;
+  attribution: string;
+  lines: Record<string, LineColor>;
+}
+
 /**
- * Official colours for the two rail networks whose lines are numbered and
- * colour-coded. Keys are upper-case line labels with no whitespace, which is
- * the same normalisation the line filter uses.
+ * The operator's own colours, generated from its published GTFS feed by
+ * `scripts/colors-refresh.ts` and committed as `data/line-colors.json`. Run
+ * `bun run colors:refresh` to regenerate it.
  *
- * Two of the rapid-transit lines are drawn as a pair of stripes in the official
- * artwork; a single colour is not expressible, so each takes one of its pair.
- * One suburban number is not currently in service and takes a neutral tone so
- * the table stays contiguous.
+ * The cast is needed because TypeScript types an imported JSON document as the
+ * literal shape of that one file, which cannot be indexed by an arbitrary line
+ * label. The generator is the thing that guarantees the shape.
  */
-export const LINE_COLORS: Readonly<Record<string, string>> = {
-  S1: '#16BAE7',
-  S2: '#76B82A',
-  S3: '#951B81',
-  S4: '#E30613',
-  S5: '#8A8A8A',
-  S6: '#00975F',
-  S7: '#963833',
-  S8: '#000000',
-  U1: '#52822F',
-  U2: '#C20831',
-  U3: '#EC6725',
-  U4: '#00A984',
-  U5: '#BC7A00',
-  U6: '#0065AE',
-  U7: '#C20831',
-  U8: '#EC6725',
-};
+const TABLE = generated as unknown as ColorTable;
+
+/**
+ * Background colour per line label, keyed by upper-case label with no
+ * whitespace, which is the same normalisation the line filter uses.
+ *
+ * Derived from the generated table rather than hand-written. Kept as an export
+ * because it is this module's long-standing surface; nothing else in the
+ * package reads it today.
+ */
+export const LINE_COLORS: Readonly<Record<string, string>> = Object.fromEntries(
+  Object.entries(TABLE.lines).map(([key, value]) => [key, value.bg]),
+);
 
 /** Fallback colour per vehicle category, for everything without its own. */
 export const MODE_COLORS: Readonly<Record<Mode, string>> = {
@@ -48,14 +56,35 @@ function lineKey(label: string): string {
 }
 
 /**
- * Resolve the colour of one departure's badge: the colour the backend supplied
- * if it supplied one, else the static line colour, else the category default.
+ * Resolve the colour of one departure's badge: the generated official table if
+ * it knows the line, else the colour the backend supplied, else the category
+ * default.
+ *
+ * This order *inverts* the one this function used to apply, which let a
+ * backend's colour win. The official table is the operator's own artwork and is
+ * stable across feed releases; a backend's colour varies by feed and has been
+ * seen to disagree with the printed colour for the same line. When the two
+ * differ, the printed one is the one a rider recognises on a platform sign, so
+ * it goes first.
  */
 export function resolveColor(dep: Pick<Departure, 'line' | 'mode' | 'color'>): string {
+  const official = TABLE.lines[lineKey(dep.line)];
+  if (official !== undefined) return official.bg;
   if (typeof dep.color === 'string' && /^#[0-9a-fA-F]{6}$/.test(dep.color)) return dep.color;
-  const byLine = LINE_COLORS[lineKey(dep.line)];
-  if (byLine !== undefined) return byLine;
   return MODE_COLORS[dep.mode];
+}
+
+/**
+ * The foreground the operator prints on that badge, or null when it names none.
+ *
+ * Null is not "black": it means the table has no opinion, and the caller is
+ * expected to fall back to `contrastText` of whatever background `resolveColor`
+ * returned. Only the table can answer this, because a backend colour or a mode
+ * default never carries a foreground of its own, and the table is consulted
+ * first, so an entry's `fg` always belongs to the `bg` actually being drawn.
+ */
+export function resolveTextColor(dep: Pick<Departure, 'line' | 'mode' | 'color'>): string | null {
+  return TABLE.lines[lineKey(dep.line)]?.fg ?? null;
 }
 
 /** Parse `#rrggbb` into its three channels. */
@@ -76,20 +105,20 @@ export function contrastText(hex: string): string {
   return luma > 0.6 ? '#000000' : '#ffffff';
 }
 
-function cssName(key: string): string {
-  return `--line-${key.toLowerCase()}`;
-}
-
 /**
- * The same table as CSS custom property declarations, for the browser page.
- * The page injects this at boot so the shell HTML and this module can never
+ * The category colours as CSS custom property declarations, for the browser
+ * page, which injects them at boot so the shell HTML and this module can never
  * drift apart.
+ *
+ * Per-*line* properties are deliberately not emitted. The generated table runs
+ * to hundreds of lines, so one property each would be tens of kilobytes of CSS
+ * built and parsed on every load, and nothing reads them: the page sets a
+ * badge's colour from `resolveColor` on the element itself. The two remaining
+ * readers of a line colour, the badge and the terminal formatter, both call
+ * this module directly.
  */
 export function cssCustomProperties(): string {
   const lines: string[] = [];
-  for (const [key, value] of Object.entries(LINE_COLORS)) {
-    lines.push(`  ${cssName(key)}: ${value};`);
-  }
   for (const [mode, value] of Object.entries(MODE_COLORS)) {
     lines.push(`  --mode-${mode.toLowerCase()}: ${value};`);
   }

@@ -7,6 +7,7 @@
   "scripts": {
     "test": "bun test",
     "typecheck": "tsc --noEmit",
+    "colors:refresh": "bun run scripts/colors-refresh.ts",
     "build": "bun build src/page.ts --target browser --outfile page/app.js"
   },
   "devDependencies": {
