@@ -55,6 +55,7 @@ horizon_minutes = 90
 backend = "mvg"
 fallback = "transitous"
 transport_types = ["SBAHN", "UBAHN", "TRAM", "BUS", "BAHN", "REGIONAL_BUS"]
+plan_modes = ["SUBURBAN", "SUBWAY", "TRAM", "BUS", "REGIONAL_RAIL"]
 timezone = "Europe/Berlin"
 home = "first"
 
@@ -367,6 +368,25 @@ An itinerary whose first timetabled leg starts at some other stop is not this
 board's journey and is dropped. A leading walking leg is normal, though, and is
 skipped over to find that first leg: the planner will walk you onto a platform
 inside the station you named.
+
+** Which vehicles a journey may use
+
+The journey planner routes over the whole national timetable, so left alone it
+will put an inter-city or high-speed train in the middle of a commute: a real
+journey, quicker than the alternative, and not one a local ticket covers. So the
+request names the modes it will accept rather than the ones it will not, because
+that is the shape the planner's parameter takes, and long-distance rail, night
+trains and long-distance coaches are simply not in the list. =defaults.plan_modes=
+replaces it for a reader who does hold a ticket that covers them.
+
+The names are the planner's own vocabulary, not this package's, and they are not
+checked against a list here: that vocabulary grows upstream without asking, and a
+validator would eventually reject a mode that works. A name the planner does not
+recognise is ignored there, which is the failure such a check would be guarding
+against anyway.
+
+The mode list is part of the plan cache key, because two searches over different
+modes are two different searches.
 
 ** Exits, walks and the early buffer
 
@@ -686,7 +706,9 @@ cache lifetimes are in =src/cache.ts=.
 The boundary between the near window and the strip view is in
 =src/format/terminal.ts=, along with how many journeys a row prints. The walking
 pace, the early buffer, the plan cache lifetime, the itineraries asked for per
-request, the page cap and the options kept per row are all in =src/plan.ts=. The
+request, the page cap and the options kept per row are all in =src/plan.ts=, and
+the transit modes a journey may use are in =src/config.ts= with the other
+defaults. The
 watch interval, the discovery sample count and the key the commute view pairs
 with the home profile are in =src/cli.ts=, and the page's refresh and tick
 intervals are in =src/page.ts=.

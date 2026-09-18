@@ -128,6 +128,7 @@ export async function planProfile(options: PlanProfileOptions): Promise<ProfileR
         startMs: options.startMs,
         baseUrl: options.config.backends.transitous_base_url,
         originCache,
+        ...(options.config.defaults.plan_modes === undefined ? {} : { planModes: options.config.defaults.plan_modes }),
         onOrigin: (resolved) => {
           origin = resolved.level;
         },

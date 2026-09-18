@@ -188,6 +188,12 @@ plan made from one platform is a slightly narrower claim than one made from the
 whole stop. The answer is cached, so this costs one small request the first time
 a stop is planned and nothing afterwards.
 
+Long-distance trains are left out of the search. The planner routes over the
+whole national timetable and would otherwise recommend an inter-city train
+through the middle of a commute, which is a real journey and not one a local
+ticket covers. `plan_modes` in the config's defaults puts them back for someone
+who holds a ticket that does.
+
 Transfer walking times are derived from the distance of the walking leg, not
 from the planner's own duration for it. The planner adds a flat padding of
 several minutes to every walking leg, which is defensible for a stranger and

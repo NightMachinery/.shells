@@ -475,6 +475,7 @@ async function commandRoute(runtime: Runtime, args: string[], flags: Flags): Pro
             rows,
             startMs: now,
             earlyBufferMinutes,
+            planModes: runtime.config.defaults.planModes,
             onOrigin: (resolved) => {
               if (origin === null || ORIGIN_RANK[resolved.level] > ORIGIN_RANK[origin]) origin = resolved.level;
             },

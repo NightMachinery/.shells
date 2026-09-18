@@ -47,6 +47,8 @@ export interface ExportedConfig {
     backend: string;
     fallback: string | null;
     transport_types: Mode[];
+    /** Transit modes a journey plan may use, in the journey planner's vocabulary. */
+    plan_modes?: string[];
     timezone: string;
     home: string | null;
   };

@@ -300,6 +300,53 @@ describe('cursor paging', () => {
   });
 });
 
+describe('transit modes', () => {
+  test('long-distance rail is left out of the request by default', async () => {
+    const { urls } = await planFixtureBoard([row('U1', 10)]);
+    const plan = urls.find((url) => url.includes('/plan')) ?? '';
+    const modes = decodeURIComponent(new URL(plan).searchParams.get('transitModes') ?? '').split(',');
+    // The planner routes over the whole national timetable and would otherwise
+    // put an inter-city train in the middle of a commute, which is a fine
+    // journey and not one a local ticket covers.
+    expect(modes).not.toContain('HIGHSPEED_RAIL');
+    expect(modes).not.toContain('LONG_DISTANCE');
+    expect(modes).not.toContain('NIGHT_RAIL');
+    expect(modes).not.toContain('COACH');
+    expect(modes).toContain('SUBURBAN');
+    expect(modes).toContain('REGIONAL_RAIL');
+  });
+
+  test('a configured mode list is sent instead, on every page', async () => {
+    const { fetchImpl, planUrls } = planMock(() => ({
+      itineraries: [],
+      nextPageCursor: '',
+    }));
+    await planBoard({
+      stop: HOME,
+      destination: DESTINATION,
+      rows: [row('U1', 10)],
+      startMs: FIXTURE_NOW,
+      baseUrl: BASE,
+      planModes: ['TRANSIT'],
+      fetchImpl,
+    });
+    for (const url of planUrls()) {
+      expect(decodeURIComponent(new URL(url).searchParams.get('transitModes') ?? '')).toBe('TRANSIT');
+    }
+  });
+
+  test('two mode lists are two searches, and one does not answer the other', async () => {
+    const body = await fixture<unknown>('transitous-plan.json');
+    const { fetchImpl, planUrls } = planMock((page) => (page === 0 ? body : { itineraries: [], nextPageCursor: '' }));
+    const call = (planModes: string[]) =>
+      planBoard({ stop: HOME, destination: DESTINATION, rows: [row('U1', 10)], startMs: FIXTURE_NOW, baseUrl: BASE, planModes, fetchImpl });
+    await call(['SUBWAY']);
+    const before = planUrls().length;
+    await call(['SUBWAY', 'TRAM']);
+    expect(planUrls().length).toBeGreaterThan(before);
+  });
+});
+
 describe('the plan cache', () => {
   test('a second plan in the same minute asks for nothing', async () => {
     const body = await fixture<unknown>('transitous-plan.json');

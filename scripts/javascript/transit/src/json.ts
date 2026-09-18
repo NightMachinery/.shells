@@ -125,6 +125,7 @@ export function configExportDocument(config: Config, options: ConfigExportOption
       backend: config.defaults.backend,
       fallback: config.defaults.fallback,
       transport_types: config.defaults.transportTypes,
+      plan_modes: config.defaults.planModes,
       timezone: config.defaults.timezone,
       // The profile key the `home` alias resolves to, so the page can follow
       // the same alias without parsing the TOML itself.

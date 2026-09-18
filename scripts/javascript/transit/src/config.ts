@@ -16,6 +16,19 @@ export const CONFIG_PATH_ENV = 'ADDRESS_CONFIG';
 /** Looked for under the home directory when the environment variable is unset. */
 export const DEFAULT_CONFIG_RELATIVE_PATH = '.address-config/address.toml';
 
+/**
+ * The transit modes a journey may use, as the planner's own vocabulary names
+ * them. An allow-list rather than a deny-list, because that is the shape the
+ * parameter takes: leaving it unset allows everything.
+ *
+ * Long-distance rail is deliberately absent. The planner routes over the whole
+ * national timetable and will happily put an inter-city or high-speed train in
+ * the middle of a commute, which is a fine journey and not one a local ticket
+ * covers, so the recommendation would be wrong in the way that costs money.
+ * `defaults.plan_modes` exists for a reader who does hold such a ticket.
+ */
+export const DEFAULT_PLAN_MODES: readonly string[] = ['SUBURBAN', 'SUBWAY', 'TRAM', 'BUS', 'REGIONAL_RAIL'];
+
 export const DEFAULT_HORIZON_MINUTES = 120;
 export const DEFAULT_BACKEND = 'mvg';
 export const DEFAULT_FALLBACK = 'transitous';
@@ -40,6 +53,11 @@ export interface Defaults {
   /** Backend to fall back to, or `null` when the config disables falling back. */
   fallback: BackendName | null;
   transportTypes: Mode[];
+  /**
+   * Transit modes a journey plan may use, in the planner's own vocabulary.
+   * Unset means the package's default, which leaves long-distance rail out.
+   */
+  planModes: string[];
   timezone: string;
   /** Profile key that the alias resolves to, or `null` when unset. */
   home: string | null;
@@ -137,6 +155,7 @@ function parseDefaults(raw: unknown, issues: string[]): Defaults {
     backend: DEFAULT_BACKEND,
     fallback: DEFAULT_FALLBACK,
     transportTypes: [...DEFAULT_TRANSPORT_TYPES],
+    planModes: [...DEFAULT_PLAN_MODES],
     timezone: DEFAULT_TIMEZONE,
     home: null,
   };
@@ -176,6 +195,19 @@ function parseDefaults(raw: unknown, issues: string[]): Defaults {
       issues.push(`defaults.transport_types: must be a non-empty list drawn from ${ALL_MODES.join(', ')}`);
     } else {
       defaults.transportTypes = list as Mode[];
+    }
+  }
+
+  if (table.plan_modes !== undefined) {
+    // Not checked against a list of names: the vocabulary is the journey
+    // planner's, it grows there without asking, and a validator here would
+    // reject a mode that works. A name the planner does not know is ignored
+    // upstream, which is the failure this would be protecting against anyway.
+    const list = stringList(table.plan_modes);
+    if (list === null || list.length === 0) {
+      issues.push('defaults.plan_modes: must be a non-empty list of journey-planner transit mode names');
+    } else {
+      defaults.planModes = list.map((mode) => mode.trim().toUpperCase());
     }
   }
 
@@ -493,6 +525,7 @@ export async function loadConfig(explicit?: string): Promise<Config> {
         backend: DEFAULT_BACKEND,
         fallback: DEFAULT_FALLBACK,
         transportTypes: [...DEFAULT_TRANSPORT_TYPES],
+        planModes: [...DEFAULT_PLAN_MODES],
         timezone: DEFAULT_TIMEZONE,
         home: null,
       },

@@ -6,6 +6,7 @@ import {
   toRawId,
   TRANSITOUS_DEFAULT_BASE_URL,
 } from './backends/transitous.ts';
+import { DEFAULT_PLAN_MODES } from './config.ts';
 import { normaliseLine, type WalkSource } from './filter.ts';
 import { resolveOrigin, type OriginCache, type OriginLevel, type ResolvedOrigin } from './origin.ts';
 import { envOverride, fetchJson, HttpError, type FetchLike } from './http.ts';
@@ -152,6 +153,8 @@ export interface PlanBoardOptions {
   rows: Departure[];
   startMs: number;
   earlyBufferMinutes?: number;
+  /** Transit modes a journey may use; defaults to `DEFAULT_PLAN_MODES`. */
+  planModes?: readonly string[];
   baseUrl?: string;
   fetchImpl?: FetchLike;
   onDebug?: (line: string) => void;
@@ -414,6 +417,7 @@ async function fetchItineraries(
   coverThroughMs: number,
   boardStop: string,
   baseUrl: string,
+  planModes: readonly string[],
   fetchImpl: FetchLike | undefined,
   onDebug: ((line: string) => void) | undefined,
 ): Promise<ParsedItinerary[]> {
@@ -423,7 +427,10 @@ async function fetchItineraries(
   for (let page = 0; page < PLAN_MAX_PAGES; page += 1) {
     const base =
       `fromPlace=${encodeURIComponent(fromPlace)}&toPlace=${encodeURIComponent(toPlace)}` +
-      `&numItineraries=${ITINERARIES_PER_REQUEST}`;
+      `&numItineraries=${ITINERARIES_PER_REQUEST}` +
+      // Sent on every page, cursor pages included: the cursor carries a position
+      // in the search, not the search's own parameters.
+      `&transitModes=${encodeURIComponent(planModes.join(','))}`;
     const query =
       cursor === null
         ? `${base}&time=${encodeURIComponent(new Date(startMs).toISOString())}&arriveBy=false`
@@ -665,8 +672,11 @@ export async function planBoard(options: PlanBoardOptions): Promise<PlannedRow[]
   options.onOrigin?.(resolved);
   const fromPlace = resolved.place;
   const toPlace = placeParam(options.destination);
+  const planModes = options.planModes ?? DEFAULT_PLAN_MODES;
   const startMinute = Math.floor(options.startMs / 60_000);
-  const cacheKey = `${fromPlace}|${toPlace}|${startMinute}`;
+  // The modes are part of the key: two searches over different modes are two
+  // different searches, and one must not answer the other.
+  const cacheKey = `${fromPlace}|${toPlace}|${startMinute}|${planModes.join(',')}`;
 
   const known = unknownOrigins.get(fromPlace);
   if (known !== undefined) throw known;
@@ -683,6 +693,7 @@ export async function planBoard(options: PlanBoardOptions): Promise<PlannedRow[]
         coverThrough,
         options.stop,
         baseUrl,
+        planModes,
         options.fetchImpl,
         options.onDebug,
       );
