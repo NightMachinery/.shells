@@ -39,6 +39,34 @@ local function onPowerEvent(event)
         if blackoutLockOff then blackoutLockOff(true) end
         if blackoutEnded then blackoutEnded() end
     end
+
+    -- Unlocking is the way back from the top blackout rung (hyper+cmd+F1,
+    -- see core/blackout-lock.lua): it locks the session outright, and while
+    -- the login window is up no chord can reach us at all, because the user
+    -- session stops receiving key events. So the unlock has to be what
+    -- restores the display, and until now the only thing listening for it was
+    -- swift/lock_watcher.swift, which fires h-hook-unlock in the garden.
+    --
+    -- That watcher was found dead, weeks after it quietly exited, with the
+    -- screen left black through every unlock in between. One unsupervised
+    -- process should not be the single way out of a black screen, so this
+    -- listens too. It is the same belt-and-braces the wake path above already
+    -- is, and h-blackout-release is written to be run from several places and
+    -- to return immediately when nothing is blanked.
+    --
+    -- Deliberately h-blackout-release rather than the whole h-hook-unlock:
+    -- the rest of that hook (audio guard, battery limit, idle reset) is not
+    -- idempotent in the way the blackout release is, and duplicating it here
+    -- would double-fire it whenever the swift watcher is alive.
+    if event == hs.caffeinate.watcher.screensDidUnlock then
+        brishz_eval_hs("h-blackout-release", "power-watcher-unlock")
+
+        -- The Lua half, as above: the garden restores the display, these give
+        -- the keyboard back and forget the blackout. Done here as well so the
+        -- keys come back even if the garden is slow or down.
+        if blackoutLockOff then blackoutLockOff(true) end
+        if blackoutEnded then blackoutEnded() end
+    end
 end
 
 -- A reload builds a fresh Lua state, and core/reload.lua path-watches this

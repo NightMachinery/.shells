@@ -856,22 +856,47 @@ first — the garden does not care what the session is doing, and
 On a blackout already up, the mark is set *before* the lock, so a `lockScreen`
 that somehow never arrives still leaves a blackout that locks on the way out.
 
-There is no chord back from rung three, and there is not meant to be: chords
-cannot reach the login screen, where Secure Input hides every keystroke from
-every tap. The way back is unlocking the session — Touch ID, or a password
-typed blind at a screen you cannot see. The Swift lock watcher turns that into
-`h-hook-unlock`, which runs `h-blackout-release`, which reaches
-`display-black-off`, which calls `blackoutLockOff` and `blackoutEnded` here over
-ipc. The display comes back on its own.
+There is no chord back from rung three, and there is not meant to be. Once the
+login window is up, no chord of any kind reaches this config: the user session
+stops receiving key events, so both taps go blind and even F18 never arrives.
+Hyper does not work at all while the session is locked. That is worth stating
+plainly, because from the outside it looks like the escape chord specifically
+has broken, and it has not — nothing is being delivered to anything.
+
+The way back is unlocking the session: Touch ID, or a password typed blind at a
+screen you cannot see. Two things listen for that unlock, and it takes both to
+make the way back trustworthy:
+
+- `swift/lock_watcher.swift`, which runs `h-hook-unlock` in the garden. That is
+  the whole unlock hook, the audio guard and the battery limit included, and it
+  keeps working while Hammerspoon is reloading.
+- `core/power-watcher.lua`, which calls `h-blackout-release` and does the Lua
+  half itself, on `screensDidUnlock`. Just the blackout, because the rest of
+  that hook is not safe to fire twice.
+
+The redundancy is not theoretical. The Swift watcher was found dead, weeks
+after quietly exiting, and with it the only way back from a black locked screen;
+see "Nothing was watching the unlock" below.
 
 Which rung a blackout is at lives in `rung`, and like the mark it is only ever
-raised. It is deliberately not persisted: the one fact it adds over the mark —
-"the session is already locked" — is macOS's own state, and would be stale the
-moment it was read back. A recovered rung-three blackout therefore comes back as
-rung two, and nothing downstream can tell the difference, because the session is
-either still locked, which the login screen says for itself, or has been
-unlocked, in which case `h-hook-unlock` ended the blackout already and there was
-nothing left to recover.
+raised. `sessionLocked` sits beside it and records that rung three really did
+lock the session, which is the one fact the mark cannot carry on its own.
+
+That field is what stops the way out locking you out again. The mark says
+"ending this blackout should lock the screen", and after rung three that is
+already spent: the session was locked, and whoever is pressing F2 now got past
+the login window, so they have authenticated. Without `sessionLocked` the
+escape chord locked a second time and restored the display under a fresh login
+screen, which reads exactly like the chord having failed. It is persisted with
+the rest, as a third field appended to the redis value, so a reload cannot
+bring the second lock back; the parser takes it as optional, so a key written
+before rung three existed still reads, as "not locked", which is what those
+blackouts were.
+
+None of this weakens the invariant. The rule is that the keyboard lock never
+releases into an *unlocked* session on its own, and here the session was locked
+and a person unlocked it, which is the deliberate act the rule asks for. The
+expiry still locks regardless, since it passes `forceLock`.
 
 The mark belongs to whoever *starts* the black, because the person who presses
 F2 might be an adversary; that is why there is no cmd chord on F2. The upgrade
@@ -986,17 +1011,18 @@ hs -c 'return blackoutNotePending()'  # is a note holding a blackout back?
 hs -c 'blackoutNoteFire()'            # stop waiting; black now
 ```
 
-There are four ways out, and every path that ends a blackout takes one of them.
+There are five ways out, and every path that ends a blackout takes one of them.
 F2, through `blackoutRestore`. The wake watcher in `core/power-watcher.lua`,
 which calls `blackoutLockOff` and `blackoutEnded` on `systemDidWake` and
-`screensDidWake`, since a wake lands on a login screen anyway. The zsh
+`screensDidWake`, since a wake lands on a login screen anyway. The unlock
+branch of that same watcher, on `screensDidUnlock`. The zsh
 `display-black-off`, which calls both over `hammerspoon -c` right after its
 unconditional gamma restore — the one point every unblack path reaches, whether
 F2, `h-hook-wake`,
 `h-hook-unlock` from the Swift lock-watcher or the function run bare from
 another machine, so the lock can never outlive the black. And the expiry. Rung
-three has no way out of its own; it takes the third of those, since unlocking
-the session is what fires `h-hook-unlock`.
+three has no way out of its own, since no chord can reach a locked session; it
+takes the unlock, which now fires two of these independently.
 
 Only the Hammerspoon side locks the session; a shell restore releases the lock
 and brings the display back, nothing more, because it is the owner acting from
@@ -1117,6 +1143,39 @@ holding a blackout back, and `blackoutNoteFire()` ends the wait early.
 `blackoutChordRun("black")` — or `"black-lock-first"`, `"black-lock-now"`,
 `"restore"` — runs the whole chord path from the shell, note gate included,
 which is the only way to exercise the gate without a keyboard.
+
+### Nothing was watching the unlock
+
+Rung three shipped relying on one process to get the screen back, and that
+process was already dead. `swift/lock_watcher.swift` is what turns a lock or an
+unlock into `h-hook-lock` / `h-hook-unlock`; without it, unlocking restored
+nothing, the keep-blank loop went on asserting zero brightness every few
+seconds, and the escape chord could not help because a locked session delivers
+no keys at all.
+
+What the evidence showed, since the shape of the failure matters more than this
+one instance:
+
+- It was started at boot with everything else in `launchers/various-darwin.zsh`,
+  and every other session started there was still up 38 days later. So nothing
+  swept it. It exited on its own.
+- There is no crash report for it, so it was signalled or returned rather than
+  crashing in a way macOS recorded. The script itself still runs fine.
+- Why it exited cannot be recovered, and that is the actual defect. It was
+  launched with `tmuxnew`, which runs the command as the session's only
+  process, so the session is destroyed the instant that process exits. The
+  pane, the scrollback and the `-v` log went with it. Nothing restarted it and
+  nothing said a word.
+
+So the launcher now wraps it in `loop` inside a shell session that outlives it,
+with `reval-notifexit` to notify on every exit. A death is now noisy and
+self-healing instead of silent and permanent. Hammerspoon listens for the
+unlock as well, which covers the blackout specifically even if this watcher is
+down again.
+
+The general lesson for anything launched from that file: `tmuxnew` is for
+processes whose death should take the session with it. Anything you would want
+to *notice* dying needs the session to outlive it.
 
 ## When a hyper chord does nothing
 

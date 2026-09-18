@@ -42,7 +42,10 @@ on top of these and needed no changes, as do the hyper+F1/F2 and
 hyper+shift+F1/F2 bindings in `hammerspoon/core/window-media-bindings.lua`.
 The blackout chord has since grown a third rung, hyper+cmd+F1, which blacks the
 screen and locks the macOS session on the spot — the way back is unlocking the
-session, not a chord — and that changes nothing down here either.
+session, not a chord, since a locked session delivers no keys to any tap — and
+that changes nothing down here either. The unlock is what restores the display,
+through `h-blackout-release`, which both the Swift lock watcher and
+Hammerspoon's own unlock watcher now call.
 
 `brightness-displays` prints TSV — index, backend, backend-local id, `main`,
 built-in/external, name, CGDirectDisplayID:

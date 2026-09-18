@@ -211,6 +211,12 @@ blackoutLockState = blackoutLockState or {
     -- "the session is already locked", is macOS's own state and would be
     -- stale the moment it was read back. Recovery sets it from the mark.
     rung = nil,
+    -- Rung three actually locked the session for this blackout. The mark says
+    -- "ending this blackout should lock"; this says "it already did", and it
+    -- is what stops the escape chord locking a second time. Persisted with
+    -- the rest, because a reload that forgot it would bring the second lock
+    -- back exactly where it is hardest to notice.
+    sessionLocked = false,
     restoreTimer = nil,
     recoverTimer = nil,
     -- The chord dispatch tap; see ** Chord dispatch below. Lives here rather
@@ -357,7 +363,14 @@ local kRedisBlackKey = "display_black_saved"
 local function persist(st)
     if not redisSet then return end
     if st.since then
-        redisSet(kRedisKey, string.format("%d %d", math.floor(st.since), st.lockFirst and 1 or 0))
+        --- A third field, appended rather than inserted, so a key written by
+        --- the previous version still reads: the parser below takes it as
+        --- optional and an absent one means "not locked yet", which is what
+        --- every blackout that predates rung three was.
+        redisSet(kRedisKey, string.format("%d %d %d",
+                                          math.floor(st.since),
+                                          st.lockFirst and 1 or 0,
+                                          st.sessionLocked and 1 or 0))
     else
         redisDel(kRedisKey)
     end
@@ -641,6 +654,7 @@ function blackoutEnded()
     st.since = nil
     st.lockFirst = false
     st.rung = nil
+    st.sessionLocked = false
     persist(st)
 
     return true
@@ -758,7 +772,12 @@ function blackoutLockNow()
             --- session beats a chord that did nothing.
             blackoutBegin(true, true)
         end
-        lockSession()
+        --- Recorded only when it really locked, so the dry-run knob does not
+        --- leave a blackout claiming a lock that never happened.
+        if lockSession() then
+            st.sessionLocked = true
+            persist(st)
+        end
         return true
     end
 
@@ -774,13 +793,31 @@ function blackoutLockNow()
     })
 
     playCue("lock-now", blackoutLockNowSound)
-    lockSession()
+    if lockSession() then
+        st.sessionLocked = true
+        persist(st)
+    end
 
     return false
 end
 
 local function shouldLockScreen(force)
-    if force or blackoutLockState.lockFirst then return true end
+    if force then return true end
+
+    --- The mark is spent once rung three has actually locked the session.
+    --- Whoever is pressing F2 now got past the login window, so they have
+    --- authenticated; locking again protects nothing, and it is precisely
+    --- what made the way out look broken. The chord threw the person back to
+    --- the login screen instead of ending the blackout, and since the screen
+    --- was still black they could not see that it had done anything at all.
+    ---
+    --- This does not weaken the invariant. The rule is that the keyboard lock
+    --- never releases into an *unlocked* session on its own; here the session
+    --- was locked and a person unlocked it, which is the deliberate act the
+    --- rule asks for.
+    if blackoutLockState.sessionLocked then return false end
+
+    if blackoutLockState.lockFirst then return true end
     local after = blackoutLockScreenAfterSeconds
     if not after then return false end
     local since = blackoutLockState.since
@@ -1241,7 +1278,7 @@ function blackoutLockRecover()
     if not raw or raw == "" then return "nothing" end
 
     local black = redisGet(kRedisBlackKey)
-    local since, first = tostring(raw):match("^(%d+)%s+([01])")
+    local since, first, locked = tostring(raw):match("^(%d+)%s+([01])%s*([01]?)")
     if not black or black == "" or not since then
         redisDel(kRedisKey)
         return "stale"
@@ -1249,6 +1286,9 @@ function blackoutLockRecover()
 
     st.since = tonumber(since)
     st.lockFirst = (first == "1")
+    --- Absent in a key written before rung three existed, and "not locked" is
+    --- the right reading of those: they had no way to lock the session.
+    st.sessionLocked = (locked == "1")
     --- Rung three is not saved (see the state table), so a recovered rung-three
     --- blackout comes back as rung two. Nothing downstream can tell: the
     --- session is either still locked, which the login screen says for
