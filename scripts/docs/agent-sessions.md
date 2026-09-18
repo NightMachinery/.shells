@@ -449,7 +449,106 @@ it is readable exactly as long as there is somewhere to go.
 
 The preview is the fftmux family's -- the Go transcript previewer. The
 subagent-shaped preview, with the result front matter and the tail of the pane,
-belongs to [agfi:agent-clean-fz], whose question is whether to close the thing.
+belongs to the two pickers whose question is about the child rather than about
+the conversation in it: [agfi:agent-clean-fz], which asks whether to close the
+thing, and [agfi:subagents-of-fz] below, which asks which of one agent's
+children to go to.
+
+### The children of *one* agent
+
+`fftas` shows every registered child on the machine. During a run with several
+coordinators going at once that is dozens of rows with nothing on them saying
+whose they are, and the answer is not recoverable from the listing: a child's
+tmux session name spells its project and its task and never its parent. The
+parentage is in the registry's `parent` and `lineage` fields and nowhere else.
+
+[agfi:subagents-of-fz] is the picker over that. It is two dialogues in a row --
+which agent, then which of that agent's children -- and an argument is a query
+for the first one:
+
+    subagents-of-fz                 #: pick the agent, then pick the child
+    subagents-of-fz coordinator     #: skip straight to that agent's children
+    subagents-of-fz -r <agent>      #: the whole subtree, with a depth column
+
+The first dialogue takes fzf's `--select-1`, so a query matching one agent skips
+it. **The second never does.** That is the point of the command rather than an
+oversight: seeing what a child is doing before you land in it matters most when
+there is exactly one of them, which is precisely the case `--select-1` would
+have skipped.
+
+Who the first dialogue offers is not "every agent". It is every agent that has
+actually launched a child -- with `-r`, every agent that has a descendant, which
+is the larger set, because a coordinator's coordinator has grandchildren and no
+children of its own. Offering an agent whose second dialogue would be empty is
+worse than leaving it out, so the two lists genuinely differ, and the error when
+you name an agent with no children says which of the two you asked for.
+
+A parent is named by whatever id it registered under, and that is three
+different kinds of string ([agfi:h-agent-subagents-parent-identity] resolves all
+three). A child of the skill registers under its tmux session name, which
+resolves directly. A top-level agent registers under its *agent session* id,
+which the autoname hooks have written onto its tmux session in the
+`@agent_session` option. And a coordinator started by hand tends to invent a
+label ending in the first field of that id -- `fanout-coordinator-1f2e3d4c` for
+session `1f2e3d4c-....` -- which nothing can resolve exactly. That last
+one is matched by suffix, which is a heuristic, and the name it produces is
+prefixed with `~` so the row says so. Nothing resolving at all is a normal
+answer: an external parent may never have been an agent in a tmux session here.
+
+The second dialogue's columns are the node id, what the child was launched as
+(provider, launcher and the model asked for), its state, whether its tmux
+session still exists, its task id and when it was created. The state is the
+derived one, never the registry's `process_state`, which is written at launch
+and never updated; [agfi:h-agent-subagents-registry-meta] is the helper that
+reads the launch metadata and deliberately refuses to hand that field out at
+all. The state is coloured -- green while something is running, dim when nothing
+is left to run, yellow when it is alive and nothing can say what it is doing,
+and loud for the three that want a person: a foreign result, a question, a
+crash.
+
+`gone` children are offered here, where every other picker drops them. There is
+nothing to attach to, and that is exactly why the row is worth having: "you
+launched this and its session is gone" is an answer. Enter on one prints where
+its task directory and its resume state live instead of failing at a missing
+target. It carries 👻, added to [agfi:h-agent-subagents-state-rank] for this
+picker alone.
+
+Enter goes to the child's session, switching the client when you are already
+inside tmux, through [agfi:h-fftmux-act] like every other picker here. **ctrl-r
+attaches read-only** -- a child mid-turn is a place where a stray keystroke
+costs you the turn. Read-only is a property of a *client* and attaching cannot
+nest, so from inside tmux that has to be a new client rather than a switch:
+`display-popup -E` with `TMUX` unset gives one over the current pane, and
+closing it leaves everything as it was. Not `switch-client -r`, which is the
+obvious-looking answer and the wrong one -- it *toggles* the flag on the client
+you are sitting in, so it would hand you a read-only terminal of your own and
+leave it that way after you came back.
+
+The preview is [agfi:agent-subagents-preview] and never the Go transcript
+renderer the rest of the family uses. Everything it shows comes from the
+registry, the task directory, the status log and the pane -- what the child put
+on a screen -- so browsing a fan-out never pages other conversations'
+transcripts past you on the way to choosing one. That preview grew three things
+for this picker, and [agfi:agent-clean-fz] gets all three: the launch metadata,
+the newest checkpoint's tail, and `--pane-lines`. The pane also moved up to sit
+directly under the identity block, because a preview is read from the top and
+with the result and the checkpoints above it the live half was reliably the half
+nobody scrolled to.
+
+`--pane-lines` is an argument and not only the `agent_subagents_preview_pane_lines`
+knob for a reason worth writing down: a preview reaches zshlang through the
+garden, and `brishzq.zsh` takes a command and its arguments rather than a shell
+line, so an `var=value` prefix in front of the call comes back as
+`command not found: var=value`.
+
+One limitation, reported rather than papered over. The listing and the liveness
+check address each entry's own `tmux_socket`, so a child on another tmux server
+is described correctly; attaching, though, is something a *client* does, and our
+client is on our server. When the two sockets differ, [agfi:h-subagents-of-fz-act]
+says so and prints the `env -u TMUX tmux -S ... attach-session` line to run
+instead of attaching to whatever happens to carry that session id here. Two
+servers number their sessions independently, so that would be a different
+session entirely.
 
 ## Closing the subagents a skill launched
 
@@ -736,6 +835,14 @@ These are new and belong to this design rather than to Claude:
   whole thing off. See the section below.
 - `agent_clean_fz_all_p` -- show busy children in [agfi:agent-clean-fz];
   [agfi:agent-clean-all-fz] is that spelling.
+- `agent_subagents_preview_pane_lines` -- how many lines of a child's pane
+  [agfi:agent-clean-fz]'s preview shows. Its `--pane-lines` argument is the
+  same value by the route a preview can actually use; "The children of *one*
+  agent" above says why the knob alone is not enough.
+- `subagents_of_fz_recursive_p` -- whether [agfi:subagents-of-fz] works on the
+  whole subtree rather than the direct children. `-r` is that spelling.
+- `subagents_of_fz_sort` -- how both of its dialogues are ordered, in the
+  values of `agent_session_rows_sort`. `last` by default, as in `ffta`.
 - `agent_launch_glyph` and `agent_launch_sync_p` -- the tab-title glyph and
   whether to sync the instruction files, for the shared launcher preamble
   [agfi:h-agent-launch] that the three launchers now share instead of each
