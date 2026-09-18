@@ -1,4 +1,7 @@
-# A chat plugin for the departure boards (deferred spec)
+# A chat plugin for the departure boards (retired spec)
+
+Retired 2026-09-18, never built. Kept so the interface does not have to be
+re-derived if the idea comes back; nothing below is wired into the tool.
 
 This is a design, not an implementation. It records what a betterborg plugin over
 [agfi:transit-board] would have to do, so that whoever writes it does not have to
