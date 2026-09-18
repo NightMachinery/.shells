@@ -84,6 +84,24 @@ matches the current directory at all. Pinning to `$HOME` and reading `$PWD`
 back out of the subshell is the one form both implementations spell the same
 way.
 
+## The picker must not go through `fzf-tmux`
+
+The `z` call empties `TMUX` for its subshell, and that is load-bearing.
+[agfi:fzf-gateway] routes to `fzf-tmux -p90%` when `isTmux && ! isKitty &&
+isI`, and `fzf-tmux` needs a `tmux popup` to draw into. Where that popup cannot
+run it blocks on `cat <fifo2>` forever and prints *nothing*: no picker, no
+error, no timeout. Measured: a cold-cache `tma-z scripts-claude` produced zero
+bytes in 45 seconds on a real pty, with the process tree showing only the
+blocked fifo read and no fzf or popup process at all. Emptying `TMUX` takes the
+plain-fzf branch, which draws on `/dev/tty` and works inside tmux and outside
+it; the same measurement then gives the alternate-screen and mouse-tracking
+sequences, i.e. a picker.
+
+This is a general hazard rather than one of this function's: any caller of
+[agfi:fz], [agfi:ffz-get] or `z` from a context where a tmux popup cannot
+display hangs the same silent way. The old `tma-z` never met it only because it
+ran `z` inside the session's own pane, where a popup always had a client.
+
 ## Knobs
 
 - `tmuxnewsh2_attach_z_force_interactive` — what `FORCE_INTERACTIVE` is set to
