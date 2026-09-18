@@ -78,7 +78,12 @@ function tmux-alive-p {
     tmux_target="$(tmux-session-id "${session}" 2>/dev/null)" || return 1
 
     local pane_dead_values
-    pane_dead_values=("${(@f)$(tmux list-panes -t "${tmux_target}" -F '#{pane_dead}')}" ) @RET
+    #: `-s' asks the whole session. Without it `list-panes' resolves a *window*
+    #: target, so a session id alone gives you the current window's panes and
+    #: nothing else: measured 1 pane of 2 on a two-window session. A session
+    #: whose current window had died would then be called dead while real work
+    #: ran on in another window.
+    pane_dead_values=("${(@f)$(tmux list-panes -s -t "${tmux_target}" -F '#{pane_dead}')}" ) @RET
 
     local pane_dead
     for pane_dead in "${pane_dead_values[@]}" ; do
