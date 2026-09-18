@@ -1,6 +1,6 @@
 import type { Board } from '../model.ts';
 import { visibleRows } from './board.ts';
-import { button, clockTime, dayOffset, el, minutesUntil } from './dom.ts';
+import { button, clockTime, compact, dayOffset, el, minutesUntil } from './dom.ts';
 import type { ExportedConfig, PageState } from './types.ts';
 
 // The sticky bar: which profile, how far ahead, from when, how fresh, and a way
@@ -133,7 +133,9 @@ function renderChips(context: BarContext): HTMLElement | null {
     const rows = visibleRows(profileKey, board);
     const next = rows.find((dep) => dep.realtime >= context.now && !dep.cancelled);
     const chip = button('chip');
-    chip.append(el('span', 'chip-title', board.title));
+    // The chip is the narrowest thing on the page; the full title is on the
+    // tooltip below, so nothing is lost by shortening what is drawn.
+    chip.append(el('span', 'chip-title', compact(board.title)));
     const when = el('span', 'chip-next');
     const write = (): void => {
       when.textContent = next === undefined ? '-' : `${minutesUntil(next.realtime, Date.now())}'`;

@@ -539,7 +539,13 @@ integrated view covers the whole horizon.
 
 A row is a grid of fixed slots: minutes, line badge, destination with its times,
 the onward connection, the journey to the destination, the platform, whether the
-time is live or a plan, a reminder marker, and the stop label. A slot is empty when the value is absent and
+time is live or a plan, a reminder marker, and the stop label.
+
+In the slots too narrow to hold a full place name (the journey slot, the strip's
+destination suffixes, the board chips) names are abbreviated by one shared map
+before they are cut, so what survives distinguishes one place from another
+rather than spelling out the word "station". The full name is always still in
+the tooltip. A slot is empty when the value is absent and
 nothing shifts, so the eye can run down one column.
 
 Which *optional* slots exist is decided per board rather than globally: the
@@ -708,7 +714,8 @@ The boundary between the near window and the strip view is in
 pace, the early buffer, the plan cache lifetime, the itineraries asked for per
 request, the page cap and the options kept per row are all in =src/plan.ts=, and
 the transit modes a journey may use are in =src/config.ts= with the other
-defaults. The
+defaults. The abbreviations used in slots too narrow for a full place name are a
+single constant in =src/page/dom.ts=. The
 watch interval, the discovery sample count and the key the commute view pairs
 with the home profile are in =src/cli.ts=, and the page's refresh and tick
 intervals are in =src/page.ts=.

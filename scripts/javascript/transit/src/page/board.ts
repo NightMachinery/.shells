@@ -1,7 +1,7 @@
 import { contrastText, resolveColor, resolveTextColor } from '../colors.ts';
 import { catchableOnBoard, describeWalk, normaliseLine, walkMinutesFor } from '../filter.ts';
 import type { Board, Departure } from '../model.ts';
-import { button, clockTime, dayMarker, el, minutesUntil, slot } from './dom.ts';
+import { button, clockTime, compact, dayMarker, el, minutesUntil, slot } from './dom.ts';
 import { alarmMarker, attachLongPress, openAlarmPopup } from './notify.ts';
 import { stopTagOf } from './data.ts';
 import { arrivalOf, rowKey, usualExits, type BoardRoutes } from './commute.ts';
@@ -345,10 +345,16 @@ function renderStrip(rows: Departure[], board: Board, context: BoardContext): HT
   return list;
 }
 
-/** Enough of a destination to tell two branches of one line apart. */
+/**
+ * Enough of a destination to tell two branches of one line apart.
+ *
+ * Abbreviated before it is cut, so the characters that survive are the ones
+ * that distinguish one place from another rather than the ones a station name
+ * spends on saying "station".
+ */
 function shortDestination(name: string): string {
   const head = name.split(/[,(]/)[0] ?? name;
-  return head.trim().slice(0, 12);
+  return compact(head).slice(0, 14);
 }
 
 function renderFilter(board: Board, context: BoardContext, rows: Departure[]): HTMLElement {

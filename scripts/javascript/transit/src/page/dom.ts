@@ -102,3 +102,28 @@ export function selectionInsideBoards(): boolean {
   const element = anchor.nodeType === Node.ELEMENT_NODE ? (anchor as Element) : anchor.parentElement;
   return element?.closest('.board') !== null && element !== null;
 }
+
+/**
+ * How a place name is shortened in a slot too narrow to hold it.
+ *
+ * One constant, applied in the three compact places (the journey slot, the
+ * strip's destination suffixes, the board chips) and nowhere else. The full
+ * name is always still in the tooltip, so this only ever trades characters a
+ * local reader supplies from memory against characters that would otherwise be
+ * cut off by an ellipsis, which supply nothing.
+ *
+ * Order matters: the city prefix goes before the station words, and the long
+ * compound goes before the short one it contains.
+ */
+const ABBREVIATIONS: ReadonlyArray<readonly [RegExp, string]> = [
+  [/^München[,\-–]\s*/iu, ''],
+  [/\bHauptbahnhof\b/giu, 'Hbf'],
+  [/\bBahnhof\b/giu, 'Bf'],
+];
+
+/** The short form of a place name, for a slot that cannot hold the long one. */
+export function compact(name: string): string {
+  let out = name;
+  for (const [pattern, replacement] of ABBREVIATIONS) out = out.replace(pattern, replacement);
+  return out.trim();
+}
