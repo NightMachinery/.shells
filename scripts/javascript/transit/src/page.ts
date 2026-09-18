@@ -18,13 +18,26 @@ import { normaliseLine } from './filter.ts';
 import type { Board, Message } from './model.ts';
 import { renderBar, HORIZONS } from './page/bar.ts';
 import { closeFilters, renderBoard, viewOf, type BoardContext } from './page/board.ts';
+import { planProfile } from './page/commute.ts';
 import { fetchMessages, fetchProfile } from './page/data.ts';
 import { el, selectionInsideBoards } from './page/dom.ts';
 import { idbGet, idbSet, STORE_BOARDS } from './page/idb.ts';
 import { primeMessageState, renderMessages, resetMessageFilters } from './page/messages.ts';
 import { rearm, setOnAlarmsChanged } from './page/notify.ts';
-import { boardId, readHorizon, readProfile, writeHorizon, writeProfile, writeView } from './page/store.ts';
-import type { BoardStatus, ExportedConfig, PageState, ProfileData } from './page/types.ts';
+import {
+  boardId,
+  readDestination,
+  readHorizon,
+  readProfile,
+  readSortByArrival,
+  writeDestination,
+  writeHorizon,
+  writeProfile,
+  writeSortByArrival,
+  writeView,
+} from './page/store.ts';
+import type { BoardStatus, ExportedConfig, ExportedProfile, PageState, ProfileData } from './page/types.ts';
+import { DEFAULT_EARLY_BUFFER_MINUTES } from './plan.ts';
 
 /** How often the visible profile is re-fetched, while the tab is looked at. */
 const REFRESH_MS = 30_000;
@@ -44,6 +57,10 @@ const state: PageState = {
   startMs: Date.now(),
   horizonMinutes: HORIZONS[1] ?? 180,
   lastError: null,
+  destinationKey: null,
+  sortByArrival: readSortByArrival(),
+  earlyBufferMinutes: DEFAULT_EARLY_BUFFER_MINUTES,
+  routes: new Map(),
 };
 
 /** Callbacks the current render registered for the one-second tick. */
@@ -94,6 +111,46 @@ async function loadCached(profileKey: string): Promise<void> {
   render();
 }
 
+/**
+ * Re-plan a profile's opted-in boards from the departures already on screen.
+ *
+ * Separate from the fetch because the tight-connection window changes the
+ * plan without changing the departures, and because the planner's own cache
+ * makes an immediate re-plan nearly free: the itineraries are already there
+ * and only the filtering of them differs.
+ */
+async function replanProfile(
+  profileKey: string,
+  profile: ExportedProfile,
+  boards: Board[],
+  startMs: number,
+): Promise<void> {
+  const config = state.config;
+  if (config === null) return;
+  const routes = await planProfile({
+    config,
+    profile,
+    boards,
+    destinationKey: state.destinationKey,
+    startMs,
+    earlyBufferMinutes: state.earlyBufferMinutes,
+  });
+  if (routes.size === 0) state.routes.delete(profileKey);
+  else state.routes.set(profileKey, routes);
+  render();
+}
+
+/** Re-plan whatever is on screen now, for a change that does not need a fetch. */
+function replanVisible(): void {
+  const config = state.config;
+  const profileKey = state.profileKey;
+  if (config === null || profileKey === null) return;
+  const profile = config.profiles.find((entry) => entry.key === profileKey);
+  const data = state.data.get(profileKey);
+  if (profile === undefined || data === undefined) return;
+  void replanProfile(profileKey, profile, data.boards, data.startMs);
+}
+
 async function refreshProfile(profileKey: string, force = false): Promise<void> {
   const config = state.config;
   if (config === null) return;
@@ -138,6 +195,11 @@ async function refreshProfile(profileKey: string, force = false): Promise<void> 
       rearm(result.boards, Date.now());
     }
     void idbSet(STORE_BOARDS, cacheKey(profileKey), data);
+
+    // The plan comes after the departures and never blocks them: a board that
+    // cannot be planned is still a board, and the journey planner is a slower
+    // and heavier service than the departure feed.
+    void replanProfile(profileKey, profile, result.boards, startMs);
   } catch (error) {
     // The last good boards stay on screen; the bar says the refresh failed and
     // the age keeps counting up, which together are more useful than a blank.
@@ -181,10 +243,36 @@ function relevantLines(config: ExportedConfig): Set<string> {
   return lines;
 }
 
+/**
+ * Where a profile plans towards when the reader has not said.
+ *
+ * From anywhere that is not work you are going to work, and from work you are
+ * going to whichever home the configuration calls the default one. That covers
+ * the journey people actually repeat; anything else is a choice they make in the
+ * picker. A configuration with no places gets no commute view at all, which is
+ * the right answer rather than an error, since the feature needs a coordinate.
+ */
+function defaultDestination(config: ExportedConfig, profileKey: string): string | null {
+  const places = new Set((config.places ?? []).map((place) => place.name));
+  if (places.size === 0) return null;
+  if (profileKey !== 'work' && places.has('work')) return 'work';
+  const home = config.defaults.home;
+  if (profileKey === 'work' && home !== null && places.has(home)) return home;
+  for (const place of places) if (place !== profileKey) return place;
+  return null;
+}
+
+function applyDestination(config: ExportedConfig, profileKey: string): void {
+  const stored = readDestination(profileKey);
+  const places = new Set((config.places ?? []).map((place) => place.name));
+  state.destinationKey = stored !== null && places.has(stored) ? stored : defaultDestination(config, profileKey);
+}
+
 function selectProfile(key: string): void {
   if (state.profileKey === key) return;
   state.profileKey = key;
   writeProfile(key);
+  if (state.config !== null) applyDestination(state.config, key);
   resetMessageFilters();
   closeFilters();
   render();
@@ -235,6 +323,17 @@ function render(): void {
         if (profileKey !== null) void refreshProfile(profileKey, true);
         void refreshMessages();
       },
+      onDestination: (key) => {
+        state.destinationKey = key;
+        if (profileKey !== null) writeDestination(profileKey, key);
+        render();
+        if (profileKey !== null) void refreshProfile(profileKey, true);
+      },
+      onSort: (value) => {
+        state.sortByArrival = value;
+        writeSortByArrival(value);
+        render();
+      },
       ticks,
     }),
   );
@@ -244,6 +343,7 @@ function render(): void {
 
   if (profileKey !== null) {
     const barBackend = backendsUsed.length === 1 ? (backendsUsed[0] ?? '') : '';
+    const routes = state.routes.get(profileKey);
     boards.forEach((board, index) => {
       const context: BoardContext = {
         profileKey,
@@ -255,6 +355,15 @@ function render(): void {
         barBackend,
         onChange: render,
         onRetry: () => void refreshProfile(profileKey, true),
+        sortByArrival: state.sortByArrival,
+        earlyBufferMinutes: state.earlyBufferMinutes,
+        onEarlyBuffer: (minutes) => {
+          if (minutes === state.earlyBufferMinutes) return;
+          state.earlyBufferMinutes = minutes;
+          render();
+          replanVisible();
+        },
+        ...(routes?.get(index) === undefined ? {} : { routes: routes.get(index) }),
         ticks,
       };
       nodes.push(renderBoard(board, context));
@@ -343,7 +452,7 @@ function installKeys(): void {
       const board = boards[index];
       if (board === undefined) return;
       const id = boardId(profileKey, board.title);
-      writeView(id, viewOf(profileKey, board) === 'full' ? 'integrated' : 'full');
+      writeView(id, viewOf(profileKey, board, state.routes.get(profileKey)?.has(index) === true) === 'full' ? 'integrated' : 'full');
       render();
     }
   });
@@ -390,6 +499,7 @@ async function boot(): Promise<void> {
     // Tabs are exactly the configured profiles, in config order. No profile key
     // is special-cased; the first one is simply the first one.
     state.profileKey = known && stored !== null ? stored : (config.profiles[0]?.key ?? null);
+    if (state.profileKey !== null) applyDestination(config, state.profileKey);
   } catch (error) {
     const app = document.getElementById('app');
     if (app !== null) {

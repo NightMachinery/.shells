@@ -1,6 +1,7 @@
 import { contrastText, resolveColor, rgb } from '../colors.ts';
 import { catchableOnBoard, describeWalk } from '../filter.ts';
 import { stopTag } from '../json.ts';
+import type { PlannedRow, RouteOption } from '../plan.ts';
 import type { Board, Departure, Direction, Message, StopHit } from '../model.ts';
 
 /**
@@ -255,4 +256,83 @@ export function renderDiscovery(stop: string, groups: DiscoveryGroup[], options:
     out.push(`  ${head2} ${directionLabel(group.direction)}  x${padEnd(String(group.count), 4)} ${group.destinations.join(' | ')}`);
   }
   return out.join('\n');
+}
+
+/**
+ * How many journeys are printed under one row. The planner offers more than
+ * anyone reads standing at a stop, and the ones past the first few arrive later
+ * than something already on screen.
+ */
+export const ROUTE_OPTIONS_SHOWN = 3;
+
+/**
+ * One journey in one line: where the first leg drops you, what you catch there
+ * and when, and when you arrive.
+ *
+ * The marker carries the verdict without colour, because the commute view is
+ * read on a terminal that may have none and the difference between a change
+ * that works and one that needs the train to run early is the whole point:
+ * `>` is the recommendation, `-` is another way of getting there, and `~` plus
+ * the trailing word is a change that only comes off if something goes right.
+ */
+export function routeOptionLine(option: RouteOption, best: boolean, options: TerminalOptions): string {
+  const marker = option.tight ? '~' : best ? '>' : '-';
+  const onward = option.legs.slice(1).map((leg) => `${leg.line} ${clockTime(leg.departure, options.timezone)}`);
+  const changes = option.transfers === 0 ? 'direct' : `${option.transfers} change${option.transfers === 1 ? '' : 's'}`;
+  const chain = [`off ${option.exitStopName}`, ...onward, `arr ${clockTime(option.arrival, options.timezone)}`].join(' → ');
+  const text = `${marker} ${chain}  (${changes}${option.tight ? ', tight' : ''})`;
+  if (!options.color) return text;
+  return best && !option.tight ? text : dim(text);
+}
+
+/** One board of the commute view: its rows, each with the journeys it starts. */
+export interface PlannedBoardView {
+  board: Board;
+  rows: PlannedRow[];
+}
+
+export function renderPlannedBoard(view: PlannedBoardView, destination: string, options: TerminalOptions): string {
+  const { board, rows } = view;
+  const out: string[] = [];
+  const heading = `${board.title} → ${destination}  [${board.backend}]`;
+  out.push(options.color ? bold(heading) : heading);
+  const subtitle = describeWalk(board.stops, board, (stop) => stopTag(stop, board.stopLabels));
+  out.push(options.color ? dim(subtitle) : subtitle);
+
+  if (rows.length === 0) {
+    out.push(options.color ? dim('  nothing in the window') : '  nothing in the window');
+    return out.join('\n');
+  }
+
+  const lineWidth = badgeWidth(rows.map((row) => row.departure));
+  let highlighted = false;
+  for (const row of rows) {
+    const dep = row.departure;
+    const reachable = catchableOnBoard(dep, board, options.now);
+    // The highlight follows the board's rule, not the planner's: it marks the
+    // first row a rider can still reach on foot, whether or not a journey was
+    // found for it.
+    const highlight = reachable && !highlighted;
+    if (highlight) highlighted = true;
+    out.push(`  ${nearRow(dep, options, board, highlight, lineWidth)}`);
+    // A cancelled departure gets no route, however good the planner thinks it
+    // is. The planner works from the timetable and does not always know the
+    // vehicle has been withdrawn, and a recommendation to take a train that is
+    // not running is worse than no recommendation. The row already says
+    // CANCELLED, so nothing further needs saying.
+    if (dep.cancelled) continue;
+    if (row.options.length === 0) {
+      out.push(options.color ? dim('      no route found') : '      no route found');
+      continue;
+    }
+    for (const option of row.options.slice(0, ROUTE_OPTIONS_SHOWN)) {
+      out.push(`      ${routeOptionLine(option, option === row.best, options)}`);
+    }
+  }
+
+  return out.join('\n');
+}
+
+export function renderPlannedBoards(views: PlannedBoardView[], destination: string, options: TerminalOptions): string {
+  return views.map((view) => renderPlannedBoard(view, destination, options)).join('\n\n');
 }

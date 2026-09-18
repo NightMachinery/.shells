@@ -63,6 +63,7 @@ on every tick. It is never paged.
 [agfi:transit-board] is the general form, and takes whatever the CLI takes:
 
     transit-board board '<stop-id>'
+    transit-board route home --to work
     transit-board search Marienplatz
     transit-board nearby '<lat>' '<lon>'
     transit-board discover '<stop-id>'
@@ -151,6 +152,37 @@ a rhythm: is there one every ten minutes all evening, or is the last useful one
 soon. So each (line, direction letter) pair collapses to a single row of times
 running out to the horizon. It is compact enough that a long horizon stays
 readable, which is what makes a long horizon worth asking for at all.
+
+## The commute view
+
+A departure board says when vehicles leave. At a stop served by four lines that
+is not the question: the question is which of them gets you there soonest, and
+the answer is not always the first one to arrive at the platform.
+
+`transit-board route <profile>` answers it. For every departure on that
+profile's opted-in boards it plans a journey to a destination and prints, beside
+the row, where you get off the first leg, what you catch there, and when you
+arrive. The destination defaults to the other end of the usual commute and
+`--to` overrides it.
+
+Boards opt in with a flag in the private configuration, and that opt-in is the
+point rather than a convenience. A journey plan is one request sequence per
+board per refresh against a free and unauthenticated service, where a departure
+board is one cheap call. Most boards are not journeys anyone plans; they are
+"is there a bus soon".
+
+Two things about the output are worth knowing before you trust it.
+
+A *tight* option is one that only works if the first leg runs a little early or
+the change is quicker than estimated. It is shown because it is sometimes the
+one you actually take, and it is never the recommendation. The window is
+adjustable.
+
+Transfer walking times are derived from the distance of the walking leg, not
+from the planner's own duration for it. The planner adds a flat padding of
+several minutes to every walking leg, which is defensible for a stranger and
+wrong for a person who knows the station, and taking it at face value makes
+every change look impossible.
 
 ## The cache
 

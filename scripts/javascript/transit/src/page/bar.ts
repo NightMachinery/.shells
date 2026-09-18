@@ -32,6 +32,8 @@ export interface BarContext {
   onHorizon: (minutes: number) => void;
   onStart: (mode: 'now' | 'picked', ms: number) => void;
   onRefresh: () => void;
+  onDestination: (key: string | null) => void;
+  onSort: (value: boolean) => void;
   /** Registered by the age label so the one-second tick can patch it in place. */
   ticks: Array<() => void>;
 }
@@ -210,12 +212,69 @@ function renderStart(context: BarContext): HTMLElement {
   return wrap;
 }
 
+/**
+ * Where the commute view plans to, and whether rows are ordered by arrival.
+ *
+ * Only rendered when the configuration carries places and the visible profile
+ * has at least one board that opted in. A picker offering nowhere to go, or
+ * governing nothing, is worse than no picker: it invites a reader to try it and
+ * then shows them the same screen.
+ */
+function renderDestination(context: BarContext): HTMLElement | null {
+  const places = context.config.places ?? [];
+  if (places.length === 0) return null;
+  const profile = context.config.profiles.find((entry) => entry.key === context.state.profileKey);
+  if (profile === undefined || !profile.boards.some((board) => board.commute)) return null;
+
+  const wrap = el('div', 'destination');
+  wrap.append(el('span', 'destination-label', 'to'));
+
+  const select = document.createElement('select');
+  select.className = 'destination-select';
+  const off = document.createElement('option');
+  off.value = '';
+  off.textContent = 'nowhere';
+  select.append(off);
+  for (const place of places) {
+    if (place.name === context.state.profileKey) continue;
+    const option = document.createElement('option');
+    option.value = place.name;
+    // The place's own key is also a profile key, so the tab's title is the name
+    // a reader recognises; the raw key is the fallback for a place with no tab.
+    option.textContent = context.config.profiles.find((entry) => entry.key === place.name)?.title ?? place.name;
+    select.append(option);
+  }
+  select.value = context.state.destinationKey ?? '';
+  select.addEventListener('change', () => context.onDestination(select.value === '' ? null : select.value));
+  wrap.append(select);
+
+  if (context.state.destinationKey !== null) {
+    const sort = button(`sort-arrival${context.state.sortByArrival ? ' active' : ''}`, 'by arrival', 'order commute rows by when they get you there, not when they leave');
+    sort.addEventListener('click', () => context.onSort(!context.state.sortByArrival));
+    wrap.append(sort);
+  }
+  return wrap;
+}
+
 export function renderBar(context: BarContext): HTMLElement {
   const bar = el('header', 'bar');
 
   const top = el('div', 'bar-row bar-top');
   top.append(renderTabs(context));
-  top.append(renderRefresh(context));
+  // The provenance sits with the freshness rather than with the controls: both
+  // answer "how much do I trust what I am looking at", and a board repeats its
+  // own backend only when it disagrees with this one.
+  const right = el('div', 'bar-right');
+  if (context.backends.length > 0) {
+    const source = el('span', 'bar-backend', context.backends.join(' + '));
+    source.title =
+      context.backends.length === 1
+        ? `every board here was answered by ${context.backends[0]}`
+        : 'two sources answered: the live one for the near window and the timetable for the rest';
+    right.append(source);
+  }
+  right.append(renderRefresh(context));
+  top.append(right);
   bar.append(top);
 
   const chips = renderChips(context);
@@ -223,15 +282,13 @@ export function renderBar(context: BarContext): HTMLElement {
 
   const controls = el('div', 'bar-row bar-controls');
   controls.append(renderHorizon(context));
+  // Before the start-time control, which is wider and used far less often. The
+  // controls row scrolls sideways on a phone, so what comes first is what a
+  // reader can reach without scrolling, and "where am I going" beats "nudge the
+  // clock by a quarter of an hour".
+  const destination = renderDestination(context);
+  if (destination !== null) controls.append(destination);
   controls.append(renderStart(context));
-  if (context.backends.length > 0) {
-    const source = el('span', 'bar-backend', context.backends.join(' + '));
-    source.title =
-      context.backends.length === 1
-        ? `every board here was answered by ${context.backends[0]}`
-        : 'two sources answered: the live one for the near window and the timetable for the rest';
-    controls.append(source);
-  }
   bar.append(controls);
 
   if (context.state.lastError !== null) {

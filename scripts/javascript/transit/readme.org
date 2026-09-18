@@ -13,9 +13,9 @@ which is authoritative for the urban network and is the default. The other is a
 national aggregator carrying the same stop identifiers, used as a fallback when
 the first one fails, and selectable outright. Neither needs an API key.
 
-The package does not plan journeys. The =route= subcommand is a placeholder
-that says so and exits with its own status code, so a script can tell "not
-implemented" apart from "something went wrong".
+It also plans journeys, for the boards that ask it to. A board that opts in
+carries, on every row, the journey that departure starts and when it gets you
+there. See *Journey planning* below.
 
 * Installing
 
@@ -157,8 +157,9 @@ letter a board should filter on.
 messages concerning lines that profile's boards name; a profile whose boards
 pin no lines narrows nothing.
 
-=route <from> <to>= is not implemented and exits with the not-implemented
-status code.
+=route <profile>= is the commute view: for every departure on that profile's
+commute boards, the journey it starts, where you change and when you arrive.
+=--to <profile>= names the far end. See *Journey planning*.
 
 =config-export= prints the loaded config as JSON for the browser page.
 
@@ -170,12 +171,15 @@ how far ahead to look. =--backend <name>= forces the primary backend.
 =--watch= clears the screen and re-renders on an interval until interrupted.
 =--no-color= suppresses colour, as does an unset terminal or the =NO_COLOR=
 environment variable. =--config <path>= reads a different config file.
-=--with-places= adds coordinates to =config-export=. =--verbose= logs every
-outbound request to standard error, which is how you confirm that a long
-horizon really did page. =--help= prints the command list.
+=--with-places= adds coordinates to =config-export=. =--to <profile>= and
+=--early-buffer <minutes>= belong to =route= and are described under *Journey
+planning*. =--verbose= logs every outbound request to standard error, which is
+how you confirm that a long horizon really did page. =--help= prints the command
+list.
 
-Exit status is zero for success, one for a runtime error, two for a config
-problem (including an unknown profile name), and three for =route=.
+Exit status is zero for success, one for a runtime error, and two for a config
+problem, which includes an unknown profile name and a commute with no
+destination.
 
 * Direction letters
 
@@ -258,6 +262,141 @@ The aggregator pages by following a cursor instead, and the endpoint used here
 carries no category parameter, so a narrowing there changes only what is kept.
 Its per-request row count is sized from the length of the window.
 
+* Journey planning
+
+A board says when vehicles leave. It does not say which of them gets you to the
+other end soonest, and at a stop served by four lines that is the question
+actually being asked. =route <profile>= answers it: for every departure on that
+profile's commute boards, the journey that starts with that departure, where you
+get off, what you catch there, and when you arrive.
+
+A board takes part only if it says =commute = true=. Planning is a much heavier
+question than a departure board, one request per board per refresh against a free
+service, and most boards are not journeys anybody plans: they are "is there a bus
+soon". A profile whose boards all decline says so and exits zero rather than
+failing.
+
+The destination is =--to <profile>=, and the coordinate is that profile's entry
+under =[places.<name>]=. The name is resolved as a profile first and as a place
+key second, because the far end of a commute often has no boards of its own and
+therefore no profile. Without =--to= there is one rule and no further guessing:
+from the home profile the destination is the =work= key, and from =work= it is
+the home profile. Anything else has to say where it is going, and a name that
+resolves to no place exits with the config status code, naming what was looked
+for.
+
+** Matching an itinerary to a departure
+
+An itinerary belongs to a board row when its first timetabled leg carries the
+same line and leaves in the same minute, at the same platform. Not the trip
+identifier: the departure board and the planner do not share one. The board's
+rows come from whichever backend answered and carry that backend's identifiers,
+and even on the aggregator a board row is a stop time while an itinerary leg is a
+trip, with nothing in either response linking the two.
+
+Which minute is the whole difficulty. The *timetabled* minute is the one both
+sides agree on, because it is the same timetable. The expected minute is not: the
+board and the planner carry separate live feeds, and they disagree by a minute or
+more whenever anything runs late. Matching on the expected minute alone silently
+emptied every delayed row while the punctual ones planned fine, which is the kind
+of failure that looks like a coverage gap rather than a bug. The expected minute
+now only backs the timetabled one up, for a row whose backend publishes no
+scheduled time.
+
+The platform is there because line and minute are not unique, and the exception
+is the case that matters most. A stop whose two directions hang off one parent
+identifier can run the same line at the same minute each way, and one S-Bahn line
+was observed doing exactly that, leaving for the city and leaving for the country
+in the same minute. Without the platform check the outbound row was handed the
+inbound journey, which is the worst answer this package can give: plausible, and
+pointing at a train going the other way. A row or a leg that names no platform is
+not held against it, since a stop with no platforms has one direction per
+identifier and cannot collide.
+
+An itinerary whose first timetabled leg starts at some other stop is not this
+board's journey and is dropped. A leading walking leg is normal, though, and is
+skipped over to find that first leg: the planner will walk you onto a platform
+inside the station you named.
+
+** Exits, walks and the early buffer
+
+The interesting part of a matched itinerary is where its first leg puts you down
+and what leaves from there. Every itinerary the planner returns ends at the
+destination, so any tail of any itinerary also ends there, and a tail observed
+after one first leg can be spliced onto another that alights at the same place.
+That recombination is the point: the planner returns only changes it considers
+feasible, so taking its itineraries as they came would never surface a change it
+had already ruled out.
+
+It rules them out with a transfer time that is not a walk. Measured on the live
+service, the street legs at the two ends of a journey come back at a steady pace,
+but the walks *between* two transit legs do not: the same service billed one
+interchange at under two minutes for a hundred and eighty metres and another at
+five minutes for a hundred and fifty. The difference is the minimum transfer time
+the timetable carries for that station, which is a property of the station rather
+than of the rider, and it is what makes a change look impossible when it is
+merely inconvenient. So the transfer walk is derived from the leg's own
+=distance= at =WALK_METRES_PER_MINUTE=, the single place this package turns a
+distance into a time, and the planner's walking =duration= is never read.
+
+The feasible change is then the first leg's arrival plus that walk. Onward
+departures up to =DEFAULT_EARLY_BUFFER_MINUTES= *before* it are offered as well,
+marked *tight*: they come off only if the first vehicle runs a little early or
+the change is quicker than the pace assumes. A tight option is never the
+recommended one. It is shown so a rider can decide to run for it, not so the tool
+can gamble on their behalf, and the recommendation is always the soonest arrival
+among the options that are not tight. =--early-buffer <minutes>= moves the line;
+at zero the tight options disappear entirely. In the terminal the marker carries
+the verdict without colour, so the distinction survives a terminal that has none.
+
+=MAX_OPTIONS_PER_ROW= caps what a row carries and =ROUTE_OPTIONS_SHOWN= caps what
+the terminal prints of it, both in =src/plan.ts= and =src/format/terminal.ts=
+respectively. Everything past the first few arrives later than something already
+on screen.
+
+** Paging, caching and gaps
+
+The planner pages by cursor, like the aggregator's departures. =numItineraries=
+is honoured and widens the search window rather than truncating a fixed one, so
+=ITINERARIES_PER_REQUEST= usually covers a whole board in one request and the
+cursor walk is the exception. The walk ends when the itineraries reach the last
+row being planned, when a page comes back empty, when the cursor stops moving, or
+at =PLAN_MAX_PAGES=. The cap is there for the same reason the departure backends
+have one: a free service with no rate-limit signal gets a bounded walk rather than
+an unbounded one. Coverage is measured only on itineraries that actually start at
+the board's stop, so one that walks off to a neighbouring stop cannot declare the
+board covered.
+
+A plan is reused for =PLAN_CACHE_MS=, keyed on the origin, the destination and
+the minute it started from. A page refreshing twice a minute must not re-plan
+every time, and within a minute nothing about the itineraries changes but the
+delays. The early buffer is deliberately not part of that key: it only changes
+how itineraries already in hand are recombined.
+
+Rows that show no journey are common and usually mean what they say. The planner
+returns optimal journeys rather than every journey, so a departure that nothing
+else beats is returned and one that something else beats is not. The early part
+of a window is sparser than the rest for the same reason. A board configured with
+a stop identifier only the primary backend carries cannot be planned at all,
+since the planner is the aggregator; that board's departures are still shown and
+the reason is reported once per stop.
+
+** The route document
+
+=route --json= emits =schema_version=, =profile=, =requested_profile=,
+=destination=, =early_buffer_minutes=, =generated_at= and =boards=, in the same
+snake_case and ISO instants as the rest of the JSON contract. =destination= names
+the far end by key and by name and carries no coordinates: the coordinate was the
+input, and this package keeps geography out of what it prints.
+
+Each board carries its title, its stops, its walking times, its labels, its
+backend, and =rows=. A row carries the departure, in exactly the shape =board
+--json= gives it, then =best= and =options=. =best= is the recommended journey or
+null; =options= is every journey found for that row, tight ones included, sorted
+by arrival, so a consumer that disagrees about what to recommend has the material
+to decide for itself. Each journey names its exit stop by identifier and by name,
+its arrival, how many changes it involves, whether it is tight, and its legs.
+
 * The JSON contract
 
 =board --json= emits a document carrying =schema_version=, =profile=,
@@ -322,14 +461,15 @@ integrated view covers the whole horizon.
 ** The row grid
 
 A row is a grid of fixed slots: minutes, line badge, destination with its times,
-the onward connection, the platform, whether the time is live or a plan, a
-reminder marker, and the stop label. A slot is empty when the value is absent and
+the onward connection, the journey to the destination, the platform, whether the
+time is live or a plan, a reminder marker, and the stop label. A slot is empty when the value is absent and
 nothing shifts, so the eye can run down one column.
 
 Which *optional* slots exist is decided per board rather than globally: the
 platform column appears only when that board's rows actually carry platforms, the
-connection column only when the board declares an interchange, and the stop
-column only when the board merges stops. The upstream feed reports a platform for
+connection column only when the board declares an interchange, the journey
+column only when that board is being planned, and the stop column only when the
+board merges stops. The upstream feed reports a platform for
 rail and never for surface transport, so a globally fixed platform column would be
 dead space on most boards.
 
@@ -353,6 +493,38 @@ is no live data for a train that has not been dispatched yet.
 On the desktop: the number keys switch profiles, =r= refreshes, =[= and =]= step
 the horizon, and =f= toggles the board under the top of the viewport between full
 and integrated. All of them are ignored while typing in a field.
+
+** The commute view on the page
+
+The same planner the =route= command uses runs in the page, for the boards that
+say =commute = true=. The bar gains a destination picker listing the configured
+places, remembered per profile, and each planned row gains a journey slot: where
+to get off the first leg, the short chain after it, and the arrival time.
+
+The slot is worth a column only because of the comparison it makes possible. The
+exit stop a line usually uses is computed from the board's own rows rather than
+configured, and a row whose best exit differs from that usual one is marked, so
+the signal is "this one is better off somewhere else" rather than the same advice
+on every row. An optional sort orders a planned board by arrival instead of
+departure, which is the order the question is actually asked in.
+
+A cancelled row is never given a journey, at any layer. The planner works from
+the timetable and does not always know a vehicle has been withdrawn, and a
+recommendation to board a train that is not running is worse than no
+recommendation.
+
+The board's own filter carries the tight-connection window, because it changes
+what one board shows and means nothing on the others. It is held in memory and
+deliberately not persisted: it is a "show me what I would have to run for"
+question about one look at one board, and a persisted one would quietly widen
+every plan for weeks after the reader forgot they had touched it. Moving it
+re-plans without re-fetching, which is nearly free, because the window is not
+part of the plan cache key.
+
+Plans are never written to the offline cache, unlike the departures. A stale
+departure is obvious, since its countdown is wrong and the row says how old the
+data is. A stale arrival time is not: it looks exactly like a fresh one, and it
+is the number a reader acts on.
 
 ** Freshness, caching and installing
 
@@ -449,9 +621,12 @@ The page cap that stops a pathological stop from being walked forever is in
 =src/backends/mvg.ts=, and the per-request row counts for the aggregator are
 in =src/backends/transitous.ts=. Both cache lifetimes are in =src/cache.ts=.
 The boundary between the near window and the strip view is in
-=src/format/terminal.ts=, the watch interval and the discovery sample count are
-in =src/cli.ts=, and the page's refresh and tick intervals are in
-=src/page.ts=.
+=src/format/terminal.ts=, along with how many journeys a row prints. The walking
+pace, the early buffer, the plan cache lifetime, the itineraries asked for per
+request, the page cap and the options kept per row are all in =src/plan.ts=. The
+watch interval, the discovery sample count and the key the commute view pairs
+with the home profile are in =src/cli.ts=, and the page's refresh and tick
+intervals are in =src/page.ts=.
 
 The cache connects using =REDIS_URL= when it is set. Failing that, a local
 server that wants a password is reached with the credential in =REDISCLI_AUTH=,

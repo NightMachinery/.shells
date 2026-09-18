@@ -344,6 +344,15 @@ function parseBoard(profileKey: string, index: number, raw: unknown, issues: str
     }
   }
 
+  if (raw.commute !== undefined) {
+    if (typeof raw.commute !== 'boolean') {
+      issues.push(`${where}.commute: must be true or false`);
+      failed = true;
+    } else if (raw.commute) {
+      board.commute = true;
+    }
+  }
+
   if (raw.connection !== undefined) {
     const connection = parseConnection(where, raw.connection, issues);
     if (connection === null) failed = true;

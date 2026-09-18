@@ -68,6 +68,8 @@ export interface Board {
   stopLabels?: Record<string, string>;
   /** The onward service this board's rows point at, when one is configured. */
   connection?: ConnectionConfig;
+  /** Whether this board takes part in the commute view. */
+  commute?: boolean;
 }
 
 /** A board as the config declares it, before anything is fetched. */
@@ -98,6 +100,13 @@ export interface BoardConfig {
   stopLabels?: Record<string, string>;
   /** An onward service to show alongside every row of this board. */
   connection?: ConnectionConfig;
+  /**
+   * Whether this board takes part in the commute view. A board opts in because
+   * the journey planner is a much heavier question than a departure board, one
+   * request per board per refresh against a free service, and most boards are
+   * not journeys anyone plans: they are "is there a bus soon".
+   */
+  commute?: boolean;
 }
 
 /**

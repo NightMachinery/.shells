@@ -23,7 +23,15 @@ export interface ExportedBoard {
   walk_minutes: number;
   walk_minutes_by_stop: Record<string, number> | null;
   stop_labels: Record<string, string> | null;
+  commute: boolean;
   connection: ExportedConnection | null;
+}
+
+/** A named coordinate, used as a journey destination. */
+export interface ExportedPlace {
+  name: string;
+  lat: number;
+  lon: number;
 }
 
 export interface ExportedProfile {
@@ -44,6 +52,8 @@ export interface ExportedConfig {
   };
   backends: { mvg_base_url: string; transitous_base_url: string };
   profiles: ExportedProfile[];
+  /** Absent unless the exporter was asked for coordinates. */
+  places?: ExportedPlace[];
 }
 
 /**
@@ -105,6 +115,28 @@ export interface PageState {
   horizonMinutes: number;
   /** Set when the most recent refresh of the visible profile failed outright. */
   lastError: string | null;
+  /**
+   * The place the commute view plans towards, named by the profile key whose
+   * place it is. Null means the commute view is off, which is also what a
+   * configuration with no places gets.
+   */
+  destinationKey: string | null;
+  /** Whether a commute board orders its rows by arrival rather than departure. */
+  sortByArrival: boolean;
+  /**
+   * How far before the feasible moment an onward departure may still be offered
+   * as a tight option. Held in memory and deliberately not persisted: it is a
+   * "show me what I would have to run for" knob for one look at one board, not
+   * a standing preference, and a persisted one would quietly widen every plan
+   * for weeks after the reader forgot they had touched it.
+   */
+  earlyBufferMinutes: number;
+  /**
+   * Journeys per profile, in memory only. Deliberately not mirrored to the
+   * offline cache: a stale arrival time looks exactly like a fresh one, and it
+   * is the number a reader acts on.
+   */
+  routes: Map<string, import('./commute.ts').ProfileRoutes>;
 }
 
 /** A row as the renderer needs it: the departure plus what the board adds. */

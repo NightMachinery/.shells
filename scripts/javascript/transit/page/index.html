@@ -58,6 +58,7 @@
         --col-state: 2.3rem;
         --col-alarm: 1rem;
         --col-stop: 2.6rem;
+        --col-route: 9rem;
       }
 
       @media (prefers-color-scheme: dark) {
@@ -128,6 +129,13 @@
 
       .bar-top {
         justify-content: space-between;
+      }
+
+      .bar-right {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        flex: none;
       }
 
       .tabs {
@@ -315,6 +323,74 @@
 
       .start.picked .start-note {
         color: var(--warn);
+        font-weight: 600;
+      }
+
+      .destination {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        white-space: nowrap;
+      }
+
+      .destination-label {
+        font-size: 12px;
+        color: var(--ink-soft);
+      }
+
+      .destination-select {
+        font: inherit;
+        font-size: 12px;
+        padding: 2px 5px;
+        border: 1px solid var(--line);
+        border-radius: 7px;
+        background: var(--card);
+        color: var(--ink);
+      }
+
+      .sort-arrival {
+        padding: 3px 7px;
+        font-size: 12px;
+        border: 1px solid var(--line);
+        border-radius: 7px;
+        background: var(--card);
+        color: var(--ink-soft);
+      }
+
+      .sort-arrival.active {
+        background: var(--ink);
+        color: var(--bg);
+        border-color: var(--ink);
+        font-weight: 600;
+      }
+
+      /* The commute slot. A tight option is one that only works if the first leg
+         runs early, so it is dashed as well as dimmed: the distinction has to
+         survive a monochrome screen, and it is the distinction that decides
+         whether someone runs for a train. */
+      .route {
+        font-size: 11px;
+        color: var(--ink-soft);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      .route-arrival {
+        font-variant-numeric: tabular-nums;
+        font-weight: 600;
+        color: var(--ink);
+      }
+
+      .route.tight {
+        opacity: 0.7;
+        border: 1px dashed currentColor;
+        border-radius: 4px;
+        padding: 0 3px;
+      }
+
+      .route.better {
+        color: var(--accent);
         font-weight: 600;
       }
 
@@ -675,6 +751,32 @@
         font-size: 13px;
       }
 
+      .filter-buffer {
+        display: flex;
+        align-items: center;
+        gap: 5px;
+        width: 100%;
+        margin-top: 4px;
+        padding-top: 6px;
+        border-top: 1px solid var(--line);
+        font-size: 12px;
+        color: var(--ink-soft);
+      }
+
+      .filter-buffer input {
+        width: 3.5em;
+        padding: 2px 4px;
+        border: 1px solid var(--line);
+        border-radius: 5px;
+        background: var(--card);
+        color: var(--ink);
+        font: inherit;
+      }
+
+      .filter-buffer-unit {
+        margin-left: -2px;
+      }
+
       /* ----------------------------------------------------- the disruptions */
 
       .disruptions {
@@ -988,6 +1090,7 @@
           --col-state: 2rem;
           --col-alarm: 0.9rem;
           --col-stop: 2.3rem;
+          --col-route: 7.5rem;
         }
 
         #app {

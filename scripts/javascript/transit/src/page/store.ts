@@ -17,6 +17,8 @@ const KEY_HORIZON = 'transit.horizon';
 const KEY_VIEW = 'transit.view';
 const KEY_FILTER = 'transit.filter';
 const KEY_GEMINI = 'transit.geminiKey';
+const KEY_DESTINATION = 'transit.destination';
+const KEY_SORT = 'transit.sortByArrival';
 
 function read(key: string): string | null {
   try {
@@ -112,6 +114,29 @@ export function writeHidden(id: string, hidden: ReadonlySet<string>): void {
 /** The key a (stop, line) pair is hidden under. */
 export function filterKey(stop: string, line: string): string {
   return `${stop}|${line}`;
+}
+
+/**
+ * Where the commute view plans to, remembered per profile because the answer is
+ * a property of where you are standing: from a home profile you are going to
+ * work, and from work you are going home.
+ */
+export function readDestination(profileKey: string): string | null {
+  return read(`${KEY_DESTINATION}.${profileKey}`);
+}
+
+export function writeDestination(profileKey: string, destinationKey: string | null): void {
+  if (destinationKey === null) remove(`${KEY_DESTINATION}.${profileKey}`);
+  else write(`${KEY_DESTINATION}.${profileKey}`, destinationKey);
+}
+
+export function readSortByArrival(): boolean {
+  return read(KEY_SORT) === '1';
+}
+
+export function writeSortByArrival(value: boolean): void {
+  if (value) write(KEY_SORT, '1');
+  else remove(KEY_SORT);
 }
 
 /**

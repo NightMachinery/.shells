@@ -6,37 +6,51 @@ import type { Backend, DepartureOptions, Window } from './backends/types.ts';
 import { createCache, lookupCacheAdapter, withCache, type TransitCache } from './cache.ts';
 import {
   BACKEND_NAMES,
+  HOME_ALIAS,
   loadConfig,
   resolveBoardTarget,
   resolveProfile,
   type BackendName,
   type Config,
   ConfigError,
+  type Place,
 } from './config.ts';
 import { attachConnections } from './connect.ts';
 import { applyFilters, mergeBoards } from './filter.ts';
 import { boardsDocument, configExportDocument, stopTag } from './json.ts';
-import { envOverride } from './http.ts';
+import { envOverride, HttpError } from './http.ts';
 import type { Board, BoardConfig, Departure, Direction, Message, Profile } from './model.ts';
+import { DEFAULT_EARLY_BUFFER_MINUTES, planBoard, routeDocument, type PlannedRow } from './plan.ts';
 import {
+  NEAR_WINDOW_MINUTES,
   renderBoards,
   renderDiscovery,
   renderMessages,
+  renderPlannedBoards,
   renderStopHits,
   type DiscoveryGroup,
+  type PlannedBoardView,
   type TerminalOptions,
 } from './format/terminal.ts';
 
 const EXIT_OK = 0;
 const EXIT_RUNTIME = 1;
 const EXIT_CONFIG = 2;
-const EXIT_NOT_IMPLEMENTED = 3;
 
 /** How often `--watch` re-renders. Chosen to sit just under the departure cache lifetime. */
 export const WATCH_INTERVAL_MS = 30_000;
 
 /** How many sample destinations `discover` prints per (line, direction) pair. */
 export const DISCOVER_SAMPLE_COUNT = 3;
+
+/**
+ * The other end of the commute. `route` needs a destination and the config
+ * already names both ends of the journey people actually plan, so with no
+ * `--to` it pairs the home profile with this key and this key with the home
+ * profile. One rule, no further guessing: anything else has to say where it is
+ * going.
+ */
+export const WORK_KEY = 'work';
 
 interface Flags {
   json: boolean;
@@ -48,6 +62,8 @@ interface Flags {
   config: string | null;
   verbose: boolean;
   withPlaces: boolean;
+  to: string | null;
+  earlyBuffer: number | null;
   help: boolean;
 }
 
@@ -69,7 +85,9 @@ commands:
                             board's direction letter is found.
   search <query>            Search stops by name.
   nearby <lat> <lon>        List stops near a coordinate.
-  route <from> <to>         Journey planning. Not implemented yet.
+  route <profile>           Commute view: for every departure on that profile's
+                            commute boards, the journey it starts, where you
+                            change and when you arrive.
   messages [profile]        Service messages, narrowed to a profile's lines
                             when a profile is named.
   config-export             Print the loaded config as JSON for the browser
@@ -85,10 +103,14 @@ flags:
   --no-color                Never emit colour.
   --config <path>           Read this config file instead of the default.
   --with-places             config-export only: include place coordinates.
+  --to <profile>            route only: where the commute ends. Defaults to the
+                            other end of the home-and-work pair.
+  --early-buffer <minutes>  route only: how early an onward departure may leave
+                            and still be offered, marked tight.
   --verbose                 Log every outbound request to stderr.
   --help                    This text.
 
-exit codes: 0 ok, 1 runtime error, 2 config validation error, 3 not implemented.
+exit codes: 0 ok, 1 runtime error, 2 config validation error.
 `;
 
 function fail(message: string, code: number): never {
@@ -107,6 +129,8 @@ export function parseArgs(argv: string[]): Invocation {
     config: null,
     verbose: false,
     withPlaces: false,
+    to: null,
+    earlyBuffer: null,
     help: false,
   };
   const positional: string[] = [];
@@ -151,6 +175,15 @@ export function parseArgs(argv: string[]): Invocation {
         flags.backend = value as BackendName;
         break;
       }
+      case '--to':
+        flags.to = argv[++i] ?? null;
+        break;
+      case '--early-buffer': {
+        const value = Number(argv[++i]);
+        if (!Number.isFinite(value) || value < 0) fail('--early-buffer needs a non-negative number of minutes', EXIT_RUNTIME);
+        flags.earlyBuffer = value;
+        break;
+      }
       case '--config':
         flags.config = argv[++i] ?? null;
         break;
@@ -176,6 +209,8 @@ interface Runtime {
   /** Set when a fallback is configured, so per-stop outcomes are observable. */
   chained: ChainedBackend | null;
   primaryName: string;
+  /** Set only under `--verbose`; handed on to anything that makes its own requests. */
+  debug: ((line: string) => void) | undefined;
   terminal: TerminalOptions;
   window(now: number): Window;
 }
@@ -220,6 +255,7 @@ async function makeRuntime(flags: Flags): Promise<Runtime> {
     backend,
     chained,
     primaryName,
+    debug,
     terminal: { now: Date.now(), timezone: config.defaults.timezone, color: colorEnabled(flags) },
     window: (now: number) => ({ fromMs: now, toMs: now + horizon * 60_000 }),
   };
@@ -339,6 +375,135 @@ async function commandBoard(runtime: Runtime, args: string[], flags: Flags): Pro
     await new Promise((resolve) => setTimeout(resolve, WATCH_INTERVAL_MS));
   }
   process.stdout.write('\x1b[?25h');
+  return EXIT_OK;
+}
+
+/**
+ * Where a commute ends, resolved from a name the caller typed or from the
+ * home-and-work pair.
+ *
+ * The name is looked up as a profile first and as a place key second, because a
+ * profile is a set of boards near a location and the location itself is the
+ * place of the same name. Both steps are needed: the destination of a commute
+ * often has no boards of its own and therefore no profile, and a profile's key
+ * is what names its place.
+ */
+function resolveDestination(config: Config, name: string): Place | undefined {
+  const profile = resolveProfile(config, name);
+  return config.places[profile?.key ?? name];
+}
+
+/** The key `--to` defaults to, or null when the pair cannot be completed. */
+function defaultDestinationKey(config: Config, origin: Profile, typed: string): string | null {
+  if (origin.key === WORK_KEY) return config.defaults.home;
+  if (typed === HOME_ALIAS || origin.key === config.defaults.home) return WORK_KEY;
+  return null;
+}
+
+async function commandRoute(runtime: Runtime, args: string[], flags: Flags): Promise<number> {
+  const target = resolveBoardTarget(runtime.config, args.slice(0, 1));
+  if (target.kind === 'error') {
+    process.stderr.write(`${target.message}\n`);
+    return EXIT_CONFIG;
+  }
+  if (target.kind !== 'profile') {
+    // Raw stop ids carry no `commute` flag and no place to travel to, so there
+    // is nothing for this command to work from.
+    process.stderr.write('route needs a configured profile, not raw stop ids\n');
+    return EXIT_CONFIG;
+  }
+  const profile = target.profile;
+
+  const wanted = flags.to ?? defaultDestinationKey(runtime.config, profile, target.requested);
+  if (wanted === null) {
+    process.stderr.write(
+      `route: no destination. Pass --to, or name the ${HOME_ALIAS} profile to go to ${WORK_KEY}, ` +
+        `or ${WORK_KEY} to come back\n`,
+    );
+    return EXIT_CONFIG;
+  }
+  const place = resolveDestination(runtime.config, wanted);
+  if (place === undefined) {
+    process.stderr.write(`route: no place named ${wanted} in ${runtime.config.path}\n`);
+    return EXIT_CONFIG;
+  }
+
+  const boardConfigs = profile.boards.filter((board) => board.commute === true);
+  if (boardConfigs.length === 0) {
+    // Not an error: most boards are "is there a bus soon" and were never meant
+    // to be planned. Saying so and stopping is the honest answer.
+    process.stdout.write(`no board in ${profile.key} takes part in the commute view; set commute = true on one\n`);
+    return EXIT_OK;
+  }
+
+  const earlyBufferMinutes = flags.earlyBuffer ?? DEFAULT_EARLY_BUFFER_MINUTES;
+  const now = Date.now();
+  // The commute view plans what it prints, and what it prints is the near
+  // window: past that the board itself stops showing individual rows.
+  const boundary = now + NEAR_WINDOW_MINUTES * 60_000;
+
+  const views: PlannedBoardView[] = [];
+  for (const boardConfig of boardConfigs) {
+    const board = await buildBoard(runtime, boardConfig, now);
+    const byStop = new Map<string, Departure[]>();
+    for (const row of board.departures) {
+      if (row.realtime > boundary) continue;
+      const bucket = byStop.get(row.stop);
+      if (bucket === undefined) byStop.set(row.stop, [row]);
+      else bucket.push(row);
+    }
+
+    const planned: PlannedRow[] = [];
+    for (const [stop, rows] of byStop) {
+      try {
+        planned.push(
+          ...(await planBoard({
+            stop,
+            destination: { lat: place.lat, lon: place.lon },
+            rows,
+            startMs: now,
+            earlyBufferMinutes,
+            ...(runtime.debug === undefined ? {} : { onDebug: runtime.debug }),
+          })),
+        );
+      } catch (error) {
+        // One stop that cannot be planned leaves its rows unplanned rather than
+        // taking the whole view down: the departures are still worth showing.
+        //
+        // A 404 is the interesting failure and deserves its own wording. The
+        // planner is the aggregator, and a board is free to be configured with a
+        // stop identifier only the primary backend carries; that board's
+        // departures are fine and its journeys are unanswerable, which is worth
+        // saying plainly rather than as an HTTP status.
+        const message =
+          error instanceof HttpError && error.status === 404
+            ? 'the journey planner does not know this stop'
+            : error instanceof Error
+              ? error.message
+              : String(error);
+        process.stderr.write(`transit: ${stop}: ${message}\n`);
+        for (const row of rows) planned.push({ departure: row, best: null, options: [] });
+      }
+    }
+    planned.sort((a, b) => a.departure.realtime - b.departure.realtime);
+    views.push({ board, rows: planned });
+  }
+
+  if (flags.json) {
+    const document = routeDocument({
+      profile: profile.key,
+      requestedProfile: target.requested,
+      destinationKey: wanted,
+      destinationName: place.name,
+      earlyBufferMinutes,
+      boards: views,
+      now,
+    });
+    process.stdout.write(`${JSON.stringify(document, null, 2)}\n`);
+    return EXIT_OK;
+  }
+
+  process.stdout.write(`${renderPlannedBoards(views, place.name, { ...runtime.terminal, now })}\n`);
   return EXIT_OK;
 }
 
@@ -467,11 +632,6 @@ async function main(): Promise<number> {
     return EXIT_OK;
   }
 
-  if (invocation.command === 'route') {
-    process.stderr.write('route: journey planning is not implemented yet\n');
-    return EXIT_NOT_IMPLEMENTED;
-  }
-
   let runtime: Runtime;
   try {
     runtime = await makeRuntime(invocation.flags);
@@ -494,6 +654,8 @@ async function main(): Promise<number> {
         return await commandSearch(runtime, invocation.args, invocation.flags);
       case 'nearby':
         return await commandNearby(runtime, invocation.args, invocation.flags);
+      case 'route':
+        return await commandRoute(runtime, invocation.args, invocation.flags);
       case 'messages':
         return await commandMessages(runtime, invocation.args, invocation.flags);
       case 'config-export':

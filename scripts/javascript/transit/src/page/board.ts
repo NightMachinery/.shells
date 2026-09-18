@@ -4,6 +4,8 @@ import type { Board, Departure } from '../model.ts';
 import { button, clockTime, dayMarker, el, minutesUntil, slot } from './dom.ts';
 import { alarmMarker, attachLongPress, openAlarmPopup } from './notify.ts';
 import { stopTagOf } from './data.ts';
+import { arrivalOf, rowKey, usualExits } from './commute.ts';
+import type { PlannedRow } from '../plan.ts';
 import { boardId, filterKey, readHidden, readView, writeHidden, writeView } from './store.ts';
 import type { BoardStatus, BoardView } from './types.ts';
 
@@ -25,6 +27,14 @@ export interface BoardContext {
   barBackend: string;
   onChange: () => void;
   onRetry: () => void;
+  /** Journeys from this board to the chosen destination, keyed by row. */
+  routes?: Map<string, PlannedRow>;
+  /** Whether this board's rows are ordered by arrival rather than departure. */
+  sortByArrival: boolean;
+  /** The current tight-connection window, shown in the filter of a planned board. */
+  earlyBufferMinutes: number;
+  /** Called when the reader moves that window; re-plans rather than re-fetches. */
+  onEarlyBuffer: (minutes: number) => void;
   /** Registered by rows that need their text patched on the one-second tick. */
   ticks: Array<() => void>;
 }
@@ -36,8 +46,11 @@ function nextView(view: BoardView): BoardView {
   return 'integrated';
 }
 
-export function viewOf(profileKey: string, board: Board): BoardView {
-  return readView(boardId(profileKey, board.title)) ?? 'integrated';
+export function viewOf(profileKey: string, board: Board, commuting = false): BoardView {
+  // A board being planned opens as rows, because the answer the commute view
+  // exists to give lives in a row's own slot and would be invisible in a strip.
+  // A stored choice still wins: the reader asked for that one.
+  return readView(boardId(profileKey, board.title)) ?? (commuting ? 'full' : 'integrated');
 }
 
 /**
@@ -93,13 +106,15 @@ function timeGroup(dep: Departure, timezone: string, referenceMs: number): HTMLE
 /** Which optional columns this board's rows have anything to put in. */
 interface Columns {
   connection: boolean;
+  route: boolean;
   platform: boolean;
   stop: boolean;
 }
 
-function columnsOf(board: Board, rows: Departure[]): Columns {
+function columnsOf(board: Board, rows: Departure[], routes: Map<string, PlannedRow> | undefined): Columns {
   return {
     connection: board.connection !== undefined,
+    route: routes !== undefined && routes.size > 0,
     // The upstream feed reports a platform for rail and never for trams or
     // buses, so a fixed platform column would be dead space on most boards.
     // Presence is decided per board, which keeps the slots aligned within a
@@ -111,6 +126,7 @@ function columnsOf(board: Board, rows: Departure[]): Columns {
 
 function gridTemplate(columns: Columns): string {
   const parts = ['var(--col-minutes)', 'var(--col-badge)', 'minmax(0, 1fr)'];
+  if (columns.route) parts.push('var(--col-route)');
   if (columns.connection) parts.push('var(--col-connection)');
   if (columns.platform) parts.push('var(--col-platform)');
   parts.push('var(--col-state)', 'var(--col-alarm)');
@@ -118,7 +134,37 @@ function gridTemplate(columns: Columns): string {
   return parts.join(' ');
 }
 
-function renderRow(dep: Departure, board: Board, columns: Columns, context: BoardContext): HTMLElement {
+/**
+ * The commute slot: where this departure puts you down, what you catch there,
+ * and when you arrive. A tight option is one that only works if the first leg
+ * runs early, so it is never the recommendation and says so when asked.
+ */
+function renderRoute(dep: Departure, context: BoardContext, usual: Map<string, string>): HTMLElement {
+  // A cancelled departure gets no route, however good the planner thinks it is.
+  // The planner works from the timetable and does not always know the vehicle
+  // has been withdrawn, and a recommendation to take a train that is not running
+  // is worse than no recommendation.
+  if (dep.cancelled) return slot('route');
+  const planned = context.routes?.get(rowKey(dep));
+  const option = planned?.best ?? planned?.options[0];
+  if (option === undefined) return slot('route');
+
+  const better = usual.get(normaliseLine(dep.line)) !== undefined && usual.get(normaliseLine(dep.line)) !== option.exitStop;
+  const node = el('span', `route${option.tight ? ' tight' : ''}${better && !option.tight ? ' better' : ''}`);
+  const onward = option.legs[1];
+  const head = onward === undefined ? option.exitStopName : `${option.exitStopName} · ${onward.line}`;
+  node.append(el('span', undefined, `${head} `));
+  node.append(el('span', 'route-arrival', clockTime(option.arrival, context.timezone)));
+
+  const chain = option.legs.map((leg) => `${leg.line} ${clockTime(leg.departure, context.timezone)}`).join(' → ');
+  const parts = [`change at ${option.exitStopName}`, chain, `arrive ${clockTime(option.arrival, context.timezone)}`];
+  if (option.tight) parts.push('tight: needs the first leg to run early or the change to be quick');
+  if (better) parts.push('a different exit from this line\u2019s usual one');
+  node.title = parts.join(' · ');
+  return node;
+}
+
+function renderRow(dep: Departure, board: Board, columns: Columns, context: BoardContext, usual: Map<string, string>): HTMLElement {
   const reachable = catchableOnBoard(dep, board, context.now);
   const row = el('li', `row${reachable ? '' : ' unreachable'}${dep.cancelled ? ' row-cancelled' : ''}`);
   row.style.gridTemplateColumns = gridTemplate(columns);
@@ -142,6 +188,8 @@ function renderRow(dep: Departure, board: Board, columns: Columns, context: Boar
   if (dep.cancelled) meta.append(el('span', 'flag cancelled-flag', 'cancelled'));
   main.append(meta);
   row.append(main);
+
+  if (columns.route) row.append(renderRoute(dep, context, usual));
 
   if (columns.connection) {
     if (dep.connection === undefined || dep.connection === null) {
@@ -313,6 +361,7 @@ function renderFilter(board: Board, context: BoardContext, rows: Departure[]): H
   const total = [...byStop.values()].reduce((sum, set) => sum + set.size, 0);
   if (total <= 1) {
     popover.append(el('p', 'filter-empty', 'only one line here, nothing to filter'));
+    appendEarlyBuffer(popover, context);
     return popover;
   }
 
@@ -344,7 +393,37 @@ function renderFilter(board: Board, context: BoardContext, rows: Departure[]): H
   if (rows.length === 0 && board.departures.length > 0) {
     popover.append(el('p', 'filter-empty', 'everything is hidden'));
   }
+  appendEarlyBuffer(popover, context);
   return popover;
+}
+
+/**
+ * The tight-connection window, on planned boards only.
+ *
+ * It belongs in the filter rather than the bar because it changes what one
+ * board shows and means nothing on the others, and because widening it is an
+ * occasional question ("what if I run for it") rather than a setting.
+ */
+function appendEarlyBuffer(popover: HTMLElement, context: BoardContext): void {
+  if (context.routes === undefined) return;
+  const label = document.createElement('label');
+  label.className = 'filter-buffer';
+  label.append(el('span', undefined, 'tight window'));
+  const input = document.createElement('input');
+  input.type = 'number';
+  input.min = '0';
+  input.max = '15';
+  input.step = '1';
+  input.value = String(context.earlyBufferMinutes);
+  input.title = 'how many minutes early an onward departure may be and still be offered as tight';
+  input.addEventListener('change', () => {
+    const value = Number(input.value);
+    if (!Number.isFinite(value) || value < 0) return;
+    context.onEarlyBuffer(Math.min(15, Math.round(value)));
+  });
+  label.append(input);
+  label.append(el('span', 'filter-buffer-unit', 'min'));
+  popover.append(label);
 }
 
 /** Which board's filter popover is open, if any. Null when none is. */
@@ -356,7 +435,7 @@ export function closeFilters(): void {
 
 export function renderBoard(board: Board, context: BoardContext): HTMLElement {
   const id = boardId(context.profileKey, board.title);
-  const view = viewOf(context.profileKey, board);
+  const view = viewOf(context.profileKey, board, context.routes !== undefined);
   const rows = visibleRows(context.profileKey, board);
 
   const section = el('section', `board board-${view}`);
@@ -435,11 +514,16 @@ export function renderBoard(board: Board, context: BoardContext): HTMLElement {
     return section;
   }
 
-  const columns = columnsOf(board, rows);
+  const columns = columnsOf(board, rows, context.routes);
+  const usual = context.routes === undefined ? new Map<string, string>() : usualExits(context.routes);
+  const ordered =
+    context.sortByArrival && columns.route
+      ? [...rows].sort((a, b) => arrivalOf(a, context.routes) - arrivalOf(b, context.routes) || a.realtime - b.realtime)
+      : rows;
   const list = el('ul', 'rows');
   let highlighted = false;
-  for (const dep of rows) {
-    const node = renderRow(dep, board, columns, context);
+  for (const dep of ordered) {
+    const node = renderRow(dep, board, columns, context, usual);
     if (!highlighted && catchableOnBoard(dep, board, context.now)) {
       node.classList.add('first-catchable');
       highlighted = true;
