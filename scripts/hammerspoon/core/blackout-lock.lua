@@ -730,12 +730,18 @@ end
 --- `caffeinate -d' that comes with it ran on across the lock. That is a trap
 --- with no exit. The loop re-asserts brightness 0, contrast 0 and black gamma
 --- on every display every few seconds, the login window included; the
---- brightness keys lose to it; no chord can reach a tap in a locked session;
---- and the assertion forbids macOS the one display sleep that would have ended
---- it. In clamshell there is no second display to fall back on and Touch ID is
---- behind a shut lid, so the only way back in was opening the lid. It happened.
---- h-blackout-release's own docstring already warned about this shape, for the
---- wake case.
+--- brightness keys lose to it; and no chord can reach a tap in a locked
+--- session. In clamshell there is no second display to fall back on and Touch
+--- ID is behind a shut lid, so the only way back in was opening the lid. It
+--- happened. h-blackout-release's own docstring already warned about this
+--- shape, for the wake case.
+---
+--- The `caffeinate -d' is not part of that, measured rather than assumed: it
+--- asserts PreventUserIdleDisplaySleep, which stops an *idle* display sleep and
+--- not a forced one, so `pmset displaysleepnow' goes through with the key held.
+--- The key is released here anyway, because h-blackout-release is how the loop
+--- is stopped and the key goes with it, and because an assertion should not
+--- outlive its blackout across a lock of unknown length.
 ---
 --- So the rung hands the job to macOS. The garden runs display-off-lock, which
 --- is release the blackout, panel off, lock, in that order. Waking a slept

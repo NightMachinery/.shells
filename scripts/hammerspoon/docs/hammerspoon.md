@@ -852,14 +852,20 @@ back is whatever wakes a sleeping display, meaning any key or any click, and
 nothing of ours has to run for it to work.
 
 It used to be a blackout, and that was a trap with no exit. `blackoutChordBegin`
-plus `lockScreen` left the keep-blank loop, and the `caffeinate -d` that comes
-with it, running across the lock. The loop re-asserts brightness 0, contrast 0
-and black gamma on every display every few seconds, the login window included;
-the brightness keys lose to it; no chord reaches a tap in a locked session; and
-the assertion forbids macOS the one display sleep that would have ended it. In
-clamshell there is no second display to fall back on and Touch ID is behind a
-shut lid, so the only way back in was opening the lid. `h-blackout-release`'s
-own docstring had warned about this exact shape, for the wake case.
+plus `lockScreen` left the keep-blank loop running across the lock. The loop
+re-asserts brightness 0, contrast 0 and black gamma on every display every few
+seconds, the login window included; the brightness keys lose to it; and no chord
+reaches a tap in a locked session. In clamshell there is no second display to
+fall back on and Touch ID is behind a shut lid, so the only way back in was
+opening the lid. `h-blackout-release`'s own docstring had warned about this
+exact shape, for the wake case.
+
+The `caffeinate -d` a blackout also holds is not part of the trap, though it
+reads like it should be. It asserts `PreventUserIdleDisplaySleep`, which stops
+an *idle* display sleep and not a forced one, so `pmset displaysleepnow` turns
+the panel off with the key still held. Measured, after this was first written
+down the other way round. `display-off-lock` releases it anyway, because
+`h-blackout-release` is how the loop is stopped and the key goes with it.
 
 Rungs one and two keep the loop, because "stay dark while the machine keeps
 working" is what they are for, and they leave the session unlocked, so the chord

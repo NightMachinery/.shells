@@ -83,14 +83,19 @@ function display-off-lock {
 blackout rung, hyper+cmd+F1; see hammerspoon/core/blackout-lock.lua.
 
 Deliberately *not* a blackout. A blackout is a dark screen on a machine that
-keeps working, and it is held that way by [agfi:display-black-on-loop] plus a
-`caffeinate -d' that forbids display sleep. Both of those are exactly wrong
-once the session is locked: the loop re-asserts brightness 0 at the login
-window every few seconds, where the brightness keys can no longer win and no
-chord can reach Hammerspoon, and the assertion stops macOS doing the one thing
-that would have saved you. In clamshell that is a screen with no way back at
-all, since there is no second display and Touch ID is behind a shut lid. It
+keeps working, held that way by [agfi:display-black-on-loop], and that loop is
+exactly wrong once the session is locked: it re-asserts brightness 0 at the
+login window every few seconds, where the brightness keys can no longer win and
+no chord can reach Hammerspoon. In clamshell that is a screen with no way back
+at all, since there is no second display and Touch ID is behind a shut lid. It
 happened; the lid had to be opened.
+
+The `caffeinate -d' a blackout also holds is *not* part of that. Measured: it
+asserts PreventUserIdleDisplaySleep, which stops an idle display sleep and not a
+forced one, so [agfi:display-off] works with the key still held. It is released
+here regardless, because [agfi:h-blackout-release] is how the loop is stopped
+and the key goes with it, and because an assertion should not outlive its
+blackout across a lock of unknown length.
 
 So this hands the whole problem to macOS instead. [agfi:h-blackout-release]
 first, which stops the loop, restores the levels and gives the key up, so
