@@ -262,10 +262,10 @@ describe('places', () => {
 
   test('a profile may name the destinations it offers, and they must exist', () => {
     const config = parseConfig(
-      { profiles: { alpha: { ...profiles.alpha, destinations: ['pasing'] } }, places: { pasing: { stop: 'de:00000:7' } } },
+      { profiles: { alpha: { ...profiles.alpha, destinations: ['station'] } }, places: { station: { stop: 'de:00000:7' } } },
       PATH,
     );
-    expect(config.profiles[0]?.destinations).toEqual(['pasing']);
+    expect(config.profiles[0]?.destinations).toEqual(['station']);
     expect(issuesOf({ profiles: { alpha: { ...profiles.alpha, destinations: ['nowhere'] } } })).toContain(
       'profiles.alpha.destinations: no place named nowhere is declared',
     );
