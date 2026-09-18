@@ -34,6 +34,38 @@ export function significantWords(name: string): string[] {
     .filter((word) => word.length > 0 && !FILLER.has(word.toLowerCase()));
 }
 
+/**
+ * How long an exit name may be before it is cut short.
+ *
+ * No more than a phone-width journey slot can spare once the onward line and
+ * the arrival time have taken their share, and enough to hold most stop names
+ * outright. The full name is always in the tooltip, so the period costs a
+ * reader nothing they cannot get back by hovering.
+ */
+const EXIT_CHARS = 7;
+
+/**
+ * A stop name short enough for the journey slot, cut where it says the most.
+ *
+ * The same rule the badges use, one step earlier: the words that only say what
+ * kind of thing this is go first, and what is left is one name. "Marienplatz
+ * (Rathaus)" is two names for one place, so the slot shows the first and the
+ * tooltip keeps both; a name still too long for the slot loses its tail to a
+ * period rather than to an ellipsis, because a period is a word that has been
+ * shortened and an ellipsis is a row that has run out of room.
+ *
+ * This exists because the alternative was measured and was useless: at 390 px
+ * the slot was ellipsising stop names down to two letters and a dot, which
+ * named no station at all, and naming the station is the one thing the slot is
+ * for.
+ */
+export function shortStopName(name: string): string {
+  const words = significantWords(name);
+  const first = words[0] ?? compact(name);
+  if (first.length <= EXIT_CHARS) return first;
+  return `${first.slice(0, EXIT_CHARS - 1)}.`;
+}
+
 /** The first word shortened to `length`, capitalised, then the other initials. */
 function badgeText(words: readonly string[], length: number): string {
   const first = words[0] ?? '';

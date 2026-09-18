@@ -16,6 +16,10 @@ describe('compact place names', () => {
   test('drops a leading city name in either of the forms it is written', () => {
     expect(compact('München, Somewhere')).toBe('Somewhere');
     expect(compact('München-Elsewhere')).toBe('Elsewhere');
+    // With a space too: an aggregator writes the city three ways and the
+    // spaced one used to survive, which left the slot showing the city rather
+    // than the station.
+    expect(compact('München Elsewhere')).toBe('Elsewhere');
   });
 
   test('leaves a name that distinguishes nothing else alone', () => {

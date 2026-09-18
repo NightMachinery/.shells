@@ -57,6 +57,10 @@
   --col-alarm: 1rem;
   --col-stop: 2.6rem;
   --col-route: 9rem;
+  /* The journey slot's floor: enough for a short exit name, the onward line
+     and the arrival time on one line. Below this the slot names no station,
+     which is worse than a destination squeezed by the same amount. */
+  --col-route-min: 7.3rem;
 
   /* Destination badges. Only the hue is chosen per destination, in code;
      how saturated and how light a badge is belongs to the colour scheme,

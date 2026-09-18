@@ -1092,21 +1092,33 @@
 
       @media (max-width: 480px) {
         :root {
-          --col-destination-min: 5.5rem;
-          --col-minutes: 2.2rem;
+          /* Lower than the desktop floor on purpose: on a phone the journey
+             slot is the one that must not collapse, so the destination is
+             what yields. It is abbreviated already and repeated down the
+             group, so a few characters cost the reader nothing. */
+          --col-destination-min: 2.9rem;
+          --col-minutes: 2.1rem;
           --col-badge: 2.5rem;
           --col-connection: 4rem;
           --col-platform: 1.4rem;
           --col-state: 3.2rem;
           --col-alarm: 0.9rem;
-          --col-stop: 2.3rem;
+          --col-stop: 2rem;
           /* Wider on a phone than on a desktop, because the interchange column
              is dropped here and the journey is what takes its place. */
           --col-route: 8.6rem;
+          --col-route-min: 8rem;
         }
 
         #app {
           padding: 0 12px 32px;
+        }
+
+        /* A denser row on a phone. Two pixels a column is not something a
+           reader sees, and seven of them are the difference between a journey
+           slot that names its station and one that ellipsises it away. */
+        .row {
+          column-gap: 5px;
         }
 
         .bar {

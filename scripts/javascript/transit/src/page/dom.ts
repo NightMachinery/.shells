@@ -129,17 +129,17 @@ export function selectionInsideBoards(): boolean {
 /**
  * How a place name is shortened in a slot too narrow to hold it.
  *
- * One constant, applied in the three compact places (the journey slot, the
- * strip's destination suffixes, the board chips) and nowhere else. The full
- * name is always still in the tooltip, so this only ever trades characters a
- * local reader supplies from memory against characters that would otherwise be
- * cut off by an ellipsis, which supply nothing.
+ * One constant, applied wherever a place name has to fit somewhere narrow: the
+ * strip's legend, the board chips, and `shortStopName`, which every journey slot
+ * goes through. The full name is always still in the tooltip, so this only ever
+ * trades characters a local reader supplies from memory against characters that
+ * would otherwise be cut off by an ellipsis, which supply nothing.
  *
  * Order matters: the city prefix goes before the station words, and the long
  * compound goes before the short one it contains.
  */
 const ABBREVIATIONS: ReadonlyArray<readonly [RegExp, string]> = [
-  [/^München[,\-–]\s*/iu, ''],
+  [/^München[,\-–\s]\s*/iu, ''],
   [/\bHauptbahnhof\b/giu, 'Hbf'],
   [/\bBahnhof\b/giu, 'Bf'],
 ];

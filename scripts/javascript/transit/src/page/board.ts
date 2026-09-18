@@ -184,17 +184,26 @@ function columnsOf(board: Board, rows: Departure[], routes: BoardRoutes | undefi
 /**
  * The row's columns, as a grid template.
  *
- * The destination carries a floor and the two wide optional slots carry a
- * ceiling they may fall below. On a phone a board with both an interchange and
- * a journey has more fixed width than the screen, and with every slot rigid the
- * destination, which is the only flexible one, was squeezed to a single letter.
- * Letting the journey and the interchange ellipsise instead costs the tail of a
- * stop name that the tooltip still carries, and keeps every row saying where it
- * is going.
+ * On a phone a board with both an interchange and a journey wants more width
+ * than the screen has, so the template says in what order the slots give way.
+ * The destination is flexible between a floor and the leftover space; the two
+ * wide optional slots carry a ceiling they may fall below; and the journey
+ * carries a floor of its own, which is the part that had to be learned twice.
+ * With no floor the journey was the slot that collapsed, and a collapsed
+ * journey says "Le…", which is not a station. With too high a floor on the
+ * destination it was the destination that collapsed to one letter. Both of
+ * them have a minimum below which they stop meaning anything, and the
+ * destination's is the lower of the two, because the same word is on every row
+ * of its group and the tooltip repeats it either way.
  */
 function gridTemplate(columns: Columns): string {
   const parts = ['var(--col-minutes)', 'var(--col-badge)', 'minmax(var(--col-destination-min), 1fr)'];
-  if (columns.route) parts.push('minmax(0, var(--col-route))');
+  // The journey keeps a floor the destination does not. When the row runs out of
+  // room something has to give, and the destination is the cheaper thing to
+  // squeeze: it is already abbreviated, the same word is on every row of the
+  // group, and the tooltip repeats it. A journey squeezed below its floor stops
+  // naming a station at all, which is the whole reason the column exists.
+  if (columns.route) parts.push('minmax(var(--col-route-min), var(--col-route))');
   if (columns.connection) parts.push('minmax(0, var(--col-connection))');
   if (columns.platform) parts.push('var(--col-platform)');
   parts.push('var(--col-state)', 'var(--col-alarm)');
@@ -240,7 +249,7 @@ function renderRoute(dep: Departure, board: Board, context: BoardContext, usual:
   node.target = '_blank';
   node.rel = 'noopener';
 
-  node.append(slotHead(option, shortDestination));
+  node.append(slotHead(option));
   node.append(timeNode(option.arrival, context.now, context.timezone, 'route-arrival'));
 
   const notes = { better, origin: context.routes?.origin };
@@ -567,18 +576,6 @@ function destinationChip(badge: DestinationBadge, name: string): HTMLElement {
   node.style.setProperty('--dest-hue', String(badge.hue));
   node.title = name;
   return node;
-}
-
-/**
- * Enough of a destination to tell two branches of one line apart.
- *
- * Abbreviated before it is cut, so the characters that survive are the ones
- * that distinguish one place from another rather than the ones a station name
- * spends on saying "station".
- */
-function shortDestination(name: string): string {
-  const head = name.split(/[,(]/)[0] ?? name;
-  return compact(head).slice(0, 14);
 }
 
 function renderFilter(board: Board, context: BoardContext, rows: Departure[]): HTMLElement {

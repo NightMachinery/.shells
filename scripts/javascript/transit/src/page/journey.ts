@@ -2,6 +2,7 @@ import { contrastText, resolveColor, resolveTextColor } from '../colors.ts';
 import type { Departure } from '../model.ts';
 import { transitLegs, WALK_MODE, type RouteLeg, type RouteOption } from '../plan.ts';
 import type { OriginLevel } from '../origin.ts';
+import { shortStopName } from './badges.ts';
 import { clockTime, compact, el, timeLabel, timeNode } from './dom.ts';
 
 // How a journey is drawn, in the one place both the board and the expanded page
@@ -81,10 +82,15 @@ export function journeySummary(option: RouteOption, timezone: string, now: numbe
  * leaves "Hbf … 00:08", which still says where and when; cutting the line
  * leaves "Hauptbahnhof Nord …", which says neither. So the name ellipsises and
  * the line does not.
+ *
+ * The name is abbreviated before it is given the chance to ellipsise, because
+ * an ellipsis is the worst of both: at 390 px the slot was showing two letters
+ * and a dot, which named no station at all. `shortStopName` spends the
+ * characters on the part that identifies the place.
  */
-export function slotHead(option: RouteOption, shorten: (name: string) => string): HTMLElement {
+export function slotHead(option: RouteOption): HTMLElement {
   const wrap = el('span', 'route-head');
-  wrap.append(el('span', 'route-exit', shorten(option.exitStopName)));
+  wrap.append(el('span', 'route-exit', shortStopName(option.exitStopName)));
   const onward = transitLegs(option)[1];
   if (onward !== undefined) wrap.append(el('span', 'route-line', `· ${onward.line}`));
   return wrap;

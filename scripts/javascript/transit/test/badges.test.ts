@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import { destinationBadges, significantWords } from '../src/page/badges.ts';
+import { destinationBadges, shortStopName, significantWords } from '../src/page/badges.ts';
 
 describe('significantWords', () => {
   test('drops the words that do not say which place this is', () => {
@@ -9,6 +9,25 @@ describe('significantWords', () => {
   test('drops a standalone station word but keeps the compounded one', () => {
     expect(significantWords('Maxmonument Bahnhof')).toEqual(['Maxmonument']);
     expect(significantWords('Ostbahnhof')).toEqual(['Ostbahnhof']);
+  });
+});
+
+describe('shortStopName', () => {
+  test('keeps a name the slot can hold', () => {
+    expect(shortStopName('Süd')).toBe('Süd');
+    expect(shortStopName('Nordweg')).toBe('Nordweg');
+  });
+
+  test('drops the second name of a place that has two', () => {
+    expect(shortStopName('Marienplatz (Rathaus)')).toBe('Marien.');
+  });
+
+  test('abbreviates before it cuts', () => {
+    expect(shortStopName('München, Hauptbahnhof')).toBe('Hbf');
+  });
+
+  test('ends a name it has to cut with a period, not an ellipsis', () => {
+    expect(shortStopName('Maxmonument')).toBe('Maxmon.');
   });
 });
 
