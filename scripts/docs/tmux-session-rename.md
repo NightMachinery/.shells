@@ -71,6 +71,22 @@ is not hypothetical: a resumed session in a pane restarted with `sbb` reported
 `not inside tmux` for its whole life, and its tmux session kept the name it had
 been given before.
 
+The helpers here do not wait to be repaired, either. `tmux-session-current-get`,
+[agfi:tmux-session-rename-current] and [agfi:tmux-session-autoname] (so
+`tsrc`, `tsrcag`, `tnameme`, `tnameme-on/off/status`) now guard on
+[agfi:h-tmux-here-p] rather than on `isTmux`: it repairs first and answers
+afterwards, so each of them settles the question against tmux instead of
+against a variable. That matters most for the stale direction. Measured here,
+a shell carrying a `TMUX_PANE` from a pane it had left resolved to
+`+Claude/default Causal-steering-gradient-descent-in-PCA`; `tsrc` in it would
+have renamed that agent's session and told you it had succeeded.
+
+`isTmux` itself is left alone. It is a one-variable predicate used all over
+the place for cosmetics like borders and picker geometry, and it should stay
+that cheap; the repair costs an ancestry walk plus a `list-panes` against the
+server. `h-tmux-here-p` is for the handful of callers where the answer decides
+what happens to a *named* tmux object.
+
 
 ## The shared core
 
@@ -294,6 +310,9 @@ Anything left over from before the change can be swept up with:
   for it. Every helper derives one from the pane,
   `tmux display-message -p -t "$TMUX_PANE" '#S'`, and inherits `$TMUX_PANE`'s
   failure modes from `./tmux-tty-title.md`: `tmux run-shell` and garden shells.
+  The rename helpers go through [agfi:h-tmux-here-p] first, which fixes the
+  missing and stale cases above; a garden shell has no pane at all and is still
+  out of reach.
 - A hand-set name (`tsrc scratch`, `tsrcag x`) in a session with an agent
   inside lasts until the next prompt, when the hook puts the `+` name back.
   Run `tnameme-off` there first.

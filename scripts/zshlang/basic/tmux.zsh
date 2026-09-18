@@ -127,6 +127,29 @@ function h-tmux-env-repair {
     return 0
 }
 
+function h-tmux-here-p {
+    : "true when this shell sits in a live tmux pane, repairing TMUX/TMUX_PANE first"
+    #: The guard to use in place of a bare [agfi:isTmux] wherever the answer
+    #: decides what happens to a *named* tmux object -- renaming a session,
+    #: setting an option on one. `isTmux' reads one environment variable, and
+    #: that variable is wrong often enough to matter in both directions: absent
+    #: after a clean shell restart, so the helper refuses inside a real pane;
+    #: or left over from a pane this process no longer lives in, so the helper
+    #: cheerfully acts on somebody else's session. Neither shows up as an
+    #: error, which is what makes them expensive.
+    #:
+    #: So settle the question against tmux before answering it, with
+    #: [agfi:h-tmux-env-repair]. Quiet on purpose: callers print their own
+    #: refusal, and the repair's diagnostics are about a conflict it has
+    #: already resolved. It costs one ancestry walk plus one `list-panes'
+    #: against the server, which is why this belongs in the handful of helpers
+    #: that rename things and not in `isTmux' itself.
+    ##
+    emulate -L zsh
+    h-tmux-env-repair >/dev/null 2>&1 || true
+    test -n "${TMUX:-}" && test -n "${TMUX_PANE:-}"
+}
+
 #: @duplicateCode/0c8b9d0226cdfb4f5bc0a9ea735089df
 function tmuxnew {
     #: @todo0 integrate =str2tmuxname=

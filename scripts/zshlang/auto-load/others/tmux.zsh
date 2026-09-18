@@ -285,7 +285,7 @@ function tmux-attach {
 ##
 function tmux-session-current-get {
     : "prints the name of the tmux session this shell runs in"
-    if ! isTmux ; then
+    if ! h-tmux-here-p ; then
         ecerr "$0: not inside tmux"
         return 1
     fi
@@ -298,7 +298,7 @@ function tmux-session-rename-current {
     local name="${1}"
     assert-args name @RET
 
-    if ! isTmux ; then
+    if ! h-tmux-here-p ; then
         ecerr "$0: not inside tmux"
         return 1
     fi
@@ -407,7 +407,7 @@ function tmux-session-autoname {
     local mode="${1:-status}"
     local opt="${agent_tmux_autoname_option}"
 
-    if ! isTmux ; then
+    if ! h-tmux-here-p ; then
         ecerr "$0: not inside tmux"
         return 1
     fi
