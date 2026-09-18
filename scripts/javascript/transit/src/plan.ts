@@ -174,6 +174,8 @@ interface RawPlanPlace {
   stopId?: string;
   track?: string;
   scheduledTrack?: string;
+  arrival?: string;
+  scheduledArrival?: string;
 }
 
 interface RawPlanLeg {
@@ -187,6 +189,8 @@ interface RawPlanLeg {
   tripId?: string;
   routeShortName?: string;
   agencyName?: string;
+  /** Stops this leg calls at between its own ends; null on a street leg. */
+  intermediateStops?: RawPlanPlace[] | null;
 }
 
 interface RawItinerary {
@@ -205,10 +209,31 @@ interface RawPlan {
  * the arithmetic needs and the street distance leading away from it, which is
  * how the walk to the next leg is recovered once the street legs are dropped.
  */
+/** Somewhere a rider could get off a leg: the stop, its name, and when. */
+interface ExitPoint {
+  stop: string;
+  name: string;
+  arrival: number;
+}
+
 interface ParsedLeg extends RouteLeg {
   fromStop: string;
   toStop: string;
   toName: string;
+  /**
+   * The stops this leg calls at on the way, which are exits too.
+   *
+   * Without these a row can only ever be told to get off where the planner's
+   * own itinerary for that exact departure alighted, and the planner returns a
+   * Pareto set: "leave at 22:21 and change at the first interchange" is
+   * dominated by "leave at 22:41 and change at the same interchange onto the
+   * same onward train", so it is never returned, and the only itinerary left
+   * beginning with the 22:21 vehicle was a much worse one changing far away.
+   * The row then got that absurd advice. Every stop the vehicle calls at is a
+   * candidate exit, and the tails observed from the later departure are what
+   * the earlier row is actually looking for.
+   */
+  intermediate: ExitPoint[];
   /** Timetabled departure, which is the reliable half of the match key below. */
   scheduledDeparture: number;
   /** Platform this leg is boarded from, when the planner names one. */
@@ -279,6 +304,24 @@ function legMode(leg: RawPlanLeg): string {
   return mapped;
 }
 
+/**
+ * The stops a leg calls at on the way, as exit points.
+ *
+ * A call with no identifier or no arrival time is dropped rather than guessed
+ * at: an exit is advice to leave a vehicle at a named place at a named minute,
+ * and half of that is not advice.
+ */
+function parseIntermediate(leg: RawPlanLeg): ExitPoint[] {
+  const out: ExitPoint[] = [];
+  for (const place of Array.isArray(leg.intermediateStops) ? leg.intermediateStops : []) {
+    const stop = toRawId(String(place?.stopId ?? ''));
+    const arrival = parseIso(place?.arrival ?? place?.scheduledArrival);
+    if (stop.length === 0 || !Number.isFinite(arrival)) continue;
+    out.push({ stop, name: String(place?.name ?? '').trim(), arrival });
+  }
+  return out;
+}
+
 function parseItinerary(raw: RawItinerary): ParsedItinerary | null {
   const arrival = parseIso(raw.endTime);
   if (!Number.isFinite(arrival)) return null;
@@ -321,6 +364,7 @@ function parseItinerary(raw: RawItinerary): ParsedItinerary | null {
       toName,
       scheduledDeparture: Number.isFinite(scheduled) ? scheduled : departure,
       fromTrack: track.length > 0 ? track : null,
+      intermediate: parseIntermediate(leg),
       walkMetresAfter: 0,
     });
   }
@@ -582,10 +626,21 @@ function optionsFor(
   const add = (option: RouteOption): void => {
     const key = optionKey(option);
     const existing = found.get(key);
-    // A journey reached by two routes through the index is one journey, and the
-    // kinder verdict wins: if any observed walk makes the change comfortable,
-    // calling it tight would be an artefact of the indexing.
-    if (existing === undefined || (existing.tight && !option.tight)) found.set(key, option);
+    if (existing === undefined) {
+      found.set(key, option);
+      return;
+    }
+    // The same onward journey can be reached by getting off at more than one
+    // stop, and that is one journey rather than several. The kinder verdict
+    // wins first: if any observed walk makes the change comfortable, calling it
+    // tight would be an artefact of the indexing. Otherwise the later exit
+    // wins, which means less walking and more time on a vehicle the rider is
+    // already sitting on.
+    if (existing.tight !== option.tight) {
+      if (existing.tight) found.set(key, option);
+      return;
+    }
+    if (exitArrival(option) > exitArrival(existing)) found.set(key, option);
   };
 
   // A journey with no change at all: ride this leg, then walk. It has no tail
@@ -601,33 +656,57 @@ function optionsFor(
     });
   }
 
-  // Boarding points reachable from where this leg puts the rider down: the same
-  // platform, at no cost, plus every platform somebody was observed walking to.
-  const reachable = new Map<string, number>([[first.toStop, 0]]);
-  for (const [boardStop, metres] of index.walks.get(first.toStop) ?? []) {
-    const known = reachable.get(boardStop);
-    if (known === undefined || metres < known) reachable.set(boardStop, metres);
-  }
+  // Every stop this leg calls at is somewhere a rider can get off, not just the
+  // one the planner's own itinerary happened to alight at.
+  const exits: ExitPoint[] = [...first.intermediate, { stop: first.toStop, name: first.toName, arrival: first.arrival }];
 
-  for (const [boardStop, metres] of reachable) {
-    const walkMs = (metres / WALK_METRES_PER_MINUTE) * 60_000;
-    const feasible = first.arrival + walkMs;
-    for (const chain of index.chains.get(boardStop) ?? []) {
-      if (chain.departure < feasible - earlyBufferMs) continue;
-      add({
-        exitStop: first.toStop,
-        exitStopName: first.toName,
-        legs: [publicLeg(first), ...chain.legs],
-        arrival: chain.arrival,
-        transfers: chain.legs.length,
-        tight: chain.departure < feasible,
-      });
+  for (const exit of exits) {
+    // Boarding points reachable from this exit: the same platform, at no cost,
+    // plus every platform somebody was observed walking to *from this exact
+    // platform*. Deliberately an exact match and not a same-stop-area one: a
+    // chain boarding elsewhere in the station is only catchable if the walk to
+    // it has been measured, and treating an unmeasured interchange as instant
+    // is how a plausible and wrong recommendation gets made.
+    const reachable = new Map<string, number>([[exit.stop, 0]]);
+    for (const [boardStop, metres] of index.walks.get(exit.stop) ?? []) {
+      const known = reachable.get(boardStop);
+      if (known === undefined || metres < known) reachable.set(boardStop, metres);
+    }
+
+    for (const [boardStop, metres] of reachable) {
+      const walkMs = (metres / WALK_METRES_PER_MINUTE) * 60_000;
+      const feasible = exit.arrival + walkMs;
+      for (const chain of index.chains.get(boardStop) ?? []) {
+        if (chain.departure < feasible - earlyBufferMs) continue;
+        // Riding the leg only as far as the exit: same vehicle, shorter ride.
+        const ridden: RouteLeg = { ...publicLeg(first), to: exit.name, arrival: exit.arrival };
+        add({
+          exitStop: exit.stop,
+          exitStopName: exit.name,
+          legs: [ridden, ...chain.legs],
+          arrival: chain.arrival,
+          transfers: chain.legs.length,
+          tight: chain.departure < feasible,
+        });
+      }
     }
   }
 
   return [...found.values()]
-    .sort((a, b) => a.arrival - b.arrival || a.transfers - b.transfers || Number(a.tight) - Number(b.tight))
+    .sort(
+      (a, b) =>
+        a.arrival - b.arrival ||
+        a.transfers - b.transfers ||
+        Number(a.tight) - Number(b.tight) ||
+        // Same journey by every measure that matters: stay on longer.
+        exitArrival(b) - exitArrival(a),
+    )
     .slice(0, MAX_OPTIONS_PER_ROW);
+}
+
+/** When the rider leaves the first vehicle, which is the first leg's own end. */
+function exitArrival(option: RouteOption): number {
+  return option.legs[0]?.arrival ?? Number.NEGATIVE_INFINITY;
 }
 
 /**

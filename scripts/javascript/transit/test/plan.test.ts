@@ -300,6 +300,54 @@ describe('cursor paging', () => {
   });
 });
 
+describe('exits along the way', () => {
+  // The fixture: one line running at 08:10 and 08:20 from the board's stop,
+  // calling at an interchange five minutes out and ending ten minutes later.
+  // The planner's own itinerary for the 08:10 vehicle rides to the end and
+  // changes onto something that arrives at 10:00; its itinerary for the 08:20
+  // vehicle alights at the interchange and arrives at 08:50. A third line
+  // calls only at a stop nobody was ever observed leaving.
+  const MID_ARRIVAL = at(50);
+  const FAR_ARRIVAL = at(120);
+
+  async function planExits(rows: Departure[]) {
+    const body = await fixture<unknown>('transitous-plan-exits.json');
+    const { fetchImpl } = planMock((page) => (page === 0 ? body : { itineraries: [], nextPageCursor: '' }));
+    return planBoard({ stop: HOME, destination: DESTINATION, rows, startMs: FIXTURE_NOW, baseUrl: BASE, fetchImpl });
+  }
+
+  test('an earlier departure is told to get off where a later one was', async () => {
+    const planned = await planExits([row('T1', 10), row('T1', 20)]);
+    const early = planned[0]?.best;
+    const later = planned[1]?.best;
+    // Both vehicles pass the interchange, so both get the same advice, and the
+    // earlier one gets there earlier. Without intermediate stops the earlier
+    // row could only ever be offered the one itinerary that began with it,
+    // which is the one arriving over an hour later.
+    expect(early?.exitStopName).toBe('Mid');
+    expect(early?.arrival).toBe(MID_ARRIVAL);
+    expect(later?.exitStopName).toBe('Mid');
+    expect(early?.legs[0]?.to).toBe('Mid');
+    // The ride is truncated at the exit, so the first leg ends when the rider
+    // actually leaves the vehicle rather than where the planner's own
+    // itinerary happened to end.
+    expect(early?.legs[0]?.arrival).toBe(at(15));
+  });
+
+  test('a row whose calling points lead nowhere keeps its own itinerary', async () => {
+    const planned = await planExits([row('T2', 12)]);
+    expect(planned[0]?.best?.exitStopName).toBe('Far');
+    expect(planned[0]?.best?.arrival).toBe(FAR_ARRIVAL);
+  });
+
+  test('the same onward journey from two exits is offered once, from the later one', async () => {
+    const planned = await planExits([row('T1', 10)]);
+    const options = planned[0]?.options ?? [];
+    const keys = options.map((option) => option.legs.map((leg) => `${leg.line}@${leg.departure}`).join('>'));
+    expect(new Set(keys).size).toBe(keys.length);
+  });
+});
+
 describe('transit modes', () => {
   test('long-distance rail is left out of the request by default', async () => {
     const { urls } = await planFixtureBoard([row('U1', 10)]);

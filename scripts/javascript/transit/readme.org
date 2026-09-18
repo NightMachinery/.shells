@@ -390,8 +390,27 @@ modes are two different searches.
 
 ** Exits, walks and the early buffer
 
-The interesting part of a matched itinerary is where its first leg puts you down
-and what leaves from there. Every itinerary the planner returns ends at the
+The interesting part of a matched itinerary is where the rider can get off and
+what leaves from there. Every stop the first leg *calls at* is a candidate exit,
+not only the one the planner's own itinerary alighted at, and this matters more
+than it sounds. The planner returns a Pareto set over arrival, changes and
+departure time, so "leave at 22:21 and change at the near interchange" is
+dominated by "leave at 22:41 and change at the same interchange onto the same
+onward train": later, no worse, so the earlier one is never returned. The only
+itinerary left beginning with the 22:21 vehicle was a much worse one changing far
+away, and that is what the row was told to do, while the row twenty minutes later
+was given sensible advice. Reading the calling points fixes it, because the tails
+observed from the later departure are exactly what the earlier row needs.
+
+A candidate exit only reaches an onward service whose boarding platform has a
+*measured* walk from that exact platform. Treating an unmeasured interchange as
+instant would manufacture changes nobody can make, which is the same plausible
+and wrong failure as handing a row the journey going the other way.
+
+The first leg is truncated at the chosen exit, so it ends where the rider leaves
+the vehicle. The same onward journey reached from two different exits is one
+journey: it appears once, from the later exit, which means less walking and more
+time on a vehicle already boarded. Every itinerary the planner returns ends at the
 destination, so any tail of any itinerary also ends there, and a tail observed
 after one first leg can be spliced onto another that alights at the same place.
 That recombination is the point: the planner returns only changes it considers

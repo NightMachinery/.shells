@@ -1,0 +1,163 @@
+{
+  "itineraries": [
+    {
+      "startTime": "2026-01-01T08:10:00Z",
+      "endTime": "2026-01-01T10:00:00Z",
+      "legs": [
+        {
+          "mode": "TRAM",
+          "tripId": "trip-a1",
+          "routeShortName": "T1",
+          "startTime": "2026-01-01T08:10:00Z",
+          "endTime": "2026-01-01T08:30:00Z",
+          "scheduledStartTime": "2026-01-01T08:10:00Z",
+          "from": {
+            "name": "Home",
+            "stopId": "de-DELFI_de:00000:1:1:1",
+            "track": "1"
+          },
+          "to": {
+            "name": "Far",
+            "stopId": "de-DELFI_de:00000:9:1:1"
+          },
+          "intermediateStops": [
+            {
+              "name": "Mid",
+              "stopId": "de-DELFI_de:00000:5:1:1",
+              "arrival": "2026-01-01T08:15:00Z",
+              "scheduledArrival": "2026-01-01T08:15:00Z"
+            }
+          ]
+        },
+        {
+          "mode": "WALK",
+          "distance": 100,
+          "startTime": "2026-01-01T08:00:00Z",
+          "endTime": "2026-01-01T08:00:00Z"
+        },
+        {
+          "mode": "TRAM",
+          "tripId": "trip-a2",
+          "routeShortName": "B9",
+          "startTime": "2026-01-01T08:40:00Z",
+          "endTime": "2026-01-01T09:55:00Z",
+          "scheduledStartTime": "2026-01-01T08:40:00Z",
+          "from": {
+            "name": "Far",
+            "stopId": "de-DELFI_de:00000:9:2:1",
+            "track": "1"
+          },
+          "to": {
+            "name": "Destination",
+            "stopId": "de-DELFI_de:00000:99:1:1"
+          },
+          "intermediateStops": []
+        }
+      ]
+    },
+    {
+      "startTime": "2026-01-01T08:20:00Z",
+      "endTime": "2026-01-01T08:50:00Z",
+      "legs": [
+        {
+          "mode": "TRAM",
+          "tripId": "trip-b1",
+          "routeShortName": "T1",
+          "startTime": "2026-01-01T08:20:00Z",
+          "endTime": "2026-01-01T08:25:00Z",
+          "scheduledStartTime": "2026-01-01T08:20:00Z",
+          "from": {
+            "name": "Home",
+            "stopId": "de-DELFI_de:00000:1:1:1",
+            "track": "1"
+          },
+          "to": {
+            "name": "Mid",
+            "stopId": "de-DELFI_de:00000:5:1:1"
+          },
+          "intermediateStops": []
+        },
+        {
+          "mode": "WALK",
+          "distance": 140,
+          "startTime": "2026-01-01T08:00:00Z",
+          "endTime": "2026-01-01T08:00:00Z"
+        },
+        {
+          "mode": "TRAM",
+          "tripId": "trip-b2",
+          "routeShortName": "X9",
+          "startTime": "2026-01-01T08:30:00Z",
+          "endTime": "2026-01-01T08:45:00Z",
+          "scheduledStartTime": "2026-01-01T08:30:00Z",
+          "from": {
+            "name": "Mid",
+            "stopId": "de-DELFI_de:00000:5:2:1",
+            "track": "1"
+          },
+          "to": {
+            "name": "Destination",
+            "stopId": "de-DELFI_de:00000:99:1:1"
+          },
+          "intermediateStops": []
+        }
+      ]
+    },
+    {
+      "startTime": "2026-01-01T08:12:00Z",
+      "endTime": "2026-01-01T10:00:00Z",
+      "legs": [
+        {
+          "mode": "TRAM",
+          "tripId": "trip-c1",
+          "routeShortName": "T2",
+          "startTime": "2026-01-01T08:12:00Z",
+          "endTime": "2026-01-01T08:32:00Z",
+          "scheduledStartTime": "2026-01-01T08:12:00Z",
+          "from": {
+            "name": "Home",
+            "stopId": "de-DELFI_de:00000:1:1:1",
+            "track": "1"
+          },
+          "to": {
+            "name": "Far",
+            "stopId": "de-DELFI_de:00000:9:1:1"
+          },
+          "intermediateStops": [
+            {
+              "name": "Lonely",
+              "stopId": "de-DELFI_de:00000:7:1:1",
+              "arrival": "2026-01-01T08:22:00Z",
+              "scheduledArrival": "2026-01-01T08:22:00Z"
+            }
+          ]
+        },
+        {
+          "mode": "WALK",
+          "distance": 100,
+          "startTime": "2026-01-01T08:00:00Z",
+          "endTime": "2026-01-01T08:00:00Z"
+        },
+        {
+          "mode": "TRAM",
+          "tripId": "trip-c2",
+          "routeShortName": "B9",
+          "startTime": "2026-01-01T08:40:00Z",
+          "endTime": "2026-01-01T09:55:00Z",
+          "scheduledStartTime": "2026-01-01T08:40:00Z",
+          "from": {
+            "name": "Far",
+            "stopId": "de-DELFI_de:00000:9:2:1",
+            "track": "1"
+          },
+          "to": {
+            "name": "Destination",
+            "stopId": "de-DELFI_de:00000:99:1:1"
+          },
+          "intermediateStops": []
+        }
+      ]
+    }
+  ],
+  "nextPageCursor": "LATER|1"
+}
