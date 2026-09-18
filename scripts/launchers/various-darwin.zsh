@@ -28,7 +28,22 @@ fi
 
 if isMe ; then
     ##
-    tmuxnew lock-watcher lock_watcher.swift -v
+    #: Supervised, and loud when it dies.
+    #:
+    #: This was `tmuxnew', which runs the watcher as the session's only
+    #: process, so the session is destroyed the moment that process exits. One
+    #: did exit, some time after the Aug 11 boot, and took every trace with it:
+    #: no pane, no scrollback, no notification, no crash report. Every other
+    #: session started here was still up 38 days later, so nothing swept it --
+    #: it went on its own and nothing noticed. The cost was weeks of unlocks
+    #: that never ran [agfi:h-hook-unlock], which is also what would have
+    #: brought the screen back after the top blackout rung.
+    #:
+    #: So: `loop' restarts it, `reval-notifexit' notifies every time it goes,
+    #: and the wrapping shell keeps the session alive so the next death leaves
+    #: something to read. Hammerspoon now listens for the unlock as well; see
+    #: hammerspoon/core/power-watcher.lua for why neither one is enough alone.
+    tmuxnewsh2 lock-watcher lo_s=10 loop reval-notifexit lock_watcher.swift -v
     ##
     blackbutler-boot
     ##
