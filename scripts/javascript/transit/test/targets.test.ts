@@ -2,11 +2,11 @@ import { describe, expect, test } from 'bun:test';
 import { destinationLabel, planTargets } from '../src/targets.ts';
 
 const HOME = { name: 'home', label: null, lat: 48.1, lon: 11.5, stop: null };
-const PASING = { name: 'pasing', label: 'Pasing', lat: null, lon: null, stop: 'de:00000:7' };
+const STATION = { name: 'station', label: 'Marienplatz', lat: null, lon: null, stop: 'de:00000:7' };
 
 describe('planTargets', () => {
   test('a stop place is one target, reached on foot in no time at all', () => {
-    expect(planTargets(PASING, [])).toEqual([{ place: { id: 'de:00000:7' }, name: 'Pasing', walkMinutes: 0 }]);
+    expect(planTargets(STATION, [])).toEqual([{ place: { id: 'de:00000:7' }, name: 'Marienplatz', walkMinutes: 0 }]);
   });
 
   test('a doorstep is asked about together with every stop that serves it', () => {
@@ -36,7 +36,7 @@ describe('planTargets', () => {
   });
 
   test('the label is what it is called, and the key when it has none', () => {
-    expect(destinationLabel(PASING)).toBe('Pasing');
+    expect(destinationLabel(STATION)).toBe('Marienplatz');
     expect(destinationLabel(HOME)).toBe('home');
   });
 });

@@ -284,9 +284,9 @@ function renderDestination(context: BarContext): HTMLElement | null {
   off.textContent = 'nowhere';
   select.append(off);
   // Doorsteps first, then the stations a reader travels to, unless the profile
-  // names its own order. The default order is the one the commute follows:
-  // where you live and where you work are the everyday answers, and Pasing is
-  // the occasional one.
+  // names its own order. A doorstep is where a journey usually ends, so those
+  // are the answers worth putting under the thumb; a station is picked
+  // deliberately, on the occasions it is wanted, and can afford the scroll.
   const declared = profile.destinations ?? null;
   const offered = [...places].filter((place) => place.name !== context.state.profileKey);
   offered.sort((a, b) => {

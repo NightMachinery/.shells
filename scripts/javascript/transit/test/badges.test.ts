@@ -3,25 +3,25 @@ import { destinationBadges, significantWords } from '../src/page/badges.ts';
 
 describe('significantWords', () => {
   test('drops the words that do not say which place this is', () => {
-    expect(significantWords('CityRing via Giselastraße – Hauptbahnhof')).toEqual(['CityRing', 'Giselastraße', 'Hbf']);
+    expect(significantWords('CityRing via Marienplatz – Hauptbahnhof')).toEqual(['CityRing', 'Marienplatz', 'Hbf']);
   });
 
   test('drops a standalone station word but keeps the compounded one', () => {
-    expect(significantWords('Pasing Bahnhof')).toEqual(['Pasing']);
+    expect(significantWords('Maxmonument Bahnhof')).toEqual(['Maxmonument']);
     expect(significantWords('Ostbahnhof')).toEqual(['Ostbahnhof']);
   });
 });
 
 describe('destinationBadges', () => {
   test('takes the initials of up to three significant words', () => {
-    const badges = destinationBadges(['CityRing via Giselastraße – Hauptbahnhof']);
-    expect(badges.get('CityRing via Giselastraße – Hauptbahnhof')?.text).toBe('CGH');
+    const badges = destinationBadges(['CityRing via Marienplatz – Hauptbahnhof']);
+    expect(badges.get('CityRing via Marienplatz – Hauptbahnhof')?.text).toBe('CMH');
   });
 
   test('resolves a collision by lengthening the first word', () => {
-    const badges = destinationBadges(['Pasing', 'Petershausen']);
-    expect(badges.get('Pasing')?.text).toBe('Pa');
-    expect(badges.get('Petershausen')?.text).toBe('Pe');
+    const badges = destinationBadges(['Marienplatz', 'Maxmonument']);
+    expect(badges.get('Marienplatz')?.text).toBe('Mar');
+    expect(badges.get('Maxmonument')?.text).toBe('Max');
   });
 
   test('lengthens as far as it needs to', () => {

@@ -192,7 +192,7 @@ it.
 
 A destination is either a doorstep, declared with coordinates, or a station,
 declared with a stop id and a label. A station is a destination in its own
-right: you are going to Pasing, not through it, so the journey ends when the
+right: you are going to Marienplatz, not through it, so the journey ends when the
 vehicle does and there is no walk at the end. Stations are offered from every
 profile; a profile can name its own order for the picker, and without one the
 doorsteps come first.

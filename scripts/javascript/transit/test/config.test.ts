@@ -233,15 +233,15 @@ describe('places', () => {
   const profiles = { alpha: { title: 'Alpha', boards: [{ title: 'b', stops: ['de:00000:1'], walk_minutes: 4 }] } };
 
   test('a stop place needs no coordinates and exports with a final walk of nothing', () => {
-    const config = parseConfig({ profiles, places: { pasing: { stop: 'de:00000:7', label: 'Pasing' } } }, PATH);
-    expect(config.places.pasing).toEqual({ name: 'pasing', label: 'Pasing', lat: null, lon: null, stop: 'de:00000:7' });
+    const config = parseConfig({ profiles, places: { station: { stop: 'de:00000:7', label: 'Marienplatz' } } }, PATH);
+    expect(config.places.station).toEqual({ name: 'station', label: 'Marienplatz', lat: null, lon: null, stop: 'de:00000:7' });
     const document = configExportDocument(config, { mvgBaseUrl: 'a', transitousBaseUrl: 'b' }) as {
       places?: Array<{ name: string; stop: string | null; lat: number | null }>;
     };
     // Exported even without `--with-places`: a stop id is not geography, and
     // this document is already a list of stop ids.
-    expect(document.places).toEqual([{ name: 'pasing', label: 'Pasing', lat: null, lon: null, stop: 'de:00000:7' }]);
-    expect(planTargets(config.places.pasing as never, [])[0]?.walkMinutes).toBe(0);
+    expect(document.places).toEqual([{ name: 'station', label: 'Marienplatz', lat: null, lon: null, stop: 'de:00000:7' }]);
+    expect(planTargets(config.places.station as never, [])[0]?.walkMinutes).toBe(0);
   });
 
   test('a doorstep keeps its coordinates out of the document unless asked for', () => {

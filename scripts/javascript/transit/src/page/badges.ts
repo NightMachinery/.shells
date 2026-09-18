@@ -17,7 +17,7 @@ import { compact } from './dom.ts';
  * Words that carry no information about *which* place this is.
  *
  * `bf` rather than `bahnhof` is the one worth explaining: `compact` has already
- * turned "Hauptbahnhof" into "Hbf" and "Pasing Bahnhof" into "Pasing Bf" by the
+ * turned "Hauptbahnhof" into "Hbf" and "Marienplatz Bahnhof" into "Marienplatz Bf" by
  * time this runs, so dropping the standalone token removes the second and
  * leaves the first, which is what a reader means by both.
  */
@@ -54,9 +54,9 @@ export interface DestinationBadge {
  *
  * Collisions are resolved by lengthening the *first* word rather than by adding
  * a digit, because the extra letters still say something: two services ending at
- * "Pasing" and at "Petershausen" both start out as "P" and separate into "Pa"
- * and "Pe", which is a reader recognising a place rather than memorising an
- * index. A pair that stays identical to the end of the first word falls back to
+ * "Marienplatz" and at "Maxmonument" both start out as "M" and separate into
+ * "Mar" and "Max", which is a reader recognising a place rather than memorising
+ * an index. A pair that stays identical to the end of the first word falls back to
  * a digit, which is the honest answer when the names really do agree that far.
  *
  * The hue comes from the destination's alphabetical rank within the board, so it

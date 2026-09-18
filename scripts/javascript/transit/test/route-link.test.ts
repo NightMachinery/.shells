@@ -27,7 +27,7 @@ function option(index: number): RouteOption {
 const departure: Departure = {
   line: 'S8',
   mode: 'SBAHN',
-  destination: 'Flughafen München',
+  destination: 'Gießing Nord',
   planned: base,
   realtime: base + 120_000,
   delayMin: 2,
