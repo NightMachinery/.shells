@@ -33,6 +33,32 @@ const SOURCE_LANGUAGE = 'de';
 const TARGET_LANGUAGE = 'en';
 
 /**
+ * Whether translating is worth doing at all in this browser.
+ *
+ * It is not when the reader's own interface is already in the language the
+ * notices are written in: translating German into English for somebody reading
+ * the page in German is work nobody asked for, and the toggle it adds to every
+ * message is clutter. `navigator.language` is what the browser was asked to
+ * speak, which is the closest thing to "the UI language" a page can observe.
+ */
+export function uiLanguageDiffers(): boolean {
+  const language = typeof navigator === 'undefined' ? '' : (navigator.language ?? '');
+  return !language.toLowerCase().startsWith(SOURCE_LANGUAGE);
+}
+
+/**
+ * Whether the browser's own translator is usable right now.
+ *
+ * Only the browser's, never Gemini: the on-device translator is free, private
+ * and needs no credential, so running it without being asked costs the reader
+ * nothing. Gemini costs them money and uses their key, so it stays a button
+ * they press.
+ */
+export function chromeTranslationReady(): boolean {
+  return chromeUsable === true && translatorFactory() !== null;
+}
+
+/**
  * The Gemini model, as one constant so it can be moved when Google retires a
  * name. The `-latest` alias tracks the current release of that variation, which
  * is what a page with no evaluation harness wants: it will never be pinned to a

@@ -22,7 +22,7 @@ import { cachedRoutes, destinationNameOf, planProfile } from './page/commute.ts'
 import { fetchMessages, fetchProfile } from './page/data.ts';
 import { el, selectionInsideBoards } from './page/dom.ts';
 import { idbGet, idbSet, STORE_BOARDS } from './page/idb.ts';
-import { primeMessageState, renderMessages, resetMessageFilters } from './page/messages.ts';
+import { autoTranslate, primeMessageState, renderMessages, resetMessageFilters } from './page/messages.ts';
 import { rearm, setOnAlarmsChanged } from './page/notify.ts';
 import {
   boardId,
@@ -282,6 +282,9 @@ async function refreshMessages(): Promise<void> {
     state.messages = messages;
     await primeMessageState(messages);
     render();
+    // Not awaited: the first translation may have to download a language pack,
+    // and the notices are readable in the meantime.
+    void autoTranslate(messages, render);
   } catch {
     /* a missing disruption list is not worth failing the render over */
   }

@@ -4,11 +4,13 @@ import { button, el } from './dom.ts';
 import { sha256Hex } from './idb.ts';
 import { readGeminiKey, writeGeminiKey } from './store.ts';
 import {
+  chromeTranslationReady,
   probeTranslationProviders,
   providerLabel,
   rememberedTranslation,
   translate,
   translationProviders,
+  uiLanguageDiffers,
 } from './translate.ts';
 
 // The disruptions panel: the operator's service messages, narrowed to the lines
@@ -38,6 +40,19 @@ const selectedLines = new Set<string>();
 
 /** Whether acknowledged messages are currently being shown anyway. */
 let showAcknowledged = false;
+
+/**
+ * Message hashes the reader has asked to see in the original.
+ *
+ * Per message rather than a panel-wide switch, because the reason to want the
+ * original is a specific one: a stop name or a line label that came out wrong,
+ * in one notice. Switching the whole panel back would hide the nine
+ * translations that were fine.
+ */
+const showOriginal = new Set<string>();
+
+/** True once the automatic pass has run, so it runs once per load and not per paint. */
+let autoTranslated = false;
 
 /** True while a translation run is in flight, so the control can say so. */
 let translating = false;
@@ -467,13 +482,30 @@ export function renderMessages(
     if (message.lines.length > 0) item.append(el('span', 'disruption-lines', message.lines.join(' ')));
     const when = describeValidity(message);
     if (when !== null) item.append(el('span', 'disruption-when', when));
-    item.append(el('p', 'disruption-text', message.text));
+    const hasTranslation = hash !== undefined && rememberedTranslation(hash) !== null;
+    if (!hasTranslation) item.append(el('p', 'disruption-text', message.text));
 
     const translation = hash === undefined ? null : rememberedTranslation(hash);
-    if (translation !== null) {
-      const box = el('p', 'disruption-translation', translation.text);
-      box.append(el('span', 'disruption-provider', providerLabel(translation.provider)));
+    if (translation !== null && hash !== undefined) {
+      // The translation is the body once there is one, with the original one tap
+      // away. A reader who wanted the German would be reading the operator's own
+      // site; a reader here has already said, by the language their browser
+      // speaks, which one they want first.
+      const original = showOriginal.has(hash);
+      const box = el('p', 'disruption-translation', original ? message.text : translation.text);
+      box.append(el('span', 'disruption-provider', original ? 'original' : providerLabel(translation.provider)));
       item.append(box);
+      const toggle = button(
+        'disruption-original',
+        original ? 'show translation' : 'original',
+        original ? 'show the translated text again' : 'show the operator’s own words',
+      );
+      toggle.addEventListener('click', () => {
+        if (original) showOriginal.delete(hash);
+        else showOriginal.add(hash);
+        onChange();
+      });
+      item.append(toggle);
     }
 
     if (hash !== undefined) {
@@ -521,4 +553,26 @@ export async function primeMessageState(messages: Message[]): Promise<void> {
   // deciding whether it can download a language pack. The next repaint, thirty
   // seconds away at most, picks up the verdict.
   void probeTranslationProviders();
+}
+
+/**
+ * Translate every notice, once per load, when the browser can do it on the
+ * device and the reader is not already reading in the notices' own language.
+ *
+ * Automatic only for the on-device translator. It is free and nothing leaves
+ * the machine, so doing it unasked costs the reader nothing and saves them a
+ * tap on every visit. Gemini stays a button: it spends their money and sends
+ * the text to Google, and neither is a thing to do on their behalf.
+ */
+export async function autoTranslate(messages: Message[], onChange: () => void): Promise<void> {
+  if (autoTranslated || messages.length === 0) return;
+  if (!uiLanguageDiffers()) return;
+  await probeTranslationProviders();
+  if (!chromeTranslationReady()) return;
+  autoTranslated = true;
+  const pending = messages.filter((message) => {
+    const hash = hashes.get(message.text);
+    return hash === undefined || rememberedTranslation(hash) === null;
+  });
+  await translateAll(pending, onChange);
 }

@@ -793,9 +793,17 @@ pins and the lines its boards are actually showing. Pinned labels alone are not
 enough: a board that filters by category rather than by line pins nothing, so a
 profile made of rapid-transit boards matched no notice at all, which is exactly
 the profile where a notice matters most. They can be copied out in one go with a translation
-instruction in front, or translated in place by the browser's own translator when
-it has one and by a paid provider when the reader supplies a key. The key lives in
-local storage on that device and nowhere else.
+instruction in front, or translated in place.
+
+Translation runs by itself when the browser has an on-device translator and the
+reader's own interface is not already in the notices' language, and the
+translation then becomes the body of the notice with the operator's own words one
+tap away, per notice rather than per panel. Automatic only for the on-device
+translator: it is free and nothing leaves the machine, so doing it unasked costs
+the reader nothing. The paid provider stays a button, because it spends the
+reader's money and sends the text to a third party, and neither is a thing to do
+on somebody's behalf. Its key lives in local storage on that device and nowhere
+else.
 
 ** Selections
 
