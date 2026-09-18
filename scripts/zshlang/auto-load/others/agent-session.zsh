@@ -2931,6 +2931,21 @@ function h-agent-session-resume-run {
     assert-args transcript @RET
     (( $# )) || return 1
 
+    #: The resumed agent inherits this shell's idea of where it is, and that
+    #: idea is routinely wrong. A pane whose shell was restarted with
+    #: `zsh-restart' carries no TMUX at all (fixed going forward in
+    #: [agfi:envless], but every pane already in that state stays that way
+    #: until its shell is replaced), and a relaunched one can carry a pane id
+    #: from somewhere else. The agent then cannot name its own pane with
+    #: [agfi:tmux-session-rename-current], and the session listers cannot place
+    #: it -- which is how a resumed session came to report `not inside tmux'
+    #: from inside a perfectly ordinary pane.
+    #:
+    #: So repair it from the process ancestry before launching, and let the
+    #: agent inherit the truth. Silent when there is nothing to repair, and
+    #: never fatal: a resume must not fail over its own window dressing.
+    h-tmux-env-repair || true
+
     #: Never a second copy of a session that is still running: `--resume' on
     #: a live transcript means two writers on one file, and for a background
     #: session -- the case that found this -- a duplicate interactive one in

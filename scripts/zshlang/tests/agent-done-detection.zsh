@@ -1,5 +1,6 @@
 #!/usr/bin/env zsh
-# Hermetic regression tests for tmux ancestry recovery used by agent-done.
+# Hermetic regression tests for tmux ancestry recovery: h-tmux-pane-of-pid and
+# h-tmux-env-repair in zshlang/basic/tmux.zsh, and agent-done's use of them.
 # Run with: zsh -f this-file
 
 setopt errexit nounset pipefail
@@ -45,7 +46,7 @@ function agent-done-detection-write-fakes {
     print -r -- 'if [ "$1" = -S ]; then socket=$2; shift 2; fi' >> "${agent_done_detection_bin}/tmux"
     print -r -- 'case "$1" in' >> "${agent_done_detection_bin}/tmux"
     print -r -- '  list-panes) [ ! -e "$AGENT_DONE_DETECTION_PANES.fail" ] || exit 1; command cat "$AGENT_DONE_DETECTION_PANES" ;;' >> "${agent_done_detection_bin}/tmux"
-    print -r -- '  display-message) case "$*" in *pane_tty*) printf "%s\n" /dev/ttys999 ;; *pane_current_path*) printf "%s\n" /outer/project ;; *socket_path*) [ -z "$AGENT_DONE_DETECTION_NO_SOCKET" ] && printf "%s\n" "/tmp/tmux socket" ;; *) exit 1 ;; esac ;;' >> "${agent_done_detection_bin}/tmux"
+    print -r -- '  display-message) case "$*" in *session_id*) printf "%s\t%s\t%s\n" "/tmp/tmux socket" 600 "\$168" ;; *pane_tty*) printf "%s\n" /dev/ttys999 ;; *pane_current_path*) printf "%s\n" /outer/project ;; *socket_path*) [ -z "$AGENT_DONE_DETECTION_NO_SOCKET" ] && printf "%s\n" "/tmp/tmux socket" ;; *) exit 1 ;; esac ;;' >> "${agent_done_detection_bin}/tmux"
     print -r -- '  respawn-pane) printf "socket=%s command=%s pane=%s\n" "$socket" "$1" "$4" >> "$AGENT_DONE_DETECTION_TMUX_CALLS" ;;' >> "${agent_done_detection_bin}/tmux"
     print -r -- '  *) exit 1 ;;' >> "${agent_done_detection_bin}/tmux"
     print -r -- 'esac' >> "${agent_done_detection_bin}/tmux"
@@ -144,6 +145,52 @@ print -r -- '900|800|zsh' >| "${agent_done_detection_ps}"
 print -r -- '800|900|proxy' >> "${agent_done_detection_ps}"
 agent-done-detection-expect 'cyclic process ancestry' 2 '' 900
 agent-done-detection-expect 'malformed pid' 2 '' nope
+
+# h-tmux-env-repair: the same ancestry walk, but writing the answer back into
+# the environment. Run in a subshell so the variables it exports cannot leak
+# from one case into the next.
+function agent-done-detection-repair {
+    local pane_in="${1}" tmux_in="${2}" pid="${3}"
+    (
+        export TMUX_PANE="${pane_in}" TMUX="${tmux_in}"
+        [[ -n "${pane_in}" ]] || unset TMUX_PANE
+        [[ -n "${tmux_in}" ]] || unset TMUX
+        local -i rc=0
+        h-tmux-env-repair "${pid}" 2>/dev/null || rc=$?
+        print -r -- "${rc}|${TMUX-<unset>}|${TMUX_PANE-<unset>}"
+    )
+}
+
+function agent-done-detection-expect-repair {
+    local description="${1}" expected="${2}"
+    shift 2
+    local got=''
+    got="$(agent-done-detection-repair "$@")"
+    [[ "${got}" == "${expected}" ]] ||
+        agent-done-detection-fail "${description}: expected ${(qqq)expected}, got ${(qqq)got}"
+}
+
+agent-done-detection-fixture
+agent-done-detection-expect-repair 'rebuilds both markers from the ancestry' \
+    '0|/tmp/tmux socket,600,168|%3' '' '' 900
+# A stale pane id is the case h-tmux-pane-of-pid refuses outright, so the
+# repair has to resolve with the hint blanked or it can never correct one.
+agent-done-detection-expect-repair 'corrects a stale pane id' \
+    '0|/tmp/tmux socket,600,168|%3' '%9' '' 900
+
+print -r -- '900|800|/usr/local/bin/script' >| "${agent_done_detection_ps}"
+print -r -- '800|1|launchd' >> "${agent_done_detection_ps}"
+: >| "${agent_done_detection_panes}"
+agent-done-detection-expect-repair 'clears markers left over from another pane' \
+    '1|<unset>|<unset>' '%9' '' 900
+
+# Unreachable server: leave what is there alone rather than stripping a working
+# environment over a transient failure.
+agent-done-detection-fixture
+command touch -- "${agent_done_detection_panes}.fail"
+agent-done-detection-expect-repair 'keeps existing markers when tmux cannot answer' \
+    '2|/tmp/tmux socket,600,168|%3' '%3' '/tmp/tmux socket,600,168' 900
+command rm -f -- "${agent_done_detection_panes}.fail"
 
 # Exercise agent-done's dry-run boundary with fake adapters and report writers.
 function aliasfn { :; }

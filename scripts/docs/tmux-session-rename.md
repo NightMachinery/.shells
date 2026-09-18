@@ -25,6 +25,53 @@ reads as window-id syntax; see "Session names are not tmux targets" below.
 
 Agent detection is [agfi:ai-agent-name] in `zshlang/basic/conditions.zsh`.
 
+## When the shell does not know it is in tmux
+
+`tnameme` and `tsrc` both start by asking whether they are in tmux at all,
+and [agfi:isTmux] is nothing but `test -n "$TMUX"`. So a pane whose shell has
+lost that variable gets `tmux-session-rename-current: not inside tmux` from
+inside a perfectly ordinary pane, and nothing in the message hints that the
+pane is real and only the marker is gone.
+
+Two ways the markers go wrong, and they fail in opposite directions:
+
+- **Lost.** `zsh-restart` (`sbb`, `sss`) execs `env -i` over the shell, keeping
+  a short whitelist ([agfi:envless]). `TMUX` and `TMUX_PANE` were not on it, so
+  a restart inside a pane produced a shell that could not see its own pane. It
+  execs over the *pane's root process*, so the hole is permanent: every process
+  started in that pane afterwards inherits it, including an agent launched
+  there hours later. Both variables are on the whitelist now, beside `TERM` and
+  `SSH_CLIENT`, for the same reason those are: they say where the shell is, not
+  how it is configured.
+- **Stale.** A relaunched or nested process can carry a `TMUX_PANE` belonging
+  to a pane it left behind. That one is worse than having none, because the
+  rename succeeds and renames somebody else's session.
+
+The cure for a shell already in either state is [agfi:h-tmux-env-repair] in
+`zshlang/basic/tmux.zsh`. It ignores the environment and asks tmux:
+[agfi:h-tmux-pane-of-pid] walks the process ancestry and matches it against
+`pane_pid`, and the pane it finds is enough to rebuild both variables exactly
+as tmux writes them, `#{socket_path},#{pid},#{session_id}` with the `$` stripped
+off the session id. It exports into the calling shell on purpose, since it only
+ever writes values that are true of that process.
+
+It resolves with `TMUX_PANE` blanked, because `h-tmux-pane-of-pid` fails closed
+when the hint disagrees with the pane it found, and disagreement is exactly the
+stale case. `TMUX` is left in place while resolving: it selects the server
+socket, so it is the best available hint for which server to ask. The three
+outcomes are 0 with both variables rebuilt, 1 when the process is provably in
+no pane (leftover markers are cleared), and 2 when tmux cannot answer, where
+the existing values are left alone rather than stripped over a transient
+failure.
+
+[agfi:h-agent-session-resume-run] calls it before launching, so a resumed
+Claude, Codex or agy session starts with the pane it is actually sitting in
+rather than with whatever the shell that resumed it happened to believe. This
+is not hypothetical: a resumed session in a pane restarted with `sbb` reported
+`not inside tmux` for its whole life, and its tmux session kept the name it had
+been given before.
+
+
 ## The shared core
 
 Everything lives in `zshlang/auto-load/others/agent-tmux.zsh`. Each agent's

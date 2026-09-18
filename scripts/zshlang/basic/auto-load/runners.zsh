@@ -478,6 +478,19 @@ function envless {
 
         SSH_CLIENT
 
+        #: Where this shell *is*, not how it is configured -- the same reason
+        #: TERM and SSH_CLIENT are on this list. Dropping these does not give
+        #: you a clean shell, it gives you a shell sitting in a tmux pane that
+        #: does not know it: `isTmux' says no and
+        #: [agfi:tmux-session-rename-current] refuses to run. The loss is
+        #: permanent, too, because `zsh-restart' execs over the pane's own root
+        #: process, so every later process in that pane inherits the hole --
+        #: including an agent launched there hours afterwards.
+        #: [agfi:h-tmux-env-repair] is the cure for a pane already in that
+        #: state; this is the cure for making more of them.
+        TMUX
+        TMUX_PANE
+
         "${envless_vars[@]}"
     )
 
