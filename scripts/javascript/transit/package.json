@@ -1,0 +1,15 @@
+{
+  "name": "transit",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Departure boards for a public transit network, as a bun CLI and a browser page.",
+  "scripts": {
+    "test": "bun test",
+    "typecheck": "tsc --noEmit",
+    "build": "bun build src/page.ts --target browser --outfile page/app.js"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.2"
+  }
+}

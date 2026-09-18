@@ -1,0 +1,56 @@
+[
+  {
+    "label": "U6",
+    "transportType": "UBAHN",
+    "destination": "Synthetic North",
+    "plannedDepartureTime": 1767256200000,
+    "realtimeDepartureTime": 1767256200000,
+    "delayInMinutes": 0,
+    "cancelled": false,
+    "sev": false,
+    "platform": "3",
+    "lineId": "swm:02",
+    "realtime": true
+  },
+  {
+    "label": "S8",
+    "transportType": "SBAHN",
+    "destination": "Synthetic East",
+    "plannedDepartureTime": 1767254400000,
+    "realtimeDepartureTime": 1767254520000,
+    "delayInMinutes": 2,
+    "cancelled": false,
+    "sev": false,
+    "platform": "",
+    "lineId": "swm:02:S8:H:001",
+    "realtime": true,
+    "stopPointGlobalId": ""
+  },
+  {
+    "label": "RE 72",
+    "transportType": "BAHN",
+    "destination": "Synthetic West",
+    "plannedDepartureTime": 1767255000000,
+    "realtimeDepartureTime": 1767255000000,
+    "delayInMinutes": 0,
+    "cancelled": false,
+    "sev": false,
+    "platform": "8",
+    "lineId": "swm:03:RE72:R:001",
+    "realtime": false,
+    "trainType": ""
+  },
+  {
+    "label": "900",
+    "transportType": "REGIONAL_BUS",
+    "destination": "Synthetic South",
+    "plannedDepartureTime": 1767254700000,
+    "realtimeDepartureTime": 1767254700000,
+    "delayInMinutes": 0,
+    "cancelled": true,
+    "sev": true,
+    "platform": null,
+    "lineId": "swm:04:900:R:001",
+    "realtime": false
+  }
+]

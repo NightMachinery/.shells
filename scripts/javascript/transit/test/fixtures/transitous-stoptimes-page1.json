@@ -1,0 +1,87 @@
+{
+  "stopTimes": [
+    {
+      "place": {
+        "name": "Synthetic Central",
+        "stopId": "de-DELFI_de:00000:1",
+        "departure": "2026-01-01T08:02:00Z",
+        "scheduledDeparture": "2026-01-01T08:00:00Z",
+        "track": "8"
+      },
+      "mode": "REGIONAL_RAIL",
+      "realTime": true,
+      "headsign": "Synthetic West",
+      "agencyName": "Example Regional Rail",
+      "routeShortName": "RE72 (78949)",
+      "routeColor": "AA3311",
+      "directionId": 1,
+      "cancelled": false
+    },
+    {
+      "place": {
+        "name": "Synthetic Central",
+        "stopId": "de-DELFI_de:00000:1",
+        "departure": "2026-01-01T08:05:00Z",
+        "scheduledDeparture": "2026-01-01T08:05:00Z",
+        "track": "2"
+      },
+      "mode": "METRO",
+      "realTime": false,
+      "headsign": "Synthetic East",
+      "agencyName": "Example Suburban Rail",
+      "routeShortName": "S8",
+      "directionId": 0,
+      "cancelled": false
+    },
+    {
+      "place": {
+        "name": "Synthetic Central",
+        "stopId": "de-DELFI_de:00000:1",
+        "departure": "2026-01-01T08:07:00Z",
+        "scheduledDeparture": "2026-01-01T08:07:00Z",
+        "track": ""
+      },
+      "mode": "SUBWAY",
+      "realTime": true,
+      "headsign": "Synthetic North",
+      "agencyName": "MVG",
+      "routeShortName": "U6",
+      "directionId": 0,
+      "cancelled": false
+    },
+    {
+      "place": {
+        "name": "Synthetic Central",
+        "stopId": "de-DELFI_de:00000:1",
+        "departure": "2026-01-01T08:09:00Z",
+        "scheduledDeparture": "2026-01-01T08:09:00Z",
+        "track": ""
+      },
+      "mode": "BUS",
+      "realTime": false,
+      "headsign": "Synthetic South",
+      "agencyName": "MVG",
+      "routeShortName": "100",
+      "directionId": 1,
+      "cancelled": false
+    },
+    {
+      "place": {
+        "name": "Synthetic Central",
+        "stopId": "de-DELFI_de:00000:1",
+        "departure": "2026-01-01T08:11:00Z",
+        "scheduledDeparture": "2026-01-01T08:11:00Z",
+        "track": ""
+      },
+      "mode": "BUS",
+      "realTime": false,
+      "headsign": "Synthetic Outskirts",
+      "agencyName": "Example Regional Coaches",
+      "routeShortName": "900",
+      "directionId": 1,
+      "cancelled": false
+    }
+  ],
+  "nextPageCursor": "SYNTHETIC-CURSOR-2",
+  "previousPageCursor": "SYNTHETIC-CURSOR-0"
+}

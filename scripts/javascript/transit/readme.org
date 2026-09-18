@@ -1,0 +1,274 @@
+#+TITLE: transit
+#+OPTIONS: toc:2
+
+* What this is
+
+A departure-board library with two front ends: a =bun= command-line tool for
+the terminal, and a browser bundle for a small phone page. Both are built from
+the same modules, so a board looks the same and filters the same way in either
+place.
+
+It talks to two public transit APIs. One is the city operator's own service,
+which is authoritative for the urban network and is the default. The other is a
+national aggregator carrying the same stop identifiers, used as a fallback when
+the first one fails, and selectable outright. Neither needs an API key.
+
+The package does not plan journeys. The =route= subcommand is a placeholder
+that says so and exits with its own status code, so a script can tell "not
+implemented" apart from "something went wrong".
+
+* Installing
+
+#+begin_src sh
+cd javascript/transit
+bun install
+#+end_src
+
+The only dependency is the TypeScript compiler, and it is only needed for
+=bun run typecheck=. Running the CLI and building the page work from a bare
+checkout.
+
+Run the tool as =bun src/cli.ts <command>=. Run the tests with =bun test=, the
+type checker with =bun run typecheck=, and the browser bundle with
+=bun run build=.
+
+* Configuration
+
+The config is TOML. The CLI looks at =$ADDRESS_CONFIG= first and falls back to
+=~/.address-config/address.toml=. A missing file at that conventional location
+is not an error: profiles are simply unavailable and raw stop ids still work.
+A path you name yourself, through =--config= or the environment variable, must
+exist.
+
+Validation collects every problem it finds and reports all of them at once,
+each naming the profile, the board index and the field, so a broken config does
+not turn into a sequence of one-error-at-a-time runs. Any validation failure
+exits with the config status code.
+
+A generic example, with placeholder identifiers throughout. Every key is
+optional and the values shown are illustrative rather than the defaults, which
+live in the code:
+
+#+begin_src toml
+[defaults]
+horizon_minutes = 90
+backend = "mvg"
+fallback = "transitous"
+transport_types = ["SBAHN", "UBAHN", "TRAM", "BUS", "BAHN", "REGIONAL_BUS"]
+timezone = "Europe/Berlin"
+home = "first"
+
+[places.somewhere]
+lat = 0.0
+lon = 0.0
+
+[profiles.first]
+title = "First"
+
+[[profiles.first.boards]]
+title = "Rapid transit, one way"
+stops = ["de:00000:1"]
+modes = ["SBAHN", "BAHN"]
+direction = "H"
+walk_minutes = 6
+
+[[profiles.first.boards]]
+title = "Two nearby stops merged"
+stops = ["de:00000:1", "de:00000:2"]
+lines = ["X1", "X2"]
+destinations = ["^Somewhere", "Elsewhere$"]
+walk_minutes = 4
+walk_minutes_by_stop = { "de:00000:1" = 2, "de:00000:2" = 9 }
+#+end_src
+
+Profile keys are arbitrary short words. Nothing in the package assumes any
+particular key exists.
+
+** The home alias
+
+=defaults.home= optionally names one profile key. =board home= then resolves to
+that profile, but only when no profile is literally called =home=: an exact key
+match always wins. No other name is aliased. If =defaults.home= names a profile
+that is not declared, that is a validation error naming the field.
+
+** Per-stop walking times
+
+=walk_minutes= is the walking time to the board's stops and defaults to zero. A
+board that merges two stops can override it per stop with
+=walk_minutes_by_stop=, because a single board-wide figure is simply wrong when
+the two stops are different distances from the same front door: it would dim the
+near stop's departures too early, or leave the far stop's looking reachable when
+they are not. Every key must be one of that board's stops, values must be
+non-negative whole minutes, and reachability is computed per row from the
+walking time of the row's own stop.
+
+** Places
+
+=[places.<name>]= holds coordinates for the =nearby= lookup. They are not part
+of any board and they are deliberately excluded from the exported config unless
+you ask for them.
+
+* Commands
+
+=board <profile|stop...>= renders a profile's boards, or an ad-hoc board for
+one or more raw stop ids. An argument that matches no profile key and does not
+have the shape of a stop id is rejected with the list of configured profile
+keys, rather than being forwarded upstream where it would come back as an
+opaque not-found for something you never typed.
+
+=discover <stop>= lists every (line, direction letter) pair seen at a stop over
+the horizon, with a few sample destinations for each. This is how you find the
+letter a board should filter on.
+
+=search <query>= searches stops by name and prints their identifiers.
+
+=nearby <lat> <lon>= lists stops near a coordinate.
+
+=messages [profile]= prints service messages. Given a profile, it keeps only
+messages concerning lines that profile's boards name; a profile whose boards
+pin no lines narrows nothing.
+
+=route <from> <to>= is not implemented and exits with the not-implemented
+status code.
+
+=config-export= prints the loaded config as JSON for the browser page.
+
+** Flags
+
+=--json= switches to the machine-readable document. =--cache= turns on the
+Redis response cache, which is off by default. =--horizon <minutes>= overrides
+how far ahead to look. =--backend <name>= forces the primary backend.
+=--watch= clears the screen and re-renders on an interval until interrupted.
+=--no-color= suppresses colour, as does an unset terminal or the =NO_COLOR=
+environment variable. =--config <path>= reads a different config file.
+=--with-places= adds coordinates to =config-export=. =--verbose= logs every
+outbound request to standard error, which is how you confirm that a long
+horizon really did page. =--help= prints the command list.
+
+Exit status is zero for success, one for a runtime error, two for a config
+problem (including an unknown profile name), and three for =route=.
+
+* Direction letters
+
+Grouping a board by destination does not work: one direction of one line can
+carry several different headsigns, so a destination-shaped grouping splits one
+direction in two and merges nothing back together. The primary backend's line
+identifier is a colon-joined tuple whose fourth field is a single letter naming
+the direction, and that letter is consistent. The package reads it there, and
+emits no direction at all rather than guessing when the identifier is malformed.
+
+Use =discover= on a stop to see which letter goes which way, then put that
+letter in the board's =direction=.
+
+The aggregator has no such letter. It has an outbound flag, which this package
+maps onto the same two letters. That mapping has *not* been verified against the
+primary backend on the same stop, and the module says so. If it is ever found
+not to hold, flip =TRANSITOUS_DIRECTION_TRUSTED= in
+=src/backends/transitous.ts= to false: the aggregator then emits no direction on
+any row, a =direction= filter drops all of its rows, and =destinations= filters
+have to do the narrowing instead.
+
+* Filters
+
+A board's filters are applied in a fixed order: modes, then lines, then
+direction, then destinations. The order is fixed so that a board producing
+nothing can be debugged by peeling filters off from the bottom. A board with no
+filters shows everything.
+
+Line comparison ignores whitespace and case, so a label written with a space
+between the category and the number matches the same label written without one,
+in both directions. Destinations are regular expressions matched
+case-insensitively against the headsign, and any one of them matching is enough.
+
+The direction rule is blunt on purpose: a board that sets =direction= keeps only
+rows carrying exactly that letter, and a row whose direction is unknown is
+dropped along with the wrong-way rows. Keeping unknowns would let a backend that
+supplies no letter quietly turn a one-way board into a both-ways board, which is
+the failure that is hardest to notice.
+
+* The JSON contract
+
+=board --json= emits a document carrying =schema_version=, =profile=,
+=requested_profile=, =generated_at= and =boards=. =profile= is the key actually
+rendered and =requested_profile= is what was typed, so a consumer can tell when
+the home alias was followed; both are null for an ad-hoc board built from raw
+stop ids.
+
+Each board carries its title, its stops, its walking time and any per-stop
+overrides, the backend that answered, and its departures. The board-level
+backend is a single name when every stop on that board was answered by the same
+one and the string =mixed= otherwise; every departure also carries its own
+backend, so the mixed case is still readable.
+
+Each departure carries the line label, the mode, the destination, the scheduled
+and expected times as ISO instants, the delay in minutes, the cancelled and
+replacement-service flags, the platform, the direction letter, whether it is
+catchable, the walking time used to decide that, its backend, its stop, and a
+short stop tag. The tag is non-null only on a board with more than one stop,
+where it is the only thing distinguishing two otherwise identical rows.
+
+=config-export= emits =schema_version=, =defaults=, =backends= and =profiles=.
+It carries *no* timestamp. The page repository refreshes this file by re-running
+the exporter and committing the result, and a timestamp would make every run
+produce different bytes, turning an unchanged config into a commit. Coordinates
+are omitted unless =--with-places= is passed.
+
+* The browser page
+
+=bun run build= bundles =src/page.ts= into =page/app.js=. The bundle imports
+only the model, the filters, the backends, the colours and the HTTP helper; it
+never touches the cache module or anything else that needs the bun runtime, and
+the build is deterministic.
+
+=page/index.html= is a generic shell: a title, the whole stylesheet, an empty
+mount point and a script tag. It contains no stop identifiers, no coordinates
+and no hostnames, because a separate private repository copies it in alongside
+its own =data/config.json= produced by =config-export=. The page fetches that
+file relative to itself on load.
+
+The page renders one tab per configured profile, in config order, titled from
+each profile's title, and remembers the selection in local storage inside a
+try/catch so a browser that refuses storage still works. Each board shows the
+near window as rows and the rest as a per-line strip with a range toggle. Rows
+sooner than their stop's walking time are dimmed and the first catchable row is
+highlighted. It refreshes only while the document is visible, ticks its
+countdowns locally in between, and on a failed refresh keeps the last good data,
+greys it and says so. Disruption notices appear as a banner, filtered to the
+lines the visible profile configures.
+
+* Knobs
+
+Every tunable value lives in exactly one place in the code, which is the only
+place to look it up. The horizon, the default backend and fallback, the
+transport types, the time zone and the default walking time are in
+=src/config.ts=. The request timeout and the user agent are in =src/http.ts=.
+The page cap that stops a pathological stop from being walked forever is in
+=src/backends/types.ts=, and the per-request row counts for the aggregator are
+in =src/backends/transitous.ts=. Both cache lifetimes are in =src/cache.ts=.
+The boundary between the near window and the strip view is in
+=src/format/terminal.ts=, the watch interval and the discovery sample count are
+in =src/cli.ts=, and the page's refresh and tick intervals are in
+=src/page.ts=.
+
+The cache connects using =REDIS_URL= when it is set. Failing that, a local
+server that wants a password is reached with the credential in =REDISCLI_AUTH=,
+the variable the standard Redis client already uses, so no password ever needs a
+home in this package or its config. Any cache failure degrades to a miss and is
+reported once; it never fails a command.
+
+The backend base URLs can be overridden with =MVG_BASE_URL= and
+=TRANSITOUS_BASE_URL=, which is also how the fallback path is exercised.
+
+* Etiquette
+
+Both APIs are free, undocumented and offered for private, non-commercial use at
+moderate request rates. Neither sends a rate-limit signal, so nothing will warn
+you before you become a problem for them; there is no back-pressure to react to
+and no quota header to watch.
+
+Design for few, on-demand requests. The defaults here already do: the page only
+refreshes while someone is looking at it, the paging loop stops as soon as it
+has covered the horizon and is capped besides, the cache is there for when you
+poll, and there are no retries anywhere. A failing primary backend is asked
+once and then the fallback is asked once. If you add a feature that fetches on a
+timer, ask first whether it can fetch on demand instead.

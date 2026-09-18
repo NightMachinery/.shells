@@ -1,0 +1,116 @@
+// The domain vocabulary. Everything else in the package speaks these types:
+// backends normalise into them, filters narrow them, the terminal formatter and
+// the browser page render them, and `src/json.ts` serialises them.
+
+/** Vehicle categories, spelled the way the primary backend spells them. */
+export type Mode = 'SBAHN' | 'UBAHN' | 'TRAM' | 'BUS' | 'BAHN' | 'REGIONAL_BUS';
+
+/** Every mode, in the order the CLI and the config example list them. */
+export const ALL_MODES: readonly Mode[] = ['SBAHN', 'UBAHN', 'TRAM', 'BUS', 'BAHN', 'REGIONAL_BUS'];
+
+export function isMode(value: unknown): value is Mode {
+  return typeof value === 'string' && (ALL_MODES as readonly string[]).includes(value);
+}
+
+/**
+ * Which way along a line a vehicle runs. The letter comes out of the primary
+ * backend's line identifier and is the only trustworthy way to group a board by
+ * direction: a single direction can carry several headsigns, so grouping by
+ * destination splits one direction into two and merges nothing back.
+ * `null` means the backend gave no usable letter.
+ */
+export type Direction = 'H' | 'R' | null;
+
+/** One vehicle leaving one stop, normalised across backends. */
+export interface Departure {
+  /** Public line label, e.g. an S-Bahn or bus line as printed on the vehicle. */
+  line: string;
+  mode: Mode;
+  destination: string;
+  /** Scheduled departure, epoch milliseconds. */
+  planned: number;
+  /** Expected departure, epoch milliseconds; equals `planned` with no live data. */
+  realtime: number;
+  delayMin: number;
+  cancelled: boolean;
+  /** Replacement service (bus instead of rail, typically). */
+  sev: boolean;
+  platform: string | null;
+  direction: Direction;
+  /** Which backend produced this row. */
+  backend: string;
+  /** The stop id this row was fetched for. */
+  stop: string;
+  /** Short human tag for the stop, set only when a board merges several stops. */
+  stopTag?: string;
+  /** False when only a scheduled time exists; the page draws a hollow dot. */
+  realtimeKnown: boolean;
+  color?: string | null;
+}
+
+/** A rendered board: one titled panel of one or more stops. */
+export interface Board {
+  title: string;
+  stops: string[];
+  /** The backend that answered, or `"mixed"` when a board's stops disagree. */
+  backend: string;
+  departures: Departure[];
+  walkMinutes: number;
+  /** Per-stop overrides of `walkMinutes`, keyed by stop id. */
+  walkMinutesByStop?: Record<string, number>;
+}
+
+/** A board as the config declares it, before anything is fetched. */
+export interface BoardConfig {
+  title: string;
+  stops: string[];
+  modes?: Mode[];
+  lines?: string[];
+  direction?: Exclude<Direction, null>;
+  /** Regular expression sources; a row passes when any of them matches. */
+  destinations?: string[];
+  /** Walking time to this board's stops, used when no per-stop value applies. */
+  walkMinutes: number;
+  /**
+   * Per-stop walking times, keyed by stop id. A board that merges two stops of
+   * the same area can have genuinely different walks to each, so a single
+   * board-wide figure would dim the near stop's departures too early or leave
+   * the far stop's looking reachable when they are not.
+   */
+  walkMinutesByStop?: Record<string, number>;
+}
+
+export interface Profile {
+  key: string;
+  title: string;
+  boards: BoardConfig[];
+}
+
+/** A stop as a search or nearby lookup returns it. */
+export interface StopHit {
+  id: string;
+  name: string;
+  /** Free-form locality string when the backend supplies one. */
+  place?: string | null;
+  /** Modes served, when the backend supplies them. */
+  modes?: Mode[];
+  backend: string;
+}
+
+/** A service disruption notice. */
+export interface Message {
+  title: string;
+  text: string;
+  /** Line labels the notice concerns, empty when it is network-wide. */
+  lines: string[];
+  /** Epoch milliseconds, when the backend dates the notice. */
+  validFrom?: number | null;
+  validTo?: number | null;
+  backend: string;
+}
+
+/**
+ * Version of the `--json` and `config-export` documents. Bump it whenever a
+ * consumer that reads the old shape would misread the new one.
+ */
+export const SCHEMA_VERSION = 1;

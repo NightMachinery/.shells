@@ -1,0 +1,451 @@
+import { ALL_MODES, isMode, type BoardConfig, type Mode, type Profile } from './model.ts';
+
+// Every default the package has lives here, named. Nothing else may hardcode
+// one: a knob with two homes is a knob that disagrees with itself.
+
+/** Environment variable that overrides the config location outright. */
+export const CONFIG_PATH_ENV = 'ADDRESS_CONFIG';
+/** Looked for under the home directory when the environment variable is unset. */
+export const DEFAULT_CONFIG_RELATIVE_PATH = '.address-config/address.toml';
+
+export const DEFAULT_HORIZON_MINUTES = 120;
+export const DEFAULT_BACKEND = 'mvg';
+export const DEFAULT_FALLBACK = 'transitous';
+export const DEFAULT_TRANSPORT_TYPES: readonly Mode[] = ALL_MODES;
+export const DEFAULT_TIMEZONE = 'Europe/Berlin';
+export const DEFAULT_WALK_MINUTES = 0;
+
+export const BACKEND_NAMES = ['mvg', 'transitous'] as const;
+export type BackendName = (typeof BACKEND_NAMES)[number];
+
+/**
+ * The one aliased profile name. `board home` resolves through this when no
+ * profile is literally called `home`; no other name is aliased, and profile
+ * keys themselves are arbitrary short strings that this package never assumes
+ * the spelling of.
+ */
+export const HOME_ALIAS = 'home';
+
+export interface Defaults {
+  horizonMinutes: number;
+  backend: BackendName;
+  /** Backend to fall back to, or `null` when the config disables falling back. */
+  fallback: BackendName | null;
+  transportTypes: Mode[];
+  timezone: string;
+  /** Profile key that the alias resolves to, or `null` when unset. */
+  home: string | null;
+}
+
+export interface Place {
+  name: string;
+  lat: number;
+  lon: number;
+}
+
+export interface Config {
+  /** Where this config was read from; useful in error messages. */
+  path: string;
+  defaults: Defaults;
+  places: Record<string, Place>;
+  profiles: Profile[];
+}
+
+/** Carries every problem found, not just the one that stopped the parse. */
+export class ConfigError extends Error {
+  readonly issues: string[];
+  constructor(issues: string[]) {
+    super(issues.join('\n'));
+    this.name = 'ConfigError';
+    this.issues = issues;
+  }
+}
+
+function homeDir(): string {
+  return process.env.HOME ?? '.';
+}
+
+/** `--config`, then the environment variable, then the conventional location. */
+export function resolveConfigPath(explicit?: string): string {
+  if (explicit !== undefined && explicit.length > 0) return explicit;
+  const fromEnv = process.env[CONFIG_PATH_ENV];
+  if (fromEnv !== undefined && fromEnv.length > 0) return fromEnv;
+  return `${homeDir()}/${DEFAULT_CONFIG_RELATIVE_PATH}`;
+}
+
+function isTable(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function stringList(value: unknown): string[] | null {
+  if (!Array.isArray(value)) return null;
+  const out: string[] = [];
+  for (const entry of value) {
+    if (typeof entry !== 'string' || entry.trim().length === 0) return null;
+    out.push(entry.trim());
+  }
+  return out;
+}
+
+function parseDefaults(raw: unknown, issues: string[]): Defaults {
+  const table = isTable(raw) ? raw : {};
+  const defaults: Defaults = {
+    horizonMinutes: DEFAULT_HORIZON_MINUTES,
+    backend: DEFAULT_BACKEND,
+    fallback: DEFAULT_FALLBACK,
+    transportTypes: [...DEFAULT_TRANSPORT_TYPES],
+    timezone: DEFAULT_TIMEZONE,
+    home: null,
+  };
+
+  if (table.horizon_minutes !== undefined) {
+    const value = table.horizon_minutes;
+    if (typeof value !== 'number' || !Number.isFinite(value) || value <= 0) {
+      issues.push('defaults.horizon_minutes: must be a positive number of minutes');
+    } else {
+      defaults.horizonMinutes = value;
+    }
+  }
+
+  if (table.backend !== undefined) {
+    const value = table.backend;
+    if (typeof value !== 'string' || !(BACKEND_NAMES as readonly string[]).includes(value)) {
+      issues.push(`defaults.backend: must be one of ${BACKEND_NAMES.join(', ')}`);
+    } else {
+      defaults.backend = value as BackendName;
+    }
+  }
+
+  if (table.fallback !== undefined) {
+    const value = table.fallback;
+    if (value === false || value === '' || value === 'none') {
+      defaults.fallback = null;
+    } else if (typeof value !== 'string' || !(BACKEND_NAMES as readonly string[]).includes(value)) {
+      issues.push(`defaults.fallback: must be one of ${BACKEND_NAMES.join(', ')}, or "none"`);
+    } else {
+      defaults.fallback = value as BackendName;
+    }
+  }
+
+  if (table.transport_types !== undefined) {
+    const list = stringList(table.transport_types);
+    if (list === null || list.length === 0 || !list.every(isMode)) {
+      issues.push(`defaults.transport_types: must be a non-empty list drawn from ${ALL_MODES.join(', ')}`);
+    } else {
+      defaults.transportTypes = list as Mode[];
+    }
+  }
+
+  if (table.timezone !== undefined) {
+    const value = table.timezone;
+    if (typeof value !== 'string' || value.trim().length === 0) {
+      issues.push('defaults.timezone: must be an IANA time zone name');
+    } else {
+      defaults.timezone = value.trim();
+    }
+  }
+
+  if (table.home !== undefined) {
+    const value = table.home;
+    if (typeof value !== 'string' || value.trim().length === 0) {
+      issues.push('defaults.home: must be the key of a declared profile');
+    } else {
+      defaults.home = value.trim();
+    }
+  }
+
+  return defaults;
+}
+
+function parsePlaces(raw: unknown, issues: string[]): Record<string, Place> {
+  const places: Record<string, Place> = {};
+  if (raw === undefined) return places;
+  if (!isTable(raw)) {
+    issues.push('places: must be a table of named places');
+    return places;
+  }
+  for (const [name, entry] of Object.entries(raw)) {
+    if (!isTable(entry)) {
+      issues.push(`places.${name}: must be a table with lat and lon`);
+      continue;
+    }
+    const lat = entry.lat;
+    const lon = entry.lon;
+    let ok = true;
+    if (typeof lat !== 'number' || !Number.isFinite(lat)) {
+      issues.push(`places.${name}.lat: must be a number`);
+      ok = false;
+    }
+    if (typeof lon !== 'number' || !Number.isFinite(lon)) {
+      issues.push(`places.${name}.lon: must be a number`);
+      ok = false;
+    }
+    if (ok) places[name] = { name, lat: lat as number, lon: lon as number };
+  }
+  return places;
+}
+
+function parseBoard(profileKey: string, index: number, raw: unknown, issues: string[]): BoardConfig | null {
+  const where = `profiles.${profileKey}.boards[${index}]`;
+  if (!isTable(raw)) {
+    issues.push(`${where}: must be a table`);
+    return null;
+  }
+
+  let failed = false;
+
+  const title = raw.title;
+  if (typeof title !== 'string' || title.trim().length === 0) {
+    issues.push(`${where}.title: must be a non-empty string`);
+    failed = true;
+  }
+
+  const stops = stringList(raw.stops);
+  if (stops === null || stops.length === 0) {
+    issues.push(`${where}.stops: must be a list of one or more stop ids`);
+    failed = true;
+  }
+
+  const board: BoardConfig = {
+    title: typeof title === 'string' ? title.trim() : '',
+    stops: stops ?? [],
+    walkMinutes: DEFAULT_WALK_MINUTES,
+  };
+
+  if (raw.modes !== undefined) {
+    const list = stringList(raw.modes);
+    if (list === null || list.length === 0 || !list.every(isMode)) {
+      issues.push(`${where}.modes: must be a non-empty list drawn from ${ALL_MODES.join(', ')}`);
+      failed = true;
+    } else {
+      board.modes = list as Mode[];
+    }
+  }
+
+  if (raw.lines !== undefined) {
+    const list = stringList(raw.lines);
+    if (list === null || list.length === 0) {
+      issues.push(`${where}.lines: must be a non-empty list of line labels`);
+      failed = true;
+    } else {
+      board.lines = list;
+    }
+  }
+
+  if (raw.direction !== undefined) {
+    const value = raw.direction;
+    if (value !== 'H' && value !== 'R') {
+      issues.push(`${where}.direction: must be "H" or "R"`);
+      failed = true;
+    } else {
+      board.direction = value;
+    }
+  }
+
+  if (raw.destinations !== undefined) {
+    const list = stringList(raw.destinations);
+    if (list === null || list.length === 0) {
+      issues.push(`${where}.destinations: must be a non-empty list of regular expressions`);
+      failed = true;
+    } else {
+      const good: string[] = [];
+      for (const source of list) {
+        try {
+          new RegExp(source, 'i');
+          good.push(source);
+        } catch (error) {
+          issues.push(`${where}.destinations: ${source} is not a valid regular expression (${String(error)})`);
+          failed = true;
+        }
+      }
+      board.destinations = good;
+    }
+  }
+
+  if (raw.walk_minutes !== undefined) {
+    const value = raw.walk_minutes;
+    if (typeof value !== 'number' || !Number.isFinite(value) || value < 0) {
+      issues.push(`${where}.walk_minutes: must be a non-negative number of minutes`);
+      failed = true;
+    } else {
+      board.walkMinutes = value;
+    }
+  }
+
+  if (raw.walk_minutes_by_stop !== undefined) {
+    const table = raw.walk_minutes_by_stop;
+    if (!isTable(table)) {
+      issues.push(`${where}.walk_minutes_by_stop: must be a table mapping stop ids to minutes`);
+      failed = true;
+    } else {
+      const known = new Set(stops ?? []);
+      const overrides: Record<string, number> = {};
+      for (const [stop, value] of Object.entries(table)) {
+        if (!known.has(stop)) {
+          issues.push(`${where}.walk_minutes_by_stop: ${stop} is not one of this board's stops`);
+          failed = true;
+          continue;
+        }
+        if (typeof value !== 'number' || !Number.isInteger(value) || value < 0) {
+          issues.push(`${where}.walk_minutes_by_stop: ${stop} must be a non-negative whole number of minutes`);
+          failed = true;
+          continue;
+        }
+        overrides[stop] = value;
+      }
+      board.walkMinutesByStop = overrides;
+    }
+  }
+
+  return failed ? null : board;
+}
+
+function parseProfiles(raw: unknown, issues: string[]): Profile[] {
+  const profiles: Profile[] = [];
+  if (raw === undefined) return profiles;
+  if (!isTable(raw)) {
+    issues.push('profiles: must be a table of named profiles');
+    return profiles;
+  }
+
+  for (const [key, entry] of Object.entries(raw)) {
+    if (!isTable(entry)) {
+      issues.push(`profiles.${key}: must be a table`);
+      continue;
+    }
+    const title = entry.title;
+    if (typeof title !== 'string' || title.trim().length === 0) {
+      issues.push(`profiles.${key}.title: must be a non-empty string`);
+    }
+    const boardsRaw = entry.boards;
+    if (!Array.isArray(boardsRaw) || boardsRaw.length === 0) {
+      issues.push(`profiles.${key}.boards: must declare at least one board`);
+      continue;
+    }
+    const boards: BoardConfig[] = [];
+    for (let index = 0; index < boardsRaw.length; index += 1) {
+      const board = parseBoard(key, index, boardsRaw[index], issues);
+      if (board !== null) boards.push(board);
+    }
+    profiles.push({ key, title: typeof title === 'string' ? title.trim() : key, boards });
+  }
+  return profiles;
+}
+
+/** Validate an already-parsed TOML document. Throws `ConfigError` listing every problem. */
+export function parseConfig(raw: unknown, path: string): Config {
+  const issues: string[] = [];
+  if (!isTable(raw)) throw new ConfigError([`${path}: top level must be a TOML table`]);
+
+  const defaults = parseDefaults(raw.defaults, issues);
+  const places = parsePlaces(raw.places, issues);
+  const profiles = parseProfiles(raw.profiles, issues);
+
+  // Cross-check last, once both halves are known: an alias that points nowhere
+  // is a config error rather than a silent miss at lookup time.
+  if (defaults.home !== null && !profiles.some((profile) => profile.key === defaults.home)) {
+    issues.push(`defaults.home: no profile named ${defaults.home} is declared`);
+  }
+
+  if (issues.length > 0) throw new ConfigError(issues);
+  return { path, defaults, places, profiles };
+}
+
+/**
+ * Read and validate the config. The path is only known at runtime, so the file
+ * is read and parsed explicitly rather than through an import attribute, which
+ * would need a literal path.
+ */
+export async function loadConfig(explicit?: string): Promise<Config> {
+  const path = resolveConfigPath(explicit);
+  const asked = explicit !== undefined || process.env[CONFIG_PATH_ENV] !== undefined;
+  const file = Bun.file(path);
+  if (!(await file.exists())) {
+    // A path someone named explicitly and got wrong is an error. The
+    // conventional path simply being absent is not: raw stop ids need no
+    // config at all, and refusing to look one up would make the tool useless
+    // before it is set up.
+    if (asked) throw new ConfigError([`${path}: no such file`]);
+    process.stderr.write(`transit: no config at ${path}; profiles are unavailable, raw stop ids still work\n`);
+    return {
+      path,
+      defaults: {
+        horizonMinutes: DEFAULT_HORIZON_MINUTES,
+        backend: DEFAULT_BACKEND,
+        fallback: DEFAULT_FALLBACK,
+        transportTypes: [...DEFAULT_TRANSPORT_TYPES],
+        timezone: DEFAULT_TIMEZONE,
+        home: null,
+      },
+      places: {},
+      profiles: [],
+    };
+  }
+  let raw: unknown;
+  try {
+    raw = Bun.TOML.parse(await file.text());
+  } catch (error) {
+    throw new ConfigError([`${path}: not valid TOML (${error instanceof Error ? error.message : String(error)})`]);
+  }
+  return parseConfig(raw, path);
+}
+
+/** Look a profile up by its literal key. */
+export function findProfile(config: Config, key: string): Profile | undefined {
+  return config.profiles.find((profile) => profile.key === key);
+}
+
+/**
+ * Resolve a name the user typed to a profile. An exact key match always wins,
+ * so a config that really does have a profile called `home` keeps it. Only when
+ * no such key exists, and the name is exactly the alias, and the config sets
+ * the alias, does the alias apply.
+ */
+export function resolveProfile(config: Config, name: string): Profile | undefined {
+  const exact = findProfile(config, name);
+  if (exact !== undefined) return exact;
+  if (name === HOME_ALIAS && config.defaults.home !== null) return findProfile(config, config.defaults.home);
+  return undefined;
+}
+
+/**
+ * Shape test telling a stop id from a profile key. Stop ids are colon-joined
+ * national identifiers and profile keys are bare words, so the colon alone
+ * separates them. The test lives here, in one place, because getting it wrong
+ * in either direction produces a confusing error: a profile key mistaken for a
+ * stop id becomes an upstream 404, and a stop id mistaken for a profile key
+ * becomes an unknown-profile complaint about something that is not a profile.
+ */
+export function looksLikeStopId(name: string): boolean {
+  return name.includes(':');
+}
+
+/** What a `board` invocation's arguments mean. */
+export type BoardTarget =
+  | { kind: 'profile'; profile: Profile; requested: string }
+  | { kind: 'stops'; stops: string[] }
+  | { kind: 'error'; message: string };
+
+/**
+ * Decide whether `board`'s arguments name a profile or raw stops. An argument
+ * that is neither is rejected here rather than forwarded upstream, where the
+ * failure would arrive as an opaque not-found for an identifier the user never
+ * typed.
+ */
+export function resolveBoardTarget(config: Config, args: string[]): BoardTarget {
+  if (args.length === 0) return { kind: 'error', message: 'board needs a profile key or one or more stop ids' };
+
+  if (args.length === 1) {
+    const name = args[0] as string;
+    const profile = resolveProfile(config, name);
+    if (profile !== undefined) return { kind: 'profile', profile, requested: name };
+  }
+
+  const unknown = args.filter((arg) => !looksLikeStopId(arg));
+  if (unknown.length > 0) {
+    const keys = config.profiles.map((profile) => profile.key);
+    const known = keys.length > 0 ? `configured profiles: ${keys.join(', ')}` : 'no profiles are configured';
+    return { kind: 'error', message: `unknown profile: ${unknown.join(', ')}\n${known}` };
+  }
+  return { kind: 'stops', stops: args };
+}

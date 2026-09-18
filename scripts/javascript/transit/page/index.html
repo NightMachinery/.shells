@@ -1,0 +1,348 @@
+<!doctype html>
+<!-- Generated from the `transit` package; the page repository's refresh script copies this shell and `app.js` in alongside its own `data/config.json`. -->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="color-scheme" content="light dark" />
+    <title>Departures</title>
+    <style>
+      /* Line and category colours. Generated from src/colors.ts; the bundle
+         re-injects the same declarations at boot, so these exist only to give
+         the first paint the right colours. */
+      :root {
+        --line-s1: #16bae7;
+        --line-s2: #76b82a;
+        --line-s3: #951b81;
+        --line-s4: #e30613;
+        --line-s5: #8a8a8a;
+        --line-s6: #00975f;
+        --line-s7: #963833;
+        --line-s8: #000000;
+        --line-u1: #52822f;
+        --line-u2: #c20831;
+        --line-u3: #ec6725;
+        --line-u4: #00a984;
+        --line-u5: #bc7a00;
+        --line-u6: #0065ae;
+        --line-u7: #c20831;
+        --line-u8: #ec6725;
+        --mode-sbahn: #008d4f;
+        --mode-ubahn: #0065ae;
+        --mode-tram: #d6001c;
+        --mode-bus: #00586a;
+        --mode-regional_bus: #4f6c8c;
+        --mode-bahn: #5a5a5a;
+      }
+
+      /* Surface palette, light first, overridden wholesale for dark. */
+      :root {
+        --bg: #f6f6f4;
+        --card: #ffffff;
+        --ink: #17181a;
+        --ink-soft: #5d6066;
+        --line: #e2e2df;
+        --accent: #0b6bcb;
+        --late: #c62828;
+        --early: #2e7d32;
+        --warn: #a8690a;
+        --radius: 12px;
+        --gap: 12px;
+      }
+
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg: #101113;
+          --card: #17191c;
+          --ink: #eceef1;
+          --ink-soft: #9aa0a8;
+          --line: #272a2f;
+          --accent: #6ea8fe;
+          --late: #ff6b6b;
+          --early: #6ecf8e;
+          --warn: #e3b341;
+        }
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        padding: env(safe-area-inset-top, 0px) 0 env(safe-area-inset-bottom, 0px);
+        background: var(--bg);
+        color: var(--ink);
+        font: 15px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+        -webkit-text-size-adjust: 100%;
+      }
+
+      #app {
+        max-width: 720px;
+        margin: 0 auto;
+        padding: var(--gap) 16px 48px;
+      }
+
+      .tabs {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        position: sticky;
+        top: env(safe-area-inset-top, 0px);
+        z-index: 2;
+        background: var(--bg);
+        padding: 8px 0;
+      }
+
+      .tab,
+      .range {
+        appearance: none;
+        border: 1px solid var(--line);
+        background: var(--card);
+        color: var(--ink);
+        border-radius: 999px;
+        padding: 7px 14px;
+        font: inherit;
+        cursor: pointer;
+      }
+
+      .tab.active,
+      .range.active {
+        border-color: var(--accent);
+        color: var(--accent);
+        font-weight: 600;
+      }
+
+      .status {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        align-items: baseline;
+        color: var(--ink-soft);
+        font-size: 13px;
+        padding: 4px 0 10px;
+      }
+
+      .status.stale {
+        color: var(--warn);
+      }
+
+      .status.stale .stale-flag {
+        font-weight: 600;
+      }
+
+      .disruptions {
+        border: 1px solid var(--warn);
+        border-radius: var(--radius);
+        padding: 10px 12px;
+        margin-bottom: var(--gap);
+        background: color-mix(in srgb, var(--warn) 12%, var(--card));
+      }
+
+      .disruption + .disruption {
+        margin-top: 10px;
+        border-top: 1px solid var(--line);
+        padding-top: 10px;
+      }
+
+      .disruption p {
+        margin: 4px 0 0;
+        font-size: 13px;
+        color: var(--ink-soft);
+      }
+
+      .disruption-lines {
+        margin-left: 8px;
+        font-size: 12px;
+        color: var(--ink-soft);
+      }
+
+      .ranges {
+        display: flex;
+        gap: 8px;
+        margin-bottom: var(--gap);
+      }
+
+      .board {
+        background: var(--card);
+        border: 1px solid var(--line);
+        border-radius: var(--radius);
+        padding: 12px;
+        margin-bottom: var(--gap);
+      }
+
+      .board-header {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        gap: 10px;
+      }
+
+      .board-header h2 {
+        margin: 0;
+        font-size: 16px;
+      }
+
+      .backend {
+        font-size: 12px;
+        color: var(--ink-soft);
+      }
+
+      .rows,
+      .strips {
+        list-style: none;
+        margin: 10px 0 0;
+        padding: 0;
+      }
+
+      .row {
+        display: grid;
+        grid-template-columns: 3.1rem auto 1fr auto;
+        align-items: center;
+        gap: 10px;
+        padding: 7px 0;
+        border-top: 1px solid var(--line);
+      }
+
+      .row:first-child {
+        border-top: none;
+      }
+
+      .row.unreachable {
+        opacity: 0.42;
+      }
+
+      .row.first-catchable {
+        background: color-mix(in srgb, var(--accent) 10%, transparent);
+        border-radius: 8px;
+      }
+
+      .minutes {
+        font-size: 22px;
+        font-weight: 650;
+        font-variant-numeric: tabular-nums;
+        text-align: right;
+      }
+
+      .badge {
+        display: inline-block;
+        min-width: 2.6rem;
+        text-align: center;
+        padding: 2px 8px;
+        border-radius: 6px;
+        font-size: 13px;
+        font-weight: 700;
+        white-space: nowrap;
+      }
+
+      .middle {
+        display: flex;
+        flex-direction: column;
+        min-width: 0;
+      }
+
+      .destination {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .destination.cancelled {
+        text-decoration: line-through;
+      }
+
+      .meta {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        font-size: 12px;
+        color: var(--ink-soft);
+        font-variant-numeric: tabular-nums;
+      }
+
+      .delay.late {
+        color: var(--late);
+        font-weight: 600;
+      }
+
+      .delay.early {
+        color: var(--early);
+        font-weight: 600;
+      }
+
+      .flag.cancelled-flag {
+        color: var(--late);
+        font-weight: 600;
+      }
+
+      .flag.sev {
+        color: var(--warn);
+        font-weight: 600;
+      }
+
+      .dot.live {
+        color: var(--early);
+      }
+
+      .dot.scheduled {
+        color: var(--ink-soft);
+      }
+
+      .later {
+        margin: 14px 0 4px;
+        font-size: 12px;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        color: var(--ink-soft);
+      }
+
+      .strip {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 5px 0;
+        border-top: 1px solid var(--line);
+      }
+
+      .strip .direction {
+        font-size: 12px;
+        color: var(--ink-soft);
+        width: 1.1rem;
+      }
+
+      .times {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        font-variant-numeric: tabular-nums;
+        font-size: 13px;
+      }
+
+      .time.cancelled {
+        text-decoration: line-through;
+        color: var(--ink-soft);
+      }
+
+      .empty {
+        color: var(--ink-soft);
+        font-size: 13px;
+        margin: 8px 0 0;
+      }
+
+      @media (max-width: 420px) {
+        .row {
+          grid-template-columns: 2.6rem auto 1fr auto;
+          gap: 8px;
+        }
+
+        .minutes {
+          font-size: 19px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div id="app"></div>
+    <script src="app.js"></script>
+  </body>
+</html>

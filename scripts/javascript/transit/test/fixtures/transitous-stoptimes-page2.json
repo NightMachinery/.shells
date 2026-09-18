@@ -1,0 +1,21 @@
+{
+  "stopTimes": [
+    {
+      "place": {
+        "name": "Synthetic Central",
+        "stopId": "de-DELFI_de:00000:1",
+        "departure": "2026-01-01T08:25:00Z",
+        "scheduledDeparture": "2026-01-01T08:25:00Z",
+        "track": "2"
+      },
+      "mode": "METRO",
+      "realTime": true,
+      "headsign": "Synthetic East",
+      "agencyName": "Example Suburban Rail",
+      "routeShortName": "S8",
+      "directionId": 0,
+      "cancelled": false
+    }
+  ],
+  "previousPageCursor": "SYNTHETIC-CURSOR-1"
+}
