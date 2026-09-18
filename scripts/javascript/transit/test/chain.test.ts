@@ -53,3 +53,41 @@ describe('falling back', () => {
     expect(never.urls).toHaveLength(0);
   });
 });
+
+describe('passing a per-call narrowing through the chain', () => {
+  test('it reaches the primary when the primary answers', async () => {
+    const rows = await fixture<unknown[]>('mvg-departures.json');
+    const working = mockFetch(() => rows);
+    const never = failingFetch('the fallback must not be reached');
+
+    const chained = chain(
+      createMvgBackend({ fetchImpl: working.fetchImpl, baseUrl: 'https://example.invalid/primary', now: () => FIXTURE_NOW }),
+      createTransitousBackend({ fetchImpl: never.fetchImpl, baseUrl: 'https://example.invalid/fallback' }),
+    );
+
+    const result = await chained.departures(SYNTHETIC_STOP, FIXTURE_WINDOW, { transportTypes: ['UBAHN'] });
+
+    expect(working.urls.length).toBeGreaterThan(0);
+    for (const url of working.urls) {
+      expect(new URL(url).searchParams.get('transportTypes')).toBe('UBAHN');
+    }
+    expect(new Set(result.map((row) => row.mode))).toEqual(new Set(['UBAHN']));
+  });
+
+  test('it reaches the fallback when the primary throws', async () => {
+    const page1 = await fixture<unknown>('transitous-stoptimes-page1.json');
+    const page2 = await fixture<unknown>('transitous-stoptimes-page2.json');
+    const broken = failingFetch('synthetic primary outage');
+    const working = mockFetch((_url, call) => (call === 0 ? page1 : page2));
+
+    const chained = chain(
+      createMvgBackend({ fetchImpl: broken.fetchImpl, baseUrl: 'https://example.invalid/primary', now: () => FIXTURE_NOW }),
+      createTransitousBackend({ fetchImpl: working.fetchImpl, baseUrl: 'https://example.invalid/fallback' }),
+    );
+
+    const rows = await chained.departures(SYNTHETIC_STOP, FIXTURE_WINDOW, { transportTypes: ['UBAHN'] });
+
+    expect(rows.length).toBeGreaterThan(0);
+    expect(new Set(rows.map((row) => row.mode))).toEqual(new Set(['UBAHN']));
+  });
+});

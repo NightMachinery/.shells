@@ -196,6 +196,49 @@ dropped along with the wrong-way rows. Keeping unknowns would let a backend that
 supplies no letter quietly turn a one-way board into a both-ways board, which is
 the failure that is hardest to notice.
 
+* Fetching and paging
+
+The primary backend answers with at most =MVG_PAGE_LIMIT= rows, and it applies
+that cap /before/ the transport-type filter. The two together mean the size of a
+response says nothing at all about the stop: a busy interchange can hand back a
+full page of raw rows that narrows to a handful, and a page that arrives short
+may be short only because the cap fell somewhere upstream of the filter. A
+paging loop that stopped on a short page would therefore truncate exactly the
+boards a long horizon was asked for.
+
+So the walk is driven by time and never by counts. Each request names an
+=offsetInMinutes=, the newest row in the response sets the next offset, and the
+walk ends when that row reaches the horizon, when a page comes back empty, or
+when the offset will not move any further. The last of those is what stops a
+stop whose paging is stuck from being asked forever, and =MAX_PAGES= caps the
+whole walk regardless. The price of not counting rows is one extra request
+against a stop that really has run out, which is what its final page costs.
+
+The next offset is rounded /down/ to the minute the newest row falls in, not up
+to the one after it. Rounding up starts the next page strictly after that row
+and loses whatever the cap had cut off later in the same minute, and no amount
+of de-duplication recovers a row the server was never asked for. Rounding down
+re-requests that minute instead, and the rows that come back twice are dropped
+on a key built from the line identifier, the planned time, the destination and
+the label.
+
+The transport-type list is never omitted from a request. With no explicit list
+the API silently drops regional rail and regional buses, so a board configured
+for them would come back plausibly populated and quietly wrong.
+
+A board that declares =modes= narrows the request to those categories, which is
+still an explicit list and merely a shorter one. That keeps the page limit spent
+on rows the board can use rather than on five categories it is about to delete.
+The narrowing is intersected with the configured transport types and so can only
+ever shrink them; a narrowing that intersects to nothing issues no request at
+all, since an empty list would read as no list. The board's own mode filter
+still runs on the result, because a backend is allowed to ignore the hint and
+must not be able to widen a board by doing so.
+
+The aggregator pages by following a cursor instead, and the endpoint used here
+carries no category parameter, so a narrowing there changes only what is kept.
+Its per-request row count is sized from the length of the window.
+
 * The JSON contract
 
 =board --json= emits a document carrying =schema_version=, =profile=,

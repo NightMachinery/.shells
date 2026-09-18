@@ -1,5 +1,5 @@
 import type { Departure, Message, StopHit } from '../model.ts';
-import type { Backend, Window } from './types.ts';
+import type { Backend, DepartureOptions, Window } from './types.ts';
 
 /** What happened for one stop: which backend answered, and why the first did not. */
 export interface ChainOutcome {
@@ -56,8 +56,8 @@ export function chain(primary: Backend, fallback: Backend, onOutcome?: (outcome:
     nearby(lat: number, lon: number): Promise<StopHit[]> {
       return attempt(`nearby:${lat},${lon}`, (backend) => backend.nearby(lat, lon));
     },
-    departures(stop: string, window: Window): Promise<Departure[]> {
-      return attempt(stop, (backend) => backend.departures(stop, window));
+    departures(stop: string, window: Window, options?: DepartureOptions): Promise<Departure[]> {
+      return attempt(stop, (backend) => backend.departures(stop, window, options));
     },
     messages(): Promise<Message[]> {
       return attempt('messages', (backend) => backend.messages());

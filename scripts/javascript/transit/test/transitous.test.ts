@@ -112,3 +112,36 @@ describe('aggregator normalisation', () => {
     expect(second.searchParams.get('time')).toBeNull();
   });
 });
+
+describe('a per-call transport-type narrowing', () => {
+  test('narrows what is kept, since the endpoint takes no category parameter', async () => {
+    const [page1, page2] = await pages();
+    const { fetchImpl } = mockFetch((_url, call) => (call === 0 ? page1 : page2));
+    const backend = createTransitousBackend({ fetchImpl, baseUrl: BASE });
+
+    const rows = await backend.departures(SYNTHETIC_STOP, FIXTURE_WINDOW, { transportTypes: ['UBAHN'] });
+
+    expect(rows.length).toBeGreaterThan(0);
+    expect(new Set(rows.map((row) => row.mode))).toEqual(new Set(['UBAHN']));
+  });
+
+  test('cannot widen the configured set', async () => {
+    const [page1, page2] = await pages();
+    const { fetchImpl } = mockFetch((_url, call) => (call === 0 ? page1 : page2));
+    const backend = createTransitousBackend({ fetchImpl, baseUrl: BASE, transportTypes: ['UBAHN'] });
+
+    const rows = await backend.departures(SYNTHETIC_STOP, FIXTURE_WINDOW, { transportTypes: ['UBAHN', 'BAHN'] });
+
+    expect(new Set(rows.map((row) => row.mode))).toEqual(new Set(['UBAHN']));
+  });
+
+  test('that intersects to nothing asks for nothing at all', async () => {
+    const { fetchImpl, urls } = mockFetch(() => ({ stopTimes: [] }));
+    const backend = createTransitousBackend({ fetchImpl, baseUrl: BASE, transportTypes: ['UBAHN'] });
+
+    const rows = await backend.departures(SYNTHETIC_STOP, FIXTURE_WINDOW, { transportTypes: ['TRAM'] });
+
+    expect(rows).toEqual([]);
+    expect(urls).toHaveLength(0);
+  });
+});

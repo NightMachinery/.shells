@@ -1,6 +1,13 @@
 import { envOverride, fetchJson, type FetchLike } from '../http.ts';
-import type { Departure, Direction, Message, Mode, StopHit } from '../model.ts';
-import { MAX_PAGES, type Backend, type BackendOptions, type Window } from './types.ts';
+import { ALL_MODES, type Departure, type Direction, type Message, type Mode, type StopHit } from '../model.ts';
+import {
+  MAX_PAGES,
+  narrowModes,
+  type Backend,
+  type BackendOptions,
+  type DepartureOptions,
+  type Window,
+} from './types.ts';
 
 export const TRANSITOUS_BACKEND_NAME = 'transitous';
 
@@ -160,9 +167,13 @@ export function createTransitousBackend(options: TransitousOptions = {}): Backen
     /\/+$/,
     '',
   );
-  const wantedSet = options.transportTypes ? new Set<Mode>(options.transportTypes) : null;
+  // No `null` sentinel for "everything": a per-call narrowing has to intersect
+  // with something, and spelling the default out as every category keeps the two
+  // paths identical.
+  const wanted: readonly Mode[] = options.transportTypes ?? ALL_MODES;
   const fetchImpl: FetchLike | undefined = options.fetchImpl;
   const debug = options.onDebug;
+  const progress = options.onProgress;
   const lookupCache = options.lookupCache;
   // Per-process memo so a board that merges several stops does not re-resolve
   // the same parent id once per stop.
@@ -208,7 +219,18 @@ export function createTransitousBackend(options: TransitousOptions = {}): Backen
     return Math.min(MAX_ROWS_PER_REQUEST, Math.max(MIN_ROWS_PER_REQUEST, estimate));
   }
 
-  async function fetchStopRows(aggregatorId: string, window: Window, label: string): Promise<Departure[]> {
+  /**
+   * `report` is handed in rather than counted here because one `departures`
+   * call can walk several platform ids, and a progress indicator wants one
+   * run of page numbers for the stop it asked about, not a counter that
+   * restarts per platform.
+   */
+  async function fetchStopRows(
+    aggregatorId: string,
+    window: Window,
+    label: string,
+    report: (rows: number) => void,
+  ): Promise<Departure[]> {
     const n = rowsPerRequest(window);
     const out: Departure[] = [];
     let cursor: string | null = null;
@@ -222,6 +244,7 @@ export function createTransitousBackend(options: TransitousOptions = {}): Backen
       const body: RawStopTimes = await get<RawStopTimes>(`/stoptimes?${query}`);
       const batch = Array.isArray(body.stopTimes) ? body.stopTimes : [];
       debug?.(`transitous page ${page + 1} rows=${batch.length}`);
+      report(batch.length);
 
       let lastTime = Number.NEGATIVE_INFINITY;
       for (const row of batch) {
@@ -301,9 +324,23 @@ export function createTransitousBackend(options: TransitousOptions = {}): Backen
       return out;
     },
 
-    async departures(stop: string, window: Window): Promise<Departure[]> {
+    async departures(stop: string, window: Window, call?: DepartureOptions): Promise<Departure[]> {
+      // The stoptimes endpoint as used here carries no category parameter, so
+      // a narrowing can only shrink what is kept, never what is asked for. The
+      // request volume is unchanged; what it buys is a board that does not pay
+      // twice for the same filtering.
+      const keep = narrowModes(wanted, call?.transportTypes);
+      if (keep.length === 0) return [];
+      const keepSet = new Set<Mode>(keep);
+
+      let pages = 0;
+      const report = (rows: number): void => {
+        pages += 1;
+        progress?.({ backend: TRANSITOUS_BACKEND_NAME, stop, page: pages, rows });
+      };
+
       const aggregatorId = toAggregatorId(stop);
-      let rows = await fetchStopRows(aggregatorId, window, stop);
+      let rows = await fetchStopRows(aggregatorId, window, stop, report);
 
       // Some parent stops carry no departures of their own; the rows hang off
       // the platform ids underneath. One extra lookup, then fan out and merge.
@@ -311,13 +348,13 @@ export function createTransitousBackend(options: TransitousOptions = {}): Backen
         const children = await platformIds(toRawId(stop));
         const merged: Departure[] = [];
         for (const child of children) {
-          merged.push(...(await fetchStopRows(child, window, stop)));
+          merged.push(...(await fetchStopRows(child, window, stop, report)));
         }
         rows = merged;
       }
 
       const out = rows.filter((row) => {
-        if (wantedSet !== null && !wantedSet.has(row.mode)) return false;
+        if (!keepSet.has(row.mode)) return false;
         return row.realtime >= window.fromMs && row.realtime <= window.toMs;
       });
       out.sort((a, b) => a.realtime - b.realtime);

@@ -2,7 +2,7 @@
 import { chain, type ChainedBackend } from './backends/chain.ts';
 import { createMvgBackend, MVG_DEFAULT_BASE_URL } from './backends/mvg.ts';
 import { createTransitousBackend, TRANSITOUS_DEFAULT_BASE_URL } from './backends/transitous.ts';
-import type { Backend, Window } from './backends/types.ts';
+import type { Backend, DepartureOptions, Window } from './backends/types.ts';
 import { createCache, lookupCacheAdapter, withCache, type TransitCache } from './cache.ts';
 import {
   BACKEND_NAMES,
@@ -242,14 +242,26 @@ function boardBackend(runtime: Runtime, stops: string[], rows: Departure[]): str
 async function buildBoard(runtime: Runtime, boardConfig: BoardConfig, now: number): Promise<Board> {
   const window = runtime.window(now);
   const multiStop = boardConfig.stops.length > 1;
+  // A board that names its categories asks for those and no others. The page
+  // limit is spent on rows the board can use instead of on five categories it
+  // is about to delete, which is what decides whether a long horizon at a busy
+  // interchange fits in the pages the backend is allowed to walk.
+  const options: DepartureOptions | undefined =
+    boardConfig.modes !== undefined && boardConfig.modes.length > 0
+      ? { transportTypes: boardConfig.modes }
+      : undefined;
   const perStop: Departure[][] = [];
   for (const stop of boardConfig.stops) {
-    const rows = await runtime.backend.departures(stop, window);
+    const rows = await runtime.backend.departures(stop, window, options);
+    // The mode filter inside `applyFilters` is now redundant for such a board,
+    // and stays anyway: the hint is a hint, and a backend that ignores it must
+    // not be able to widen a board.
     const filtered = applyFilters(rows, boardConfig);
     if (multiStop) for (const row of filtered) row.stopTag = stopTag(row.stop, boardConfig.stopLabels);
     perStop.push(filtered);
   }
   const departures = mergeBoards(perStop);
+
   const board: Board = {
     title: boardConfig.title,
     stops: boardConfig.stops,

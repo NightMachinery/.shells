@@ -1,5 +1,5 @@
-import type { Backend, Window } from './backends/types.ts';
-import type { Departure, Message, StopHit } from './model.ts';
+import { narrowModes, type Backend, type DepartureOptions, type Window } from './backends/types.ts';
+import type { Departure, Message, Mode, StopHit } from './model.ts';
 
 // Opt-in response cache backed by Redis. This module is bun-only and is never
 // imported by the browser entry point; the page has its own in-memory state and
@@ -139,7 +139,7 @@ export function createCache(enabled: boolean): TransitCache {
 }
 
 /** Wrap a backend so its reads go through the cache. */
-export function withCache(backend: Backend, cache: TransitCache, transportTypes: readonly string[]): Backend {
+export function withCache(backend: Backend, cache: TransitCache, transportTypes: readonly Mode[]): Backend {
   if (!cache.enabled) return backend;
   return {
     name: backend.name,
@@ -159,11 +159,15 @@ export function withCache(backend: Backend, cache: TransitCache, transportTypes:
       await cache.set(key, value, LOOKUP_TTL_SECONDS);
       return value;
     },
-    async departures(stop: string, window: Window): Promise<Departure[]> {
-      const key = departuresKey(backend.name, stop, window, transportTypes);
+    async departures(stop: string, window: Window, options?: DepartureOptions): Promise<Departure[]> {
+      // A per-call narrowing is part of the request and so part of the key. A
+      // board asking for one category would otherwise store its short answer
+      // under the key the unnarrowed board reads, and empty that board out.
+      const types = narrowModes(transportTypes, options?.transportTypes);
+      const key = departuresKey(backend.name, stop, window, types);
       const hit = await cache.get<Departure[]>(key);
       if (hit !== null) return hit;
-      const value = await backend.departures(stop, window);
+      const value = await backend.departures(stop, window, options);
       await cache.set(key, value, DEPARTURES_TTL_SECONDS);
       return value;
     },
