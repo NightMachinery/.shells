@@ -178,6 +178,16 @@ the change is quicker than estimated. It is shown because it is sometimes the
 one you actually take, and it is never the recommendation. The window is
 adjustable.
 
+The planner is a different service from the departure board, and it does not
+always know a stop by the identifier the board is configured with: some stops
+exist in its data only as their individual platforms. So the identifier is
+resolved before anything is planned, trying the stop itself, then the platforms
+the departure rows already name, then the station's coordinate. Which one
+answered is printed in the board heading and carried in the JSON, because a
+plan made from one platform is a slightly narrower claim than one made from the
+whole stop. The answer is cached, so this costs one small request the first time
+a stop is planned and nothing afterwards.
+
 Transfer walking times are derived from the distance of the walking leg, not
 from the planner's own duration for it. The planner adds a flat padding of
 several minutes to every walking leg, which is defensible for a stranger and

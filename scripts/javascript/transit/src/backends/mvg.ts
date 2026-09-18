@@ -80,6 +80,9 @@ function toDeparture(row: RawDeparture, stop: string): Departure | null {
     cancelled: row.cancelled === true,
     sev: row.sev === true,
     platform: normalisePlatform(row.platform),
+    ...(typeof row.stopPointGlobalId === 'string' && row.stopPointGlobalId.length > 0
+      ? { stopPoint: row.stopPointGlobalId }
+      : {}),
     direction: directionFromLineId(row.lineId),
     backend: MVG_BACKEND_NAME,
     stop,

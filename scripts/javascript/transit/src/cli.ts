@@ -21,6 +21,14 @@ import { boardsDocument, configExportDocument, stopTag } from './json.ts';
 import { envOverride, HttpError } from './http.ts';
 import type { Board, BoardConfig, Departure, Direction, Message, Profile } from './model.ts';
 import { DEFAULT_EARLY_BUFFER_MINUTES, planBoard, routeDocument, type PlannedRow } from './plan.ts';
+import { UnresolvableOriginError, type OriginLevel } from './origin.ts';
+
+/**
+ * How weak a claim each step of the origin chain makes, weakest highest. A
+ * board that resolved at several steps reports the weakest, because that is
+ * the strongest thing it can honestly say about itself.
+ */
+const ORIGIN_RANK: Readonly<Record<OriginLevel, number>> = { parent: 0, platform: 1, coordinate: 2 };
 import {
   NEAR_WINDOW_MINUTES,
   renderBoards,
@@ -454,6 +462,10 @@ async function commandRoute(runtime: Runtime, args: string[], flags: Flags): Pro
     }
 
     const planned: PlannedRow[] = [];
+    // Which step of the chain answered, for the board as a whole. A board that
+    // merges stops can in principle resolve them at different steps; the
+    // weakest one is reported, because that is the claim the board can make.
+    let origin: OriginLevel | null = null;
     for (const [stop, rows] of byStop) {
       try {
         planned.push(
@@ -463,6 +475,10 @@ async function commandRoute(runtime: Runtime, args: string[], flags: Flags): Pro
             rows,
             startMs: now,
             earlyBufferMinutes,
+            onOrigin: (resolved) => {
+              if (origin === null || ORIGIN_RANK[resolved.level] > ORIGIN_RANK[origin]) origin = resolved.level;
+            },
+            ...(runtime.cache.enabled ? { originCache: lookupCacheAdapter(runtime.cache) } : {}),
             ...(runtime.debug === undefined ? {} : { onDebug: runtime.debug }),
           })),
         );
@@ -476,8 +492,8 @@ async function commandRoute(runtime: Runtime, args: string[], flags: Flags): Pro
         // departures are fine and its journeys are unanswerable, which is worth
         // saying plainly rather than as an HTTP status.
         const message =
-          error instanceof HttpError && error.status === 404
-            ? 'the journey planner does not know this stop'
+          error instanceof UnresolvableOriginError || (error instanceof HttpError && error.status === 404)
+            ? 'the journey planner does not know this stop, under any identifier it was offered'
             : error instanceof Error
               ? error.message
               : String(error);
@@ -486,7 +502,7 @@ async function commandRoute(runtime: Runtime, args: string[], flags: Flags): Pro
       }
     }
     planned.sort((a, b) => a.departure.realtime - b.departure.realtime);
-    views.push({ board, rows: planned });
+    views.push({ board, rows: planned, origin });
   }
 
   if (flags.json) {

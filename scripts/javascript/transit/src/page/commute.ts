@@ -1,6 +1,8 @@
 import { normaliseLine } from '../filter.ts';
 import type { Board, Departure } from '../model.ts';
 import { planBoard, type PlannedRow, type PlanDestination, type RouteOption } from '../plan.ts';
+import type { OriginCache, OriginLevel } from '../origin.ts';
+import { idbGet, idbSet, STORE_ORIGINS } from './idb.ts';
 import type { ExportedConfig, ExportedProfile } from './types.ts';
 
 // The commute view: for a board that opts in, which of its departures actually
@@ -12,8 +14,27 @@ import type { ExportedConfig, ExportedProfile } from './types.ts';
 // looks exactly like a fresh one and it is the number a reader acts on. So the
 // commute view simply has nothing to show until it has asked.
 
-/** Plans for one profile: board index, then row key, then the planned row. */
-export type ProfileRoutes = Map<number, Map<string, PlannedRow>>;
+/** One board's plans, plus how its stop had to be named to get them. */
+export interface BoardRoutes {
+  rows: Map<string, PlannedRow>;
+  origin: OriginLevel | null;
+}
+
+/** Plans for one profile, by board index. */
+export type ProfileRoutes = Map<number, BoardRoutes>;
+
+/**
+ * The resolved stop identifiers, kept in IndexedDB.
+ *
+ * Unlike the plans, this is safe to persist and worth persisting: it is a fact
+ * about which identifiers the aggregator carries, not a time that goes stale,
+ * and without it every cold start pays a probe per planned board before it can
+ * plan anything.
+ */
+const originCache: OriginCache = {
+  get: (key) => idbGet<string[]>(STORE_ORIGINS, key),
+  set: (key, value) => idbSet(STORE_ORIGINS, key, value),
+};
 
 /**
  * The identity of one departure across a re-fetch.
@@ -99,17 +120,22 @@ export async function planProfile(options: PlanProfileOptions): Promise<ProfileR
     const stop = board.stops[0];
     if (stop === undefined) continue;
     try {
+      let origin: OriginLevel | null = null;
       const planned = await planBoard({
         stop,
         destination,
         rows: board.departures,
         startMs: options.startMs,
         baseUrl: options.config.backends.transitous_base_url,
+        originCache,
+        onOrigin: (resolved) => {
+          origin = resolved.level;
+        },
         ...(options.earlyBufferMinutes === undefined ? {} : { earlyBufferMinutes: options.earlyBufferMinutes }),
       });
       const byKey = new Map<string, PlannedRow>();
       for (const row of planned) byKey.set(rowKey(row.departure), row);
-      routes.set(index, byKey);
+      routes.set(index, { rows: byKey, origin });
     } catch {
       // A board with no plan is a board without the commute slot, not a broken
       // board. The departures are still correct and still the main thing.

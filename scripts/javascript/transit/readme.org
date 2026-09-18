@@ -285,6 +285,56 @@ the home profile. Anything else has to say where it is going, and a name that
 resolves to no place exits with the config status code, naming what was looked
 for.
 
+** Which identifier the planner will accept
+
+The two services carry the same national stop identifiers, so for a long time
+the rule here was "prefix it and send it". That rule is wrong, and it fails
+silently. The planner is built from the national feed, and that feed does not
+always publish the *parent* of a stop area: some stops exist there only as their
+platforms. Asking about the parent answers =stop_found=false=, and a board
+configured with the obvious identifier could not be planned at all while its
+departures worked perfectly.
+
+So the identifier is resolved rather than assumed, in three steps, cheapest
+first, and the answer is cached because it is a fact about the data and not
+about the moment.
+
+First the parent identifier itself, confirmed with a one-row stop-time request.
+That is the cheapest question that distinguishes "this stop exists here" from
+"it does not", and it is the right answer most of the time.
+
+Then the platform identifiers the primary backend has *already handed us* on the
+board's own departure rows. They cost no request, they are exactly the platforms
+the board's lines depart from, and they are ordered by how many of the board's
+rows use them, so the busiest platform leads. A journey plan asks from the first;
+a departure fan-out walks them all, because one platform's stop times are not
+necessarily the whole stop's.
+
+Last the station's coordinate, which the planner accepts in place of an
+identifier. The coordinate comes from the primary backend's per-station lookup,
+not from its location search: the search takes a name and answers *nothing at
+all* for an identifier. For the departures path, which needs identifiers rather
+than a point, the coordinate is turned back into stop identifiers by reverse
+geocoding, narrowed to the stop area that was asked about. Without that narrowing
+a board would quietly start reporting the stop across the road, which is a worse
+answer than reporting none.
+
+The step that answered is published: in the route slot's tooltip on the page, in
+the board heading in the terminal, and as =origin_resolution= in =route --json=.
+A plan made from one platform or from a coordinate is a slightly weaker claim
+than one made from the stop itself, and a reader checking a surprising route
+against what they know deserves to see which it was.
+
+Only a 404 settles a step. Every other failure is a bad moment and is raised, so
+a network blip cannot be mistaken for a missing stop and then remembered as one.
+When no step answers, the board says so once and keeps showing its departures.
+
+This chain replaced a =/geocode?text=<stop id>= lookup that used to resolve a
+stop to its platforms. That call now returns nothing at all for an identifier in
+either form, though it still works for a name, so the old fallback had been dead
+without anyone noticing. That is the argument for probing with a request that
+fails loudly rather than one that can answer an empty list.
+
 ** Matching an itinerary to a departure
 
 An itinerary belongs to a board row when its first timetabled leg carries the
@@ -376,15 +426,17 @@ how itineraries already in hand are recombined.
 Rows that show no journey are common and usually mean what they say. The planner
 returns optimal journeys rather than every journey, so a departure that nothing
 else beats is returned and one that something else beats is not. The early part
-of a window is sparser than the rest for the same reason. A board configured with
-a stop identifier only the primary backend carries cannot be planned at all,
-since the planner is the aggregator; that board's departures are still shown and
-the reason is reported once per stop. The aggregator is also *asked* only once
-per origin: a 404 on the origin is remembered without an expiry, because it says
-the identifier does not exist rather than that this moment was a bad one, and a
+of a window is sparser than the rest for the same reason. A board whose stop no step of the
+resolution chain can name is not planned at all; its departures are still shown
+and the reason is reported once per stop. The aggregator is also *asked* only
+once per origin: a 404 is remembered without an expiry, because it says the
+identifier does not exist rather than that this moment was a bad one, and a
 board that re-asked an unanswerable question twice a minute for as long as a tab
-stayed open would be a rude thing to point at a free service. Every other
-failure stays retryable.
+stayed open would be a rude thing to point at a free service. That memory is
+keyed on the *resolved* origin rather than on the configured stop, so a stop
+that failed as a parent identifier and then resolved to a platform is asked
+again under the identifier that might work. Every other failure stays
+retryable.
 
 ** The route document
 
@@ -627,7 +679,10 @@ transport types, the time zone and the default walking time are in
 The page cap that stops a pathological stop from being walked forever is in
 =src/backends/types.ts=, the primary backend's rows-per-page limit is in
 =src/backends/mvg.ts=, and the per-request row counts for the aggregator are
-in =src/backends/transitous.ts=. Both cache lifetimes are in =src/cache.ts=.
+in =src/backends/transitous.ts=. The aggregator's address and the shape of its
+stop identifiers are in =src/aggregator.ts=, which exists as its own module so
+the origin resolver and the backend that uses it are not an import cycle. Both
+cache lifetimes are in =src/cache.ts=.
 The boundary between the near window and the strip view is in
 =src/format/terminal.ts=, along with how many journeys a row prints. The walking
 pace, the early buffer, the plan cache lifetime, the itineraries asked for per

@@ -7,6 +7,7 @@ import {
   WALK_METRES_PER_MINUTE,
   type RouteOption,
 } from '../src/plan.ts';
+import { clearOriginCache, UnresolvableOriginError } from '../src/origin.ts';
 import type { Departure } from '../src/model.ts';
 import { FIXTURE_NOW, fixture, mockFetch } from './helpers.ts';
 
@@ -51,11 +52,31 @@ const X9_TIGHT_ARRIVAL = at(38);
 const X9_BEST_ARRIVAL = at(40);
 const X9_SLOW_ARRIVAL = at(45);
 
+/**
+ * A fetch that answers the origin probe and then serves plan pages in order.
+ *
+ * `planBoard` resolves the stop identifier before it plans anything, and that
+ * resolution is one `/stoptimes` request. Answering it here keeps the page
+ * numbering in the plan handler about pages rather than about requests, and
+ * `planUrls` keeps the paging assertions about paging.
+ */
+function planMock(pages: (page: number) => unknown) {
+  let page = 0;
+  const { fetchImpl, urls } = mockFetch((url) => {
+    // The probe asks whether the stop exists; one row is enough to say yes.
+    if (url.includes('/stoptimes')) return { stopTimes: [{}] };
+    const body = pages(page);
+    page += 1;
+    return body;
+  });
+  return { fetchImpl, urls, planUrls: (): string[] => urls.filter((url) => url.includes('/plan')) };
+}
+
 async function planFixtureBoard(rows: Departure[], earlyBufferMinutes?: number) {
   const body = await fixture<unknown>('transitous-plan.json');
   // One page of substance, then nothing: the fixture carries a cursor, and a
   // second page of the same itineraries would only re-assert the first.
-  const { fetchImpl, urls } = mockFetch((_url, call) => (call === 0 ? body : { itineraries: [], nextPageCursor: '' }));
+  const { fetchImpl, urls } = planMock((page) => (page === 0 ? body : { itineraries: [], nextPageCursor: '' }));
   const planned = await planBoard({
     stop: HOME,
     destination: DESTINATION,
@@ -70,8 +91,11 @@ async function planFixtureBoard(rows: Departure[], earlyBufferMinutes?: number) 
 
 beforeEach(() => {
   // The cache is keyed on origin, destination and start minute, all of which
-  // these cases share; without this one case would answer another.
+  // these cases share; without this one case would answer another. The origin
+  // resolution is remembered per stop for the life of the process, so it needs
+  // clearing for the same reason: every case here uses the same stop.
   clearPlanCache();
+  clearOriginCache();
 });
 
 describe('stop identity', () => {
@@ -188,7 +212,7 @@ describe('exit connections', () => {
 describe('cursor paging', () => {
   /** A page whose only itinerary leaves at 08:10 and which always offers another. */
   function endlessPages() {
-    return mockFetch((_url, call) => ({
+    return planMock((call) => ({
       itineraries: [
         {
           startTime: '2026-01-01T08:10:00Z',
@@ -211,7 +235,7 @@ describe('cursor paging', () => {
   }
 
   test('stops at the cap when coverage is never reached', async () => {
-    const { fetchImpl, urls } = endlessPages();
+    const { fetchImpl, planUrls } = endlessPages();
     // The last row leaves ninety minutes out and no page ever gets near it.
     await planBoard({
       stop: HOME,
@@ -221,14 +245,15 @@ describe('cursor paging', () => {
       baseUrl: BASE,
       fetchImpl,
     });
-    expect(urls).toHaveLength(PLAN_MAX_PAGES);
-    expect(urls[0]).toContain('time=');
-    expect(urls[0]).not.toContain('pageCursor=');
-    for (const url of urls.slice(1)) expect(url).toContain('pageCursor=');
+    const pages = planUrls();
+    expect(pages).toHaveLength(PLAN_MAX_PAGES);
+    expect(pages[0]).toContain('time=');
+    expect(pages[0]).not.toContain('pageCursor=');
+    for (const url of pages.slice(1)) expect(url).toContain('pageCursor=');
   });
 
   test('stops as soon as the itineraries cover the last row', async () => {
-    const { fetchImpl, urls } = endlessPages();
+    const { fetchImpl, planUrls } = endlessPages();
     await planBoard({
       stop: HOME,
       destination: DESTINATION,
@@ -237,13 +262,13 @@ describe('cursor paging', () => {
       baseUrl: BASE,
       fetchImpl,
     });
-    expect(urls).toHaveLength(1);
+    expect(planUrls()).toHaveLength(1);
   });
 
   test('coverage ignores itineraries that board somewhere else', async () => {
     // Same page, but the one itinerary starts at another stop, so it can cover
     // nothing on this board and the walk must go on to the cap.
-    const { fetchImpl, urls } = mockFetch((_url, call) => ({
+    const { fetchImpl, planUrls } = planMock((call) => ({
       itineraries: [
         {
           startTime: '2026-01-01T08:10:00Z',
@@ -271,14 +296,14 @@ describe('cursor paging', () => {
       baseUrl: BASE,
       fetchImpl,
     });
-    expect(urls).toHaveLength(PLAN_MAX_PAGES);
+    expect(planUrls()).toHaveLength(PLAN_MAX_PAGES);
   });
 });
 
 describe('the plan cache', () => {
   test('a second plan in the same minute asks for nothing', async () => {
     const body = await fixture<unknown>('transitous-plan.json');
-    const { fetchImpl, urls } = mockFetch((_url, call) => (call === 0 ? body : { itineraries: [], nextPageCursor: '' }));
+    const { fetchImpl, urls } = planMock((page) => (page === 0 ? body : { itineraries: [], nextPageCursor: '' }));
     const call = () =>
       planBoard({
         stop: HOME,
@@ -295,34 +320,50 @@ describe('the plan cache', () => {
     expect(second[0]?.best?.arrival).toBe(first[0]?.best?.arrival);
   });
 
-  test('an origin the planner does not know is asked about once, not once a refresh', async () => {
+  test('a stop nothing in the chain can resolve is walked once, not once a refresh', async () => {
+    // Everything 404s: the parent is not a stop, there are no platform ids on
+    // these rows, and the station lookup has nothing either.
     const { fetchImpl, urls } = mockFetch(
       () => new Response(JSON.stringify({ error: 'no radius' }), { status: 404, headers: { 'content-type': 'application/json' } }),
     );
-    const call = () =>
+    const call = (offsetMinutes: number) =>
       planBoard({
         stop: HOME,
         destination: DESTINATION,
         rows: [row('U1', 10)],
         // A different minute each time, so the itinerary cache cannot be what
-        // suppresses the second request.
-        startMs: FIXTURE_NOW,
+        // suppresses the second attempt.
+        startMs: FIXTURE_NOW + offsetMinutes * 60_000,
         baseUrl: BASE,
         fetchImpl,
       });
-    await expect(call()).rejects.toThrow(/404/);
+    await expect(call(0)).rejects.toBeInstanceOf(UnresolvableOriginError);
     const before = urls.length;
     expect(before).toBeGreaterThan(0);
-    await expect(
+    await expect(call(5)).rejects.toBeInstanceOf(UnresolvableOriginError);
+    expect(urls).toHaveLength(before);
+  });
+
+  test('a resolved origin the planner then rejects is asked about once', async () => {
+    // The stop resolves, so the chain is happy; it is the plan itself that
+    // 404s, which is the case the negative memo on the resolved origin covers.
+    const { fetchImpl, urls } = mockFetch((url) =>
+      url.includes('/stoptimes')
+        ? { stopTimes: [{}] }
+        : new Response(JSON.stringify({ error: 'nope' }), { status: 404, headers: { 'content-type': 'application/json' } }),
+    );
+    const call = (offsetMinutes: number) =>
       planBoard({
         stop: HOME,
         destination: DESTINATION,
         rows: [row('U1', 10)],
-        startMs: FIXTURE_NOW + 5 * 60_000,
+        startMs: FIXTURE_NOW + offsetMinutes * 60_000,
         baseUrl: BASE,
         fetchImpl,
-      }),
-    ).rejects.toThrow(/404/);
+      });
+    await expect(call(0)).rejects.toThrow(/404/);
+    const before = urls.length;
+    await expect(call(5)).rejects.toThrow(/404/);
     expect(urls).toHaveLength(before);
   });
 });

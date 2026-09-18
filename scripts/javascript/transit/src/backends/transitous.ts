@@ -1,4 +1,6 @@
+import { toAggregatorId, TRANSITOUS_DEFAULT_BASE_URL } from '../aggregator.ts';
 import { envOverride, fetchJson, type FetchLike } from '../http.ts';
+import { departureIds, resolveOrigin } from '../origin.ts';
 import { ALL_MODES, type Departure, type Direction, type Message, type Mode, type StopHit } from '../model.ts';
 import {
   MAX_PAGES,
@@ -11,14 +13,9 @@ import {
 
 export const TRANSITOUS_BACKEND_NAME = 'transitous';
 
-/** Overridable with the `TRANSITOUS_BASE_URL` environment variable or a page global. */
-export const TRANSITOUS_DEFAULT_BASE_URL = 'https://api.transitous.org/api/v1';
-
-/**
- * The aggregator carries the same national stop identifiers as the primary
- * backend, under a source prefix.
- */
-export const DELFI_ID_PREFIX = 'de-DELFI_';
+// Re-exported so every existing importer keeps working; they live in their own
+// module because the origin resolver needs them and this file needs it.
+export { DELFI_ID_PREFIX, toAggregatorId, toRawId, TRANSITOUS_DEFAULT_BASE_URL } from '../aggregator.ts';
 
 /**
  * Rows fetched per hour of horizon, used to size a page request. The endpoint
@@ -98,15 +95,6 @@ export function directionFromDirectionId(directionId: unknown): Direction {
   return null;
 }
 
-/** Accept a bare national id or one that already carries the source prefix. */
-export function toAggregatorId(stop: string): string {
-  return /^[a-z]{2}-[A-Za-z0-9]+_/.test(stop) ? stop : `${DELFI_ID_PREFIX}${stop}`;
-}
-
-export function toRawId(stop: string): string {
-  return stop.startsWith(DELFI_ID_PREFIX) ? stop.slice(DELFI_ID_PREFIX.length) : stop;
-}
-
 function parseIso(value: unknown): number {
   if (typeof value !== 'string') return Number.NaN;
   return Date.parse(value);
@@ -175,9 +163,24 @@ export function createTransitousBackend(options: TransitousOptions = {}): Backen
   const debug = options.onDebug;
   const progress = options.onProgress;
   const lookupCache = options.lookupCache;
-  // Per-process memo so a board that merges several stops does not re-resolve
-  // the same parent id once per stop.
-  const platformMemo = new Map<string, string[]>();
+
+  /**
+   * The identifiers to fan a stop-time fetch out over when the configured stop
+   * answered nothing. Delegated to the shared resolver so the departures path
+   * and the journey planner agree on what a stop is called here; a coordinate
+   * is dropped, because stop times cannot be asked for at one.
+   */
+  async function resolveChildren(stop: string): Promise<string[]> {
+    const resolved = await resolveOrigin({
+      stop,
+      baseUrl,
+      ...(fetchImpl === undefined ? {} : { fetchImpl }),
+      ...(lookupCache === undefined ? {} : { cache: lookupCache }),
+      ...(debug === undefined ? {} : { onDebug: debug }),
+    });
+    const parent = toAggregatorId(stop);
+    return departureIds(resolved).filter((id) => id !== parent);
+  }
 
   async function get<T>(path: string): Promise<T> {
     const url = `${baseUrl}${path}`;
@@ -263,32 +266,6 @@ export function createTransitousBackend(options: TransitousOptions = {}): Backen
     return out;
   }
 
-  /** Resolve a parent stop to the platform ids underneath it. */
-  async function platformIds(rawId: string): Promise<string[]> {
-    const memo = platformMemo.get(rawId);
-    if (memo !== undefined) return memo;
-    const cacheKey = `${TRANSITOUS_BACKEND_NAME}:geocode:${rawId}`;
-    if (lookupCache) {
-      const cached = await lookupCache.get(cacheKey);
-      if (cached !== null) {
-        platformMemo.set(rawId, cached);
-        return cached;
-      }
-    }
-    const hits = await get<RawGeocodeHit[]>(`/geocode?text=${encodeURIComponent(rawId)}`);
-    const parent = toAggregatorId(rawId);
-    const ids: string[] = [];
-    for (const hit of Array.isArray(hits) ? hits : []) {
-      const id = typeof hit.id === 'string' ? hit.id : '';
-      if (id.length === 0 || id === parent) continue;
-      if (!id.includes(rawId)) continue;
-      if (!ids.includes(id)) ids.push(id);
-    }
-    platformMemo.set(rawId, ids);
-    if (lookupCache) await lookupCache.set(cacheKey, ids);
-    return ids;
-  }
-
   function toStopHit(hit: RawGeocodeHit): StopHit | null {
     const id = typeof hit.id === 'string' ? hit.id : '';
     if (id.length === 0) return null;
@@ -342,13 +319,22 @@ export function createTransitousBackend(options: TransitousOptions = {}): Backen
       const aggregatorId = toAggregatorId(stop);
       let rows = await fetchStopRows(aggregatorId, window, stop, report);
 
-      // Some parent stops carry no departures of their own; the rows hang off
-      // the platform ids underneath. One extra lookup, then fan out and merge.
+      // Some parent stops carry no departures of their own, and some are not
+      // stops here at all; either way the rows hang off the platforms beneath
+      // them. The shared resolution chain works out which identifiers those
+      // are, then this fans out over all of them and merges, because one
+      // platform's stop times are not the whole stop's.
       if (rows.length === 0) {
-        const children = await platformIds(toRawId(stop));
+        const children = await resolveChildren(stop);
         const merged: Departure[] = [];
+        const seen = new Set<string>();
         for (const child of children) {
-          merged.push(...(await fetchStopRows(child, window, stop, report)));
+          for (const row of await fetchStopRows(child, window, stop, report)) {
+            const key = `${row.line}|${row.planned}|${row.destination}`;
+            if (seen.has(key)) continue;
+            seen.add(key);
+            merged.push(row);
+          }
         }
         rows = merged;
       }

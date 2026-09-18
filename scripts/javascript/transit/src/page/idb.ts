@@ -14,13 +14,20 @@
 // cache is an optimisation, and the network is the source of truth.
 
 const DB_NAME = 'transit';
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 
 /** Object stores, named for what they hold rather than for who writes them. */
 export const STORE_BOARDS = 'boards';
 export const STORE_TRANSLATIONS = 'translations';
+/**
+ * Which identifier the journey planner accepts for a stop. Worth keeping
+ * between visits rather than re-deriving: it is a fact about the aggregator's
+ * data, it costs a request to establish, and it does not change from one day
+ * to the next.
+ */
+export const STORE_ORIGINS = 'origins';
 
-const STORES: readonly string[] = [STORE_BOARDS, STORE_TRANSLATIONS];
+const STORES: readonly string[] = [STORE_BOARDS, STORE_TRANSLATIONS, STORE_ORIGINS];
 
 let opening: Promise<IDBDatabase | null> | null = null;
 

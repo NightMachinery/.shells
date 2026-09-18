@@ -1,6 +1,7 @@
 import { contrastText, resolveColor, rgb } from '../colors.ts';
 import { catchableOnBoard, describeWalk } from '../filter.ts';
 import { stopTag } from '../json.ts';
+import type { OriginLevel } from '../origin.ts';
 import type { PlannedRow, RouteOption } from '../plan.ts';
 import type { Board, Departure, Direction, Message, StopHit } from '../model.ts';
 
@@ -292,12 +293,27 @@ export function routeOptionLine(option: RouteOption, best: boolean, options: Ter
 export interface PlannedBoardView {
   board: Board;
   rows: PlannedRow[];
+  /**
+   * Which step of the origin chain answered for this board's stop. Printed
+   * only when it is not the obvious one, because a plan made from a platform
+   * or from a coordinate is a slightly weaker claim than one made from the
+   * stop itself and a reader checking a surprising route should see that.
+   */
+  origin?: OriginLevel | null;
 }
+
+/** What the heading says about an origin that was not simply the stop. */
+const ORIGIN_NOTE: Readonly<Record<OriginLevel, string>> = {
+  parent: '',
+  platform: 'via platform',
+  coordinate: 'via coordinate',
+};
 
 export function renderPlannedBoard(view: PlannedBoardView, destination: string, options: TerminalOptions): string {
   const { board, rows } = view;
   const out: string[] = [];
-  const heading = `${board.title} → ${destination}  [${board.backend}]`;
+  const note = view.origin === undefined || view.origin === null ? '' : ORIGIN_NOTE[view.origin];
+  const heading = `${board.title} → ${destination}  [${board.backend}${note === '' ? '' : `, ${note}`}]`;
   out.push(options.color ? bold(heading) : heading);
   const subtitle = describeWalk(board.stops, board, (stop) => stopTag(stop, board.stopLabels));
   out.push(options.color ? dim(subtitle) : subtitle);

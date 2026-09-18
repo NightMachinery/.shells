@@ -7,6 +7,7 @@ import {
   TRANSITOUS_DEFAULT_BASE_URL,
 } from './backends/transitous.ts';
 import { normaliseLine, type WalkSource } from './filter.ts';
+import { resolveOrigin, type OriginCache, type OriginLevel, type ResolvedOrigin } from './origin.ts';
 import { envOverride, fetchJson, HttpError, type FetchLike } from './http.ts';
 import { departureJson, toIso } from './json.ts';
 import { SCHEMA_VERSION, type Board, type Departure } from './model.ts';
@@ -154,6 +155,15 @@ export interface PlanBoardOptions {
   baseUrl?: string;
   fetchImpl?: FetchLike;
   onDebug?: (line: string) => void;
+  /** Where the resolved origin is kept between runs, when the caller has one. */
+  originCache?: OriginCache;
+  /**
+   * Told which step of the origin chain answered, so the caller can say so.
+   * A plan made from a coordinate or a single platform is a slightly different
+   * claim from one made from the stop itself, and the difference is worth
+   * being able to see when a route looks wrong.
+   */
+  onOrigin?: (resolved: ResolvedOrigin) => void;
 }
 
 interface RawPlanPlace {
@@ -358,10 +368,31 @@ function cacheSet(key: string, now: number, itineraries: ParsedItinerary[]): voi
  */
 const unknownOrigins = new Map<string, HttpError>();
 
+// Keyed on the resolved origin, not on the stop as configured: the resolution
+// chain exists precisely because those two are not always the same identifier.
+
 /** Drop everything cached. Tests use it so one case cannot answer another. */
 export function clearPlanCache(): void {
   planCache.clear();
   unknownOrigins.clear();
+}
+
+/**
+ * The platform identifiers this board's own rows depart from, most used first.
+ *
+ * Ordering by count matters: a journey plan is asked from one place, and the
+ * platform most of the board's departures leave from is the one most of its
+ * journeys start at. Rows that carry no platform identifier contribute nothing
+ * rather than a guess.
+ */
+function platformsOf(rows: Departure[]): string[] {
+  const counts = new Map<string, number>();
+  for (const row of rows) {
+    const id = row.stopPoint;
+    if (id === undefined || id.length === 0) continue;
+    counts.set(id, (counts.get(id) ?? 0) + 1);
+  }
+  return [...counts.entries()].sort((a, b) => b[1] - a[1]).map(([id]) => id);
 }
 
 function placeParam(place: PlanDestination): string {
@@ -620,7 +651,19 @@ export async function planBoard(options: PlanBoardOptions): Promise<PlannedRow[]
     /\/+$/,
     '',
   );
-  const fromPlace = toAggregatorId(options.stop);
+  // Which identifier the aggregator will accept for this stop, which is not
+  // always the one the board is configured with. Cached, so this costs one
+  // small request the first time a stop is planned and nothing afterwards.
+  const resolved = await resolveOrigin({
+    stop: options.stop,
+    platformIds: platformsOf(rows),
+    baseUrl: options.baseUrl,
+    ...(options.fetchImpl === undefined ? {} : { fetchImpl: options.fetchImpl }),
+    ...(options.originCache === undefined ? {} : { cache: options.originCache }),
+    ...(options.onDebug === undefined ? {} : { onDebug: options.onDebug }),
+  });
+  options.onOrigin?.(resolved);
+  const fromPlace = resolved.place;
   const toPlace = placeParam(options.destination);
   const startMinute = Math.floor(options.startMs / 60_000);
   const cacheKey = `${fromPlace}|${toPlace}|${startMinute}`;
@@ -645,8 +688,11 @@ export async function planBoard(options: PlanBoardOptions): Promise<PlannedRow[]
       );
     } catch (error) {
       // A 404 here means the aggregator has never heard of this origin, which
-      // is worth remembering. Any other failure is a bad moment rather than a
-      // bad identifier and must stay retryable.
+      // is worth remembering. Keyed on the *resolved* origin rather than the
+      // configured stop, so a stop that failed as a parent identifier and then
+      // resolved to a platform is asked again under the identifier that might
+      // work. Any other failure is a bad moment rather than a bad identifier
+      // and must stay retryable.
       if (error instanceof HttpError && error.status === 404) unknownOrigins.set(fromPlace, error);
       throw error;
     }
@@ -750,6 +796,14 @@ export function plannedRowJson(row: PlannedRow, board: WalkSource, now: number, 
 export interface PlannedBoard {
   board: Board;
   rows: PlannedRow[];
+  /**
+   * Which step of the origin chain answered for this board's stop, or null
+   * when it could not be planned at all. Published because a plan made from a
+   * coordinate or from one platform is a slightly weaker claim than one made
+   * from the stop itself, and a reader comparing a surprising route against
+   * their own knowledge deserves to know which it was.
+   */
+  origin?: OriginLevel | null;
 }
 
 /**
@@ -773,8 +827,9 @@ export function routeDocument(input: {
     destination: { key: input.destinationKey, name: input.destinationName },
     early_buffer_minutes: input.earlyBufferMinutes,
     generated_at: toIso(input.now),
-    boards: input.boards.map(({ board, rows }) => ({
+    boards: input.boards.map(({ board, rows, origin }) => ({
       title: board.title,
+      origin_resolution: origin ?? null,
       stops: board.stops,
       walk_minutes: board.walkMinutes,
       walk_minutes_by_stop: board.walkMinutesByStop ?? null,

@@ -4,8 +4,7 @@ import type { Board, Departure } from '../model.ts';
 import { button, clockTime, dayMarker, el, minutesUntil, slot } from './dom.ts';
 import { alarmMarker, attachLongPress, openAlarmPopup } from './notify.ts';
 import { stopTagOf } from './data.ts';
-import { arrivalOf, rowKey, usualExits } from './commute.ts';
-import type { PlannedRow } from '../plan.ts';
+import { arrivalOf, rowKey, usualExits, type BoardRoutes } from './commute.ts';
 import { boardId, filterKey, readHidden, readView, writeHidden, writeView } from './store.ts';
 import type { BoardStatus, BoardView } from './types.ts';
 
@@ -28,7 +27,7 @@ export interface BoardContext {
   onChange: () => void;
   onRetry: () => void;
   /** Journeys from this board to the chosen destination, keyed by row. */
-  routes?: Map<string, PlannedRow>;
+  routes?: BoardRoutes;
   /** Whether this board's rows are ordered by arrival rather than departure. */
   sortByArrival: boolean;
   /** The current tight-connection window, shown in the filter of a planned board. */
@@ -111,10 +110,10 @@ interface Columns {
   stop: boolean;
 }
 
-function columnsOf(board: Board, rows: Departure[], routes: Map<string, PlannedRow> | undefined): Columns {
+function columnsOf(board: Board, rows: Departure[], routes: BoardRoutes | undefined): Columns {
   return {
     connection: board.connection !== undefined,
-    route: routes !== undefined && routes.size > 0,
+    route: routes !== undefined && routes.rows.size > 0,
     // The upstream feed reports a platform for rail and never for trams or
     // buses, so a fixed platform column would be dead space on most boards.
     // Presence is decided per board, which keeps the slots aligned within a
@@ -145,7 +144,7 @@ function renderRoute(dep: Departure, context: BoardContext, usual: Map<string, s
   // has been withdrawn, and a recommendation to take a train that is not running
   // is worse than no recommendation.
   if (dep.cancelled) return slot('route');
-  const planned = context.routes?.get(rowKey(dep));
+  const planned = context.routes?.rows.get(rowKey(dep));
   const option = planned?.best ?? planned?.options[0];
   if (option === undefined) return slot('route');
 
@@ -165,6 +164,12 @@ function renderRoute(dep: Departure, context: BoardContext, usual: Map<string, s
   const parts = [`change at ${option.exitStopName}`, chain, `arrive ${clockTime(option.arrival, context.timezone)}`];
   if (option.tight) parts.push('tight: needs the first leg to run early or the change to be quick');
   if (better) parts.push('a different exit from this line\u2019s usual one');
+  // Which identifier the planner had to be given for this stop. Said only when
+  // it was not the stop itself, because that is when a plan is a slightly
+  // weaker claim and a reader checking it against what they know should see it.
+  const origin = context.routes?.origin;
+  if (origin === 'platform') parts.push('planned from this stop\u2019s platform, which is how the planner knows it');
+  if (origin === 'coordinate') parts.push('planned from this stop\u2019s position, which is all the planner knows of it');
   node.title = parts.join(' · ');
   return node;
 }
@@ -520,10 +525,10 @@ export function renderBoard(board: Board, context: BoardContext): HTMLElement {
   }
 
   const columns = columnsOf(board, rows, context.routes);
-  const usual = context.routes === undefined ? new Map<string, string>() : usualExits(context.routes);
+  const usual = context.routes === undefined ? new Map<string, string>() : usualExits(context.routes.rows);
   const ordered =
     context.sortByArrival && columns.route
-      ? [...rows].sort((a, b) => arrivalOf(a, context.routes) - arrivalOf(b, context.routes) || a.realtime - b.realtime)
+      ? [...rows].sort((a, b) => arrivalOf(a, context.routes?.rows) - arrivalOf(b, context.routes?.rows) || a.realtime - b.realtime)
       : rows;
   const list = el('ul', 'rows');
   let highlighted = false;

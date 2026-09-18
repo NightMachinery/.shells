@@ -36,6 +36,12 @@ export interface Departure {
   /** Replacement service (bus instead of rail, typically). */
   sev: boolean;
   platform: string | null;
+  /**
+   * The platform-level stop identifier this row departs from, when the backend
+   * publishes one. Not for display: it is what lets the journey planner be
+   * asked about a stop whose parent identifier the aggregator does not carry.
+   */
+  stopPoint?: string;
   direction: Direction;
   /** Which backend produced this row. */
   backend: string;
