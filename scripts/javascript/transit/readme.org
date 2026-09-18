@@ -302,13 +302,93 @@ file relative to itself on load.
 
 The page renders one tab per configured profile, in config order, titled from
 each profile's title, and remembers the selection in local storage inside a
-try/catch so a browser that refuses storage still works. Each board shows the
-near window as rows and the rest as a per-line strip with a range toggle. Rows
-sooner than their stop's walking time are dimmed and the first catchable row is
-highlighted. It refreshes only while the document is visible, ticks its
-countdowns locally in between, and on a failed refresh keeps the last good data,
-greys it and says so. Disruption notices appear as a banner, filtered to the
-lines the visible profile configures.
+try/catch so a browser that refuses storage still works. It refreshes only while
+the document is visible, ticks its countdowns locally in between, and on a failed
+refresh keeps the last good data and says so.
+
+** Three states per board
+
+A board is *integrated*, *full* or *collapsed*, and integrated is the default.
+Integrated is a strip of times, one line per (stop, line, direction), which
+answers "when is the next one and how often" in a glance. Full is one row per
+departure, for when the platform, the delay and the onward connection matter.
+Collapsed is for a board that is not relevant today but would be annoying to
+delete from the configuration. Clicking a board's title cycles the three, and the
+choice is remembered per profile and per board title.
+
+There is no separate "later" section any more. One board is one state, and the
+integrated view covers the whole horizon.
+
+** The row grid
+
+A row is a grid of fixed slots: minutes, line badge, destination with its times,
+the onward connection, the platform, whether the time is live or a plan, a
+reminder marker, and the stop label. A slot is empty when the value is absent and
+nothing shifts, so the eye can run down one column.
+
+Which *optional* slots exist is decided per board rather than globally: the
+platform column appears only when that board's rows actually carry platforms, the
+connection column only when the board declares an interchange, and the stop
+column only when the board merges stops. The upstream feed reports a platform for
+rail and never for surface transport, so a globally fixed platform column would be
+dead space on most boards.
+
+The expected time is the headline and the planned time follows it in parentheses
+when the two differ, because a departure eleven minutes late is a different thing
+from one always scheduled for then. Delay and cancellation are carried by weight
+and by a struck line as well as by colour, so they survive a monochrome screen.
+
+** The bar
+
+Sticky, and it carries the profile tabs, one jump chip per board with that
+board's next departure, the horizon picker with the resulting end time, the start
+time, the refresh control with its age and progress ring, and the name of
+whichever backends answered. The chips count only the rows a board is actually
+showing, so a chip never promises a departure the board's own filter is hiding.
+
+The start time is either *now*, which moves with the clock, or a moment the
+reader picked. With a picked moment every row is labelled a plan, because there
+is no live data for a train that has not been dispatched yet.
+
+On the desktop: the number keys switch profiles, =r= refreshes, =[= and =]= step
+the horizon, and =f= toggles the board under the top of the viewport between full
+and integrated. All of them are ignored while typing in a field.
+
+** Freshness, caching and installing
+
+The last good result for every profile is mirrored into IndexedDB and rendered
+immediately on load with its age, then refreshed. Switching tabs shows the cache
+at once and refreshes only when it is older than a glance. While a fetch is in
+flight a board shows skeleton rows and a progress line naming the backend and the
+page number.
+
+The page ships a web manifest and a service worker, so it installs as a
+standalone app. The worker caches the shell and deliberately not the departures:
+a worker that served stale departures would do it silently, with no age and no
+way for the page to know, which is the one failure this page exists to avoid. The
+departures come back from IndexedDB instead, with their age on screen.
+
+** Reminders and disruptions
+
+A long press on a row opens a reminder popup: an optional "keep walk time"
+allowance, a set of lead times, and a set button. Reminders are re-pointed at the
+updated expected departure on every refresh, which is the point of them, and they
+are best effort while the page is open. That is said on the popup rather than
+implied.
+
+Disruption notices are collapsed by default, filtered to the lines the visible
+profile configures, and can be narrowed further by chips or acknowledged until
+their text changes. They can be copied out in one go with a translation
+instruction in front, or translated in place by the browser's own translator when
+it has one and by a paid provider when the reader supplies a key. The key lives in
+local storage on that device and nowhere else.
+
+** Selections
+
+The countdowns are patched once a second by rewriting single text nodes, not by
+re-rendering, and the tick skips its work entirely while a selection is live
+inside a board. A full render every second would destroy a selection in progress,
+and copying a time or a destination off the page is a thing people do.
 
 * Line colours
 
@@ -361,7 +441,8 @@ place to look it up. The horizon, the default backend and fallback, the
 transport types, the time zone and the default walking time are in
 =src/config.ts=. The request timeout and the user agent are in =src/http.ts=.
 The page cap that stops a pathological stop from being walked forever is in
-=src/backends/types.ts=, and the per-request row counts for the aggregator are
+=src/backends/types.ts=, the primary backend's rows-per-page limit is in
+=src/backends/mvg.ts=, and the per-request row counts for the aggregator are
 in =src/backends/transitous.ts=. Both cache lifetimes are in =src/cache.ts=.
 The boundary between the near window and the strip view is in
 =src/format/terminal.ts=, the watch interval and the discovery sample count are

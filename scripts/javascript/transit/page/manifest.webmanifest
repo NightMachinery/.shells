@@ -1,0 +1,15 @@
+{
+  "name": "Departures",
+  "short_name": "Departures",
+  "description": "Live departure boards for the stops you actually use.",
+  "start_url": ".",
+  "scope": ".",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#f6f6f4",
+  "theme_color": "#f6f6f4",
+  "icons": [
+    { "src": "icon.png", "sizes": "72x72", "type": "image/png" },
+    { "src": "icon-180.png", "sizes": "180x180", "type": "image/png", "purpose": "any" }
+  ]
+}
