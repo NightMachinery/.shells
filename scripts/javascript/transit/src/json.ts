@@ -1,6 +1,6 @@
 import type { Config } from './config.ts';
 import { catchable, walkMinutesFor, type WalkSource } from './filter.ts';
-import { SCHEMA_VERSION, type Board, type Departure } from './model.ts';
+import { SCHEMA_VERSION, type Board, type ConnectionConfig, type Departure } from './model.ts';
 
 // The machine-readable surface of the package, in one file. Everything here is
 // snake_case, because these documents are consumed by shell pipelines and by
@@ -24,6 +24,18 @@ export function stopTag(stop: string, labels?: Record<string, string>): string {
   return last !== undefined && last.length > 0 ? last : stop;
 }
 
+/** The connection a board declares, in the snake_case the page reads. */
+export function connectionJson(connection: ConnectionConfig | undefined): unknown {
+  if (connection === undefined) return null;
+  return {
+    stop: connection.stop,
+    lines: connection.lines,
+    direction: connection.direction ?? null,
+    ride_minutes: connection.rideMinutes,
+    transfer_minutes: connection.transferMinutes,
+  };
+}
+
 export function departureJson(dep: Departure, board: WalkSource, now: number, multiStop: boolean): unknown {
   const walkMinutes = walkMinutesFor(board, dep.stop);
   return {
@@ -44,6 +56,10 @@ export function departureJson(dep: Departure, board: WalkSource, now: number, mu
     backend: dep.backend,
     stop: dep.stop,
     stop_tag: multiStop ? (dep.stopTag ?? stopTag(dep.stop, board.stopLabels)) : null,
+    connection:
+      dep.connection === undefined || dep.connection === null
+        ? null
+        : { line: dep.connection.line, departure: toIso(dep.connection.departure) },
   };
 }
 
@@ -55,6 +71,7 @@ export function boardJson(board: Board, now: number): unknown {
     walk_minutes: board.walkMinutes,
     walk_minutes_by_stop: board.walkMinutesByStop ?? null,
     stop_labels: board.stopLabels ?? null,
+    connection: connectionJson(board.connection),
     backend: board.backend,
     departures: board.departures.map((dep) => departureJson(dep, board, now, multiStop)),
   };
@@ -130,6 +147,7 @@ export function configExportDocument(config: Config, options: ConfigExportOption
         walk_minutes: board.walkMinutes,
         walk_minutes_by_stop: board.walkMinutesByStop ?? null,
         stop_labels: board.stopLabels ?? null,
+        connection: connectionJson(board.connection),
       })),
     })),
   };

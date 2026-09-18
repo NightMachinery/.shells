@@ -1,4 +1,12 @@
-import { ALL_MODES, isMode, type BoardConfig, type Mode, type Profile } from './model.ts';
+import {
+  ALL_MODES,
+  isMode,
+  type BoardConfig,
+  type ConnectionConfig,
+  type Direction,
+  type Mode,
+  type Profile,
+} from './model.ts';
 
 // Every default the package has lives here, named. Nothing else may hardcode
 // one: a knob with two homes is a knob that disagrees with itself.
@@ -336,7 +344,70 @@ function parseBoard(profileKey: string, index: number, raw: unknown, issues: str
     }
   }
 
+  if (raw.connection !== undefined) {
+    const connection = parseConnection(where, raw.connection, issues);
+    if (connection === null) failed = true;
+    else board.connection = connection;
+  }
+
   return failed ? null : board;
+}
+
+/**
+ * The onward service a board points at. Everything is required except the
+ * direction letter, which some interchanges do not need because the line only
+ * runs one way from there.
+ */
+function parseConnection(where: string, raw: unknown, issues: string[]): ConnectionConfig | null {
+  const at = `${where}.connection`;
+  if (!isTable(raw)) {
+    issues.push(`${at}: must be a table with stop, lines, ride_minutes and transfer_minutes`);
+    return null;
+  }
+  let failed = false;
+
+  const stop = typeof raw.stop === 'string' ? raw.stop.trim() : '';
+  if (stop.length === 0) {
+    issues.push(`${at}.stop: must be a non-empty stop id`);
+    failed = true;
+  }
+
+  const lines = stringList(raw.lines);
+  if (lines === null || lines.length === 0) {
+    issues.push(`${at}.lines: must be a non-empty list of line labels`);
+    failed = true;
+  }
+
+  let direction: Exclude<Direction, null> | undefined;
+  if (raw.direction !== undefined) {
+    if (raw.direction !== 'H' && raw.direction !== 'R') {
+      issues.push(`${at}.direction: must be "H" or "R"`);
+      failed = true;
+    } else {
+      direction = raw.direction;
+    }
+  }
+
+  const minutes: Record<'ride_minutes' | 'transfer_minutes', number> = { ride_minutes: 0, transfer_minutes: 0 };
+  for (const key of ['ride_minutes', 'transfer_minutes'] as const) {
+    const value = raw[key];
+    if (typeof value !== 'number' || !Number.isInteger(value) || value < 0) {
+      issues.push(`${at}.${key}: must be a non-negative whole number of minutes`);
+      failed = true;
+      continue;
+    }
+    minutes[key] = value;
+  }
+
+  if (failed) return null;
+  const parsed: ConnectionConfig = {
+    stop,
+    lines: lines ?? [],
+    rideMinutes: minutes.ride_minutes,
+    transferMinutes: minutes.transfer_minutes,
+  };
+  if (direction !== undefined) parsed.direction = direction;
+  return parsed;
 }
 
 function parseProfiles(raw: unknown, issues: string[]): Profile[] {

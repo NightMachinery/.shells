@@ -112,6 +112,25 @@ tell two platforms apart, useless for telling a reader *which* platform. Labels
 are per board, so the same stop can be =Wkz= on one board and something else on
 another.
 
+** Onward connections
+
+A board may name one interchange it feeds into:
+
+#+begin_src toml
+connection = { stop = "de:00000:9", lines = ["X9"], direction = "H", ride_minutes = 3, transfer_minutes = 5 }
+#+end_src
+
+Every row then carries the first departure at that stop which a rider leaving on
+that row could still catch, computed as the row's own departure plus the ride and
+the transfer. The two figures are static, and that is a deliberate first cut: a
+per-departure figure needs a journey lookup for every row, which is a different
+order of request volume against a free API, and for a fixed pair of stops the
+static pair is right to within a minute or two.
+
+=direction= is optional, for an interchange where the line only runs one way.
+An empty slot on a row means the board has an interchange and nothing at it was
+catchable from that row, which is information rather than a gap.
+
 ** Places
 
 =[places.<name>]= holds coordinates for the =nearby= lookup. They are not part

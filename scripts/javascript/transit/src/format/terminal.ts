@@ -109,6 +109,13 @@ function nearRow(dep: Departure, options: TerminalOptions, board: Board, highlig
   pieces.push(realtimeMark(dep, options.color));
   if (dep.cancelled) pieces.push(options.color ? fg('#D14343', 'CANCELLED') : 'CANCELLED');
   if (dep.sev) pieces.push(options.color ? fg('#C98A00', 'SEV') : 'SEV');
+  if (dep.connection !== undefined) {
+    // An empty slot is as informative as a full one here: it says the board has
+    // an interchange and nothing at it was catchable from this row.
+    const onward =
+      dep.connection === null ? '→ -' : `→ ${dep.connection.line} ${clockTime(dep.connection.departure, options.timezone)}`;
+    pieces.push(options.color ? dim(onward) : onward);
+  }
   if (dep.stopTag !== undefined) pieces.push(options.color ? dim(`@${dep.stopTag}`) : `@${dep.stopTag}`);
 
   const row = pieces.join(' ').replace(/\s+$/, '');

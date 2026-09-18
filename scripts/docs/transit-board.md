@@ -119,6 +119,25 @@ labels whenever a board merges more than one. The board then heads itself with
 the per-stop figures in board order rather than a count and one number, and the
 rows carry `@Label` instead of `@1682`.
 
+## Onward connections
+
+A board can name one interchange it feeds into, and every row then carries the
+first onward departure a rider leaving on that row could still catch. That is
+the question a departure board cannot otherwise answer: two trams four minutes
+apart are interchangeable until you know that only one of them makes the next
+underground train.
+
+The configuration gives the interchange stop, the lines to watch there, an
+optional direction letter, and two static figures: how long this board's vehicle
+takes to reach the interchange, and how long the change itself takes. Both are
+static on purpose. A per-departure figure needs a journey lookup for every row,
+which is a different order of request volume against a free API, and for a fixed
+pair of stops the static pair is right to within a minute or two, which is
+enough to answer "do I make it or do I wait".
+
+An empty slot on a row is information rather than a gap: it means the board has
+an interchange and nothing at it was catchable from that row.
+
 ## The near window and the far window
 
 A board has two parts. The near window lists individual departures: minutes

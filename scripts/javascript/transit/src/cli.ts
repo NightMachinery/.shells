@@ -13,6 +13,7 @@ import {
   type Config,
   ConfigError,
 } from './config.ts';
+import { attachConnections } from './connect.ts';
 import { applyFilters, mergeBoards } from './filter.ts';
 import { boardsDocument, configExportDocument, stopTag } from './json.ts';
 import { envOverride } from './http.ts';
@@ -262,6 +263,22 @@ async function buildBoard(runtime: Runtime, boardConfig: BoardConfig, now: numbe
   }
   const departures = mergeBoards(perStop);
 
+  const connection = boardConfig.connection;
+  if (connection !== undefined) {
+    // The onward window is this board's window shifted by the whole journey to
+    // the interchange: nothing leaving before that is reachable from any row
+    // here, and nothing after the last row plus that shift is ever consulted.
+    const reach = (connection.rideMinutes + connection.transferMinutes) * 60_000;
+    try {
+      const onward = await runtime.backend.departures(connection.stop, { fromMs: window.fromMs + reach, toMs: window.toMs + reach });
+      attachConnections(departures, onward, connection);
+    } catch {
+      // An interchange that cannot be reached leaves the slot empty rather than
+      // failing the board; the departures are what the caller asked for.
+      for (const row of departures) row.connection = null;
+    }
+  }
+
   const board: Board = {
     title: boardConfig.title,
     stops: boardConfig.stops,
@@ -271,6 +288,7 @@ async function buildBoard(runtime: Runtime, boardConfig: BoardConfig, now: numbe
   };
   if (boardConfig.walkMinutesByStop !== undefined) board.walkMinutesByStop = boardConfig.walkMinutesByStop;
   if (boardConfig.stopLabels !== undefined) board.stopLabels = boardConfig.stopLabels;
+  if (connection !== undefined) board.connection = connection;
   return board;
 }
 

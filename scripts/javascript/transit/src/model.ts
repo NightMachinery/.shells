@@ -43,6 +43,12 @@ export interface Departure {
   stop: string;
   /** Short human tag for the stop, set only when a board merges several stops. */
   stopTag?: string;
+  /**
+   * The onward departure a rider leaving on this row could catch, when the
+   * board declares a connection and one was found. Absent means no connection
+   * is configured; null means one is and nothing was catchable in the window.
+   */
+  connection?: { line: string; departure: number } | null;
   /** False when only a scheduled time exists; the page draws a hollow dot. */
   realtimeKnown: boolean;
   color?: string | null;
@@ -60,6 +66,8 @@ export interface Board {
   walkMinutesByStop?: Record<string, number>;
   /** Short human names for the stops, keyed by stop id. */
   stopLabels?: Record<string, string>;
+  /** The onward service this board's rows point at, when one is configured. */
+  connection?: ConnectionConfig;
 }
 
 /** A board as the config declares it, before anything is fetched. */
@@ -88,6 +96,32 @@ export interface BoardConfig {
    * last field of the id is used, which is a number and tells you very little.
    */
   stopLabels?: Record<string, string>;
+  /** An onward service to show alongside every row of this board. */
+  connection?: ConnectionConfig;
+}
+
+/**
+ * An onward service a rider changes to after this board's departure. The board
+ * shows, on every row, the first departure at `stop` that a rider leaving on
+ * that row could still catch.
+ *
+ * The two figures are static and that is a deliberate first cut: `rideMinutes`
+ * is how long this board's vehicle takes to reach the interchange and
+ * `transferMinutes` is the walk between platforms plus a little slack. A real
+ * per-departure figure needs a trip lookup per row, which is a different order
+ * of request volume against a free API, so it is left for later. The static
+ * pair is right within a minute or two for a fixed pair of stops, which is
+ * enough to answer "do I make the connection or do I wait".
+ */
+export interface ConnectionConfig {
+  /** Stop id where the onward service is boarded. */
+  stop: string;
+  /** Line labels to keep at that stop. */
+  lines: string[];
+  /** Direction letter of the onward service, when it matters. */
+  direction?: Exclude<Direction, null>;
+  rideMinutes: number;
+  transferMinutes: number;
 }
 
 export interface Profile {
