@@ -76,7 +76,7 @@ function h-tmux-pane-of-pid {
 
 
 function h-tmux-env-repair {
-    : "rebuilds this shell's TMUX/TMUX_PANE from the pane that really owns <pid> (default $$); 0 in tmux, 1 outside it, 2 unknown"
+    : "rebuilds this shell's TMUX/TMUX_PANE from the pane that really owns <pid>, this shell by default; 0 in tmux, 1 outside it, 2 unknown"
     #: The environment markers are all most callers have, and they go wrong in
     #: both directions. A clean restart drops them -- `zsh-restart' execs
     #: `env -i' over the pane's own root process, so the entire pane loses tmux

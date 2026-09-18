@@ -82,30 +82,38 @@ function display-off-lock {
     : "Ends any blackout, turns the display off and locks the session. The top
 blackout rung, hyper+cmd+F1; see hammerspoon/core/blackout-lock.lua.
 
-Deliberately *not* a blackout. A blackout is a dark screen on a machine that
-keeps working, held that way by [agfi:display-black-on-loop], and that loop is
-exactly wrong once the session is locked: it re-asserts brightness 0 at the
-login window every few seconds, where the brightness keys can no longer win and
-no chord can reach Hammerspoon. In clamshell that is a screen with no way back
-at all, since there is no second display and Touch ID is behind a shut lid. It
-happened; the lid had to be opened.
-
-The `caffeinate -d' a blackout also holds is *not* part of that. Measured: it
-asserts PreventUserIdleDisplaySleep, which stops an idle display sleep and not a
-forced one, so [agfi:display-off] works with the key still held. It is released
-here regardless, because [agfi:h-blackout-release] is how the loop is stopped
-and the key goes with it, and because an assertion should not outlive its
-blackout across a lock of unknown length.
-
-So this hands the whole problem to macOS instead. [agfi:h-blackout-release]
-first, which stops the loop, restores the levels and gives the key up, so
-nothing is left fighting; then the panel off, then the lock. The way back is
-whatever wakes a sleeping display: any key, any click. Nothing here has to run
-again for the screen to return, which is the point -- no loop, no watcher, no
-assertion, nothing that can be dead when you need it.
-
-[agfi:os-lock] ends with a `displaysleepnow' of its own, so a lock that woke
-the panel puts it straight back to sleep."
+The way back is whatever wakes a sleeping display, any key or any click, and
+nothing here has to run again for the screen to return."
+    #: Keep the docstring free of backticks and of dollar signs. It is a
+    #: double-quoted string, not a comment, so a backtick opens a command
+    #: substitution that runs when the function is *called*. Two of them here
+    #: swallowed a stretch of prose containing an apostrophe, which made the
+    #: whole line a parse error, so this function aborted before its first
+    #: statement and hyper+cmd+F1 silently did nothing. `zsh -n' does not catch
+    #: it: the file parses, the substitution only fails at run time. Rationale
+    #: belongs down here in `#:' comments, where a backtick is inert.
+    ##
+    #: Deliberately *not* a blackout. A blackout is a dark screen on a machine
+    #: that keeps working, held that way by [agfi:display-black-on-loop], and
+    #: that loop is exactly wrong once the session is locked: it re-asserts
+    #: brightness 0 at the login window every few seconds, where the brightness
+    #: keys can no longer win and no chord can reach Hammerspoon. In clamshell
+    #: that is a screen with no way back at all, since there is no second
+    #: display and Touch ID is behind a shut lid. It happened; the lid had to
+    #: be opened.
+    #:
+    #: The `caffeinate -d' a blackout also holds is *not* part of that.
+    #: Measured: it asserts PreventUserIdleDisplaySleep, which stops an idle
+    #: display sleep and not a forced one, so [agfi:display-off] works with the
+    #: key still held. It is released here regardless, because
+    #: [agfi:h-blackout-release] is how the loop is stopped and the key goes
+    #: with it, and because an assertion should not outlive its blackout across
+    #: a lock of unknown length.
+    #:
+    #: So this hands the whole problem to macOS instead: release, panel off,
+    #: lock. No loop, no watcher, no assertion, nothing that can be dead when
+    #: you need it. [agfi:os-lock] ends with a `displaysleepnow' of its own, so
+    #: a lock that woke the panel puts it straight back to sleep.
     ##
     #: Escalating from a live blackout means a slow DDC restore runs here, and
     #: the desktop is lit while it does. Accepted: the alternative is locking
