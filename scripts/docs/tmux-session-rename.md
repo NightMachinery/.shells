@@ -87,6 +87,34 @@ that cheap; the repair costs an ancestry walk plus a `list-panes` against the
 server. `h-tmux-here-p` is for the handful of callers where the answer decides
 what happens to a *named* tmux object.
 
+## A dead session still owns its name
+
+tmux refuses a duplicate session name, and `has-session` is not a liveness
+test: with `remain-on-exit`, a session whose process died stays listed forever
+and keeps its name against everything that comes after. Measured on this
+machine, 22 of 76 sessions had no live pane at all, 16 of them `+Claude/*`.
+
+A resumed agent walks straight into this, because it computes the very name
+its own abandoned session is still wearing. `tnameme` after a resume answered
+`duplicate session` against a corpse two days dead, while the pane kept the
+name of whoever had used it before.
+
+[agfi:h-tmux-session-name-claim] settles it the way
+[agfi:tmux-job-running-p] already documents for job sessions: a corpse counts
+as absent rather than as a conflict. It moves the dead session aside, to
+`<name> ~dead` (`~dead2` and so on when they pile up), and lets the rename
+through. It kills nothing, because the scrollback is the only record of how
+that session ended, and a rename is no place for a destructive default. A name
+held by a session with a live pane is still an error, and renaming a session to
+the name it already has stays a no-op rather than colliding with itself.
+
+The liveness call is [agfi:tmux-alive-p], which had to be fixed for this to be
+safe. It asked `list-panes` without `-s`, and without `-s` that is a *window*
+target: a session id alone answers for the current window only. Measured 1 pane
+of 2 on a two-window session, so a session whose current window had died would
+have been called dead while real work ran on in another window, and this
+feature would have renamed it out from under itself.
+
 
 ## The shared core
 

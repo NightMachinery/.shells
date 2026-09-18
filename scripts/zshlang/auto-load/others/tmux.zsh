@@ -293,6 +293,55 @@ function tmux-session-current-get {
     command tmux display-message -p -t "${TMUX_PANE}" '#S'
 }
 
+function h-tmux-session-name-claim {
+    : "frees <name> for a rename when a dead session is holding it; 0 free, 1 held by a live session"
+    #: tmux refuses a duplicate session name, and `has-session' is not a
+    #: liveness test: with remain-on-exit, a session whose process died stays
+    #: listed forever and keeps its name against everything that comes after.
+    #: [agfi:tmux-job-running-p] already treats a corpse as absent rather than
+    #: as a conflict; this is the same stance for renames.
+    #:
+    #: It is routine rather than exotic. A resumed agent computes the very name
+    #: its own abandoned session is still wearing, so `tnameme' after a resume
+    #: met `duplicate session' against a corpse two days dead, and the pane
+    #: kept the name of whoever had used it before.
+    #:
+    #: The corpse is moved aside, not killed: its scrollback is the only record
+    #: of how the thing ended, and a rename is no place for a destructive
+    #: default. [agfi:tmux-alive-p] decides, so a session with a live pane in
+    #: any window is never touched.
+    #:
+    #: Usage: h-tmux-session-name-claim <name> [own-session-id]
+    ##
+    local name="${1}" own="${2}"
+    assert-args name @RET
+
+    local id
+    #: Resolving the id doubles as the existence check: no session, name free.
+    id="$(tmux-session-id "${name}" 2>/dev/null)" || return 0
+
+    #: Already ours. Renaming a session to the name it has is a no-op, not a
+    #: collision with a live session.
+    if test -n "${own}" && [[ "${id}" == "${own}" ]] ; then
+        return 0
+    fi
+
+    if tmux-alive-p "${id}" ; then
+        return 1
+    fi
+
+    local aside="${name} ~dead"
+    local i
+    #: Corpses pile up under one name over time, so find a free suffix.
+    for i in {2..99} ; do
+        tmux-session-id "${aside}" &>/dev/null || break
+        aside="${name} ~dead${i}"
+    done
+
+    command tmux rename-session -t "${id}" "${aside}" @RET
+    ecgray "$0: '${name}' was held by a dead session; moved it to '${aside}'"
+}
+
 function tmux-session-rename-current {
     : "renames the tmux session this shell runs in"
     local name="${1}"
@@ -304,6 +353,15 @@ function tmux-session-rename-current {
     fi
 
     name="$(h-tmux-session-name-sanitize "${name}")"
+
+    #: A session that died but still holds this name must not stop us; see
+    #: [agfi:h-tmux-session-name-claim].
+    local own
+    own="$(command tmux display-message -p -t "${TMUX_PANE}" '#{session_id}')" @RET
+    if ! h-tmux-session-name-claim "${name}" "${own}" ; then
+        ecerr "$0: '${name}' is taken by a live session"
+        return 1
+    fi
 
     command tmux rename-session -t "${TMUX_PANE}" "${name}" @RET
     ecgray "$0: ${name}"
