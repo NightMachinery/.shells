@@ -260,7 +260,11 @@
         font-weight: 600;
       }
 
-      .destination {
+      /* The picker in the sticky bar. Named apart from the row cell it used to
+         collide with: both were `.destination`, so the bar's `display: flex`
+         reached every row and quietly disabled the ellipsis there, which is why
+         a squeezed destination was cut mid-letter instead of trailing off. */
+      .destination-pick {
         display: flex;
         align-items: center;
         gap: 6px;

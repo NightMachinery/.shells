@@ -274,7 +274,7 @@ function renderDestination(context: BarContext): HTMLElement | null {
   const profile = context.config.profiles.find((entry) => entry.key === context.state.profileKey);
   if (profile === undefined || !profile.boards.some((board) => board.commute)) return null;
 
-  const wrap = el('div', 'destination');
+  const wrap = el('div', 'destination-pick');
   wrap.append(el('span', 'destination-label', 'to'));
 
   const select = document.createElement('select');
