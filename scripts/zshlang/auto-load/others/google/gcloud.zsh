@@ -1072,6 +1072,13 @@ if ! command -v tmux >/dev/null 2>&1 ; then
     DEBIAN_FRONTEND=noninteractive apt-get install -y tmux git rsync
 fi
 
+## nvitop (GPU process viewer) ------------------------------------------
+#: `uv tool install` is idempotent: a no-op when nvitop is already present.
+#: Runs as the login user because uv puts executables in ~/.local/bin.
+if id -u "$GCP_GPU_RUN_USER" >/dev/null 2>&1 ; then
+    su - "$GCP_GPU_RUN_USER" -c 'command -v uv >/dev/null 2>&1 && uv tool install nvitop 2>&1 || true'
+fi
+
 ## idle auto-shutdown ----------------------------------------------------
 cat > /usr/local/bin/gcp-gpu-idle-check <<'IDLE_EOF'
 #!/bin/bash
