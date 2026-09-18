@@ -331,6 +331,14 @@ function visibleLines(config: ExportedConfig): Set<string> {
   return lines;
 }
 
+/**
+ * Whether the disruption list is expanded. Module state rather than DOM state,
+ * because the whole page is re-rendered every refresh and a `<details>` that
+ * snapped shut every thirty seconds while you were reading it would be worse
+ * than not having the feature.
+ */
+let disruptionsOpen = false;
+
 function renderMessages(config: ExportedConfig): HTMLElement | null {
   if (state.messages.length === 0) return null;
   const wanted = visibleLines(config);
@@ -339,7 +347,29 @@ function renderMessages(config: ExportedConfig): HTMLElement | null {
       ? state.messages
       : state.messages.filter((message) => message.lines.some((line) => wanted.has(line.replace(/\s+/g, '').toLowerCase())));
   if (relevant.length === 0) return null;
-  const box = el('div', 'disruptions');
+
+  /* Collapsed by default. These notices run to several paragraphs each and the
+     operator posts one per affected section, so rendering them open pushes
+     every board below the fold on a phone, which is the opposite of what the
+     page is for. The summary says how many and which lines, which is enough to
+     decide whether to open it. */
+  const affected = new Set<string>();
+  for (const message of relevant) for (const line of message.lines) affected.add(line);
+  const lineList = [...affected].sort();
+
+  const box = document.createElement('details');
+  box.className = 'disruptions';
+  box.open = disruptionsOpen;
+  box.addEventListener('toggle', () => {
+    disruptionsOpen = box.open;
+  });
+
+  const summary = document.createElement('summary');
+  const count = relevant.length === 1 ? '1 service message' : `${relevant.length} service messages`;
+  summary.append(el('strong', undefined, count));
+  if (lineList.length > 0) summary.append(el('span', 'disruption-lines', lineList.join(' ')));
+  box.append(summary);
+
   for (const message of relevant) {
     const item = el('div', 'disruption');
     item.append(el('strong', undefined, message.title));

@@ -139,7 +139,26 @@
         background: color-mix(in srgb, var(--warn) 12%, var(--card));
       }
 
-      .disruption + .disruption {
+      .disruptions > summary {
+        cursor: pointer;
+        list-style: none;
+        font-size: 14px;
+      }
+
+      .disruptions > summary::-webkit-details-marker {
+        display: none;
+      }
+
+      .disruptions > summary::after {
+        content: " \25BE";
+        color: var(--ink-soft);
+      }
+
+      .disruptions[open] > summary::after {
+        content: " \25B4";
+      }
+
+      .disruptions > .disruption {
         margin-top: 10px;
         border-top: 1px solid var(--line);
         padding-top: 10px;
@@ -197,7 +216,11 @@
 
       .row {
         display: grid;
-        grid-template-columns: 3.1rem auto 1fr auto;
+        /* minmax(0, 1fr) rather than 1fr: an `fr` track's automatic minimum is
+           its content's min-content width, so a long destination widens the whole
+           row past the viewport instead of being ellipsised, and the realtime dot
+           is pushed off the right edge. */
+        grid-template-columns: 3.1rem auto minmax(0, 1fr) auto;
         align-items: center;
         gap: 10px;
         padding: 7px 0;
@@ -329,9 +352,9 @@
         margin: 8px 0 0;
       }
 
-      @media (max-width: 420px) {
+      @media (max-width: 480px) {
         .row {
-          grid-template-columns: 2.6rem auto 1fr auto;
+          grid-template-columns: 2.6rem auto minmax(0, 1fr) auto;
           gap: 8px;
         }
 
