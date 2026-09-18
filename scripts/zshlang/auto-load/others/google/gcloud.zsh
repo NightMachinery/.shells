@@ -1397,6 +1397,9 @@ function gcp-gpu-up {
                 h-gcp-gpu-retry h-gcp-gpu-reval h-gcp-gpu-gcloud compute instances start \
                     "${gcp_gpu_instance}" --zone="${gcp_gpu_zone}" @RET
                 ec "started ${gcp_gpu_instance}."
+                #: A restart hands out a NEW external IP, so the include is
+                #: stale the instant this returns.
+                gcp-gpu-ssh-sync --quiet || true
                 return 0 ;;
             *)
                 ec "${gcp_gpu_instance} is ${vm_state}; leaving it alone."
@@ -1484,6 +1487,9 @@ function gcp-gpu-up {
         ec "@warn it CANNOT be stopped and resumed. gcp-gpu-down will not save money here;"
         ec "      only gcp-gpu-destroy ends the bill early."
     fi
+
+    gcp-gpu-ssh-sync --quiet || true
+    ec "  ssh:         ssh $(h-gcp-gpu-alias-of "${gcp_gpu_instance}")   (gcp-vm-status for the fleet)"
 }
 
 function h-gcp-gpu-stop-flags {
@@ -1536,6 +1542,8 @@ function gcp-gpu-down {
 
     ec "stopped ${gcp_gpu_instance}. Boot disk, /mnt/data, drivers and packages all survive."
     ec "Disks keep billing while stopped: gcp-gpu-disks"
+
+    gcp-gpu-ssh-sync --quiet || true
 }
 
 function gcp-gpu-destroy {
@@ -1557,6 +1565,8 @@ function gcp-gpu-destroy {
         "${gcp_gpu_instance}" --zone="${gcp_gpu_zone}" --keep-disks=all --quiet @RET
 
     ec "deleted ${gcp_gpu_instance}. Disks kept -- 'gcp-gpu-disks' to see what is still billing."
+
+    gcp-gpu-ssh-sync --quiet || true
 }
 ##
 function gcp-gpu-ssh {
@@ -1728,6 +1738,183 @@ function gcp-gpu-ps {
         fi
         printf '%-18s %-18s %-12s %-16s %-9s %s\n' "$name" "$zone" "$vm_state" "$machine" "$model" "$up"
     done <<< "$rows"
+}
+
+##
+#: --- ssh aliases, the fleet view, and the storage view -------------------
+#:
+#: Three user-facing names: `gcp-vm-status` (every running machine of ours,
+#: with live CPU/RAM/load/GPU/disk read over ssh), `gcp-storage-status` (disks,
+#: scratch arrays, buckets) and `gcp-gpu-ssh-sync` (regenerate the ssh include
+#: and nothing else).
+#:
+#: The work happens in `python/gcp/gcp_status.py`: one `instances list` call,
+#: a thread pool for the parallel ssh probes, and the 24-bit rendering, all in
+#: one place -- the same wiring as [agfi:claude-code-usage] and its
+#: `claude_code_usage.py`. Zsh keeps the names, the flags and every *value*
+#: that identifies this deployment: the Python side is public too and has no
+#: default for the project, the owner label or the bucket. It is told them.
+#:
+#: The ssh include (`$gcp_gpu_ssh_include`) is GENERATED and rewritten in full
+#: on every sync, so a stopped or deleted machine leaves it by construction and
+#: `ssh <alias>` can never point at a dead IP. Regenerating needs no ssh, which
+#: is why it is safe to hang off `gcp-gpu-up`, `-down`, `-destroy` and `-reap`.
+##
+typeset -g gcp_gpu_ssh_include="${gcp_gpu_ssh_include:-${HOME}/.ssh/config.d/gcp}"
+#: The alias table is per-deployment -- it names instances -- so it lives beside
+#: the private config, never here.
+typeset -g gcp_gpu_alias_file="${gcp_gpu_alias_file:-${gcp_conf_file:h}/aliases.tsv}"
+#: The key and known-hosts file `gcloud compute ssh` itself uses. Sharing them
+#: is the point: the host keys it has already accepted are then the ones plain
+#: `ssh` verifies against, so the two never disagree about a machine.
+typeset -g gcp_gpu_ssh_key="${gcp_gpu_ssh_key:-${HOME}/.ssh/google_compute_engine}"
+typeset -g gcp_gpu_known_hosts="${gcp_gpu_known_hosts:-${HOME}/.ssh/google_compute_known_hosts}"
+#: Short on purpose: an unreachable box must print `unreachable` and get out of
+#: the way, not hold up the listing of the ones that are fine.
+typeset -g gcp_gpu_probe_timeout="${gcp_gpu_probe_timeout:-12}"
+#: The login name `gcloud compute ssh` lands on, which is `$gcp_gpu_owner` --
+#: the same name the startup script chowns /mnt/data to. Verified against
+#: `gcloud compute ssh --dry-run`.
+typeset -g gcp_gpu_ssh_user="${gcp_gpu_ssh_user:-${gcp_gpu_owner}}"
+
+function h-gcp-gpu-price-json-1 {
+    #: `h-gcp-gpu-price-json-1 ASSOC-NAME` -> `{"a3-highgpu-1g":2.33,...}`
+    local name="${1:?}"
+    local -A tbl
+    tbl=( "${(@Pkv)name}" )
+
+    local k out='' sep=''
+    for k in "${(@k)tbl}" ; do
+        out+="${sep}\"${k}\":${tbl[$k]}"
+        sep=','
+    done
+
+    ec "{${out}}"
+}
+
+function h-gcp-gpu-price-json {
+    #: The price tables above, as JSON, for the Python side.
+    #:
+    #: Passed rather than duplicated: a second copy of a price table is a copy
+    #: that silently goes stale, and the failure mode is an under-reported
+    #: burn rate -- the one direction a spend figure must never fail in.
+    ec "{\"spot\":$(h-gcp-gpu-price-json-1 gcp_gpu_price_spot),\"flexstart\":$(h-gcp-gpu-price-json-1 gcp_gpu_price_flexstart),\"ondemand\":$(h-gcp-gpu-price-json-1 gcp_gpu_price_ondemand),\"disk\":$(h-gcp-gpu-price-json-1 gcp_gpu_price_disk)}"
+}
+
+function h-gcp-gpu-status-run {
+    #: `h-gcp-gpu-status-run SUBCOMMAND [ARG...]`
+    #:
+    #: `$gcp_status_color` (auto|always|never) is a variable rather than an
+    #: argument because argparse wants it before the subcommand, and the
+    #: callers' own `--no-color` arrives after it.
+    local sub="${1:?}" ; shift
+
+    ensure-cmd gcp_status.py @RET
+    h-gcp-gpu-conf-assert gcp_gpu_project @RET
+
+    local -a global
+    global=(
+        --project "${gcp_gpu_project}"
+        --owner "${gcp_gpu_owner}"
+        --user "${gcp_gpu_ssh_user}"
+        --include "${gcp_gpu_ssh_include}"
+        --alias-file "${gcp_gpu_alias_file}"
+        --key "${gcp_gpu_ssh_key}"
+        --known-hosts "${gcp_gpu_known_hosts}"
+        --timeout "${gcp_gpu_probe_timeout}"
+    )
+    if test -n "${gcp_status_color}" ; then
+        global+=( --color "${gcp_status_color}" )
+    fi
+
+    GCP_STATUS_PRICES="$(h-gcp-gpu-price-json)" \
+        GCP_STATUS_BUCKET="${gcp_gpu_bucket}" \
+        command gcp_status.py "${global[@]}" "$sub" "$@"
+}
+
+function h-gcp-gpu-status-color-args {
+    #: Pulls `--no-color`/`--color X` out of a flag list and prints the rest,
+    #: one per line, having set `$gcp_status_color` in the CALLER's scope.
+    local -a rest
+    while (( $# )) ; do
+        case "$1" in
+            --no-color|--no-colour) gcp_status_color=never ; shift ;;
+            --color|--colour) gcp_status_color="${2:?--color needs auto|always|never}" ; shift 2 ;;
+            *) rest+=( "$1" ) ; shift ;;
+        esac
+    done
+
+    ec "${(F)rest}"
+}
+
+function gcp-gpu-ssh-sync {
+    : "usage: gcp-gpu-ssh-sync [--quiet]"
+    #: Rewrites `$gcp_gpu_ssh_include` from the live instance list. Idempotent,
+    #: cheap (one gcloud call, no ssh), and the only thing that ever writes
+    #: that file -- which is why it can be hung off every lifecycle command
+    #: without anyone having to remember to run it.
+    local gcp_status_color=''
+    h-gcp-gpu-status-run ssh-sync "$@"
+}
+
+function h-gcp-gpu-alias-of {
+    #: `h-gcp-gpu-alias-of INSTANCE` -> its ssh alias, or the instance name
+    #: when the table has nothing for it (which is also a working ssh name,
+    #: since every generated block lists both).
+    local name="${1:?}"
+
+    if ! test -r "${gcp_gpu_alias_file}" ; then
+        ec "$name"
+        return 0
+    fi
+
+    #: awk on the exact first field, not a grep: one instance name is often a
+    #: prefix of another (`lin-v2-c`, `lin-v2-c-retry`) and a substring match
+    #: would hand back the wrong machine's alias.
+    command awk -F'\t' -v n="$name" '
+        $1 == n { print $2 ; found = 1 ; exit }
+        END { if (! found) print n }
+    ' "${gcp_gpu_alias_file}"
+}
+
+function gcp-vm-status {
+    : "usage: gcp-vm-status [--no-ssh] [--no-color]"
+    #: Every RUNNING instance of ours in every zone -- GPU or not, so the
+    #: e2-micro controller appears here too, with the GPU columns empty.
+    #:
+    #: Per machine: alias, name, zone, machine type, provisioning model,
+    #: uptime, EUR/hr from the price table above, the ssh name to type, then
+    #: cores and clock, RAM, 1/5/15 load, boot and scratch free space, and one
+    #: line per GPU with model, VRAM and utilisation. The per-machine figures
+    #: come from one ssh round trip each, run in parallel with a short timeout,
+    #: so an unreachable box prints `unreachable` instead of stalling the list.
+    #:
+    #: The ssh include is regenerated FIRST, before the probes, so the aliases
+    #: this prints are the ones it just wrote and a machine created a minute
+    #: ago is reachable in the same call.
+    local gcp_status_color=''
+    local -a rest
+    rest=( "${(@f)$(h-gcp-gpu-status-color-args "$@")}" )
+
+    h-gcp-gpu-status-run vm "${(@)rest:#}"
+}
+#: The name it was born with, kept working for muscle memory and old notes.
+aliasfn gcp-gpu-fleet gcp-vm-status
+
+function gcp-storage-status {
+    : "usage: gcp-storage-status [--fast] [--no-ssh] [--no-color]"
+    #: What is on disk and what it costs: our persistent disks (with the mount
+    #: path inside the guest, so `ssh <alias>` then `cd` actually works), the
+    #: local-SSD scratch arrays, and the project's buckets with sizes.
+    #:
+    #: `--fast` skips the bucket sizes: `gcloud storage du` walks the whole
+    #: bucket, which is slow enough on a large one to be worth not doing by
+    #: accident.
+    local gcp_status_color=''
+    local -a rest
+    rest=( "${(@f)$(h-gcp-gpu-status-color-args "$@")}" )
+
+    h-gcp-gpu-status-run storage "${(@)rest:#}"
 }
 
 function gcp-gpu-disks {
@@ -1992,6 +2179,8 @@ function gcp-gpu-reap {
     if (( reaped == 0 )) ; then
         ec "no anomalies. Every running instance is accounted for."
     fi
+
+    gcp-gpu-ssh-sync --quiet || true
 }
 
 function gcp-gpu-project-cost {
