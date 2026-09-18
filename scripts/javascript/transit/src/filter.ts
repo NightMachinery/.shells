@@ -72,10 +72,14 @@ export function catchable(dep: Departure, walkMinutes: number, now: number): boo
   return dep.realtime - now >= walkMinutes * 60_000;
 }
 
-/** Just enough of a board to resolve a walking time; both `Board` and `BoardConfig` fit. */
+/**
+ * Just enough of a board to resolve a walking time and name a stop; both `Board`
+ * and `BoardConfig` fit.
+ */
 export interface WalkSource {
   walkMinutes: number;
   walkMinutesByStop?: Record<string, number>;
+  stopLabels?: Record<string, string>;
 }
 
 /**
@@ -93,4 +97,34 @@ export function walkMinutesFor(board: WalkSource, stop: string): number {
 /** `catchable`, resolving the walking time from the row's own stop. */
 export function catchableOnBoard(dep: Departure, board: WalkSource, now: number): boolean {
   return catchable(dep, walkMinutesFor(board, dep.stop), now);
+}
+
+/**
+ * The one-line walk summary under a board title, in the terminal and on the page.
+ *
+ * Three cases, because one wording cannot serve all of them. With a single stop
+ * there is nothing to distinguish, so the figure stands alone. With several
+ * stops that share a walk, saying it once and counting the stops is shorter than
+ * repeating it. With several stops that differ, the figures are the whole point
+ * and each is named, because that is what explains why a row two minutes sooner
+ * is dimmed and a row two minutes later is not.
+ *
+ * `tagOf` is passed in rather than imported so this module stays free of the
+ * JSON layer; both callers hand it the same rule.
+ */
+export function describeWalk(
+  stops: string[],
+  source: WalkSource,
+  tagOf: (stop: string) => string,
+): string {
+  if (stops.length <= 1) {
+    const only = stops[0];
+    const minutes = only === undefined ? source.walkMinutes : walkMinutesFor(source, only);
+    return `walk ${minutes} min`;
+  }
+  const minutes = stops.map((stop) => walkMinutesFor(source, stop));
+  const same = minutes.every((value) => value === minutes[0]);
+  if (same) return `${stops.length} stops, walk ${minutes[0]} min`;
+  const parts = stops.map((stop, index) => `${tagOf(stop)} ${minutes[index]} min`);
+  return `walk: ${parts.join(', ')}`;
 }

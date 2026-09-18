@@ -1,5 +1,6 @@
 import { contrastText, resolveColor, rgb } from '../colors.ts';
-import { catchableOnBoard } from '../filter.ts';
+import { catchableOnBoard, describeWalk } from '../filter.ts';
+import { stopTag } from '../json.ts';
 import type { Board, Departure, Direction, Message, StopHit } from '../model.ts';
 
 /**
@@ -120,16 +121,22 @@ interface Strip {
   line: string;
   direction: Direction;
   color: string;
+  /** Set only on a multi-stop board, where a strip is per stop. */
+  stopTag?: string;
   entries: Departure[];
 }
 
 function stripGroups(rows: Departure[]): Strip[] {
   const groups = new Map<string, Strip>();
   for (const row of rows) {
-    const key = JSON.stringify([row.line, row.direction]);
+    // A multi-stop board strips per stop: the two stops have different walking
+    // times, so merging their times into one rhythm row would describe a
+    // service nobody can actually take from one doorstep.
+    const key = JSON.stringify([row.line, row.direction, row.stopTag ?? null]);
     let group = groups.get(key);
     if (group === undefined) {
       group = { line: row.line, direction: row.direction, color: resolveColor(row), entries: [] };
+      if (row.stopTag !== undefined) group.stopTag = row.stopTag;
       groups.set(key, group);
     }
     group.entries.push(row);
@@ -151,16 +158,15 @@ function stripRow(group: Strip, options: TerminalOptions, lineWidth: number): st
     if (dep.cancelled) return options.color ? strike(cell) : `${cell}(x)`;
     return options.color && chip.length > 0 ? `${text}${fg('#D14343', chip)}` : cell;
   });
-  return `${head} ${directionLabel(group.direction)}  ${times.join(' ')}`;
+  const tag = group.stopTag === undefined ? '' : ` ${options.color ? dim(`@${group.stopTag}`) : `@${group.stopTag}`}`;
+  return `${head} ${directionLabel(group.direction)}${tag}  ${times.join(' ')}`;
 }
 
 export function renderBoard(board: Board, options: TerminalOptions): string {
   const out: string[] = [];
   const heading = `${board.title}  [${board.backend}]`;
   out.push(options.color ? bold(heading) : heading);
-  const overrides = Object.keys(board.walkMinutesByStop ?? {}).length;
-  const walk = overrides > 0 ? `walk ${board.walkMinutes} min (${overrides} per-stop)` : `walk ${board.walkMinutes} min`;
-  const subtitle = `${board.stops.length} stop${board.stops.length === 1 ? '' : 's'}, ${walk}`;
+  const subtitle = describeWalk(board.stops, board, (stop) => stopTag(stop, board.stopLabels));
   out.push(options.color ? dim(subtitle) : subtitle);
 
   if (board.departures.length === 0) {

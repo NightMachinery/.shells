@@ -10,7 +10,7 @@ import { createMvgBackend, MVG_DEFAULT_BASE_URL } from './backends/mvg.ts';
 import { createTransitousBackend, TRANSITOUS_DEFAULT_BASE_URL } from './backends/transitous.ts';
 import type { Backend } from './backends/types.ts';
 import { contrastText, cssCustomProperties, resolveColor } from './colors.ts';
-import { applyFilters, catchableOnBoard, mergeBoards } from './filter.ts';
+import { applyFilters, catchableOnBoard, describeWalk, mergeBoards } from './filter.ts';
 import type { Board, BoardConfig, Departure, Message, Mode } from './model.ts';
 
 /** How often the page re-fetches, while the tab is actually being looked at. */
@@ -36,6 +36,7 @@ interface ExportedBoard {
   destinations: string[] | null;
   walk_minutes: number;
   walk_minutes_by_stop: Record<string, number> | null;
+  stop_labels: Record<string, string> | null;
 }
 
 interface ExportedProfile {
@@ -105,6 +106,7 @@ function toBoardConfig(board: ExportedBoard): BoardConfig {
   if (board.direction !== null) config.direction = board.direction;
   if (board.destinations !== null) config.destinations = board.destinations;
   if (board.walk_minutes_by_stop !== null) config.walkMinutesByStop = board.walk_minutes_by_stop;
+  if (board.stop_labels !== null) config.stopLabels = board.stop_labels;
   return config;
 }
 
@@ -119,7 +121,10 @@ function makeBackend(config: ExportedConfig): { backend: Backend; outcomes: Read
   return { backend: chained, outcomes: chained.outcomes };
 }
 
-function stopTagOf(stop: string): string {
+/** The same rule as the CLI's: the configured label, else the id's last field. */
+function stopTagOf(stop: string, labels?: Record<string, string>): string {
+  const label = labels?.[stop];
+  if (label !== undefined && label.length > 0) return label;
   const fields = stop.split(':');
   const last = fields[fields.length - 1];
   return last !== undefined && last.length > 0 ? last : stop;
@@ -145,7 +150,7 @@ async function loadBoards(): Promise<void> {
       const perStop: Departure[][] = [];
       for (const stop of boardConfig.stops) {
         const rows = applyFilters(await backend.departures(stop, window), boardConfig);
-        if (multiStop) for (const row of rows) row.stopTag = stopTagOf(row.stop);
+        if (multiStop) for (const row of rows) row.stopTag = stopTagOf(row.stop, boardConfig.stopLabels);
         perStop.push(rows);
       }
       const departures = mergeBoards(perStop);
@@ -159,6 +164,7 @@ async function loadBoards(): Promise<void> {
         walkMinutes: boardConfig.walkMinutes,
       };
       if (boardConfig.walkMinutesByStop !== undefined) board.walkMinutesByStop = boardConfig.walkMinutesByStop;
+      if (boardConfig.stopLabels !== undefined) board.stopLabels = boardConfig.stopLabels;
       built.push(board);
     }
     state.boards = built;
@@ -232,7 +238,8 @@ function renderStrip(rows: Departure[], timezone: string): HTMLElement {
   const list = el('ul', 'strips');
   const groups = new Map<string, { head: Departure; entries: Departure[] }>();
   for (const row of rows) {
-    const key = JSON.stringify([row.line, row.direction]);
+    // Per stop as well as per line: see the terminal renderer's note.
+    const key = JSON.stringify([row.line, row.direction, row.stopTag ?? null]);
     const group = groups.get(key);
     if (group === undefined) groups.set(key, { head: row, entries: [row] });
     else group.entries.push(row);
@@ -242,6 +249,7 @@ function renderStrip(rows: Departure[], timezone: string): HTMLElement {
     const item = el('li', 'strip');
     item.append(badge(group.head));
     item.append(el('span', 'direction', group.head.direction ?? '-'));
+    if (group.head.stopTag !== undefined) item.append(el('span', 'stop-tag', `@${group.head.stopTag}`));
     const times = el('span', 'times');
     for (const dep of group.entries) {
       const cell = el('span', `time${dep.cancelled ? ' cancelled' : ''}`, clockTime(dep.realtime, timezone));
@@ -260,6 +268,7 @@ function renderBoard(board: Board, now: number, timezone: string): HTMLElement {
   header.append(el('h2', undefined, board.title));
   header.append(el('span', 'backend', board.backend));
   section.append(header);
+  section.append(el('p', 'board-walk', describeWalk(board.stops, board, (stop) => stopTagOf(stop, board.stopLabels))));
 
   if (board.departures.length === 0) {
     section.append(el('p', 'empty', 'nothing in the window'));

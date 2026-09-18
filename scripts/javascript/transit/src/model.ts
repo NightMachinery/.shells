@@ -58,6 +58,8 @@ export interface Board {
   walkMinutes: number;
   /** Per-stop overrides of `walkMinutes`, keyed by stop id. */
   walkMinutesByStop?: Record<string, number>;
+  /** Short human names for the stops, keyed by stop id. */
+  stopLabels?: Record<string, string>;
 }
 
 /** A board as the config declares it, before anything is fetched. */
@@ -78,6 +80,14 @@ export interface BoardConfig {
    * the far stop's looking reachable when they are not.
    */
   walkMinutesByStop?: Record<string, number>;
+  /**
+   * Short human names for the stops, keyed by stop id, for the tag a merged
+   * board puts on each row. A stop id is unreadable and a stop's full name is
+   * too long to repeat on every row, so this is the one place a person gets to
+   * choose the three or four letters they will actually recognise. Absent, the
+   * last field of the id is used, which is a number and tells you very little.
+   */
+  stopLabels?: Record<string, string>;
 }
 
 export interface Profile {

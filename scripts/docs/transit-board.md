@@ -100,6 +100,25 @@ becomes two half-boards, each missing the departures that belong to the other,
 and nothing in the output says a thing is missing. The direction letter is the
 stable key, so it is the one the configuration stores.
 
+## Merged stops: walking times and labels
+
+Two stops a few minutes apart, served by the same line in the same direction,
+belong on one board: you are choosing between them, not consulting them
+separately. The complication is that they are not equally far from the door, so
+a single board-wide walking time is wrong for at least one of them. `walk_minutes`
+carries the board's figure and `walk_minutes_by_stop` overrides it for the stops
+that differ, and reachability is decided per row from the walking time of that
+row's own stop.
+
+Once a board merges stops, every row needs to say which stop it came from, and
+the board needs to say what the walking times are, or the dimming looks
+arbitrary. Both read off the same short name: a stop written as a table with an
+`id` and a `label` supplies one, and a stop written as a bare id falls back to
+the last field of the identifier, which is a bare number. So give the stops
+labels whenever a board merges more than one. The board then heads itself with
+the per-stop figures in board order rather than a count and one number, and the
+rows carry `@Label` instead of `@1682`.
+
 ## The near window and the far window
 
 A board has two parts. The near window lists individual departures: minutes

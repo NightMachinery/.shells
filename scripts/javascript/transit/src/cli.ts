@@ -246,7 +246,7 @@ async function buildBoard(runtime: Runtime, boardConfig: BoardConfig, now: numbe
   for (const stop of boardConfig.stops) {
     const rows = await runtime.backend.departures(stop, window);
     const filtered = applyFilters(rows, boardConfig);
-    if (multiStop) for (const row of filtered) row.stopTag = stopTag(row.stop);
+    if (multiStop) for (const row of filtered) row.stopTag = stopTag(row.stop, boardConfig.stopLabels);
     perStop.push(filtered);
   }
   const departures = mergeBoards(perStop);
@@ -258,6 +258,7 @@ async function buildBoard(runtime: Runtime, boardConfig: BoardConfig, now: numbe
     walkMinutes: boardConfig.walkMinutes,
   };
   if (boardConfig.walkMinutesByStop !== undefined) board.walkMinutesByStop = boardConfig.walkMinutesByStop;
+  if (boardConfig.stopLabels !== undefined) board.stopLabels = boardConfig.stopLabels;
   return board;
 }
 

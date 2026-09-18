@@ -1,5 +1,13 @@
 import { describe, expect, test } from 'bun:test';
-import { applyFilters, catchable, catchableOnBoard, mergeBoards, normaliseLine, walkMinutesFor } from '../src/filter.ts';
+import {
+  applyFilters,
+  catchable,
+  catchableOnBoard,
+  describeWalk,
+  mergeBoards,
+  normaliseLine,
+  walkMinutesFor,
+} from '../src/filter.ts';
 import type { BoardConfig, Departure, Direction, Mode } from '../src/model.ts';
 
 const NOW = Date.parse('2026-01-01T08:00:00Z');
@@ -135,5 +143,26 @@ describe('per-stop walking times', () => {
     const fromFar = departure({ stop: far, realtime: when });
     expect(catchableOnBoard(fromNear, merged, NOW)).toBe(true);
     expect(catchableOnBoard(fromFar, merged, NOW)).toBe(false);
+  });
+});
+
+describe('the walk summary line', () => {
+  const near = 'de:00000:1';
+  const far = 'de:00000:2';
+  const tag = (stop: string) => ({ [near]: 'Varn', [far]: 'Wkz' })[stop] ?? stop;
+
+  test('a single stop states the figure alone', () => {
+    expect(describeWalk([near], { walkMinutes: 6 }, tag)).toBe('walk 6 min');
+    expect(describeWalk([near], { walkMinutes: 6, walkMinutesByStop: { [near]: 2 } }, tag)).toBe('walk 2 min');
+  });
+
+  test('several stops that share a walk say it once and count them', () => {
+    expect(describeWalk([near, far], { walkMinutes: 3 }, tag)).toBe('2 stops, walk 3 min');
+  });
+
+  test('several stops that differ name each figure in board order', () => {
+    const source = { walkMinutes: 0, walkMinutesByStop: { [far]: 6 } };
+    expect(describeWalk([near, far], source, tag)).toBe('walk: Varn 0 min, Wkz 6 min');
+    expect(describeWalk([far, near], source, tag)).toBe('walk: Wkz 6 min, Varn 0 min');
   });
 });

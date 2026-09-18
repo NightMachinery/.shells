@@ -94,6 +94,31 @@ describe('config validation', () => {
     const board = config.profiles[0]?.boards[0];
     expect(board?.walkMinutes).toBe(0);
     expect(board?.walkMinutesByStop).toEqual({ 'de:00000:2': 6 });
+    expect(board?.stopLabels).toBeUndefined();
+  });
+
+  test('a stop may be given as a table carrying a short label', () => {
+    const config = parseConfig(
+      {
+        profiles: {
+          alpha: {
+            title: 'Alpha',
+            boards: [{ title: 'first', stops: [{ id: 'de:00000:1', label: 'Varn' }, 'de:00000:2'] }],
+          },
+        },
+      },
+      PATH,
+    );
+    const board = config.profiles[0]?.boards[0];
+    expect(board?.stops).toEqual(['de:00000:1', 'de:00000:2']);
+    expect(board?.stopLabels).toEqual({ 'de:00000:1': 'Varn' });
+  });
+
+  test('a stop table without an id is rejected', () => {
+    const issues = issuesOf({
+      profiles: { alpha: { title: 'Alpha', boards: [{ title: 'first', stops: [{ label: 'Varn' }] }] } },
+    });
+    expect(issues.join('\n')).toContain('profiles.alpha.boards[0].stops');
   });
 });
 

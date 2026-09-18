@@ -16,7 +16,9 @@ export function toIso(epochMs: number): string {
  * identifier is the stop's own number within its area, which is what a person
  * comparing two platforms of the same interchange actually wants to see.
  */
-export function stopTag(stop: string): string {
+export function stopTag(stop: string, labels?: Record<string, string>): string {
+  const label = labels?.[stop];
+  if (label !== undefined && label.length > 0) return label;
   const fields = stop.split(':');
   const last = fields[fields.length - 1];
   return last !== undefined && last.length > 0 ? last : stop;
@@ -41,7 +43,7 @@ export function departureJson(dep: Departure, board: WalkSource, now: number, mu
     walk_minutes: walkMinutes,
     backend: dep.backend,
     stop: dep.stop,
-    stop_tag: multiStop ? (dep.stopTag ?? stopTag(dep.stop)) : null,
+    stop_tag: multiStop ? (dep.stopTag ?? stopTag(dep.stop, board.stopLabels)) : null,
   };
 }
 
@@ -52,6 +54,7 @@ export function boardJson(board: Board, now: number): unknown {
     stops: board.stops,
     walk_minutes: board.walkMinutes,
     walk_minutes_by_stop: board.walkMinutesByStop ?? null,
+    stop_labels: board.stopLabels ?? null,
     backend: board.backend,
     departures: board.departures.map((dep) => departureJson(dep, board, now, multiStop)),
   };
@@ -126,6 +129,7 @@ export function configExportDocument(config: Config, options: ConfigExportOption
         destinations: board.destinations ?? null,
         walk_minutes: board.walkMinutes,
         walk_minutes_by_stop: board.walkMinutesByStop ?? null,
+        stop_labels: board.stopLabels ?? null,
       })),
     })),
   };

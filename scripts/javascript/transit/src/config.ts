@@ -87,6 +87,41 @@ function stringList(value: unknown): string[] | null {
   return out;
 }
 
+/**
+ * A board's `stops`, in either of the two accepted spellings.
+ *
+ * A bare string is the common case and stays the common case: most boards have
+ * one stop and nothing to say about it. A table adds a label, which is the tag
+ * a merged board puts on every row, and is worth having only because the
+ * alternative on screen is a stop id. Both forms mix freely in one list.
+ *
+ * Returns null when the list is unusable, so the caller can report it with the
+ * profile and board index it has and this function does not.
+ */
+export function parseStops(raw: unknown): { stops: string[]; labels: Record<string, string> } | null {
+  if (!Array.isArray(raw) || raw.length === 0) return null;
+  const stops: string[] = [];
+  const labels: Record<string, string> = {};
+  for (const entry of raw) {
+    if (typeof entry === 'string') {
+      const id = entry.trim();
+      if (id.length === 0) return null;
+      stops.push(id);
+      continue;
+    }
+    if (!isTable(entry)) return null;
+    const id = typeof entry.id === 'string' ? entry.id.trim() : '';
+    if (id.length === 0) return null;
+    stops.push(id);
+    if (entry.label !== undefined) {
+      const label = typeof entry.label === 'string' ? entry.label.trim() : '';
+      if (label.length === 0) return null;
+      labels[id] = label;
+    }
+  }
+  return { stops, labels };
+}
+
 function parseDefaults(raw: unknown, issues: string[]): Defaults {
   const table = isTable(raw) ? raw : {};
   const defaults: Defaults = {
@@ -200,17 +235,21 @@ function parseBoard(profileKey: string, index: number, raw: unknown, issues: str
     failed = true;
   }
 
-  const stops = stringList(raw.stops);
-  if (stops === null || stops.length === 0) {
-    issues.push(`${where}.stops: must be a list of one or more stop ids`);
+  const parsedStops = parseStops(raw.stops);
+  if (parsedStops === null) {
+    issues.push(`${where}.stops: must be a list of one or more stop ids, each a string or a table with an id and an optional label`);
     failed = true;
   }
+  const stops = parsedStops?.stops ?? null;
 
   const board: BoardConfig = {
     title: typeof title === 'string' ? title.trim() : '',
     stops: stops ?? [],
     walkMinutes: DEFAULT_WALK_MINUTES,
   };
+  if (parsedStops !== null && Object.keys(parsedStops.labels).length > 0) {
+    board.stopLabels = parsedStops.labels;
+  }
 
   if (raw.modes !== undefined) {
     const list = stringList(raw.modes);
