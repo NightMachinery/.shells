@@ -687,7 +687,10 @@ def cmd_storage(args: argparse.Namespace) -> int:
     print(st("LOCAL SSD (scratch; DISCARDED on stop, billed with the instance)", GRAY))
     any_scratch = False
     for name, ms in mounts.items():
-        for target, (source, fstype, size_kb, free_kb) in ms.items():
+        for target, val in ms.items():
+            if target.startswith("@"):
+                continue
+            source, fstype, size_kb, free_kb = val
             if target in ("/", "/boot/efi") or not source:
                 continue
             if not (source.startswith("/dev/md") or source.startswith("/dev/nvme")):
