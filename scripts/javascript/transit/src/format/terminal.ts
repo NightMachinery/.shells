@@ -121,7 +121,10 @@ function nearRow(dep: Departure, options: TerminalOptions, board: Board, highlig
 
   const row = pieces.join(' ').replace(/\s+$/, '');
   if (!reachable && options.color) return dim(row);
-  if (!reachable) return `${row} (tight)`;
+  // "unreachable" rather than "tight", which now means something else on a
+  // planned board: an onward departure a rider would have to run for. This
+  // marker says the opposite thing, that the walk to the stop no longer fits.
+  if (!reachable) return `${row} (unreachable)`;
   return row;
 }
 
