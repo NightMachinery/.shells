@@ -1,18 +1,22 @@
 import { normaliseLine } from '../filter.ts';
 import type { Board, Departure } from '../model.ts';
-import { planBoard, type PlannedRow, type PlanDestination, type RouteOption } from '../plan.ts';
+import { planBoard, type PlannedRow, type RouteOption } from '../plan.ts';
+import { destinationLabel, planTargets, type DestinationPlace } from '../targets.ts';
 import type { OriginCache, OriginLevel } from '../origin.ts';
-import { idbGet, idbSet, STORE_ORIGINS } from './idb.ts';
-import type { ExportedConfig, ExportedProfile } from './types.ts';
+import { idbGet, idbSet, STORE_ORIGINS, STORE_ROUTES } from './idb.ts';
+import type { ExportedConfig, ExportedPlace, ExportedProfile } from './types.ts';
 
 // The commute view: for a board that opts in, which of its departures actually
 // gets you there soonest.
 //
-// Plans are held in memory and deliberately never written to the offline cache,
-// unlike the departures. A stale departure is obvious, because its countdown is
-// wrong and the row says how old the data is. A stale arrival time is not: it
-// looks exactly like a fresh one and it is the number a reader acts on. So the
-// commute view simply has nothing to show until it has asked.
+// Plans are held in memory and mirrored to IndexedDB, and the mirror is the
+// delicate part. A stale departure is obvious, because its countdown is wrong
+// and the row says how old the data is; a stale arrival time is not, because it
+// looks exactly like a fresh one and it is the number a reader acts on. So a
+// restored plan is never presented as current: it is dimmed and labelled with
+// its age until a fresh one lands, which is the whole of `ProfileRoutes.stale`.
+// Without the mirror a cold start shows every row with an empty journey slot
+// for a second or two, which reads as "no journey" rather than "not yet asked".
 
 /** One board's plans, plus how its stop had to be named to get them. */
 export interface BoardRoutes {
@@ -20,8 +24,18 @@ export interface BoardRoutes {
   origin: OriginLevel | null;
 }
 
-/** Plans for one profile, by board index. */
-export type ProfileRoutes = Map<number, BoardRoutes>;
+/** Plans for one profile: per board, plus how old and how trustworthy they are. */
+export interface ProfileRoutes {
+  boards: Map<number, BoardRoutes>;
+  /** When these journeys were planned, epoch milliseconds. */
+  at: number;
+  /** The place they were planned towards, so a changed picker invalidates them. */
+  destinationKey: string;
+  /** True while they came from the cache and nothing fresh has landed yet. */
+  stale: boolean;
+  /** What question these answer; an unchanged one is never asked twice. */
+  key: string;
+}
 
 /**
  * The resolved stop identifiers, kept in IndexedDB.
@@ -47,11 +61,16 @@ export function rowKey(dep: Departure): string {
   return `${normaliseLine(dep.line)}|${dep.planned}|${dep.stop}`;
 }
 
-/** The destination a profile key names, as the planner wants it. */
-export function destinationOf(config: ExportedConfig, key: string | null): PlanDestination | null {
+/** The place a profile key names, or null when the configuration has none. */
+export function placeOf(config: ExportedConfig, key: string | null): ExportedPlace | null {
   if (key === null) return null;
-  const place = (config.places ?? []).find((entry) => entry.name === key);
-  return place === undefined ? null : { lat: place.lat, lon: place.lon };
+  return (config.places ?? []).find((entry) => entry.name === key) ?? null;
+}
+
+/** What the picker and the journey slots call a destination. */
+export function destinationNameOf(config: ExportedConfig, key: string | null): string {
+  const place = placeOf(config, key);
+  return place === null ? (key ?? '') : destinationLabel(place as DestinationPlace);
 }
 
 /**
@@ -95,52 +114,142 @@ export function arrivalOf(dep: Departure, planned: Map<string, PlannedRow> | und
 
 export interface PlanProfileOptions {
   config: ExportedConfig;
+  profileKey: string;
   profile: ExportedProfile;
   boards: Board[];
   destinationKey: string | null;
   startMs: number;
   earlyBufferMinutes?: number;
+  walkWeight?: number;
+  /** The plans already on screen, so an unchanged question is not asked again. */
+  previous?: ProfileRoutes | undefined;
+  /** Told how many of this profile's planned boards have answered so far. */
+  onProgress?: (done: number, total: number) => void;
 }
 
 /**
- * Plan every board of a profile that opted in. One request sequence per board,
- * which is why the opt-in exists: a profile of five boards would otherwise put
- * five journey plans on a free service every thirty seconds, for boards that
- * nobody plans a journey from.
+ * What makes one planning run different from another.
+ *
+ * A page that refreshes twice a minute must not re-plan twice a minute, and the
+ * planner's own cache only stops the requests, not the recombination. Everything
+ * that can change an answer is in this key and nothing else is: the row count
+ * is there because a row scrolling into the horizon deserves a plan, and the
+ * delays are deliberately absent because a journey is looked up by its
+ * timetabled minute and a delay does not move it.
  */
-export async function planProfile(options: PlanProfileOptions): Promise<ProfileRoutes> {
-  const destination = destinationOf(options.config, options.destinationKey);
-  const routes: ProfileRoutes = new Map();
-  if (destination === null) return routes;
+function planKey(options: PlanProfileOptions): string {
+  const counts = options.boards.map((board) => board.departures.length).join(',');
+  return [
+    options.destinationKey ?? '',
+    Math.floor(options.startMs / 60_000),
+    options.earlyBufferMinutes ?? '',
+    options.walkWeight ?? '',
+    counts,
+  ].join('|');
+}
 
+/** Where one profile's plans live between visits. */
+function routesKey(profileKey: string): string {
+  return `routes:${profileKey}`;
+}
+
+/**
+ * The plans from the last visit, for the moment before the fresh ones land.
+ * Marked stale, which is what makes the page dim them and say how old they are.
+ */
+export async function cachedRoutes(profileKey: string, destinationKey: string | null): Promise<ProfileRoutes | null> {
+  if (destinationKey === null) return null;
+  const stored = await idbGet<ProfileRoutes>(STORE_ROUTES, routesKey(profileKey));
+  if (stored === null || !(stored.boards instanceof Map)) return null;
+  if (stored.destinationKey !== destinationKey) return null;
+  return { ...stored, stale: true };
+}
+
+/**
+ * Plan every board of a profile that opted in, all at once.
+ *
+ * In parallel rather than one after another: the boards are independent
+ * questions to the same service, and planning them in sequence made the journey
+ * slots of the last board on a profile arrive a second and a half after the
+ * first board's. The opt-in still exists, because a plan is a much heavier
+ * question than a departure board and most boards are "is there a bus soon".
+ */
+export async function planProfile(options: PlanProfileOptions): Promise<ProfileRoutes | null> {
+  const place = placeOf(options.config, options.destinationKey);
+  if (place === null || options.destinationKey === null) return null;
+
+  const previous = options.previous;
+  const key = planKey(options);
+  // Asked and answered within this same minute: hand back what is on screen.
+  if (previous !== undefined && !previous.stale && previous.key === key) return previous;
+
+  // A coordinate place is also a profile's doorstep, so its own boards' stops
+  // become targets too; see `planTargets` for why that is not redundant.
+  const destinationProfile = options.config.profiles.find((entry) => entry.key === place.name);
+  const targets = planTargets(place as DestinationPlace, (destinationProfile?.boards ?? []).map((board) => ({
+    stops: board.stops,
+    walkMinutes: board.walk_minutes,
+    walkMinutesByStop: board.walk_minutes_by_stop,
+  })));
+  if (targets.length === 0) return null;
+
+  const jobs: Array<{ index: number; board: Board; stop: string }> = [];
   for (let index = 0; index < options.boards.length; index += 1) {
     const board = options.boards[index];
     const exported = options.profile.boards[index];
     if (board === undefined || exported === undefined || !exported.commute) continue;
     const stop = board.stops[0];
     if (stop === undefined) continue;
-    try {
-      let origin: OriginLevel | null = null;
-      const planned = await planBoard({
-        stop,
-        destination,
-        rows: board.departures,
-        startMs: options.startMs,
-        baseUrl: options.config.backends.transitous_base_url,
-        originCache,
-        ...(options.config.defaults.plan_modes === undefined ? {} : { planModes: options.config.defaults.plan_modes }),
-        onOrigin: (resolved) => {
-          origin = resolved.level;
-        },
-        ...(options.earlyBufferMinutes === undefined ? {} : { earlyBufferMinutes: options.earlyBufferMinutes }),
-      });
-      const byKey = new Map<string, PlannedRow>();
-      for (const row of planned) byKey.set(rowKey(row.departure), row);
-      routes.set(index, { rows: byKey, origin });
-    } catch {
-      // A board with no plan is a board without the commute slot, not a broken
-      // board. The departures are still correct and still the main thing.
-    }
+    jobs.push({ index, board, stop });
   }
+  if (jobs.length === 0) return null;
+
+  let done = 0;
+  options.onProgress?.(0, jobs.length);
+  const planModes = options.config.defaults.plan_modes;
+  const results = await Promise.all(
+    jobs.map(async ({ index, board, stop }) => {
+      try {
+        let origin: OriginLevel | null = null;
+        const planned = await planBoard({
+          stop,
+          targets,
+          rows: board.departures,
+          startMs: options.startMs,
+          baseUrl: options.config.backends.transitous_base_url,
+          originCache,
+          ...(planModes === undefined ? {} : { planModes }),
+          ...(options.walkWeight === undefined ? {} : { walkWeight: options.walkWeight }),
+          onOrigin: (resolved) => {
+            origin = resolved.level;
+          },
+          ...(options.earlyBufferMinutes === undefined ? {} : { earlyBufferMinutes: options.earlyBufferMinutes }),
+        });
+        const byKey = new Map<string, PlannedRow>();
+        for (const row of planned) byKey.set(rowKey(row.departure), row);
+        return { index, routes: { rows: byKey, origin } as BoardRoutes };
+      } catch {
+        // A board with no plan is a board without the commute slot, not a broken
+        // board. The departures are still correct and still the main thing.
+        return { index, routes: null };
+      } finally {
+        done += 1;
+        options.onProgress?.(done, jobs.length);
+      }
+    }),
+  );
+
+  const boards = new Map<number, BoardRoutes>();
+  for (const result of results) if (result.routes !== null) boards.set(result.index, result.routes);
+  if (boards.size === 0) return null;
+
+  const routes: ProfileRoutes = {
+    boards,
+    at: Date.now(),
+    destinationKey: options.destinationKey,
+    stale: false,
+    key,
+  };
+  void idbSet(STORE_ROUTES, routesKey(options.profileKey), routes);
   return routes;
 }

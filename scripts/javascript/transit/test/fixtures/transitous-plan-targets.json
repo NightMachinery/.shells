@@ -1,0 +1,76 @@
+{
+  "_comment": "Two answers to the same question, one per destination target. Every identifier is made up. The place plan offers the fast train to a far station and a fourteen minute walk; the stop plan, asked about the near station by name, offers a slower train that stops six minutes from the door. The second is Pareto-dominated by the first on arrival and on changes, which is exactly why the planner never returns it unless it is asked.",
+  "place": {
+    "itineraries": [
+      {
+        "startTime": "2026-01-01T08:08:00Z",
+        "endTime": "2026-01-01T08:52:00Z",
+        "legs": [
+          {
+            "mode": "TRAM",
+            "tripId": "trip-t1",
+            "routeShortName": "T1",
+            "agencyName": "City",
+            "from": { "name": "Home", "stopId": "de:00000:1:1:1" },
+            "to": { "name": "Interchange", "stopId": "de:00000:9:1:1" },
+            "startTime": "2026-01-01T08:10:00Z",
+            "endTime": "2026-01-01T08:20:00Z",
+            "scheduledStartTime": "2026-01-01T08:10:00Z",
+            "intermediateStops": []
+          },
+          { "mode": "WALK", "distance": 140, "startTime": "2026-01-01T08:20:00Z", "endTime": "2026-01-01T08:24:00Z" },
+          {
+            "mode": "REGIONAL_RAIL",
+            "tripId": "trip-s3",
+            "routeShortName": "S3",
+            "agencyName": "Rail",
+            "from": { "name": "Interchange", "stopId": "de:00000:9:2:2" },
+            "to": { "name": "Far Station", "stopId": "de:00000:7:1:1" },
+            "startTime": "2026-01-01T08:24:00Z",
+            "endTime": "2026-01-01T08:38:00Z",
+            "scheduledStartTime": "2026-01-01T08:24:00Z",
+            "intermediateStops": []
+          },
+          { "mode": "WALK", "distance": 980, "startTime": "2026-01-01T08:38:00Z", "endTime": "2026-01-01T08:52:00Z" }
+        ]
+      }
+    ],
+    "nextPageCursor": ""
+  },
+  "stop": {
+    "itineraries": [
+      {
+        "startTime": "2026-01-01T08:08:00Z",
+        "endTime": "2026-01-01T08:50:00Z",
+        "legs": [
+          {
+            "mode": "TRAM",
+            "tripId": "trip-t1",
+            "routeShortName": "T1",
+            "agencyName": "City",
+            "from": { "name": "Home", "stopId": "de:00000:1:1:1" },
+            "to": { "name": "Interchange", "stopId": "de:00000:9:1:1" },
+            "startTime": "2026-01-01T08:10:00Z",
+            "endTime": "2026-01-01T08:20:00Z",
+            "scheduledStartTime": "2026-01-01T08:10:00Z",
+            "intermediateStops": []
+          },
+          { "mode": "WALK", "distance": 140, "startTime": "2026-01-01T08:20:00Z", "endTime": "2026-01-01T08:26:00Z" },
+          {
+            "mode": "SUBURBAN",
+            "tripId": "trip-s8",
+            "routeShortName": "S8",
+            "agencyName": "Rail",
+            "from": { "name": "Interchange", "stopId": "de:00000:9:2:2" },
+            "to": { "name": "Near Station", "stopId": "de:00000:5:1:1" },
+            "startTime": "2026-01-01T08:26:00Z",
+            "endTime": "2026-01-01T08:50:00Z",
+            "scheduledStartTime": "2026-01-01T08:26:00Z",
+            "intermediateStops": []
+          }
+        ]
+      }
+    ],
+    "nextPageCursor": ""
+  }
+}

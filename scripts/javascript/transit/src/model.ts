@@ -143,6 +143,12 @@ export interface Profile {
   key: string;
   title: string;
   boards: BoardConfig[];
+  /**
+   * Place keys this profile offers as journey destinations, in the order they
+   * should appear. Absent means the default order: the other profiles' own
+   * places first, then the stops the reader travels to.
+   */
+  destinations?: string[];
 }
 
 /** A stop as a search or nearby lookup returns it. */

@@ -281,10 +281,21 @@ export const ROUTE_OPTIONS_SHOWN = 3;
  */
 export function routeOptionLine(option: RouteOption, best: boolean, options: TerminalOptions): string {
   const marker = option.tight ? '~' : best ? '>' : '-';
-  const onward = option.legs.slice(1).map((leg) => `${leg.line} ${clockTime(leg.departure, options.timezone)}`);
   const changes = option.transfers === 0 ? 'direct' : `${option.transfers} change${option.transfers === 1 ? '' : 's'}`;
-  const chain = [`off ${option.exitStopName}`, ...onward, `arr ${clockTime(option.arrival, options.timezone)}`].join(' → ');
-  const text = `${marker} ${chain}  (${changes}${option.tight ? ', tight' : ''})`;
+  // Every leg, walks included, in the order they happen. The walks are the
+  // reason this line is worth reading twice: "off at the far station" and "off
+  // at the near one" only differ by the minutes on foot between them, and a
+  // chain that lists the trains alone hides exactly that difference.
+  const middle = option.legs
+    .slice(1)
+    .map((leg) =>
+      leg.kind === 'walk'
+        ? `walk ${Math.max(1, Math.round((leg.arrival - leg.departure) / 60_000))}`
+        : `${leg.line} ${clockTime(leg.departure, options.timezone)}`,
+    );
+  const chain = [`off ${option.exitStopName}`, ...middle, `arr ${clockTime(option.arrival, options.timezone)}`].join(' → ');
+  const walk = `walk ${Math.round(option.walkMinutes)}`;
+  const text = `${marker} ${chain}  (${changes}, ${walk}${option.tight ? `, tight by ${option.tightBy}` : ''})`;
   if (!options.color) return text;
   return best && !option.tight ? text : dim(text);
 }

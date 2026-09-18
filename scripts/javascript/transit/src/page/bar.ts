@@ -1,6 +1,8 @@
-import type { Board } from '../model.ts';
+import type { Board, Departure } from '../model.ts';
 import { visibleRows } from './board.ts';
-import { button, clockTime, compact, dayOffset, el, minutesUntil } from './dom.ts';
+import { button, compact, el, minutesUntil, timeLabel, timeNode } from './dom.ts';
+import { lineBadge } from './journey.ts';
+import { attachTip } from './tip.ts';
 import type { ExportedConfig, PageState } from './types.ts';
 
 // The sticky bar: which profile, how far ahead, from when, how fresh, and a way
@@ -85,13 +87,21 @@ function renderRefresh(context: BarContext): HTMLElement {
 
   // The ring is the same element whether or not a fetch is running, so the
   // button does not change size when one starts. Only the spin class moves.
-  const ring = el('span', `refresh-ring${context.state.inFlight > 0 ? ' spinning' : ''}`);
+  // Planning counts as work in flight. It is the slower half of a refresh, and
+  // a ring that stopped while the journeys were still being worked out said the
+  // page was idle when it was not.
+  const busy = context.state.inFlight > 0 || context.state.planInFlight > 0;
+  const ring = el('span', `refresh-ring${busy ? ' spinning' : ''}`);
   control.append(ring);
 
   const age = el('span', 'refresh-age');
   const write = (): void => {
     if (context.state.inFlight > 0) {
       age.textContent = 'updating';
+      return;
+    }
+    if (context.state.planInFlight > 0) {
+      age.textContent = 'planning';
       return;
     }
     age.textContent = context.ageSeconds === null ? 'no data' : `${context.ageSeconds}s`;
@@ -143,13 +153,46 @@ function renderChips(context: BarContext): HTMLElement | null {
     write();
     context.ticks.push(write);
     chip.append(when);
-    chip.title = next === undefined ? `${board.title}: nothing in the window` : `${board.title}: next at ${clockTime(next.realtime, context.config.defaults.timezone)}`;
+    // A tap jumps to the board, so the tip opens on hover and on a long press
+    // rather than on a tap: taking the tap for an explanation would break the
+    // one thing the chip is for.
+    attachTip(chip, () => chipTip(board, next, context), { label: chipLabel(board, next, context), tapOpens: false });
     chip.addEventListener('click', () => {
       document.getElementById(`board-${index}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     });
     bar.append(chip);
   });
   return bar;
+}
+
+/** What a jump chip says in plain text. */
+function chipLabel(board: Board, next: Departure | undefined, context: BarContext): string {
+  const timezone = context.config.defaults.timezone;
+  if (next === undefined) return `${board.title}: nothing in the window, tap to jump to the board`;
+  const minutes = minutesUntil(next.realtime, context.now);
+  const when = minutes === 0 ? 'now' : `in ${minutes} min`;
+  return `${board.title}, ${next.line} towards ${next.destination}: next departure ${when} (${timeLabel(next.realtime, context.now, timezone)}), tap to jump to the board`;
+}
+
+/** The same, as the page's own tooltip. */
+function chipTip(board: Board, next: Departure | undefined, context: BarContext): HTMLElement {
+  const timezone = context.config.defaults.timezone;
+  const body = el('div', 'tip-body');
+  const head = el('div', 'tip-head');
+  if (next !== undefined) head.append(lineBadge(next));
+  head.append(el('span', 'tip-title', board.title));
+  body.append(head);
+  if (next === undefined) {
+    body.append(el('p', 'tip-note', 'nothing in the window'));
+  } else {
+    const line = el('p', 'tip-next');
+    const minutes = minutesUntil(next.realtime, context.now);
+    line.append(el('span', undefined, `towards ${next.destination}, ${minutes === 0 ? 'now' : `in ${minutes} min`} at `));
+    line.append(timeNode(next.realtime, context.now, timezone));
+    body.append(line);
+  }
+  body.append(el('p', 'tip-note', 'tap to jump to this board'));
+  return body;
 }
 
 function renderHorizon(context: BarContext): HTMLElement {
@@ -168,8 +211,10 @@ function renderHorizon(context: BarContext): HTMLElement {
   const startMs = context.state.startMode === 'picked' ? context.state.startMs : context.now;
   const endMs = startMs + context.state.horizonMinutes * 60_000;
   const timezone = context.config.defaults.timezone;
-  const offset = dayOffset(endMs, startMs, timezone);
-  wrap.append(el('span', 'horizon-end', `to ${clockTime(endMs, timezone)}${offset > 0 ? `+${offset}` : ''}`));
+  const end = el('span', 'horizon-end');
+  end.append(el('span', undefined, 'to '));
+  end.append(timeNode(endMs, startMs, timezone));
+  wrap.append(end);
   return wrap;
 }
 
@@ -206,8 +251,9 @@ function renderStart(context: BarContext): HTMLElement {
   }
 
   if (context.state.startMode === 'picked') {
-    const offset = dayOffset(startMs, context.now, timezone);
-    const note = el('span', 'start-note', `showing ${clockTime(startMs, timezone)}${offset > 0 ? ` +${offset}` : ''}`);
+    const note = el('span', 'start-note');
+    note.append(el('span', undefined, 'showing '));
+    note.append(timeNode(startMs, context.now, timezone));
     note.title = 'a timetable for the moment you picked. Nothing here is live.';
     wrap.append(note);
   }
@@ -237,13 +283,28 @@ function renderDestination(context: BarContext): HTMLElement | null {
   off.value = '';
   off.textContent = 'nowhere';
   select.append(off);
-  for (const place of places) {
-    if (place.name === context.state.profileKey) continue;
+  // Doorsteps first, then the stations a reader travels to, unless the profile
+  // names its own order. The default order is the one the commute follows:
+  // where you live and where you work are the everyday answers, and Pasing is
+  // the occasional one.
+  const declared = profile.destinations ?? null;
+  const offered = [...places].filter((place) => place.name !== context.state.profileKey);
+  offered.sort((a, b) => {
+    if (declared !== null) {
+      const left = declared.indexOf(a.name);
+      const right = declared.indexOf(b.name);
+      if (left !== right) return (left === -1 ? declared.length : left) - (right === -1 ? declared.length : right);
+      return 0;
+    }
+    return Number(a.stop !== null) - Number(b.stop !== null);
+  });
+  for (const place of offered) {
     const option = document.createElement('option');
     option.value = place.name;
-    // The place's own key is also a profile key, so the tab's title is the name
-    // a reader recognises; the raw key is the fallback for a place with no tab.
-    option.textContent = context.config.profiles.find((entry) => entry.key === place.name)?.title ?? place.name;
+    // A stop place says what it is called; a doorstep borrows the tab's title,
+    // which is the name a reader recognises, and falls back to the raw key.
+    option.textContent =
+      place.label ?? context.config.profiles.find((entry) => entry.key === place.name)?.title ?? place.name;
     select.append(option);
   }
   select.value = context.state.destinationKey ?? '';

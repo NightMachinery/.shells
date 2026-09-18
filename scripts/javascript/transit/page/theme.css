@@ -1,0 +1,368 @@
+/* The part of the stylesheet more than one page needs.
+ *
+ * It exists because there are two pages now: the board itself, and the expanded
+ * view of one row's journeys that a journey slot opens in a new tab. They have
+ * to agree about colour, about type, about what a line badge looks like and
+ * about how a journey is drawn, and the only way to be sure two files agree is
+ * for there to be one file. Everything specific to a single page stays inline in
+ * that page, where it is read next to the markup it styles.
+ *
+ * `#app` is here as well: both pages are one element that a renderer replaces
+ * the children of, and they are the same column on the same screen.
+ */
+
+/* Category colours for the first paint only. The bundle injects the full
+   generated table at boot from src/colors.ts, so these exist to stop the
+   badges flashing grey and are deliberately not the source of truth. */
+:root {
+  --mode-sbahn: #008d4f;
+  --mode-ubahn: #0065ae;
+  --mode-tram: #d6001c;
+  --mode-bus: #00586a;
+  --mode-regional_bus: #4f6c8c;
+  --mode-bahn: #5a5a5a;
+}
+
+/* Surface palette, light first, overridden wholesale for dark. */
+:root {
+  --bg: #f6f6f4;
+  --card: #ffffff;
+  --raised: #ececea;
+  --ink: #17181a;
+  --ink-soft: #5d6066;
+  --line: #e2e2df;
+  --accent: #0b6bcb;
+  --late: #c62828;
+  --early: #2e7d32;
+  --warn: #a8690a;
+  --radius: 12px;
+  --gap: 12px;
+
+  /* The fixed row slots. Named here rather than inlined so a board's grid
+     template is assembled from the same widths everywhere, and so one
+     media query can narrow all of them at once. */
+  /* The destination is the one column that must never be squashed away:
+     a row whose destination is a single letter says nothing at all. It
+     is a floor rather than a fixed width, so it still grows into space
+     the other slots do not need. */
+  --col-destination-min: 7rem;
+  --col-minutes: 2.6rem;
+  --col-badge: 2.9rem;
+  --col-connection: 4.6rem;
+  --col-platform: 1.6rem;
+  /* Wide enough for the word "planned", which is what most rows say: the
+     column used to fit "plan" and the longer word spilled over the bell
+     beside it. */
+  --col-state: 2.3rem;
+  --col-alarm: 1rem;
+  --col-stop: 2.6rem;
+  --col-route: 9rem;
+
+  /* Destination badges. Only the hue is chosen per destination, in code;
+     how saturated and how light a badge is belongs to the colour scheme,
+     which is the only thing that knows whether it is drawing on paper
+     white or on near black. */
+  --dest-badge-s: 62%;
+  --dest-badge-l: 34%;
+  --dest-badge-ink: #ffffff;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #131416;
+    --card: #1c1e21;
+    --raised: #26282c;
+    --ink: #eceef1;
+    --ink-soft: #9aa0a8;
+    --line: #2c2f34;
+    --accent: #63a4ff;
+    --late: #ff6b6b;
+    --early: #7bd88f;
+    --warn: #e0a458;
+    --dest-badge-s: 55%;
+    --dest-badge-l: 68%;
+    --dest-badge-ink: #16181b;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font: 15px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  -webkit-text-size-adjust: 100%;
+}
+
+#app {
+  max-width: 780px;
+  margin: 0 auto;
+  padding: 0 16px 40px;
+}
+
+button {
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+}
+
+.badge {
+  display: inline-block;
+  padding: 1px 6px;
+  border-radius: 5px;
+  font-size: 12px;
+  font-weight: 700;
+  text-align: center;
+  white-space: nowrap;
+  background: var(--mode-bus);
+  color: #fff;
+}
+
+.day-marker {
+  font-size: 9px;
+  margin-left: 1px;
+  color: var(--warn);
+  font-weight: 700;
+}
+
+/* ---------------------------------------------------------- the tooltip */
+
+/* One tooltip, for the journey slots, the times and the jump chips. It is
+   not a dialog: nothing behind it is disabled and it never takes focus,
+   because it explains something the reader is still looking at. */
+.tip {
+  z-index: 40;
+  max-width: min(24rem, calc(100vw - 16px));
+  overflow: auto;
+  overscroll-behavior: contain;
+  background: var(--card);
+  color: var(--ink);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: 0 8px 28px rgb(0 0 0 / 22%);
+  padding: 10px 12px;
+  font-size: 13px;
+}
+
+.tip-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-bottom: 6px;
+}
+
+.tip-title {
+  font-weight: 600;
+}
+
+.tip-departure {
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+}
+
+.tip-rows {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 2px 10px;
+  margin: 0;
+}
+
+.tip-rows dt {
+  color: var(--ink-soft);
+}
+
+.tip-rows dd {
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.tip-note,
+.tip-next {
+  margin: 6px 0 0;
+  color: var(--ink-soft);
+}
+
+.tip-warning {
+  margin: 6px 0 0;
+  color: var(--late);
+  font-weight: 600;
+}
+
+.tip-alternatives-title {
+  margin: 10px 0 4px;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--ink-soft);
+}
+
+.tip-alternatives {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 4px;
+}
+
+.tip-alternative {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: baseline;
+  gap: 6px;
+}
+
+.tip-alternative.tight .tip-alternative-line {
+  opacity: 0.75;
+  font-style: italic;
+}
+
+.tip-alternative-line {
+  text-align: left;
+  background: none;
+  border: none;
+  padding: 0;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  text-decoration: underline dotted;
+}
+
+.tip-alternative-detail {
+  grid-column: 1 / -1;
+}
+
+.tip-alternative-open,
+.tip-open {
+  color: var(--accent);
+  font-size: 12px;
+}
+
+.tip-open {
+  display: inline-block;
+  margin-top: 10px;
+}
+
+/* --------------------------------------------------------- one journey */
+
+.journey-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.journey-exit {
+  font-weight: 600;
+}
+
+.journey-arrival {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+}
+
+.journey-arrival-time {
+  font-size: 18px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.journey-arrival-place {
+  color: var(--ink-soft);
+  font-size: 11px;
+}
+
+.journey-tight .journey-arrival-time {
+  color: var(--warn);
+}
+
+/* The legs, as a timeline. A walk is a row of its own, because a walk is
+   a thing the reader does and fourteen minutes of it at the end decides
+   whether a journey was worth recommending. */
+.legs {
+  list-style: none;
+  margin: 6px 0 0;
+  padding: 0 0 0 2px;
+  display: grid;
+  gap: 3px;
+  border-left: 2px solid var(--line);
+}
+
+.leg {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  padding-left: 8px;
+}
+
+.leg-text {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+
+.leg-time {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+
+.leg-arrow,
+.leg-from,
+.leg-to {
+  color: var(--ink-soft);
+}
+
+.leg-walk .leg-text {
+  color: var(--ink-soft);
+  font-style: italic;
+}
+
+.leg-badge {
+  flex: none;
+}
+
+.leg-walk-badge {
+  width: 2.9rem;
+  text-align: center;
+  color: var(--ink-soft);
+}
+
+.journey-notes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 6px;
+}
+
+.journey-note {
+  font-size: 10px;
+  padding: 1px 5px;
+  border-radius: 999px;
+  background: var(--raised);
+  color: var(--ink-soft);
+}
+
+.note-tight {
+  color: var(--warn);
+  border: 1px dashed currentColor;
+}
+
+.note-better {
+  color: var(--accent);
+}
+

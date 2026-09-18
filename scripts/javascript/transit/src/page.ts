@@ -18,7 +18,7 @@ import { normaliseLine } from './filter.ts';
 import type { Board, Message } from './model.ts';
 import { renderBar, HORIZONS } from './page/bar.ts';
 import { closeFilters, renderBoard, viewOf, type BoardContext } from './page/board.ts';
-import { planProfile } from './page/commute.ts';
+import { cachedRoutes, destinationNameOf, planProfile } from './page/commute.ts';
 import { fetchMessages, fetchProfile } from './page/data.ts';
 import { el, selectionInsideBoards } from './page/dom.ts';
 import { idbGet, idbSet, STORE_BOARDS } from './page/idb.ts';
@@ -38,6 +38,7 @@ import {
 } from './page/store.ts';
 import type { BoardStatus, ExportedConfig, ExportedProfile, PageState, ProfileData } from './page/types.ts';
 import { DEFAULT_EARLY_BUFFER_MINUTES } from './plan.ts';
+import { DEFAULT_WALK_WEIGHT } from './config.ts';
 
 /** How often the visible profile is re-fetched, while the tab is looked at. */
 const REFRESH_MS = 30_000;
@@ -60,17 +61,45 @@ const state: PageState = {
   destinationKey: null,
   sortByArrival: readSortByArrival(),
   earlyBufferMinutes: DEFAULT_EARLY_BUFFER_MINUTES,
+  walkWeight: DEFAULT_WALK_WEIGHT,
   routes: new Map(),
+  planning: new Map(),
+  planInFlight: 0,
 };
 
 /** Callbacks the current render registered for the one-second tick. */
 let ticks: Array<() => void> = [];
+/** The visible profile's planning run, which the other profiles queue behind. */
+let visiblePlan: Promise<void> = Promise.resolve();
 /** Backends that answered the visible profile's most recent fetch. */
 let backendsUsed: string[] = [];
 
 function currentBoards(): Board[] {
   const key = state.profileKey;
   return key === null ? [] : (state.data.get(key)?.boards ?? []);
+}
+
+/**
+ * Where this board sits in the run the planner is in the middle of, or null
+ * when nothing is being planned. Boards are planned in parallel, so the number
+ * is "how many of this profile's planned boards have answered", not "which one
+ * is being worked on"; the board's own position among them is what makes the
+ * line say something different on each board rather than the same thing four
+ * times.
+ */
+function planningFor(profileKey: string, index: number, boards: Board[]): { position: number; done: number; total: number } | null {
+  const progress = state.planning.get(profileKey);
+  if (progress === undefined || progress.done >= progress.total) return null;
+  const config = state.config;
+  const profile = config?.profiles.find((entry) => entry.key === profileKey);
+  if (profile === undefined) return null;
+  let position = 0;
+  for (let candidate = 0; candidate < boards.length; candidate += 1) {
+    if (profile.boards[candidate]?.commute !== true) continue;
+    position += 1;
+    if (candidate === index) return { position, done: progress.done, total: progress.total };
+  }
+  return null;
 }
 
 function statusFor(profileKey: string, index: number): BoardStatus {
@@ -112,6 +141,18 @@ async function loadCached(profileKey: string): Promise<void> {
 }
 
 /**
+ * The journeys from the last visit, shown dimmed and dated until fresh ones
+ * land. Never allowed to overwrite a plan this session already made, which is
+ * by definition newer than anything on disk.
+ */
+async function loadCachedRoutes(profileKey: string): Promise<void> {
+  const restored = await cachedRoutes(profileKey, state.destinationKey);
+  if (restored === null || state.routes.has(profileKey)) return;
+  state.routes.set(profileKey, restored);
+  render();
+}
+
+/**
  * Re-plan a profile's opted-in boards from the departures already on screen.
  *
  * Separate from the fetch because the tight-connection window changes the
@@ -127,16 +168,29 @@ async function replanProfile(
 ): Promise<void> {
   const config = state.config;
   if (config === null) return;
-  const routes = await planProfile({
-    config,
-    profile,
-    boards,
-    destinationKey: state.destinationKey,
-    startMs,
-    earlyBufferMinutes: state.earlyBufferMinutes,
-  });
-  if (routes.size === 0) state.routes.delete(profileKey);
-  else state.routes.set(profileKey, routes);
+  state.planInFlight += 1;
+  try {
+    const routes = await planProfile({
+      config,
+      profileKey,
+      profile,
+      boards,
+      destinationKey: state.destinationKey,
+      startMs,
+      earlyBufferMinutes: state.earlyBufferMinutes,
+      walkWeight: state.walkWeight,
+      previous: state.routes.get(profileKey),
+      onProgress: (done, total) => {
+        state.planning.set(profileKey, { done, total });
+        if (profileKey === state.profileKey) render();
+      },
+    });
+    if (routes === null) state.routes.delete(profileKey);
+    else state.routes.set(profileKey, routes);
+  } finally {
+    state.planInFlight -= 1;
+    state.planning.delete(profileKey);
+  }
   render();
 }
 
@@ -199,7 +253,17 @@ async function refreshProfile(profileKey: string, force = false): Promise<void> 
     // The plan comes after the departures and never blocks them: a board that
     // cannot be planned is still a board, and the journey planner is a slower
     // and heavier service than the departure feed.
-    void replanProfile(profileKey, profile, result.boards, startMs);
+    //
+    // The visible profile plans at once and the others queue behind it. Boards
+    // within one profile are planned all at once, so the queue is one profile
+    // deep, not one board deep: what it buys is that a background tab cannot
+    // put four journey searches in front of the one the reader is looking at.
+    if (profileKey === state.profileKey) {
+      visiblePlan = replanProfile(profileKey, profile, result.boards, startMs);
+    } else {
+      const wait = visiblePlan;
+      void wait.then(() => replanProfile(profileKey, profile, result.boards, startMs));
+    }
   } catch (error) {
     // The last good boards stay on screen; the bar says the refresh failed and
     // the age keeps counting up, which together are more useful than a blank.
@@ -253,7 +317,10 @@ function relevantLines(config: ExportedConfig): Set<string> {
  * the right answer rather than an error, since the feature needs a coordinate.
  */
 function defaultDestination(config: ExportedConfig, profileKey: string): string | null {
-  const places = new Set((config.places ?? []).map((place) => place.name));
+  // Only the doorsteps. A stop place is somewhere the reader goes now and then,
+  // on purpose, by picking it; making one the default would answer a question
+  // nobody asked, every day, until they noticed.
+  const places = new Set((config.places ?? []).filter((place) => place.stop === null).map((place) => place.name));
   if (places.size === 0) return null;
   if (profileKey !== 'work' && places.has('work')) return 'work';
   const home = config.defaults.home;
@@ -278,6 +345,7 @@ function selectProfile(key: string): void {
   render();
   // Cached boards first, so the tab switch is instant, then a refresh if what
   // we had is older than a glance.
+  void loadCachedRoutes(key);
   void loadCached(key).then(() => refreshProfile(key));
 }
 
@@ -363,7 +431,19 @@ function render(): void {
           render();
           replanVisible();
         },
-        ...(routes?.get(index) === undefined ? {} : { routes: routes.get(index) }),
+        ...(routes?.boards.get(index) === undefined ? {} : { routes: routes.boards.get(index) }),
+        routesStale: routes !== undefined && routes.stale,
+        routesAt: routes?.at ?? null,
+        destinationName: destinationNameOf(config, state.destinationKey),
+        destinationKey: state.destinationKey ?? '',
+        planning: planningFor(profileKey, index, boards),
+        walkWeight: state.walkWeight,
+        onWalkWeight: (value) => {
+          if (value === state.walkWeight) return;
+          state.walkWeight = value;
+          render();
+          replanVisible();
+        },
         ticks,
       };
       nodes.push(renderBoard(board, context));
@@ -452,7 +532,7 @@ function installKeys(): void {
       const board = boards[index];
       if (board === undefined) return;
       const id = boardId(profileKey, board.title);
-      writeView(id, viewOf(profileKey, board, state.routes.get(profileKey)?.has(index) === true) === 'full' ? 'integrated' : 'full');
+      writeView(id, viewOf(profileKey, board, state.routes.get(profileKey)?.boards.has(index) === true) === 'full' ? 'integrated' : 'full');
       render();
     }
   });
@@ -494,6 +574,7 @@ async function boot(): Promise<void> {
     const config = (await response.json()) as ExportedConfig;
     state.config = config;
     state.horizonMinutes = readHorizon() ?? config.defaults.horizon_minutes;
+    state.walkWeight = config.defaults.walk_weight ?? DEFAULT_WALK_WEIGHT;
     const stored = readProfile();
     const known = config.profiles.some((profile) => profile.key === stored);
     // Tabs are exactly the configured profiles, in config order. No profile key
@@ -525,6 +606,9 @@ async function boot(): Promise<void> {
   // network fetch that is the real source of truth.
   const config = state.config;
   for (const profile of config.profiles) void loadCached(profile.key);
+  // The journeys from the last visit, dimmed and dated, so the commute slots are
+  // not empty for the second and a half a fresh plan takes.
+  if (state.profileKey !== null) void loadCachedRoutes(state.profileKey);
 
   // The visible profile first, then the others: a prefetch is worth doing but
   // never at the cost of the tab the reader is actually on.

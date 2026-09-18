@@ -7,7 +7,8 @@ import {
   resolveProfile,
   type Config,
 } from '../src/config.ts';
-import { boardsDocument } from '../src/json.ts';
+import { boardsDocument, configExportDocument } from '../src/json.ts';
+import { planTargets } from '../src/targets.ts';
 
 const PATH = '/synthetic/address.toml';
 
@@ -225,5 +226,55 @@ describe('telling a profile key from a stop id', () => {
     // A genuinely bad identifier must still produce the upstream not-found
     // rather than being swallowed here.
     expect(resolveBoardTarget(config, ['de:99999:9999']).kind).toBe('stops');
+  });
+});
+
+describe('places', () => {
+  const profiles = { alpha: { title: 'Alpha', boards: [{ title: 'b', stops: ['de:00000:1'], walk_minutes: 4 }] } };
+
+  test('a stop place needs no coordinates and exports with a final walk of nothing', () => {
+    const config = parseConfig({ profiles, places: { pasing: { stop: 'de:00000:7', label: 'Pasing' } } }, PATH);
+    expect(config.places.pasing).toEqual({ name: 'pasing', label: 'Pasing', lat: null, lon: null, stop: 'de:00000:7' });
+    const document = configExportDocument(config, { mvgBaseUrl: 'a', transitousBaseUrl: 'b' }) as {
+      places?: Array<{ name: string; stop: string | null; lat: number | null }>;
+    };
+    // Exported even without `--with-places`: a stop id is not geography, and
+    // this document is already a list of stop ids.
+    expect(document.places).toEqual([{ name: 'pasing', label: 'Pasing', lat: null, lon: null, stop: 'de:00000:7' }]);
+    expect(planTargets(config.places.pasing as never, [])[0]?.walkMinutes).toBe(0);
+  });
+
+  test('a doorstep keeps its coordinates out of the document unless asked for', () => {
+    const config = parseConfig({ profiles, places: { alpha: { lat: 1, lon: 2 } } }, PATH);
+    const withheld = configExportDocument(config, { mvgBaseUrl: 'a', transitousBaseUrl: 'b' }) as { places?: unknown };
+    expect(withheld.places).toBeUndefined();
+    const shared = configExportDocument(config, { withPlaces: true, mvgBaseUrl: 'a', transitousBaseUrl: 'b' }) as {
+      places?: Array<{ lat: number | null }>;
+    };
+    expect(shared.places?.[0]?.lat).toBe(1);
+  });
+
+  test('a place cannot be both a stop and a coordinate', () => {
+    expect(issuesOf({ profiles, places: { odd: { stop: 'de:00000:7', lat: 1, lon: 2 } } })).toContain(
+      'places.odd: declare either stop, or lat and lon, not both',
+    );
+  });
+
+  test('a profile may name the destinations it offers, and they must exist', () => {
+    const config = parseConfig(
+      { profiles: { alpha: { ...profiles.alpha, destinations: ['pasing'] } }, places: { pasing: { stop: 'de:00000:7' } } },
+      PATH,
+    );
+    expect(config.profiles[0]?.destinations).toEqual(['pasing']);
+    expect(issuesOf({ profiles: { alpha: { ...profiles.alpha, destinations: ['nowhere'] } } })).toContain(
+      'profiles.alpha.destinations: no place named nowhere is declared',
+    );
+  });
+
+  test('a walked minute cannot be worth less than a ridden one', () => {
+    expect(issuesOf({ profiles, defaults: { walk_weight: 0.5 } })).toContain(
+      'defaults.walk_weight: must be a number of at least 1',
+    );
+    expect(parseConfig({ profiles, defaults: { walk_weight: 3 } }, PATH).defaults.walkWeight).toBe(3);
   });
 });

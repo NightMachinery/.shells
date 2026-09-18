@@ -6,6 +6,7 @@ import type { Backend, DepartureOptions, Window } from './backends/types.ts';
 import { createCache, lookupCacheAdapter, withCache, type TransitCache } from './cache.ts';
 import {
   BACKEND_NAMES,
+  findProfile,
   HOME_ALIAS,
   loadConfig,
   resolveBoardTarget,
@@ -22,6 +23,7 @@ import { envOverride, HttpError } from './http.ts';
 import type { Board, BoardConfig, Departure, Direction, Message, Profile } from './model.ts';
 import { DEFAULT_EARLY_BUFFER_MINUTES, planBoard, routeDocument, type PlannedRow } from './plan.ts';
 import { UnresolvableOriginError, type OriginLevel } from './origin.ts';
+import { destinationLabel, planTargets } from './targets.ts';
 
 /**
  * How weak a claim each step of the origin chain makes, weakest highest. A
@@ -444,6 +446,15 @@ async function commandRoute(runtime: Runtime, args: string[], flags: Flags): Pro
     return EXIT_OK;
   }
 
+  // Where the plan actually goes: the place itself, and, when it is a profile's
+  // doorstep, every stop that profile is built from. See `planTargets`.
+  const destinationProfile = findProfile(runtime.config, place.name);
+  const targets = planTargets(place, destinationProfile?.boards ?? []);
+  if (targets.length === 0) {
+    process.stderr.write(`route: ${place.name} declares neither coordinates nor a stop\n`);
+    return EXIT_CONFIG;
+  }
+
   const earlyBufferMinutes = flags.earlyBuffer ?? DEFAULT_EARLY_BUFFER_MINUTES;
   const now = Date.now();
   // The commute view plans what it prints, and what it prints is the near
@@ -471,10 +482,11 @@ async function commandRoute(runtime: Runtime, args: string[], flags: Flags): Pro
         planned.push(
           ...(await planBoard({
             stop,
-            destination: { lat: place.lat, lon: place.lon },
+            targets,
             rows,
             startMs: now,
             earlyBufferMinutes,
+            walkWeight: runtime.config.defaults.walkWeight,
             planModes: runtime.config.defaults.planModes,
             onOrigin: (resolved) => {
               if (origin === null || ORIGIN_RANK[resolved.level] > ORIGIN_RANK[origin]) origin = resolved.level;
@@ -511,8 +523,9 @@ async function commandRoute(runtime: Runtime, args: string[], flags: Flags): Pro
       profile: profile.key,
       requestedProfile: target.requested,
       destinationKey: wanted,
-      destinationName: place.name,
+      destinationName: destinationLabel(place),
       earlyBufferMinutes,
+      walkWeight: runtime.config.defaults.walkWeight,
       boards: views,
       now,
     });
@@ -520,7 +533,7 @@ async function commandRoute(runtime: Runtime, args: string[], flags: Flags): Pro
     return EXIT_OK;
   }
 
-  process.stdout.write(`${renderPlannedBoards(views, place.name, { ...runtime.terminal, now })}\n`);
+  process.stdout.write(`${renderPlannedBoards(views, destinationLabel(place), { ...runtime.terminal, now })}\n`);
   return EXIT_OK;
 }
 

@@ -14,7 +14,7 @@
 // cache is an optimisation, and the network is the source of truth.
 
 const DB_NAME = 'transit';
-const DB_VERSION = 2;
+const DB_VERSION = 3;
 
 /** Object stores, named for what they hold rather than for who writes them. */
 export const STORE_BOARDS = 'boards';
@@ -26,8 +26,16 @@ export const STORE_TRANSLATIONS = 'translations';
  * to the next.
  */
 export const STORE_ORIGINS = 'origins';
+/**
+ * The journeys planned for a profile, so a cold start has something to show
+ * while it asks again. Kept apart from the boards because the two go stale
+ * differently: a stale departure announces itself with a wrong countdown, and a
+ * stale arrival time does not, so what is restored from here is always dimmed
+ * and dated on screen.
+ */
+export const STORE_ROUTES = 'routes';
 
-const STORES: readonly string[] = [STORE_BOARDS, STORE_TRANSLATIONS, STORE_ORIGINS];
+const STORES: readonly string[] = [STORE_BOARDS, STORE_TRANSLATIONS, STORE_ORIGINS, STORE_ROUTES];
 
 let opening: Promise<IDBDatabase | null> | null = null;
 

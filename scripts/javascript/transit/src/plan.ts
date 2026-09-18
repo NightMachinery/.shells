@@ -6,7 +6,7 @@ import {
   toRawId,
   TRANSITOUS_DEFAULT_BASE_URL,
 } from './backends/transitous.ts';
-import { DEFAULT_PLAN_MODES } from './config.ts';
+import { DEFAULT_PLAN_MODES, DEFAULT_WALK_WEIGHT } from './config.ts';
 import { normaliseLine, type WalkSource } from './filter.ts';
 import { resolveOrigin, type OriginCache, type OriginLevel, type ResolvedOrigin } from './origin.ts';
 import { envOverride, fetchJson, HttpError, type FetchLike } from './http.ts';
@@ -109,9 +109,25 @@ export const PLAN_CACHE_MS = 60_000;
  */
 export const MAX_OPTIONS_PER_ROW = 4;
 
-/** One timetabled leg of a journey. `from` and `to` are stop names, for display. */
+/** The mode a walking leg carries, so one field answers "is this a vehicle". */
+export const WALK_MODE = 'WALK';
+
+/**
+ * One leg of a journey, timetabled or on foot. `from` and `to` are stop names,
+ * for display.
+ *
+ * Walks are legs rather than an annotation on the vehicle legs around them
+ * because they are the part of a journey a rider is choosing between: "off at
+ * the far station and fourteen minutes on foot" and "off at the near one and
+ * six" are two different offers, and a list that shows only the vehicles hides
+ * the difference exactly where it is being decided. The final walk to the
+ * destination is a leg for the same reason.
+ */
 export interface RouteLeg {
+  kind: 'transit' | 'walk';
+  /** Line label; empty on a walk. */
   line: string;
+  /** Vehicle category, or `WALK_MODE`. */
   mode: string;
   from: string;
   to: string;
@@ -129,6 +145,42 @@ export interface RouteOption {
   transfers: number;
   /** True when this only works if the first leg runs early or the change is quick. */
   tight: boolean;
+  /**
+   * How many minutes short the tight change is: what the first vehicle would
+   * have to make up, or the walk would have to save. Zero when not tight. It is
+   * the difference between "run for it" and "do not bother" and it costs one
+   * subtraction to keep, so it is kept rather than recomputed from nothing.
+   */
+  tightBy: number;
+  /**
+   * Minutes on foot over the whole journey: every change plus the final walk.
+   * Fractional, because the walks are derived from distances; round it for
+   * display and leave the arithmetic alone.
+   */
+  walkMinutes: number;
+  /** Which destination target this journey ends at, for display. */
+  destinationName: string;
+}
+
+/** The transit legs of a journey, which is what a compact slot names. */
+export function transitLegs(option: RouteOption): RouteLeg[] {
+  return option.legs.filter((leg) => leg.kind === 'transit');
+}
+
+/**
+ * How an option is ranked: its arrival, with every walked minute charged at
+ * `walkWeight` ridden minutes.
+ *
+ * Arrival alone is the wrong objective and the failure is not subtle. A journey
+ * that arrives two minutes sooner after a fourteen-minute walk beats one that
+ * arrives two minutes later after six, and the planner will keep recommending
+ * the first because by its own measure it wins. Charging a walked minute more
+ * than a ridden one is the smallest change that makes the ranking agree with
+ * what a rider would pick, and it is a preference rather than a fact, which is
+ * why it is configurable and adjustable on the page.
+ */
+export function optionScore(option: RouteOption, walkWeight: number): number {
+  return option.arrival + (walkWeight - 1) * option.walkMinutes * 60_000;
 }
 
 /**
@@ -147,12 +199,40 @@ export interface PlannedRow {
 /** Where a plan ends: a stop the aggregator knows, or a bare coordinate. */
 export type PlanDestination = { lat: number; lon: number } | { id: string };
 
+/**
+ * One place a journey may end, and how long the walk from the last vehicle to
+ * it takes.
+ *
+ * A plan is made to several of these at once, and that is the point rather than
+ * a convenience. The planner answers with a Pareto set over arrival, changes
+ * and departure, so an option that arrives later with a much shorter walk is
+ * dominated and never returned: asked for a coordinate, it offered a fast train
+ * to a far station and a fourteen-minute walk, and never mentioned the slower
+ * train to the near station six minutes from the door, because that option
+ * arrives later and no measure it optimises knows about the walk. Asking a
+ * second time with the near station itself as the destination makes that option
+ * exist, and only then can it be ranked.
+ *
+ * `walkMinutes` is what the configuration says the walk from that stop is; null
+ * means take the planner's own final street leg, which is the honest answer for
+ * a coordinate it routed to itself.
+ */
+export interface PlanTarget {
+  place: PlanDestination;
+  /** What this place is called, for the final walk leg and the slot. */
+  name: string;
+  walkMinutes: number | null;
+}
+
 export interface PlanBoardOptions {
   stop: string;
-  destination: PlanDestination;
+  /** Every place this board's riders may be heading for; see `PlanTarget`. */
+  targets: readonly PlanTarget[];
   rows: Departure[];
   startMs: number;
   earlyBufferMinutes?: number;
+  /** What a walked minute costs in ridden minutes; defaults to `DEFAULT_WALK_WEIGHT`. */
+  walkWeight?: number;
   /** Transit modes a journey may use; defaults to `DEFAULT_PLAN_MODES`. */
   planModes?: readonly string[];
   baseUrl?: string;
@@ -251,14 +331,24 @@ interface ParsedItinerary {
   legs: ParsedLeg[];
   /** Itinerary end, which includes the final walk to the destination. */
   arrival: number;
+  /** Where this itinerary was planned to, and what that place is called. */
+  destinationName: string;
+  /** The last walk, from the final alighting stop to the destination. */
+  finalWalkMs: number;
 }
 
 /** A suffix of some itinerary, indexed by where it is boarded. */
 interface OnwardChain {
   boardStop: string;
+  /** The name of the stop it is boarded at, for the walk leg leading into it. */
+  boardName: string;
   departure: number;
   legs: RouteLeg[];
   arrival: number;
+  /** Minutes on foot inside this tail, the final walk included. */
+  walkMinutes: number;
+  destinationName: string;
+  transfers: number;
 }
 
 function parseIso(value: unknown): number {
@@ -322,9 +412,9 @@ function parseIntermediate(leg: RawPlanLeg): ExitPoint[] {
   return out;
 }
 
-function parseItinerary(raw: RawItinerary): ParsedItinerary | null {
-  const arrival = parseIso(raw.endTime);
-  if (!Number.isFinite(arrival)) return null;
+function parseItinerary(raw: RawItinerary, target: PlanTarget): ParsedItinerary | null {
+  const planned = parseIso(raw.endTime);
+  if (!Number.isFinite(planned)) return null;
 
   const legs: ParsedLeg[] = [];
   let pendingWalkMetres = 0;
@@ -353,6 +443,7 @@ function parseItinerary(raw: RawItinerary): ParsedItinerary | null {
     pendingWalkMetres = 0;
 
     legs.push({
+      kind: 'transit',
       line: normaliseLineName(leg.routeShortName),
       mode: legMode(leg),
       from: fromName,
@@ -370,7 +461,30 @@ function parseItinerary(raw: RawItinerary): ParsedItinerary | null {
   }
 
   if (legs.length === 0) return null;
-  return { legs, arrival };
+  // The final walk is the configuration's when the target is a stop whose walk
+  // somebody has measured, and the planner's own street leg otherwise. A stop
+  // the reader themselves is travelling to has a walk of zero, which is the
+  // same rule with the same answer.
+  const last = legs[legs.length - 1] as ParsedLeg;
+  const finalWalkMs = target.walkMinutes === null ? Math.max(0, planned - last.arrival) : target.walkMinutes * 60_000;
+  return { legs, arrival: last.arrival + finalWalkMs, destinationName: target.name, finalWalkMs };
+}
+
+/** A walking leg between two named places. */
+function walkLeg(from: string, to: string, departure: number, walkMs: number): RouteLeg {
+  return { kind: 'walk', line: '', mode: WALK_MODE, from, to, departure, arrival: departure + walkMs };
+}
+
+/** How long a walk of this many metres takes, in milliseconds. */
+function walkMsFor(metres: number): number {
+  return (metres / WALK_METRES_PER_MINUTE) * 60_000;
+}
+
+/** The minutes on foot in a list of legs. */
+function walkMinutesIn(legs: readonly RouteLeg[]): number {
+  let ms = 0;
+  for (const leg of legs) if (leg.kind === 'walk') ms += leg.arrival - leg.departure;
+  return ms / 60_000;
 }
 
 interface CacheEntry {
@@ -447,6 +561,56 @@ function placeParam(place: PlanDestination): string {
 }
 
 /**
+ * How wide a single search window is asked for, in seconds.
+ *
+ * Bounded at both ends. The floor is the service's own default, because a board
+ * whose last row is three minutes away still wants more than three minutes of
+ * itineraries to recombine tails from. The ceiling exists because a board may
+ * run a twenty-four hour horizon and asking a free service to search a day in
+ * one request is not a reasonable thing to do; past the ceiling the cursor walk
+ * takes over, which is what it is for.
+ */
+export const PLAN_SEARCH_WINDOW_MIN_SECONDS = 900;
+export const PLAN_SEARCH_WINDOW_MAX_SECONDS = 4 * 3600;
+
+/**
+ * The identifier to send as `toPlace` for one target.
+ *
+ * A stop target goes through the same resolution chain as the origin, for the
+ * same reason: the national feed does not always publish the parent of a stop
+ * area, and a destination named by its parent identifier is refused exactly as
+ * an origin would be. It gets no platform identifiers to try, because nothing
+ * here has departure rows for the far end of the journey, so the chain is the
+ * parent and then the station's coordinate.
+ */
+async function resolveTarget(target: PlanTarget, options: PlanBoardOptions): Promise<{ place: string; target: PlanTarget }> {
+  if (!('id' in target.place)) return { place: placeParam(target.place), target };
+  const resolved = await resolveOrigin({
+    stop: target.place.id,
+    ...(options.baseUrl === undefined ? {} : { baseUrl: options.baseUrl }),
+    ...(options.fetchImpl === undefined ? {} : { fetchImpl: options.fetchImpl }),
+    ...(options.originCache === undefined ? {} : { cache: options.originCache }),
+    ...(options.onDebug === undefined ? {} : { onDebug: options.onDebug }),
+  });
+  // The configured walk is the walk *from that stop*, so it only applies while
+  // the plan really ends at that stop. When the chain has to fall back to the
+  // station's coordinate the planner alights wherever it likes and walks from
+  // there, and overriding that with a figure measured from somewhere else is
+  // how a fourteen minute walk gets reported as none at all. Measured: a bus
+  // stop at the doorstep, walk zero, whose parent identifier the aggregator
+  // carries only as a position, was handed an S-Bahn arriving a quarter of an
+  // hour away and reported it as arriving at the door.
+  if (resolved.level === 'coordinate') return { place: resolved.place, target: { ...target, walkMinutes: null } };
+  return { place: resolved.place, target };
+}
+
+function searchWindowSeconds(startMs: number, coverThroughMs: number): number {
+  const wanted = Math.ceil((coverThroughMs - startMs) / 1000);
+  if (!Number.isFinite(wanted)) return PLAN_SEARCH_WINDOW_MIN_SECONDS;
+  return Math.min(PLAN_SEARCH_WINDOW_MAX_SECONDS, Math.max(PLAN_SEARCH_WINDOW_MIN_SECONDS, wanted));
+}
+
+/**
  * Walk the planner's cursor pages until the itineraries reach the last row the
  * caller cares about, or the cap stops the walk.
  *
@@ -457,6 +621,7 @@ function placeParam(place: PlanDestination): string {
 async function fetchItineraries(
   fromPlace: string,
   toPlace: string,
+  target: PlanTarget,
   startMs: number,
   coverThroughMs: number,
   boardStop: string,
@@ -467,11 +632,18 @@ async function fetchItineraries(
 ): Promise<ParsedItinerary[]> {
   const out: ParsedItinerary[] = [];
   let cursor: string | null = null;
+  // One wide window instead of a walk. Measured against the live service: a
+  // request with `searchWindow=10800` answered in 357 ms with itineraries
+  // spanning 184 minutes of departures, where the same request without it
+  // needed two cursor pages and 620 ms to cover less. The cursor walk below is
+  // kept as the safety net for a board whose horizon outruns even this window.
+  const windowSeconds = searchWindowSeconds(startMs, coverThroughMs);
 
   for (let page = 0; page < PLAN_MAX_PAGES; page += 1) {
     const base =
       `fromPlace=${encodeURIComponent(fromPlace)}&toPlace=${encodeURIComponent(toPlace)}` +
       `&numItineraries=${ITINERARIES_PER_REQUEST}` +
+      `&searchWindow=${windowSeconds}` +
       // Sent on every page, cursor pages included: the cursor carries a position
       // in the search, not the search's own parameters.
       `&transitModes=${encodeURIComponent(planModes.join(','))}`;
@@ -487,7 +659,7 @@ async function fetchItineraries(
 
     let latestAtStop = Number.NEGATIVE_INFINITY;
     for (const raw of batch) {
-      const parsed = parseItinerary(raw);
+      const parsed = parseItinerary(raw, target);
       if (parsed === null) continue;
       out.push(parsed);
       const first = parsed.legs[0];
@@ -550,11 +722,16 @@ function buildOnwardIndex(itineraries: ParsedItinerary[]): OnwardIndex {
         atStop = [];
         chains.set(leg.fromStop, atStop);
       }
+      const legs = tailLegs(itinerary, i);
       atStop.push({
         boardStop: leg.fromStop,
+        boardName: leg.from,
         departure: leg.departure,
-        legs: itinerary.legs.slice(i).map(publicLeg),
+        legs,
         arrival: itinerary.arrival,
+        walkMinutes: walkMinutesIn(legs),
+        destinationName: itinerary.destinationName,
+        transfers: itinerary.legs.length - 1 - i,
       });
     }
   }
@@ -562,8 +739,34 @@ function buildOnwardIndex(itineraries: ParsedItinerary[]): OnwardIndex {
   return { chains, walks };
 }
 
+/**
+ * An itinerary from its `index`-th timetabled leg onwards, with the walks
+ * between the legs and the final walk to the destination put back in.
+ *
+ * The walks between legs are derived from the street distance rather than
+ * copied from the planner's own street-leg duration, for the reason given at
+ * `WALK_METRES_PER_MINUTE`: that duration carries the station's minimum
+ * transfer time, which is padding and not walking.
+ */
+function tailLegs(itinerary: ParsedItinerary, index: number): RouteLeg[] {
+  const out: RouteLeg[] = [];
+  for (let i = index; i < itinerary.legs.length; i += 1) {
+    const leg = itinerary.legs[i] as ParsedLeg;
+    out.push(publicLeg(leg));
+    const next = itinerary.legs[i + 1];
+    if (next === undefined) break;
+    if (leg.walkMetresAfter > 0) out.push(walkLeg(leg.to, next.from, leg.arrival, walkMsFor(leg.walkMetresAfter)));
+  }
+  const last = itinerary.legs[itinerary.legs.length - 1] as ParsedLeg;
+  if (itinerary.finalWalkMs > 0) {
+    out.push(walkLeg(last.to, itinerary.destinationName, last.arrival, itinerary.finalWalkMs));
+  }
+  return out;
+}
+
 function publicLeg(leg: ParsedLeg): RouteLeg {
   return {
+    kind: 'transit',
     line: leg.line,
     mode: leg.mode,
     from: leg.from,
@@ -600,9 +803,18 @@ function matchKey(line: string, epochMs: number): string {
   return `${normaliseLine(line)}|${Math.floor(epochMs / 60_000)}`;
 }
 
-/** A key that makes two spellings of the same journey one journey. */
+/**
+ * A key that makes two spellings of the same journey one journey.
+ *
+ * Only the vehicles, because the walks are what differ between two spellings of
+ * the same ride: getting off one stop earlier and walking to the same platform
+ * is the same journey, and it is the walk that decides which spelling wins.
+ * The destination is in the key because two targets are two journeys even when
+ * every vehicle agrees.
+ */
 function optionKey(option: RouteOption): string {
-  return option.legs.map((leg) => `${normaliseLine(leg.line)}@${leg.departure}`).join('>');
+  const vehicles = transitLegs(option).map((leg) => `${normaliseLine(leg.line)}@${leg.departure}`);
+  return `${option.destinationName}|${vehicles.join('>')}`;
 }
 
 /**
@@ -620,6 +832,7 @@ function optionsFor(
   ownItinerary: ParsedItinerary,
   index: OnwardIndex,
   earlyBufferMs: number,
+  walkWeight: number,
 ): RouteOption[] {
   const found = new Map<string, RouteOption>();
 
@@ -640,19 +853,32 @@ function optionsFor(
       if (existing.tight) found.set(key, option);
       return;
     }
+    // Then the one that walks less, which is the whole reason two exits onto
+    // one onward service are worth telling apart.
+    if (option.walkMinutes !== existing.walkMinutes) {
+      if (option.walkMinutes < existing.walkMinutes) found.set(key, option);
+      return;
+    }
     if (exitArrival(option) > exitArrival(existing)) found.set(key, option);
   };
 
   // A journey with no change at all: ride this leg, then walk. It has no tail
   // to splice and so cannot come out of the index.
   if (ownItinerary.legs.length === 1) {
+    const legs: RouteLeg[] = [publicLeg(first)];
+    if (ownItinerary.finalWalkMs > 0) {
+      legs.push(walkLeg(first.toName, ownItinerary.destinationName, first.arrival, ownItinerary.finalWalkMs));
+    }
     add({
       exitStop: first.toStop,
       exitStopName: first.toName,
-      legs: [publicLeg(first)],
+      legs,
       arrival: ownItinerary.arrival,
       transfers: 0,
       tight: false,
+      tightBy: 0,
+      walkMinutes: walkMinutesIn(legs),
+      destinationName: ownItinerary.destinationName,
     });
   }
 
@@ -674,34 +900,46 @@ function optionsFor(
     }
 
     for (const [boardStop, metres] of reachable) {
-      const walkMs = (metres / WALK_METRES_PER_MINUTE) * 60_000;
+      const walkMs = walkMsFor(metres);
       const feasible = exit.arrival + walkMs;
       for (const chain of index.chains.get(boardStop) ?? []) {
         if (chain.departure < feasible - earlyBufferMs) continue;
         // Riding the leg only as far as the exit: same vehicle, shorter ride.
         const ridden: RouteLeg = { ...publicLeg(first), to: exit.name, arrival: exit.arrival };
+        const legs: RouteLeg[] =
+          metres > 0
+            ? [ridden, walkLeg(exit.name, chain.boardName, exit.arrival, walkMs), ...chain.legs]
+            : [ridden, ...chain.legs];
         add({
           exitStop: exit.stop,
           exitStopName: exit.name,
-          legs: [ridden, ...chain.legs],
+          legs,
           arrival: chain.arrival,
-          transfers: chain.legs.length,
+          transfers: chain.transfers + 1,
           tight: chain.departure < feasible,
+          tightBy: Math.max(0, Math.ceil((feasible - chain.departure) / 60_000)),
+          walkMinutes: walkMinutesIn(legs),
+          destinationName: chain.destinationName,
         });
       }
     }
   }
 
-  return [...found.values()]
-    .sort(
-      (a, b) =>
-        a.arrival - b.arrival ||
-        a.transfers - b.transfers ||
-        Number(a.tight) - Number(b.tight) ||
-        // Same journey by every measure that matters: stay on longer.
-        exitArrival(b) - exitArrival(a),
-    )
-    .slice(0, MAX_OPTIONS_PER_ROW);
+  return [...found.values()].sort(orderBy(walkWeight)).slice(0, MAX_OPTIONS_PER_ROW);
+}
+
+/**
+ * How options are ordered: by score, then by the number of changes, then by the
+ * verdict, then by staying on the first vehicle longer. Used both inside one
+ * itinerary's recombination and across the whole row, so the list a reader sees
+ * and the list `best` is picked from are ordered by the same rule.
+ */
+function orderBy(walkWeight: number): (a: RouteOption, b: RouteOption) => number {
+  return (a, b) =>
+    optionScore(a, walkWeight) - optionScore(b, walkWeight) ||
+    a.transfers - b.transfers ||
+    Number(a.tight) - Number(b.tight) ||
+    exitArrival(b) - exitArrival(a);
 }
 
 /** When the rider leaves the first vehicle, which is the first leg's own end. */
@@ -750,44 +988,77 @@ export async function planBoard(options: PlanBoardOptions): Promise<PlannedRow[]
   });
   options.onOrigin?.(resolved);
   const fromPlace = resolved.place;
-  const toPlace = placeParam(options.destination);
   const planModes = options.planModes ?? DEFAULT_PLAN_MODES;
+  const walkWeight = options.walkWeight ?? DEFAULT_WALK_WEIGHT;
   const startMinute = Math.floor(options.startMs / 60_000);
-  // The modes are part of the key: two searches over different modes are two
-  // different searches, and one must not answer the other.
-  const cacheKey = `${fromPlace}|${toPlace}|${startMinute}|${planModes.join(',')}`;
 
   const known = unknownOrigins.get(fromPlace);
   if (known !== undefined) throw known;
 
-  let itineraries = cacheGet(cacheKey, options.startMs);
-  if (itineraries === null) {
-    let coverThrough = Number.NEGATIVE_INFINITY;
-    for (const row of rows) if (row.realtime > coverThrough) coverThrough = row.realtime;
-    try {
-      itineraries = await fetchItineraries(
-        fromPlace,
-        toPlace,
-        options.startMs,
-        coverThrough,
-        options.stop,
-        baseUrl,
-        planModes,
-        options.fetchImpl,
-        options.onDebug,
-      );
-    } catch (error) {
-      // A 404 here means the aggregator has never heard of this origin, which
-      // is worth remembering. Keyed on the *resolved* origin rather than the
-      // configured stop, so a stop that failed as a parent identifier and then
-      // resolved to a platform is asked again under the identifier that might
-      // work. Any other failure is a bad moment rather than a bad identifier
-      // and must stay retryable.
+  let coverThrough = Number.NEGATIVE_INFINITY;
+  for (const row of rows) if (row.realtime > coverThrough) coverThrough = row.realtime;
+
+  // One search per destination, all at once. They are independent questions to
+  // the same service and running them one after another would multiply the
+  // slowest part of a refresh by the number of places the reader might be
+  // going.
+  //
+  // Settled rather than all: a destination stop the aggregator does not carry
+  // is a target to drop, not a reason to leave the board with no journeys at
+  // all. A profile's stops are ordinary configured identifiers and the
+  // aggregator's coverage of parent stops is exactly the thing the origin chain
+  // exists to work around, so this happens in practice and not in theory.
+  const perTarget = await Promise.allSettled(
+    options.targets.map(async (target) => {
+      const resolvedTarget = await resolveTarget(target, options);
+      const toPlace = resolvedTarget.place;
+      // The modes are part of the key: two searches over different modes are two
+      // different searches, and one must not answer the other.
+      const cacheKey = `${fromPlace}|${toPlace}|${startMinute}|${planModes.join(',')}`;
+      const cached = cacheGet(cacheKey, options.startMs);
+      if (cached !== null) return cached;
+      let fetched: ParsedItinerary[];
+      try {
+        fetched = await fetchItineraries(
+          fromPlace,
+          toPlace,
+          resolvedTarget.target,
+          options.startMs,
+          coverThrough,
+          options.stop,
+          baseUrl,
+          planModes,
+          options.fetchImpl,
+          options.onDebug,
+        );
+      } catch (error) {
+        // Not recorded against the origin here: a 404 names one of the two ends
+        // and this function cannot tell which. That verdict is reached below,
+        // once every destination has failed and the origin is what they had in
+        // common.
+        options.onDebug?.(`plan to ${toPlace} failed: ${error instanceof Error ? error.message : String(error)}`);
+        throw error;
+      }
+      cacheSet(cacheKey, options.startMs, fetched);
+      return fetched;
+    }),
+  );
+  const answered = perTarget.filter((result) => result.status === 'fulfilled');
+  if (answered.length === 0) {
+    const first = perTarget[0];
+    if (first !== undefined && first.status === 'rejected') {
+      // Every destination failed, so the origin is the thing in common and a
+      // 404 is worth remembering against it. One failed destination out of
+      // several says nothing about the origin and must not be recorded here:
+      // doing so would make one unreachable station poison every plan from
+      // this stop for the life of the process.
+      const error: unknown = first.reason;
       if (error instanceof HttpError && error.status === 404) unknownOrigins.set(fromPlace, error);
       throw error;
     }
-    cacheSet(cacheKey, options.startMs, itineraries);
+    return rows.map((row) => ({ departure: row, best: null, options: [] }));
   }
+  const itineraries = answered.flatMap((result) => result.value);
 
   const index = buildOnwardIndex(itineraries);
   const earlyBufferMs = (options.earlyBufferMinutes ?? DEFAULT_EARLY_BUFFER_MINUTES) * 60_000;
@@ -819,7 +1090,7 @@ export async function planBoard(options: PlanBoardOptions): Promise<PlannedRow[]
     if (sameMinute === undefined) continue;
     const matches = sameMinute.filter((row) => samePlatform(row.platform, first.fromTrack));
     if (matches.length === 0) continue;
-    const candidates = optionsFor(first, itinerary, index, earlyBufferMs);
+    const candidates = optionsFor(first, itinerary, index, earlyBufferMs, walkWeight);
     for (const row of matches) (planned.get(row) as RouteOption[]).push(...candidates);
   }
 
@@ -829,11 +1100,19 @@ export async function planBoard(options: PlanBoardOptions): Promise<PlannedRow[]
     for (const option of collected) {
       const key = optionKey(option);
       const existing = unique.get(key);
-      if (existing === undefined || (existing.tight && !option.tight)) unique.set(key, option);
+      if (existing === undefined) {
+        unique.set(key, option);
+        continue;
+      }
+      // The same journey found twice: the kinder verdict first, then the one
+      // that walks less.
+      if (existing.tight !== option.tight) {
+        if (existing.tight) unique.set(key, option);
+        continue;
+      }
+      if (option.walkMinutes < existing.walkMinutes) unique.set(key, option);
     }
-    const list = [...unique.values()]
-      .sort((a, b) => a.arrival - b.arrival || a.transfers - b.transfers || Number(a.tight) - Number(b.tight))
-      .slice(0, MAX_OPTIONS_PER_ROW);
+    const list = [...unique.values()].sort(orderBy(walkWeight)).slice(0, MAX_OPTIONS_PER_ROW);
     // A tight option is never recommended: it is offered so a rider can choose
     // to gamble on it, not so the tool can gamble on their behalf.
     //
@@ -854,6 +1133,7 @@ export async function planBoard(options: PlanBoardOptions): Promise<PlannedRow[]
 
 export function routeLegJson(leg: RouteLeg): unknown {
   return {
+    kind: leg.kind,
     line: leg.line,
     mode: leg.mode,
     from: leg.from,
@@ -867,9 +1147,12 @@ export function routeOptionJson(option: RouteOption): unknown {
   return {
     exit_stop: option.exitStop,
     exit_stop_name: option.exitStopName,
+    destination: option.destinationName,
     arrival: toIso(option.arrival),
     transfers: option.transfers,
     tight: option.tight,
+    tight_by_minutes: option.tightBy,
+    walk_minutes: Math.round(option.walkMinutes),
     legs: option.legs.map(routeLegJson),
   };
 }
@@ -907,6 +1190,7 @@ export function routeDocument(input: {
   destinationKey: string;
   destinationName: string;
   earlyBufferMinutes: number;
+  walkWeight: number;
   boards: PlannedBoard[];
   now: number;
 }): unknown {
@@ -916,6 +1200,7 @@ export function routeDocument(input: {
     requested_profile: input.requestedProfile,
     destination: { key: input.destinationKey, name: input.destinationName },
     early_buffer_minutes: input.earlyBufferMinutes,
+    walk_weight: input.walkWeight,
     generated_at: toIso(input.now),
     boards: input.boards.map(({ board, rows, origin }) => ({
       title: board.title,

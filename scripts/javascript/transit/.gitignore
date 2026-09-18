@@ -1,3 +1,4 @@
 node_modules/
-# Built by `bun run build`; the page repository copies it in rather than tracking it here.
+# Built by `bun run build`; the page repository copies them in rather than tracking them here.
 page/app.js
+page/route.js

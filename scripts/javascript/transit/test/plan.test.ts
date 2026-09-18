@@ -5,6 +5,8 @@ import {
   PLAN_MAX_PAGES,
   sameStopArea,
   WALK_METRES_PER_MINUTE,
+  transitLegs,
+  type PlanTarget,
   type RouteOption,
 } from '../src/plan.ts';
 import { clearOriginCache, UnresolvableOriginError } from '../src/origin.ts';
@@ -15,7 +17,7 @@ const BASE = 'https://example.invalid/api';
 
 /** The board's parent stop; every identifier in this file is made up. */
 const HOME = 'de:00000:1';
-const DESTINATION = { lat: 0, lon: 0 };
+const DESTINATION: PlanTarget[] = [{ place: { lat: 0, lon: 0 }, name: 'Destination', walkMinutes: null }];
 
 /** Minutes past the instant the fixtures are written around. */
 function at(minutes: number): number {
@@ -79,7 +81,7 @@ async function planFixtureBoard(rows: Departure[], earlyBufferMinutes?: number) 
   const { fetchImpl, urls } = planMock((page) => (page === 0 ? body : { itineraries: [], nextPageCursor: '' }));
   const planned = await planBoard({
     stop: HOME,
-    destination: DESTINATION,
+    targets: DESTINATION,
     rows,
     startMs: FIXTURE_NOW,
     baseUrl: BASE,
@@ -204,8 +206,10 @@ describe('exit connections', () => {
     expect(best.exitStop).toBe('de:00000:9:1:1');
     expect(best.exitStopName).toBe('Interchange');
     expect(best.transfers).toBe(1);
-    expect(best.legs.map((leg) => leg.line)).toEqual(['U1', 'X9']);
-    expect(best.legs[1]?.departure).toBe(at(23));
+    expect(transitLegs(best).map((leg) => leg.line)).toEqual(['U1', 'X9']);
+    // The walks are legs too now: the change, and the last stretch to the door.
+    expect(best.legs.map((leg) => leg.kind)).toEqual(['transit', 'walk', 'transit', 'walk']);
+    expect(transitLegs(best)[1]?.departure).toBe(at(23));
   });
 });
 
@@ -239,7 +243,7 @@ describe('cursor paging', () => {
     // The last row leaves ninety minutes out and no page ever gets near it.
     await planBoard({
       stop: HOME,
-      destination: DESTINATION,
+      targets: DESTINATION,
       rows: [row('U1', 10), row('U1', 90)],
       startMs: FIXTURE_NOW,
       baseUrl: BASE,
@@ -256,7 +260,7 @@ describe('cursor paging', () => {
     const { fetchImpl, planUrls } = endlessPages();
     await planBoard({
       stop: HOME,
-      destination: DESTINATION,
+      targets: DESTINATION,
       rows: [row('U1', 10)],
       startMs: FIXTURE_NOW,
       baseUrl: BASE,
@@ -290,7 +294,7 @@ describe('cursor paging', () => {
     }));
     await planBoard({
       stop: HOME,
-      destination: DESTINATION,
+      targets: DESTINATION,
       rows: [row('U1', 10)],
       startMs: FIXTURE_NOW,
       baseUrl: BASE,
@@ -313,7 +317,7 @@ describe('exits along the way', () => {
   async function planExits(rows: Departure[]) {
     const body = await fixture<unknown>('transitous-plan-exits.json');
     const { fetchImpl } = planMock((page) => (page === 0 ? body : { itineraries: [], nextPageCursor: '' }));
-    return planBoard({ stop: HOME, destination: DESTINATION, rows, startMs: FIXTURE_NOW, baseUrl: BASE, fetchImpl });
+    return planBoard({ stop: HOME, targets: DESTINATION, rows, startMs: FIXTURE_NOW, baseUrl: BASE, fetchImpl });
   }
 
   test('an earlier departure is told to get off where a later one was', async () => {
@@ -371,7 +375,7 @@ describe('transit modes', () => {
     }));
     await planBoard({
       stop: HOME,
-      destination: DESTINATION,
+      targets: DESTINATION,
       rows: [row('U1', 10)],
       startMs: FIXTURE_NOW,
       baseUrl: BASE,
@@ -387,7 +391,7 @@ describe('transit modes', () => {
     const body = await fixture<unknown>('transitous-plan.json');
     const { fetchImpl, planUrls } = planMock((page) => (page === 0 ? body : { itineraries: [], nextPageCursor: '' }));
     const call = (planModes: string[]) =>
-      planBoard({ stop: HOME, destination: DESTINATION, rows: [row('U1', 10)], startMs: FIXTURE_NOW, baseUrl: BASE, planModes, fetchImpl });
+      planBoard({ stop: HOME, targets: DESTINATION, rows: [row('U1', 10)], startMs: FIXTURE_NOW, baseUrl: BASE, planModes, fetchImpl });
     await call(['SUBWAY']);
     const before = planUrls().length;
     await call(['SUBWAY', 'TRAM']);
@@ -402,7 +406,7 @@ describe('the plan cache', () => {
     const call = () =>
       planBoard({
         stop: HOME,
-        destination: DESTINATION,
+        targets: DESTINATION,
         rows: [row('U1', 10)],
         startMs: FIXTURE_NOW,
         baseUrl: BASE,
@@ -424,7 +428,7 @@ describe('the plan cache', () => {
     const call = (offsetMinutes: number) =>
       planBoard({
         stop: HOME,
-        destination: DESTINATION,
+        targets: DESTINATION,
         rows: [row('U1', 10)],
         // A different minute each time, so the itinerary cache cannot be what
         // suppresses the second attempt.
@@ -450,7 +454,7 @@ describe('the plan cache', () => {
     const call = (offsetMinutes: number) =>
       planBoard({
         stop: HOME,
-        destination: DESTINATION,
+        targets: DESTINATION,
         rows: [row('U1', 10)],
         startMs: FIXTURE_NOW + offsetMinutes * 60_000,
         baseUrl: BASE,
@@ -460,5 +464,134 @@ describe('the plan cache', () => {
     const before = urls.length;
     await expect(call(5)).rejects.toThrow(/404/);
     expect(urls).toHaveLength(before);
+  });
+});
+
+describe('planning to the destination’s own stops', () => {
+  /** The near station, six minutes from the door; the place is fourteen. */
+  const NEAR = 'de:00000:5';
+  const PLACE_TARGET: PlanTarget = { place: { lat: 0, lon: 0 }, name: 'Home', walkMinutes: null };
+  const STOP_TARGET: PlanTarget = { place: { id: NEAR }, name: 'Home', walkMinutes: 6 };
+
+  async function planTo(targets: PlanTarget[], walkWeight?: number) {
+    const body = await fixture<{ place: unknown; stop: unknown }>('transitous-plan-targets.json');
+    const { fetchImpl } = mockFetch((url) => {
+      if (url.includes('/stoptimes')) return { stopTimes: [{}] };
+      return url.includes(encodeURIComponent(NEAR)) ? body.stop : body.place;
+    });
+    return planBoard({
+      stop: HOME,
+      targets,
+      rows: [row('T1', 10)],
+      startMs: FIXTURE_NOW,
+      baseUrl: BASE,
+      fetchImpl,
+      ...(walkWeight === undefined ? {} : { walkWeight }),
+    });
+  }
+
+  /** Where the last vehicle of a journey puts the rider down. */
+  function lastStation(option: RouteOption): string {
+    const legs = transitLegs(option);
+    return legs[legs.length - 1]?.to ?? '';
+  }
+
+  test('the near station is not offered at all when only the place is asked about', async () => {
+    const planned = await planTo([PLACE_TARGET]);
+    expect((planned[0]?.options ?? []).map(lastStation)).not.toContain('Near Station');
+  });
+
+  test('asking about the stop by name makes that journey exist', async () => {
+    const planned = await planTo([PLACE_TARGET, STOP_TARGET]);
+    expect((planned[0]?.options ?? []).map(lastStation)).toContain('Near Station');
+  });
+
+  test('the shorter walk wins when a walked minute costs two ridden ones', async () => {
+    const planned = await planTo([PLACE_TARGET, STOP_TARGET], 2);
+    const best = planned[0]?.best as RouteOption;
+    expect(lastStation(best)).toBe('Near Station');
+    expect(best.arrival).toBe(at(56));
+    expect(Math.round(best.walkMinutes)).toBe(8);
+  });
+
+  test('the earlier arrival wins when walking is free', async () => {
+    const planned = await planTo([PLACE_TARGET, STOP_TARGET], 1);
+    const best = planned[0]?.best as RouteOption;
+    expect(lastStation(best)).toBe('Far Station');
+    expect(best.arrival).toBe(at(52));
+    expect(Math.round(best.walkMinutes)).toBe(16);
+  });
+
+  test('a stop target’s final walk is the configured one, as its own leg', async () => {
+    const planned = await planTo([STOP_TARGET]);
+    const best = planned[0]?.best as RouteOption;
+    const last = best.legs[best.legs.length - 1];
+    expect(last?.kind).toBe('walk');
+    expect(last?.to).toBe('Home');
+    expect((last as { arrival: number }).arrival - (last as { departure: number }).departure).toBe(6 * 60_000);
+  });
+});
+
+describe('the search window', () => {
+  test('one wide window replaces the cursor walk', async () => {
+    const body = await fixture<unknown>('transitous-plan.json');
+    const { fetchImpl, planUrls } = planMock(() => body);
+    await planBoard({ stop: HOME, targets: DESTINATION, rows: [row('U1', 10)], startMs: FIXTURE_NOW, baseUrl: BASE, fetchImpl });
+    const urls = planUrls();
+    expect(urls).toHaveLength(1);
+    // The board's last row is ten minutes out, under the floor, so the floor is
+    // what is asked for rather than six hundred seconds of nothing.
+    expect(urls[0]).toContain('searchWindow=900');
+  });
+
+  test('the window is the span the board actually covers', async () => {
+    const body = await fixture<unknown>('transitous-plan.json');
+    const { fetchImpl, planUrls } = planMock(() => body);
+    await planBoard({ stop: HOME, targets: DESTINATION, rows: [row('U1', 10), row('U1', 130)], startMs: FIXTURE_NOW, baseUrl: BASE, fetchImpl });
+    expect(planUrls()[0]).toContain('searchWindow=7800');
+  });
+});
+
+describe('a destination stop the aggregator carries only as a position', () => {
+  const NEAR = 'de:00000:5';
+
+  /**
+   * The aggregator knows the board's stop and does not know the destination
+   * stop, so the chain falls back to that station's coordinate and the planner
+   * alights wherever it likes and walks from there.
+   */
+  function fallbackMock(body: unknown) {
+    return mockFetch((url) => {
+      if (url.includes('/stoptimes')) {
+        const id = decodeURIComponent(new URL(url).searchParams.get('stopId') ?? '');
+        return id.includes(NEAR)
+          ? new Response(JSON.stringify({ error: 'stop_found=false' }), { status: 404 })
+          : { stopTimes: [{}] };
+      }
+      if (url.includes('/stations/')) return { globalId: NEAR, latitude: 1, longitude: 2 };
+      if (url.includes('/reverse-geocode')) return [];
+      return body;
+    });
+  }
+
+  test('the configured walk is dropped, because it is measured from somewhere else', async () => {
+    const body = await fixture<{ place: unknown; stop: unknown }>('transitous-plan-targets.json');
+    const { fetchImpl, urls } = fallbackMock(body.place);
+    const planned = await planBoard({
+      stop: HOME,
+      // Claiming the destination is at the door, which is true of the stop and
+      // not of the position the planner ends up using.
+      targets: [{ place: { id: NEAR }, name: 'Home', walkMinutes: 0 }],
+      rows: [row('T1', 10)],
+      startMs: FIXTURE_NOW,
+      baseUrl: BASE,
+      fetchImpl,
+    });
+    expect(urls.some((url) => url.includes('toPlace=1%2C2'))).toBe(true);
+    const best = planned[0]?.best as RouteOption;
+    // The fixture's own final street leg is fourteen minutes; a walk of zero
+    // here would be the bug this case exists for.
+    expect(best.arrival).toBe(at(52));
+    expect(Math.round(best.walkMinutes)).toBe(16);
   });
 });

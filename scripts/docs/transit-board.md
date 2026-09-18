@@ -178,6 +178,37 @@ the change is quicker than estimated. It is shown because it is sometimes the
 one you actually take, and it is never the recommendation. The window is
 adjustable.
 
+Journeys are not ranked by arrival alone. Every option carries the minutes you
+spend on foot, changes and the final walk together, and a walked minute is
+charged at more than a ridden one before the options are sorted. Without that
+the recommendation is regularly a train that arrives a couple of minutes
+earlier and leaves you a quarter of an hour from the door, beating one that
+stops at the end of your street. `walk_weight` in the config's defaults sets
+the exchange rate, one turns it off and ranks by arrival the way the planner
+itself does, and the browser page lets you move it for one look without saving
+it.
+
+### Where a journey can end
+
+A destination is either a doorstep, declared with coordinates, or a station,
+declared with a stop id and a label. A station is a destination in its own
+right: you are going to Pasing, not through it, so the journey ends when the
+vehicle does and there is no walk at the end. Stations are offered from every
+profile; a profile can name its own order for the picker, and without one the
+doorsteps come first.
+
+A plan towards a doorstep is asked several times over, once for the coordinate
+and once for each stop the profile that lives there is built from, each with
+the walking time the configuration records for it. That is not redundancy. The
+planner answers with the best journeys over arrival, changes and departure, and
+the walk at the end is in none of those, so a journey that arrives a few
+minutes later at the station six minutes from the door is beaten by one that
+arrives sooner fourteen minutes away and is never offered at all. Naming the
+near station makes that journey exist; the ranking above then decides between
+them. The searches run at once rather than one after another.
+
+### Which identifier the planner is given
+
 The planner is a different service from the departure board, and it does not
 always know a stop by the identifier the board is configured with: some stops
 exist in its data only as their individual platforms. So the identifier is
@@ -187,6 +218,18 @@ answered is printed in the board heading and carried in the JSON, because a
 plan made from one platform is a slightly narrower claim than one made from the
 whole stop. The answer is cached, so this costs one small request the first time
 a stop is planned and nothing afterwards.
+
+Destinations go through the same chain, and one thing follows from that which
+is worth stating plainly: when a destination stop can only be resolved to the
+station's position, the walking time the configuration records for it is
+dropped and the planner's own final walk is used instead. The configured figure
+is the walk *from that stop*, and once the plan is free to alight anywhere near
+the position it is a measurement of something else.
+
+One destination the planner cannot place does not spoil the board: that target
+is dropped and the others answer. Only when every destination fails is the
+origin blamed, which is the one case where the origin is what they had in
+common.
 
 Long-distance trains are left out of the search. The planner routes over the
 whole national timetable and would otherwise recommend an inter-city train
@@ -199,6 +242,12 @@ from the planner's own duration for it. The planner adds a flat padding of
 several minutes to every walking leg, which is defensible for a stranger and
 wrong for a person who knows the station, and taking it at face value makes
 every change look impossible.
+
+The itineraries come back in one wide request rather than a walk through pages
+of them: the planner takes a search window, and asking for the span the board
+actually covers answers in one round trip what the page walk needed two or more
+for. The page walk is still there as the safety net for a board whose horizon
+outruns the widest window worth asking a free service for.
 
 ## The cache
 

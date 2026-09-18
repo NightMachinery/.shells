@@ -80,6 +80,29 @@ export function dayMarker(epochMs: number, referenceMs: number, timezone: string
   return node;
 }
 
+/**
+ * A clock time with its day marker: the one way this page draws an instant.
+ *
+ * One function rather than a convention, because a convention does not hold. The
+ * `+1` was a real superscript element in the rows and a `+1` glued onto a string
+ * in the sticky bar, and the two looked different on the same screen for as long
+ * as nobody compared them. Anything that draws a time calls this; anything that
+ * needs a time inside a longer sentence calls `timeLabel`, which is the same
+ * answer in plain text.
+ */
+export function timeNode(epochMs: number, referenceMs: number, timezone: string, className = 'clock'): HTMLElement {
+  const node = el('span', className, clockTime(epochMs, timezone));
+  const marker = dayMarker(epochMs, referenceMs, timezone);
+  if (marker !== null) node.append(marker);
+  return node;
+}
+
+/** The same instant as plain text, for a tooltip, a title or an aria-label. */
+export function timeLabel(epochMs: number, referenceMs: number, timezone: string): string {
+  const offset = dayOffset(epochMs, referenceMs, timezone);
+  return `${clockTime(epochMs, timezone)}${offset > 0 ? `+${offset}` : ''}`;
+}
+
 /** Whole minutes from now until an instant, floored at zero. */
 export function minutesUntil(epochMs: number, now: number): number {
   return Math.max(0, Math.floor((epochMs - now) / 60_000));

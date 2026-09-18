@@ -126,6 +126,7 @@ export function configExportDocument(config: Config, options: ConfigExportOption
       fallback: config.defaults.fallback,
       transport_types: config.defaults.transportTypes,
       plan_modes: config.defaults.planModes,
+      walk_weight: config.defaults.walkWeight,
       timezone: config.defaults.timezone,
       // The profile key the `home` alias resolves to, so the page can follow
       // the same alias without parsing the TOML itself.
@@ -138,6 +139,7 @@ export function configExportDocument(config: Config, options: ConfigExportOption
     profiles: config.profiles.map((profile) => ({
       key: profile.key,
       title: profile.title,
+      destinations: profile.destinations ?? null,
       boards: profile.boards.map((board) => ({
         title: board.title,
         stops: board.stops,
@@ -153,11 +155,18 @@ export function configExportDocument(config: Config, options: ConfigExportOption
       })),
     })),
   };
-  if (options.withPlaces === true) {
-    document.places = Object.values(config.places).map((place) => ({
+  // Coordinates are geography and are withheld unless asked for. A stop place
+  // is not: it is a stop identifier, and this document is already a list of
+  // stop identifiers, so withholding it would buy no privacy and would cost the
+  // picker the destinations a reader can always reach.
+  const places = Object.values(config.places).filter((place) => options.withPlaces === true || place.stop !== null);
+  if (places.length > 0) {
+    document.places = places.map((place) => ({
       name: place.name,
+      label: place.label,
       lat: place.lat,
       lon: place.lon,
+      stop: place.stop,
     }));
   }
   return document;

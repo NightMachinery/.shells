@@ -36,6 +36,18 @@ export const DEFAULT_TRANSPORT_TYPES: readonly Mode[] = ALL_MODES;
 export const DEFAULT_TIMEZONE = 'Europe/Berlin';
 export const DEFAULT_WALK_MINUTES = 0;
 
+/**
+ * What one minute on foot costs, measured in minutes on a vehicle.
+ *
+ * Two, which says a rider would rather sit for twenty minutes than walk for
+ * eleven. It exists because ranking journeys by arrival alone produces advice
+ * nobody follows: a train that arrives two minutes earlier and leaves you a
+ * quarter of an hour from the door loses to one that arrives later at the stop
+ * by your street, and only a weight says so. One turns the preference off and
+ * ranks by arrival, which is what the planner does on its own.
+ */
+export const DEFAULT_WALK_WEIGHT = 2;
+
 export const BACKEND_NAMES = ['mvg', 'transitous'] as const;
 export type BackendName = (typeof BACKEND_NAMES)[number];
 
@@ -58,15 +70,43 @@ export interface Defaults {
    * Unset means the package's default, which leaves long-distance rail out.
    */
   planModes: string[];
+  /** What a walked minute costs in ridden minutes, when journeys are ranked. */
+  walkWeight: number;
   timezone: string;
   /** Profile key that the alias resolves to, or `null` when unset. */
   home: string | null;
 }
 
+/**
+ * Somewhere a journey can end.
+ *
+ * Two kinds, because the two questions are different. A *coordinate place* is a
+ * doorstep: the planner routes to the point and the final walk is whatever it
+ * works out. A *stop place* is a station the reader is themselves travelling
+ * to, named by its identifier: the journey ends when the vehicle does, the
+ * final walk is zero, and it is offered from every profile rather than being
+ * tied to one. Exactly one of the two is declared.
+ */
 export interface Place {
+  /** The key it is declared under, and how the rest of the config names it. */
   name: string;
-  lat: number;
-  lon: number;
+  /** What the picker calls it; the key when nothing else is given. */
+  label: string | null;
+  /** Set on a coordinate place. */
+  lat: number | null;
+  lon: number | null;
+  /** Set on a stop place: the stop that is the destination. */
+  stop: string | null;
+}
+
+/** Whether this place is a stop the reader travels to rather than a doorstep. */
+export function isStopPlace(place: Place): boolean {
+  return place.stop !== null;
+}
+
+/** What a place is called on screen. */
+export function placeLabel(place: Place): string {
+  return place.label ?? place.name;
 }
 
 export interface Config {
@@ -156,6 +196,7 @@ function parseDefaults(raw: unknown, issues: string[]): Defaults {
     fallback: DEFAULT_FALLBACK,
     transportTypes: [...DEFAULT_TRANSPORT_TYPES],
     planModes: [...DEFAULT_PLAN_MODES],
+    walkWeight: DEFAULT_WALK_WEIGHT,
     timezone: DEFAULT_TIMEZONE,
     home: null,
   };
@@ -211,6 +252,18 @@ function parseDefaults(raw: unknown, issues: string[]): Defaults {
     }
   }
 
+  if (table.walk_weight !== undefined) {
+    const value = table.walk_weight;
+    if (typeof value !== 'number' || !Number.isFinite(value) || value < 1) {
+      // Below one would mean a rider prefers walking to riding, which is a
+      // coherent preference and not one this ranking can express: the score
+      // would then reward journeys that arrive later for no reason it can name.
+      issues.push('defaults.walk_weight: must be a number of at least 1');
+    } else {
+      defaults.walkWeight = value;
+    }
+  }
+
   if (table.timezone !== undefined) {
     const value = table.timezone;
     if (typeof value !== 'string' || value.trim().length === 0) {
@@ -241,7 +294,21 @@ function parsePlaces(raw: unknown, issues: string[]): Record<string, Place> {
   }
   for (const [name, entry] of Object.entries(raw)) {
     if (!isTable(entry)) {
-      issues.push(`places.${name}: must be a table with lat and lon`);
+      issues.push(`places.${name}: must be a table with either lat and lon, or stop`);
+      continue;
+    }
+    const label = typeof entry.label === 'string' && entry.label.trim().length > 0 ? entry.label.trim() : null;
+    const stop = entry.stop;
+    if (stop !== undefined) {
+      if (typeof stop !== 'string' || stop.trim().length === 0) {
+        issues.push(`places.${name}.stop: must be a stop id`);
+        continue;
+      }
+      if (entry.lat !== undefined || entry.lon !== undefined) {
+        issues.push(`places.${name}: declare either stop, or lat and lon, not both`);
+        continue;
+      }
+      places[name] = { name, label, lat: null, lon: null, stop: stop.trim() };
       continue;
     }
     const lat = entry.lat;
@@ -255,7 +322,7 @@ function parsePlaces(raw: unknown, issues: string[]): Record<string, Place> {
       issues.push(`places.${name}.lon: must be a number`);
       ok = false;
     }
-    if (ok) places[name] = { name, lat: lat as number, lon: lon as number };
+    if (ok) places[name] = { name, label, lat: lat as number, lon: lon as number, stop: null };
   }
   return places;
 }
@@ -478,7 +545,13 @@ function parseProfiles(raw: unknown, issues: string[]): Profile[] {
       const board = parseBoard(key, index, boardsRaw[index], issues);
       if (board !== null) boards.push(board);
     }
-    profiles.push({ key, title: typeof title === 'string' ? title.trim() : key, boards });
+    const profile: Profile = { key, title: typeof title === 'string' ? title.trim() : key, boards };
+    if (entry.destinations !== undefined) {
+      const list = stringList(entry.destinations);
+      if (list === null) issues.push(`profiles.${key}.destinations: must be a list of place keys`);
+      else profile.destinations = list.map((name) => name.trim()).filter((name) => name.length > 0);
+    }
+    profiles.push(profile);
   }
   return profiles;
 }
@@ -494,6 +567,14 @@ export function parseConfig(raw: unknown, path: string): Config {
 
   // Cross-check last, once both halves are known: an alias that points nowhere
   // is a config error rather than a silent miss at lookup time.
+  for (const profile of profiles) {
+    for (const name of profile.destinations ?? []) {
+      if (places[name] === undefined) {
+        issues.push(`profiles.${profile.key}.destinations: no place named ${name} is declared`);
+      }
+    }
+  }
+
   if (defaults.home !== null && !profiles.some((profile) => profile.key === defaults.home)) {
     issues.push(`defaults.home: no profile named ${defaults.home} is declared`);
   }
@@ -526,6 +607,7 @@ export async function loadConfig(explicit?: string): Promise<Config> {
         fallback: DEFAULT_FALLBACK,
         transportTypes: [...DEFAULT_TRANSPORT_TYPES],
         planModes: [...DEFAULT_PLAN_MODES],
+        walkWeight: DEFAULT_WALK_WEIGHT,
         timezone: DEFAULT_TIMEZONE,
         home: null,
       },

@@ -27,16 +27,23 @@ export interface ExportedBoard {
   connection: ExportedConnection | null;
 }
 
-/** A named coordinate, used as a journey destination. */
+/**
+ * Somewhere a journey can end: a doorstep with coordinates, or a stop the
+ * reader is travelling to. Exactly one of the two is set.
+ */
 export interface ExportedPlace {
   name: string;
-  lat: number;
-  lon: number;
+  label: string | null;
+  lat: number | null;
+  lon: number | null;
+  stop: string | null;
 }
 
 export interface ExportedProfile {
   key: string;
   title: string;
+  /** Place keys this profile offers, in order; null for the default order. */
+  destinations?: string[] | null;
   boards: ExportedBoard[];
 }
 
@@ -49,6 +56,8 @@ export interface ExportedConfig {
     transport_types: Mode[];
     /** Transit modes a journey plan may use, in the journey planner's vocabulary. */
     plan_modes?: string[];
+    /** What a walked minute costs in ridden minutes when journeys are ranked. */
+    walk_weight?: number;
     timezone: string;
     home: string | null;
   };
@@ -134,11 +143,21 @@ export interface PageState {
    */
   earlyBufferMinutes: number;
   /**
-   * Journeys per profile, in memory only. Deliberately not mirrored to the
-   * offline cache: a stale arrival time looks exactly like a fresh one, and it
-   * is the number a reader acts on.
+   * What one walked minute costs in ridden minutes when journeys are ranked.
+   * Held in memory and not persisted, for the same reason as the tight window:
+   * it is a "what if I would rather walk" question about one look at one board.
+   */
+  walkWeight: number;
+  /**
+   * Journeys per profile. Mirrored to IndexedDB, but a restored plan is always
+   * marked stale and drawn dimmed with its age, because a stale arrival time
+   * looks exactly like a fresh one and it is the number a reader acts on.
    */
   routes: Map<string, import('./commute.ts').ProfileRoutes>;
+  /** How far the current planning run has got, per profile. */
+  planning: Map<string, { done: number; total: number }>;
+  /** How many planning runs are in flight, which the refresh ring counts too. */
+  planInFlight: number;
 }
 
 /** A row as the renderer needs it: the departure plus what the board adds. */

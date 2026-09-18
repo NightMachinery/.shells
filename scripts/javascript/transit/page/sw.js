@@ -11,7 +11,7 @@
 // Bumping CACHE invalidates everything. Do that when the shell changes shape in
 // a way the stale-while-revalidate below cannot heal on its own.
 
-const CACHE = 'transit-shell-v1';
+const CACHE = 'transit-shell-v2';
 
 /**
  * The shell, relative to this worker's scope so the same bytes work wherever
@@ -19,7 +19,21 @@ const CACHE = 'transit-shell-v1';
  * draw a single tab without it, and it is a small file that changes only when
  * the configuration does.
  */
-const SHELL = ['./', './index.html', './app.js', './icon.png', './icon-180.png', './manifest.webmanifest', './data/config.json'];
+const SHELL = [
+  './',
+  './index.html',
+  './app.js',
+  './theme.css',
+  // The expanded view of one journey. It is in the shell because it is opened
+  // from a board, often underground, and it needs nothing but itself and its
+  // own URL to render: caching it is what makes that true offline as well.
+  './route.html',
+  './route.js',
+  './icon.png',
+  './icon-180.png',
+  './manifest.webmanifest',
+  './data/config.json',
+];
 
 self.addEventListener('install', (event) => {
   event.waitUntil(

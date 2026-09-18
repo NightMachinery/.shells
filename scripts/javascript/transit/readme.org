@@ -134,9 +134,23 @@ catchable from that row, which is information rather than a gap.
 
 ** Places
 
-=[places.<name>]= holds coordinates for the =nearby= lookup. They are not part
-of any board and they are deliberately excluded from the exported config unless
-you ask for them.
+=[places.<name>]= declares somewhere a journey can end, and there are two kinds.
+
+A *coordinate place* carries =lat= and =lon= and is a doorstep: the planner
+routes to the point and works out the walk at the end. It is also what the
+=nearby= lookup uses. Coordinates are geography, so they are excluded from the
+exported config unless you ask for them.
+
+A *stop place* carries =stop= and =label= instead and is a station you are
+travelling to rather than through: the journey ends when the vehicle does, the
+walk at the end is nothing, and it is offered as a destination from every
+profile. It is exported unconditionally, because a stop id is not geography and
+the document is already a list of stop ids.
+
+A place declares one or the other, never both. A profile may list
+=destinations = [keys…]= to fix the order the picker offers them in; without one
+the doorsteps come first and the stations after, which is the order the everyday
+answers come in.
 
 * Commands
 
@@ -277,14 +291,44 @@ service, and most boards are not journeys anybody plans: they are "is there a bu
 soon". A profile whose boards all decline says so and exits zero rather than
 failing.
 
-The destination is =--to <profile>=, and the coordinate is that profile's entry
+The destination is =--to <profile>=, and the place is that profile's entry
 under =[places.<name>]=. The name is resolved as a profile first and as a place
 key second, because the far end of a commute often has no boards of its own and
-therefore no profile. Without =--to= there is one rule and no further guessing:
+therefore no profile, and because a stop place has no profile by construction.
+Without =--to= there is one rule and no further guessing:
 from the home profile the destination is the =work= key, and from =work= it is
 the home profile. Anything else has to say where it is going, and a name that
 resolves to no place exits with the config status code, naming what was looked
 for.
+
+** What a plan is asked about, and how it is ranked
+
+A plan towards a doorstep is not one search. It is one search for the
+coordinate, plus one for every stop of the profile that lives there, each
+carrying the walking time the configuration records for that stop, all issued at
+once and merged into one set of options.
+
+That is not redundancy, and the reason is the same Pareto set that makes exits
+worth recomputing. A journey arriving at a station six minutes from the door is
+dominated by one arriving sooner at a station fourteen minutes away: later, no
+fewer changes, so it is never returned. Asking about the near station by name is
+what makes it exist as an option at all. Measured live: from work towards home,
+the recommendation was a fast train to the far station and a quarter of an hour
+on foot, and the near station's train was not in the answer to be ranked.
+
+Once the options exist they are ranked by =arrival + (walk_weight - 1) x walked
+minutes=, not by arrival. Every option carries the minutes on foot over the whole
+journey, the changes and the last stretch together. =walk_weight= defaults to
+=DEFAULT_WALK_WEIGHT= and says what a minute on foot is worth in minutes on a
+vehicle; one ranks by arrival, the way the planner does on its own. It is a
+preference rather than a fact, which is why it is configurable and why the page
+lets you move it for one look without saving it. Ties go to fewer changes, then
+to the option that is not tight, then to staying on the first vehicle longer.
+
+Walks are legs in the result rather than annotations on the vehicles around
+them, because a walk is the thing being chosen between: "off at the far station
+and fourteen minutes on foot" and "off at the near one and six" differ in
+nothing else, and a list of trains hides exactly that.
 
 ** Which identifier the planner will accept
 
@@ -445,12 +489,20 @@ on screen.
 
 ** Paging, caching and gaps
 
-The planner pages by cursor, like the aggregator's departures. =numItineraries=
-is honoured and widens the search window rather than truncating a fixed one, so
-=ITINERARIES_PER_REQUEST= usually covers a whole board in one request and the
-cursor walk is the exception. The walk ends when the itineraries reach the last
-row being planned, when a page comes back empty, when the cursor stops moving, or
-at =PLAN_MAX_PAGES=. The cap is there for the same reason the departure backends
+One request, as wide as the board. The planner takes =searchWindow= in seconds,
+and asking for the span the board actually covers, bounded by
+=PLAN_SEARCH_WINDOW_MIN_SECONDS= and =PLAN_SEARCH_WINDOW_MAX_SECONDS=, answers in
+one round trip what the cursor walk needed two or more for. Measured against the
+live service: =searchWindow=10800= answered in 357 ms with itineraries spanning
+184 minutes of departures, where the same request without it needed two pages and
+620 ms to cover less.
+
+The cursor walk survives as the safety net for a board whose horizon outruns the
+widest window worth asking a free service for. =numItineraries= is honoured too
+and widens the window on its own, so it stays as a floor on how many itineraries
+come back, which is what the onward-chain index feeds on. The walk ends when the
+itineraries reach the last row being planned, when a page comes back empty, when
+the cursor stops moving, or at =PLAN_MAX_PAGES=. The cap is there for the same reason the departure backends
 have one: a free service with no rate-limit signal gets a bounded walk rather than
 an unbounded one. Coverage is measured only on itineraries that actually start at
 the board's stop, so one that walks off to a neighbouring stop cannot declare the
@@ -476,6 +528,11 @@ keyed on the *resolved* origin rather than on the configured stop, so a stop
 that failed as a parent identifier and then resolved to a platform is asked
 again under the identifier that might work. Every other failure stays
 retryable.
+
+A 404 names one of the two ends and does not say which, so it is only blamed on
+the origin when *every* destination has failed, which is the one case where the
+origin is what they had in common. One destination the planner cannot place is
+dropped and the rest answer.
 
 ** The route document
 
@@ -524,16 +581,18 @@ are omitted unless =--with-places= is passed.
 
 * The browser page
 
-=bun run build= bundles =src/page.ts= into =page/app.js=. The bundle imports
-only the model, the filters, the backends, the colours and the HTTP helper; it
-never touches the cache module or anything else that needs the bun runtime, and
-the build is deterministic.
+=bun run build= bundles =src/page.ts= into =page/app.js= and =src/route.ts= into
+=page/route.js=. The bundles import only the model, the filters, the backends,
+the colours and the HTTP helper; they never touch the cache module or anything
+else that needs the bun runtime, and the build is deterministic.
 
-=page/index.html= is a generic shell: a title, the whole stylesheet, an empty
-mount point and a script tag. It contains no stop identifiers, no coordinates
-and no hostnames, because a separate private repository copies it in alongside
-its own =data/config.json= produced by =config-export=. The page fetches that
-file relative to itself on load.
+=page/index.html= is a generic shell: a title, a stylesheet link, what CSS only
+that page needs, an empty mount point and a script tag. =page/route.html= is the
+same for the expanded view of one journey, and =page/theme.css= is what they
+share. None of them contains a stop identifier, a coordinate or a hostname,
+because a separate private repository copies them in alongside its own
+=data/config.json= produced by =config-export=. The page fetches that file
+relative to itself on load.
 
 The page renders one tab per configured profile, in config order, titled from
 each profile's title, and remembers the selection in local storage inside a
@@ -629,18 +688,69 @@ the timetable and does not always know a vehicle has been withdrawn, and a
 recommendation to board a train that is not running is worse than no
 recommendation.
 
-The board's own filter carries the tight-connection window, because it changes
-what one board shows and means nothing on the others. It is held in memory and
-deliberately not persisted: it is a "show me what I would have to run for"
-question about one look at one board, and a persisted one would quietly widen
-every plan for weeks after the reader forgot they had touched it. Moving it
-re-plans without re-fetching, which is nearly free, because the window is not
-part of the plan cache key.
+The board's own filter carries the tight-connection window and the walking
+weight, because both change what one board shows and mean nothing on the others.
+Both are held in memory and deliberately not persisted: they are "show me what I
+would have to run for" and "what if I would rather sit down" questions about one
+look at one board, and a persisted one would quietly change every plan for weeks
+after the reader forgot they had touched it. Moving either re-plans without
+re-fetching, which is nearly free, because neither is part of the plan cache key.
 
-Plans are never written to the offline cache, unlike the departures. A stale
-departure is obvious, since its countdown is wrong and the row says how old the
-data is. A stale arrival time is not: it looks exactly like a fresh one, and it
-is the number a reader acts on.
+The boards of a profile are planned all at once, and the profile the reader is
+looking at is planned before the others: a background tab must not put four
+journey searches in front of the one on screen. While a run is going a planned
+board says so, and the refresh ring counts planning as work in flight, because a
+ring that stopped while the journeys were still being worked out said the page
+was idle when it was not.
+
+Plans *are* mirrored to IndexedDB, and what comes back is never presented as
+current. A stale departure is obvious, since its countdown is wrong and the row
+says how old the data is; a stale arrival time is not, because it looks exactly
+like a fresh one and it is the number a reader acts on. So a restored plan is
+drawn dimmed and italic with its age on the board, and swapped out the moment a
+fresh one lands. Without the mirror a cold start shows every row with an empty
+journey slot for a second or two, which reads as "no journey" rather than "not
+yet asked".
+
+*** The journey tooltip and the expanded page
+
+A journey slot is two centimetres wide and the answer is a paragraph, so the
+slot is a summary with two ways out of it.
+
+Hovering it, or tapping it on a touch screen, opens the page's tooltip: the
+recommended journey with every leg listed, walks included, then the other
+options as one-liners that expand where they stand. The same tooltip carries the
+times in the rows and the strip, and the jump chips in the bar. It replaced the
+native =title= attribute, which takes plain text only and never appears at all
+on a phone, which is where this page is read and where the slot is narrowest.
+A control with its own primary action, like a jump chip, keeps its tap and opens
+the tooltip on hover or a long press instead.
+
+Clicking the slot opens =route.html= in a new tab: one row's journeys in full,
+as vertical timelines. It takes its whole state from the URL fragment, as
+base64url of a small JSON object, which is why it opens instantly, opens
+underground, and cannot disagree with the board it came from. A fragment rather
+than a query string because a fragment never leaves the browser. The cost is
+that a link is a snapshot, so the page says when it was planned and carries a
+button that plans that one row again and rewrites the fragment.
+
+*** Destination badges in the strip
+
+A strip is one line per line and direction and one cell per departure, which is
+what makes it a glance. Branching services broke that: a run terminating short
+of the others had its destination spelled out after every time, the row wrapped,
+and the rhythm was gone.
+
+Where a group's runs all end in the same place the header says so and nothing is
+repeated. Where they do not, every time carries a two or three letter badge and
+a legend under the group defines each one. The letters are the initials of up to
+three significant words of the destination, filler words dropped, and collisions
+are resolved by lengthening the first word rather than by adding a digit,
+because the extra letters still name a place. The colour comes from the
+destination's alphabetical rank within the board, so it is stable across
+refreshes; how saturated and how light it is belongs to the stylesheet, which is
+the only thing that knows the colour scheme. A badge never borrows the line's own
+colour, because the line badge beside it already carries that.
 
 ** Freshness, caching and installing
 
@@ -649,6 +759,11 @@ immediately on load with its age, then refreshed. Switching tabs shows the cache
 at once and refreshes only when it is older than a glance. While a fetch is in
 flight a board shows skeleton rows and a progress line naming the backend and the
 page number.
+
+The shell is two pages now, the board and the expanded journey view, and they
+share =theme.css=: the palette, the type, the line badge and everything a
+journey is drawn with. Two copies of a palette drift, and these two are on the
+same screen a tap apart.
 
 The page ships a web manifest and a service worker, so it installs as a
 standalone app. The worker caches the shell and deliberately not the departures:
@@ -742,10 +857,13 @@ cache lifetimes are in =src/cache.ts=.
 The boundary between the near window and the strip view is in
 =src/format/terminal.ts=, along with how many journeys a row prints. The walking
 pace, the early buffer, the plan cache lifetime, the itineraries asked for per
-request, the page cap and the options kept per row are all in =src/plan.ts=, and
-the transit modes a journey may use are in =src/config.ts= with the other
-defaults. The abbreviations used in slots too narrow for a full place name are a
-single constant in =src/page/dom.ts=. The
+request, the bounds on the search window, the page cap and the options kept per
+row are all in =src/plan.ts=, and the transit modes a journey may use and what a
+walked minute costs are in =src/config.ts= with the other defaults. The
+abbreviations used in slots too narrow for a full place name are a single
+constant in =src/page/dom.ts=, and the filler words a destination badge drops
+are one in =src/page/badges.ts=. How long a pointer rests before a tooltip opens
+is in =src/page/tip.ts=. The
 watch interval, the discovery sample count and the key the commute view pairs
 with the home profile are in =src/cli.ts=, and the page's refresh and tick
 intervals are in =src/page.ts=.

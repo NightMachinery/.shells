@@ -1,7 +1,11 @@
-import { contrastText, resolveColor, resolveTextColor } from '../colors.ts';
 import { catchableOnBoard, describeWalk, normaliseLine, walkMinutesFor } from '../filter.ts';
 import type { Board, Departure } from '../model.ts';
-import { button, clockTime, compact, dayMarker, el, minutesUntil, slot } from './dom.ts';
+import { handoffFor, routeUrl } from '../route-link.ts';
+import type { RouteOption } from '../plan.ts';
+import { button, clockTime, compact, el, minutesUntil, slot, timeLabel, timeNode } from './dom.ts';
+import { destinationBadges, type DestinationBadge } from './badges.ts';
+import { alternativeLine, journeySummary, lineBadge, renderJourney, slotHead } from './journey.ts';
+import { attachTip } from './tip.ts';
 import { alarmMarker, attachLongPress, openAlarmPopup } from './notify.ts';
 import { stopTagOf } from './data.ts';
 import { arrivalOf, rowKey, usualExits, type BoardRoutes } from './commute.ts';
@@ -28,6 +32,20 @@ export interface BoardContext {
   onRetry: () => void;
   /** Journeys from this board to the chosen destination, keyed by row. */
   routes?: BoardRoutes;
+  /** True while the journeys came from the cache and nothing fresh has landed. */
+  routesStale: boolean;
+  /** When the journeys on screen were planned, epoch ms; null when there are none. */
+  routesAt: number | null;
+  /** What the destination is called, for the journey slot and its tooltip. */
+  destinationName: string;
+  /** The place key it is, so the expanded page can plan the same journey again. */
+  destinationKey: string;
+  /** Where this board sits in a planning run, or null when none is running. */
+  planning: { position: number; done: number; total: number } | null;
+  /** What a walked minute costs in ridden minutes, shown in the filter popover. */
+  walkWeight: number;
+  /** Called when the reader changes that; re-plans rather than re-fetches. */
+  onWalkWeight: (value: number) => void;
   /** Whether this board's rows are ordered by arrival rather than departure. */
   sortByArrival: boolean;
   /** The current tight-connection window, shown in the filter of a planned board. */
@@ -65,14 +83,6 @@ export function visibleRows(profileKey: string, board: Board): Departure[] {
   return board.departures.filter((dep) => !hidden.has(filterKey(dep.stop, normaliseLine(dep.line))));
 }
 
-function lineBadge(dep: Pick<Departure, 'line' | 'mode' | 'color'>): HTMLElement {
-  const background = resolveColor(dep);
-  const node = el('span', 'badge', dep.line);
-  node.style.backgroundColor = background;
-  node.style.color = resolveTextColor(dep) ?? contrastText(background);
-  return node;
-}
-
 /**
  * A time, with its planned time behind it when the two differ.
  *
@@ -87,19 +97,46 @@ function timeGroup(dep: Departure, timezone: string, referenceMs: number): HTMLE
   const wrap = el('span', `times${dep.cancelled ? ' cancelled' : ''}`);
   const late = dep.delayMin > 0;
   const early = dep.delayMin < 0;
-  const main = el('span', `time-main${late ? ' late' : ''}${early ? ' early' : ''}`, clockTime(dep.realtime, timezone));
-  const marker = dayMarker(dep.realtime, referenceMs, timezone);
-  if (marker !== null) main.append(marker);
+  const main = timeNode(dep.realtime, referenceMs, timezone, `time-main${late ? ' late' : ''}${early ? ' early' : ''}`);
   wrap.append(main);
-
-  if (dep.delayMin !== 0) {
-    wrap.append(el('span', 'time-planned', `(${clockTime(dep.planned, timezone)})`));
-    wrap.title = `planned ${clockTime(dep.planned, timezone)}, ${dep.delayMin > 0 ? '+' : ''}${dep.delayMin} min`;
-  } else {
-    wrap.title = `planned ${clockTime(dep.planned, timezone)}, on time`;
-  }
-  if (dep.cancelled) wrap.title = `${wrap.title}. Cancelled.`;
+  if (dep.delayMin !== 0) wrap.append(el('span', 'time-planned', `(${clockTime(dep.planned, timezone)})`));
+  attachTip(wrap, () => departureTip(dep, timezone, referenceMs), { label: departureLabel(dep, timezone, referenceMs) });
   return wrap;
+}
+
+/** What a time says in plain text: the timetable, the delay, where it is going. */
+function departureLabel(dep: Departure, timezone: string, referenceMs: number): string {
+  const parts = [dep.destination, `planned ${timeLabel(dep.planned, referenceMs, timezone)}`];
+  parts.push(dep.delayMin === 0 ? 'on time' : `${dep.delayMin > 0 ? '+' : ''}${dep.delayMin} min`);
+  if (dep.platform !== null) parts.push(`platform ${dep.platform}`);
+  if (dep.cancelled) parts.push('cancelled');
+  return parts.join(' · ');
+}
+
+/** The same, as the tooltip everything on this page uses. */
+function departureTip(dep: Departure, timezone: string, referenceMs: number): HTMLElement {
+  const body = el('div', 'tip-body');
+  const head = el('div', 'tip-head');
+  head.append(lineBadge(dep));
+  head.append(el('span', 'tip-title', dep.destination));
+  body.append(head);
+
+  const rows = el('dl', 'tip-rows');
+  const row = (term: string, value: Node | string): void => {
+    rows.append(el('dt', undefined, term));
+    const dd = el('dd');
+    if (typeof value === 'string') dd.textContent = value;
+    else dd.append(value);
+    rows.append(dd);
+  };
+  row('planned', timeNode(dep.planned, referenceMs, timezone));
+  row('expected', timeNode(dep.realtime, referenceMs, timezone));
+  row('delay', dep.delayMin === 0 ? 'on time' : `${dep.delayMin > 0 ? '+' : ''}${dep.delayMin} min`);
+  if (dep.platform !== null) row('platform', dep.platform);
+  body.append(rows);
+  if (dep.cancelled) body.append(el('p', 'tip-warning', 'This departure is cancelled.'));
+  if (dep.sev) body.append(el('p', 'tip-note', 'A replacement service, not the usual vehicle.'));
+  return body;
 }
 
 /** Which optional columns this board's rows have anything to put in. */
@@ -170,7 +207,7 @@ function gridTemplate(columns: Columns): string {
  * and when you arrive. A tight option is one that only works if the first leg
  * runs early, so it is never the recommendation and says so when asked.
  */
-function renderRoute(dep: Departure, context: BoardContext, usual: Map<string, string>): HTMLElement {
+function renderRoute(dep: Departure, board: Board, context: BoardContext, usual: Map<string, string>): HTMLElement {
   // A cancelled departure gets no route, however good the planner thinks it is.
   // The planner works from the timetable and does not always know the vehicle
   // has been withdrawn, and a recommendation to take a train that is not running
@@ -179,31 +216,137 @@ function renderRoute(dep: Departure, context: BoardContext, usual: Map<string, s
   const planned = context.routes?.rows.get(rowKey(dep));
   const option = planned?.best ?? planned?.options[0];
   if (option === undefined) return slot('route');
+  const options = planned?.options ?? [option];
 
   const better = usual.get(normaliseLine(dep.line)) !== undefined && usual.get(normaliseLine(dep.line)) !== option.exitStop;
-  const node = el('span', `route${option.tight ? ' tight' : ''}${better && !option.tight ? ' better' : ''}`);
-  const onward = option.legs[1];
-  // The exit name is shortened the same way a destination is, because the slot
-  // is narrow and the arrival time is the part a reader acts on. A stop called
-  // "Somewhere (Something)" would otherwise push the time out of the slot
-  // entirely, which is the one thing here that must never be cut.
-  const exit = shortDestination(option.exitStopName);
-  const head = onward === undefined ? exit : `${exit} · ${onward.line}`;
-  node.append(el('span', 'route-head', head));
-  node.append(el('span', 'route-arrival', clockTime(option.arrival, context.timezone)));
+  const stale = context.routesStale ? ' route-stale' : '';
+  // A link, not a span: the expanded view is a page with its own address, so it
+  // opens in a new tab, it can be shared, and the browser's own affordances for
+  // "this goes somewhere" all work without being reimplemented.
+  const node = document.createElement('a');
+  node.className = `route${option.tight ? ' tight' : ''}${better && !option.tight ? ' better' : ''}${stale}`;
+  node.href = routeUrl(
+    handoffFor({
+      board: board.title,
+      destination: context.destinationName,
+      destinationKey: context.destinationKey,
+      timezone: context.timezone,
+      plannedAt: context.routesAt ?? context.now,
+      departure: dep,
+      from: board.title,
+      options,
+    }),
+  );
+  node.target = '_blank';
+  node.rel = 'noopener';
 
-  const chain = option.legs.map((leg) => `${leg.line} ${clockTime(leg.departure, context.timezone)}`).join(' → ');
-  const parts = [`change at ${option.exitStopName}`, chain, `arrive ${clockTime(option.arrival, context.timezone)}`];
-  if (option.tight) parts.push('tight: needs the first leg to run early or the change to be quick');
-  if (better) parts.push('a different exit from this line\u2019s usual one');
-  // Which identifier the planner had to be given for this stop. Said only when
-  // it was not the stop itself, because that is when a plan is a slightly
-  // weaker claim and a reader checking it against what they know should see it.
-  const origin = context.routes?.origin;
-  if (origin === 'platform') parts.push('planned from this stop\u2019s platform, which is how the planner knows it');
-  if (origin === 'coordinate') parts.push('planned from this stop\u2019s position, which is all the planner knows of it');
-  node.title = parts.join(' · ');
+  node.append(slotHead(option, shortDestination));
+  node.append(timeNode(option.arrival, context.now, context.timezone, 'route-arrival'));
+
+  const notes = { better, origin: context.routes?.origin };
+  attachTip(node, () => routeTip(dep, board, context, options, notes), {
+    label: journeySummary(option, context.timezone, context.now),
+    // The link is the tap target's primary action on a desktop; on a touch
+    // screen a tap opens the tooltip instead, and the tooltip carries its own
+    // button to the page. Otherwise the only way to see the alternatives on a
+    // phone would be to leave the board.
+    tapOpens: true,
+  });
   return node;
+}
+
+/**
+ * The tooltip for a journey slot: the recommendation in full, then the other
+ * ways of making the same trip, each of which expands where it stands.
+ *
+ * Three rather than all of them, because past the third every option is worse
+ * on every measure than something already listed, and the tooltip has to stay
+ * readable on a phone held in one hand.
+ */
+const TIP_OPTIONS_SHOWN = 3;
+
+function routeTip(
+  dep: Departure,
+  board: Board,
+  context: BoardContext,
+  options: readonly RouteOption[],
+  notes: { better: boolean; origin: BoardRoutes['origin'] | undefined },
+): HTMLElement {
+  const body = el('div', 'tip-body tip-journey');
+  const shown = options.slice(0, TIP_OPTIONS_SHOWN);
+  const best = shown[0] as RouteOption;
+
+  const head = el('div', 'tip-head');
+  head.append(lineBadge(dep));
+  head.append(timeNode(dep.realtime, context.now, context.timezone, 'tip-departure'));
+  head.append(el('span', 'tip-title', `${board.title} → ${context.destinationName}`));
+  body.append(head);
+
+  body.append(renderJourney(best, context.timezone, context.now, notes));
+
+  if (shown.length > 1) {
+    body.append(el('h4', 'tip-alternatives-title', 'Alternatives'));
+    const list = el('ul', 'tip-alternatives');
+    shown.slice(1).forEach((option, offset) => {
+      const item = el('li', `tip-alternative${option.tight ? ' tight' : ''}`);
+      const toggle = button('tip-alternative-line', alternativeLine(option, context.timezone));
+      const detail = el('div', 'tip-alternative-detail');
+      detail.hidden = true;
+      detail.append(renderJourney(option, context.timezone, context.now, { origin: notes.origin }));
+      toggle.addEventListener('click', (event) => {
+        event.stopPropagation();
+        detail.hidden = !detail.hidden;
+      });
+      item.append(toggle);
+      const open = document.createElement('a');
+      open.className = 'tip-alternative-open';
+      open.textContent = 'open';
+      open.target = '_blank';
+      open.rel = 'noopener';
+      open.href = routeUrl(
+        handoffFor({
+          board: board.title,
+          destination: context.destinationName,
+          destinationKey: context.destinationKey,
+          timezone: context.timezone,
+          plannedAt: context.routesAt ?? context.now,
+          departure: dep,
+          from: board.title,
+          options: [...options],
+          first: offset + 1,
+        }),
+      );
+      item.append(open);
+      item.append(detail);
+      list.append(item);
+    });
+    body.append(list);
+  }
+
+  if (context.routesStale && context.routesAt !== null) {
+    const age = Math.max(0, Math.round((Date.now() - context.routesAt) / 1000));
+    body.append(el('p', 'tip-note', `from the last visit, ${age} s old; planning again now`));
+  }
+
+  const open = document.createElement('a');
+  open.className = 'tip-open';
+  open.textContent = 'Open in a new tab';
+  open.target = '_blank';
+  open.rel = 'noopener';
+  open.href = routeUrl(
+    handoffFor({
+      board: board.title,
+      destination: context.destinationName,
+      destinationKey: context.destinationKey,
+      timezone: context.timezone,
+      plannedAt: context.routesAt ?? context.now,
+      departure: dep,
+      from: board.title,
+      options: [...options],
+    }),
+  );
+  body.append(open);
+  return body;
 }
 
 function renderRow(dep: Departure, board: Board, columns: Columns, context: BoardContext, usual: Map<string, string>): HTMLElement {
@@ -231,7 +374,7 @@ function renderRow(dep: Departure, board: Board, columns: Columns, context: Boar
   main.append(meta);
   row.append(main);
 
-  if (columns.route) row.append(renderRoute(dep, context, usual));
+  if (columns.route) row.append(renderRoute(dep, board, context, usual));
 
   if (columns.connection) {
     if (dep.connection === undefined || dep.connection === null) {
@@ -319,13 +462,17 @@ function stripLabel(group: Strip): { text: string; title: string } {
 function renderStrip(rows: Departure[], board: Board, context: BoardContext): HTMLElement {
   const list = el('ul', 'strips');
   const multiStop = board.stops.length > 1;
+  // Computed over the whole board rather than per group, so a destination that
+  // two lines both serve gets one badge and one colour everywhere on the board.
+  const badges = destinationBadges(rows.map((row) => row.destination));
   for (const group of stripGroups(rows)) {
     const item = el('li', 'strip');
-    item.append(lineBadge(group.head));
+    const main = el('span', 'strip-main');
+    main.append(lineBadge(group.head));
     const label = stripLabel(group);
     const direction = el('span', 'direction', label.text);
     direction.title = label.title;
-    item.append(direction);
+    main.append(direction);
 
     // A platform is a property of the group when every run uses the same one,
     // which is the usual case, and only becomes per-time when it is not.
@@ -334,47 +481,72 @@ function renderStrip(rows: Departure[], board: Board, context: BoardContext): HT
     if (uniform !== undefined && uniform !== '') {
       const node = el('span', 'platform', uniform);
       node.title = `platform ${uniform}`;
-      item.append(node);
+      main.append(node);
     }
     if (multiStop) {
       const tag = group.head.stopTag ?? stopTagOf(group.head.stop, board.stopLabels);
       const node = el('span', 'stop-tag', tag);
       node.title = `from ${tag}`;
-      item.append(node);
+      main.append(node);
     }
 
-    const head = group.entries[0]?.destination ?? '';
+    // A run that terminates short of the others is a different journey, and a
+    // strip that hides that sends people onto a train that stops before their
+    // stop. When the whole group agrees, the header already says where it goes
+    // and nothing is repeated; when it does not, every time carries a two or
+    // three letter badge and the legend below says what each one stands for.
+    const destinations = [...new Set(group.entries.map((entry) => entry.destination))];
+    const branching = destinations.length > 1;
     const times = el('span', 'times-strip');
     for (const dep of group.entries) {
       const late = dep.delayMin > 0;
       const early = dep.delayMin < 0;
-      const cell = el(
-        'span',
-        `time${dep.cancelled ? ' cancelled' : ''}${late ? ' late' : ''}${early ? ' early' : ''}`,
-        clockTime(dep.realtime, context.timezone),
-      );
-      const marker = dayMarker(dep.realtime, context.now, context.timezone);
-      if (marker !== null) cell.append(marker);
-      // A run that terminates short of the others is a different journey, and a
-      // strip that hides that sends people onto a train that stops before their
-      // stop. The suffix is the short form; the whole destination is in the
-      // tooltip, along with everything else this time knows.
-      if (dep.destination !== head) cell.append(el('span', 'time-note', shortDestination(dep.destination)));
+      const cell = el('span', `time${dep.cancelled ? ' cancelled' : ''}${late ? ' late' : ''}${early ? ' early' : ''}`);
+      cell.append(timeNode(dep.realtime, context.now, context.timezone, 'time-clock'));
+      if (branching) {
+        const badge = badges.get(dep.destination);
+        if (badge !== undefined) cell.append(destinationChip(badge, dep.destination));
+      }
       // A platform only appears per time when the group's platforms disagree.
       // When they agree it is on the row, once, which is where a reader looks.
       if (uniform === undefined && dep.platform !== null) cell.append(el('span', 'time-note', `pl ${dep.platform}`));
-      const parts = [dep.destination];
-      parts.push(dep.delayMin === 0 ? `planned ${clockTime(dep.planned, context.timezone)}, on time` : `planned ${clockTime(dep.planned, context.timezone)}, ${dep.delayMin > 0 ? '+' : ''}${dep.delayMin} min`);
-      if (dep.platform !== null) parts.push(`platform ${dep.platform}`);
-      if (dep.cancelled) parts.push('cancelled');
-      cell.title = parts.join(' · ');
       if (dep.cancelled) cell.append(el('span', 'time-note', '✕'));
+      attachTip(cell, () => departureTip(dep, context.timezone, context.now), {
+        label: departureLabel(dep, context.timezone, context.now),
+      });
       times.append(cell);
     }
-    item.append(times);
+    main.append(times);
+    item.append(main);
+
+    if (branching) {
+      const legend = el('span', 'strip-legend');
+      for (const name of destinations) {
+        const badge = badges.get(name);
+        if (badge === undefined) continue;
+        const entry = el('span', 'strip-legend-entry');
+        entry.append(destinationChip(badge, name));
+        entry.append(el('span', 'strip-legend-name', compact(name)));
+        legend.append(entry);
+      }
+      item.append(legend);
+    }
     list.append(item);
   }
   return list;
+}
+
+/** One destination badge: procedural colour, full name on the tooltip. */
+function destinationChip(badge: DestinationBadge, name: string): HTMLElement {
+  const node = el('span', 'dest-badge', badge.text);
+  // Only the hue is set here. Saturation, lightness and the text colour belong
+  // to the stylesheet, which is the only place that knows about the colour
+  // scheme, and the line's own colour is never reused: the line badge beside it
+  // already carries that, and two things in one colour saying different things
+  // is worse than no colour at all.
+  node.style.setProperty('--dest-hue', String(badge.hue));
+  node.title = name;
+  return node;
 }
 
 /**
@@ -472,6 +644,28 @@ function appendEarlyBuffer(popover: HTMLElement, context: BoardContext): void {
   label.append(input);
   label.append(el('span', 'filter-buffer-unit', 'min'));
   popover.append(label);
+
+  // What a walked minute is worth. It sits next to the tight window because the
+  // two are the same kind of question, "how do I actually want to travel", and
+  // like it, it is not saved: it is asked about one board on one evening.
+  const weight = document.createElement('label');
+  weight.className = 'filter-buffer';
+  weight.append(el('span', undefined, 'walking costs'));
+  const factor = document.createElement('input');
+  factor.type = 'number';
+  factor.min = '1';
+  factor.max = '5';
+  factor.step = '0.5';
+  factor.value = String(context.walkWeight);
+  factor.title = 'what one minute on foot is worth in minutes on a vehicle. 1 ranks by arrival alone.';
+  factor.addEventListener('change', () => {
+    const value = Number(factor.value);
+    if (!Number.isFinite(value) || value < 1) return;
+    context.onWalkWeight(Math.min(5, value));
+  });
+  weight.append(factor);
+  weight.append(el('span', 'filter-buffer-unit', '×'));
+  popover.append(weight);
 }
 
 /** Which board's filter popover is open, if any. Null when none is. */
@@ -555,6 +749,19 @@ export function renderBoard(board: Board, context: BoardContext): HTMLElement {
   if (context.status.kind === 'loading') {
     const note = context.status.backend === null ? 'refreshing' : `${context.status.backend} · page ${context.status.page}`;
     section.append(el('p', 'board-progress', note));
+  }
+
+  // The journeys arrive after the departures and take longer, so a board says
+  // so rather than leaving its journey slots empty and unexplained.
+  if (context.planning !== null) {
+    section.append(
+      el('p', 'board-progress board-planning', `planning · Transitous · ${context.planning.position}/${context.planning.total}`),
+    );
+  } else if (context.routes !== undefined && context.routesStale && context.routesAt !== null) {
+    const age = Math.max(0, Math.round((Date.now() - context.routesAt) / 1000));
+    const note = el('p', 'board-progress board-stale', `journeys from the last visit, ${age}s old`);
+    note.title = 'these arrival times were planned before this page was opened, and are being planned again now';
+    section.append(note);
   }
 
   if (view === 'integrated') {

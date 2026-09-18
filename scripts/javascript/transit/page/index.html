@@ -20,99 +20,11 @@
     <link rel="icon" type="image/png" sizes="72x72" href="icon.png" />
     <link rel="apple-touch-icon" href="icon-180.png" />
     <link rel="manifest" href="manifest.webmanifest" />
+    <!-- The tokens, the base type and everything a journey is drawn with live in
+         one file, because the expanded journey page draws the same things and two
+         copies of a palette drift. What is only ever on this page stays below. -->
+    <link rel="stylesheet" href="theme.css" />
     <style>
-      /* Category colours for the first paint only. The bundle injects the full
-         generated table at boot from src/colors.ts, so these exist to stop the
-         badges flashing grey and are deliberately not the source of truth. */
-      :root {
-        --mode-sbahn: #008d4f;
-        --mode-ubahn: #0065ae;
-        --mode-tram: #d6001c;
-        --mode-bus: #00586a;
-        --mode-regional_bus: #4f6c8c;
-        --mode-bahn: #5a5a5a;
-      }
-
-      /* Surface palette, light first, overridden wholesale for dark. */
-      :root {
-        --bg: #f6f6f4;
-        --card: #ffffff;
-        --raised: #ececea;
-        --ink: #17181a;
-        --ink-soft: #5d6066;
-        --line: #e2e2df;
-        --accent: #0b6bcb;
-        --late: #c62828;
-        --early: #2e7d32;
-        --warn: #a8690a;
-        --radius: 12px;
-        --gap: 12px;
-
-        /* The fixed row slots. Named here rather than inlined so a board's grid
-           template is assembled from the same widths everywhere, and so one
-           media query can narrow all of them at once. */
-        /* The destination is the one column that must never be squashed away:
-           a row whose destination is a single letter says nothing at all. It
-           is a floor rather than a fixed width, so it still grows into space
-           the other slots do not need. */
-        --col-destination-min: 7rem;
-        --col-minutes: 2.6rem;
-        --col-badge: 2.9rem;
-        --col-connection: 4.6rem;
-        --col-platform: 1.6rem;
-        --col-state: 2.3rem;
-        --col-alarm: 1rem;
-        --col-stop: 2.6rem;
-        --col-route: 9rem;
-      }
-
-      @media (prefers-color-scheme: dark) {
-        :root {
-          --bg: #131416;
-          --card: #1c1e21;
-          --raised: #26282c;
-          --ink: #eceef1;
-          --ink-soft: #9aa0a8;
-          --line: #2c2f34;
-          --accent: #63a4ff;
-          --late: #ff6b6b;
-          --early: #7bd88f;
-          --warn: #e0a458;
-        }
-      }
-
-      * {
-        box-sizing: border-box;
-      }
-
-      html,
-      body {
-        margin: 0;
-        padding: 0;
-      }
-
-      body {
-        background: var(--bg);
-        color: var(--ink);
-        font: 15px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-        -webkit-text-size-adjust: 100%;
-      }
-
-      #app {
-        max-width: 780px;
-        margin: 0 auto;
-        padding: 0 16px 40px;
-      }
-
-      button {
-        font: inherit;
-        color: inherit;
-        background: none;
-        border: none;
-        padding: 0;
-        cursor: pointer;
-      }
-
       /* ------------------------------------------------------------- the bar */
 
       .bar {
@@ -392,6 +304,7 @@
          whether someone runs for a train. */
       .route {
         display: flex;
+        text-decoration: none;
         align-items: baseline;
         gap: 4px;
         min-width: 0;
@@ -400,11 +313,24 @@
         white-space: nowrap;
       }
 
-      /* The name gives way and the time does not. Where to get off is useful,
-         when you arrive is the number the reader is comparing rows by. */
+      /* The name gives way; the onward line and the time do not. Where to get
+         off is useful, what to catch and when you arrive are what the reader is
+         comparing rows by. */
       .route-head {
+        display: flex;
+        align-items: baseline;
+        gap: 3px;
+        min-width: 0;
+        overflow: hidden;
+      }
+
+      .route-exit {
         overflow: hidden;
         text-overflow: ellipsis;
+      }
+
+      .route-line {
+        flex: none;
       }
 
       .route-arrival {
@@ -424,6 +350,20 @@
       .route.better {
         color: var(--accent);
         font-weight: 600;
+      }
+
+      /* A journey restored from the last visit. Dimmed and italic, because an
+         arrival time is the one number here that looks exactly as convincing
+         when it is an hour old as when it is a second old. */
+      .route-stale {
+        opacity: 0.55;
+        font-style: italic;
+      }
+
+      .board-planning,
+      .board-stale {
+        color: var(--ink-soft);
+        font-style: italic;
       }
 
       .bar-error {
@@ -536,18 +476,6 @@
         text-align: right;
       }
 
-      .badge {
-        display: inline-block;
-        padding: 1px 6px;
-        border-radius: 5px;
-        font-size: 12px;
-        font-weight: 700;
-        text-align: center;
-        white-space: nowrap;
-        background: var(--mode-bus);
-        color: #fff;
-      }
-
       .row-main {
         min-width: 0;
         display: flex;
@@ -597,13 +525,6 @@
         text-decoration: line-through;
         color: var(--ink-soft);
         font-weight: 400;
-      }
-
-      .day-marker {
-        font-size: 9px;
-        margin-left: 1px;
-        color: var(--warn);
-        font-weight: 700;
       }
 
       .flag {
@@ -740,6 +661,53 @@
         color: var(--ink-soft);
         margin-left: 2px;
         vertical-align: super;
+      }
+
+      /* The strip's own row, so the legend can sit under it without disturbing
+         the rhythm of the times. */
+      .strip-main {
+        display: flex;
+        align-items: baseline;
+        gap: 7px;
+        flex-wrap: wrap;
+        flex: 1 1 100%;
+        min-width: 0;
+      }
+
+      .strip-legend {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 4px 10px;
+        flex: 1 1 100%;
+        font-size: 10px;
+        color: var(--ink-soft);
+      }
+
+      .strip-legend-entry {
+        display: inline-flex;
+        align-items: center;
+        gap: 3px;
+      }
+
+      /* A destination badge. Same height as the day marker, so a strip with
+         branching services is still one line tall. */
+      .dest-badge {
+        display: inline-block;
+        margin-left: 3px;
+        padding: 0 3px;
+        border-radius: 6px;
+        font-size: 9px;
+        font-weight: 700;
+        line-height: 1.35;
+        letter-spacing: 0.02em;
+        vertical-align: super;
+        background: hsl(var(--dest-hue, 0) var(--dest-badge-s) var(--dest-badge-l));
+        color: var(--dest-badge-ink);
+      }
+
+      .strip-legend .dest-badge {
+        vertical-align: baseline;
+        margin-left: 0;
       }
 
       .board-collapsed .board-walk {
@@ -1123,7 +1091,9 @@
           --col-state: 2rem;
           --col-alarm: 0.9rem;
           --col-stop: 2.3rem;
-          --col-route: 7.5rem;
+          /* Wider on a phone than on a desktop, because the interchange column
+             is dropped here and the journey is what takes its place. */
+          --col-route: 8.6rem;
         }
 
         #app {
