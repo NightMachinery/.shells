@@ -163,11 +163,21 @@ async function refreshMessages(): Promise<void> {
 
 // ------------------------------------------------------------------- render
 
-/** Every line label the visible profile configures, normalised for comparison. */
-function configuredLines(config: ExportedConfig): Set<string> {
+/**
+ * The lines a disruption notice has to name to be worth showing.
+ *
+ * Both what the profile pins and what its boards are actually showing right now.
+ * The configured labels alone are not enough: a board filtered by category
+ * rather than by line pins nothing, so a profile made of rapid-transit boards
+ * would have matched no notice at all, which is exactly the profile where a
+ * notice matters most. Taking the lines off the fetched rows makes the rule
+ * "notices about lines you can see", which is what a reader means.
+ */
+function relevantLines(config: ExportedConfig): Set<string> {
   const profile = config.profiles.find((entry) => entry.key === state.profileKey);
   const lines = new Set<string>();
   for (const board of profile?.boards ?? []) for (const line of board.lines ?? []) lines.add(normaliseLine(line));
+  for (const board of currentBoards()) for (const dep of board.departures) lines.add(normaliseLine(dep.line));
   return lines;
 }
 
@@ -229,7 +239,7 @@ function render(): void {
     }),
   );
 
-  const disruptions = renderMessages(state.messages, configuredLines(config), render);
+  const disruptions = renderMessages(state.messages, relevantLines(config), render);
   if (disruptions !== null) nodes.push(disruptions);
 
   if (profileKey !== null) {

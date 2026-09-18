@@ -376,9 +376,13 @@ updated expected departure on every refresh, which is the point of them, and the
 are best effort while the page is open. That is said on the popup rather than
 implied.
 
-Disruption notices are collapsed by default, filtered to the lines the visible
-profile configures, and can be narrowed further by chips or acknowledged until
-their text changes. They can be copied out in one go with a translation
+Disruption notices are collapsed by default, filtered to the lines that are
+relevant to the visible profile, and can be narrowed further by chips or
+acknowledged until their text changes. Relevant means both the lines the profile
+pins and the lines its boards are actually showing. Pinned labels alone are not
+enough: a board that filters by category rather than by line pins nothing, so a
+profile made of rapid-transit boards matched no notice at all, which is exactly
+the profile where a notice matters most. They can be copied out in one go with a translation
 instruction in front, or translated in place by the browser's own translator when
 it has one and by a paid provider when the reader supplies a key. The key lives in
 local storage on that device and nowhere else.
