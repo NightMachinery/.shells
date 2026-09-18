@@ -258,7 +258,16 @@ function tmuxnewsh2-attach-z {
     #: servers, which never matches the current directory at all. Reading $PWD
     #: back out of a subshell is the one form both spell the same way.
     local dir
-    if ! dir="$(cd "${HOME}" && FORCE_INTERACTIVE="${force_i}" z "${query}" >/dev/null && print -r -- "${PWD}")" || test -z "${dir}" ; then
+    #: `TMUX=' is load-bearing, not tidiness. [agfi:fzf-gateway] routes to
+    #: `fzf-tmux -p90%' when `isTmux && ! isKitty && isI', and fzf-tmux needs a
+    #: `tmux popup' to draw in. When that popup cannot run -- no client
+    #: attached to the target, or no client resolvable from here -- fzf-tmux
+    #: blocks on `cat <fifo2>' forever and prints *nothing*: no picker, no
+    #: error, no timeout. The old `tma-z' never met this because it ran `z'
+    #: inside the session's own pane, where a popup always had a client;
+    #: resolving in the caller exposed it. Emptying TMUX takes the plain-fzf
+    #: branch, which draws on /dev/tty and works inside tmux and outside it.
+    if ! dir="$(cd "${HOME}" && TMUX= FORCE_INTERACTIVE="${force_i}" z "${query}" >/dev/null && print -r -- "${PWD}")" || test -z "${dir}" ; then
         ecerr "$0: no directory matched: ${query}"
         #: The old `tma-z' took the query from everything before the *last*
         #: dash, so every `<dir>-<tag>' name people already have now misses.
