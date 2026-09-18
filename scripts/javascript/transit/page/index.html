@@ -131,6 +131,23 @@
         justify-content: space-between;
       }
 
+      /* The horizon, the start time and the destination do not fit on a phone
+         side by side, and a control that cannot be reached is worse than one
+         that has to be scrolled to. Same treatment as the chips: scrollable,
+         with the scrollbar hidden so it still reads as a bar. */
+      .bar-controls {
+        overflow-x: auto;
+        scrollbar-width: none;
+      }
+
+      .bar-controls::-webkit-scrollbar {
+        display: none;
+      }
+
+      .bar-controls > * {
+        flex: none;
+      }
+
       .bar-right {
         display: flex;
         align-items: center;
@@ -369,14 +386,24 @@
          survive a monochrome screen, and it is the distinction that decides
          whether someone runs for a train. */
       .route {
+        display: flex;
+        align-items: baseline;
+        gap: 4px;
+        min-width: 0;
         font-size: 11px;
         color: var(--ink-soft);
         white-space: nowrap;
+      }
+
+      /* The name gives way and the time does not. Where to get off is useful,
+         when you arrive is the number the reader is comparing rows by. */
+      .route-head {
         overflow: hidden;
         text-overflow: ellipsis;
       }
 
       .route-arrival {
+        flex: none;
         font-variant-numeric: tabular-nums;
         font-weight: 600;
         color: var(--ink);

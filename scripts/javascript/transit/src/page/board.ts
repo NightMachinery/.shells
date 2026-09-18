@@ -152,8 +152,13 @@ function renderRoute(dep: Departure, context: BoardContext, usual: Map<string, s
   const better = usual.get(normaliseLine(dep.line)) !== undefined && usual.get(normaliseLine(dep.line)) !== option.exitStop;
   const node = el('span', `route${option.tight ? ' tight' : ''}${better && !option.tight ? ' better' : ''}`);
   const onward = option.legs[1];
-  const head = onward === undefined ? option.exitStopName : `${option.exitStopName} · ${onward.line}`;
-  node.append(el('span', undefined, `${head} `));
+  // The exit name is shortened the same way a destination is, because the slot
+  // is narrow and the arrival time is the part a reader acts on. A stop called
+  // "Somewhere (Something)" would otherwise push the time out of the slot
+  // entirely, which is the one thing here that must never be cut.
+  const exit = shortDestination(option.exitStopName);
+  const head = onward === undefined ? exit : `${exit} · ${onward.line}`;
+  node.append(el('span', 'route-head', head));
   node.append(el('span', 'route-arrival', clockTime(option.arrival, context.timezone)));
 
   const chain = option.legs.map((leg) => `${leg.line} ${clockTime(leg.departure, context.timezone)}`).join(' → ');

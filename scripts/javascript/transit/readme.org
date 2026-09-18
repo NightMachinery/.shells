@@ -487,8 +487,11 @@ and by a struck line as well as by colour, so they survive a monochrome screen.
 
 Sticky, and it carries the profile tabs, one jump chip per board with that
 board's next departure, the horizon picker with the resulting end time, the start
-time, the refresh control with its age and progress ring, and the name of
-whichever backends answered. The chips count only the rows a board is actually
+time, the destination the commute view plans towards, the refresh control with
+its age and progress ring, and the name of whichever backends answered. The chip
+row and the control row both scroll sideways rather than wrapping or shrinking,
+because on a phone they do not fit and a control that cannot be reached at all is
+worse than one that has to be scrolled to. The chips count only the rows a board is actually
 showing, so a chip never promises a departure the board's own filter is hiding.
 
 The start time is either *now*, which moves with the clock, or a moment the
