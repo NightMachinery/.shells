@@ -51,6 +51,11 @@
         /* The fixed row slots. Named here rather than inlined so a board's grid
            template is assembled from the same widths everywhere, and so one
            media query can narrow all of them at once. */
+        /* The destination is the one column that must never be squashed away:
+           a row whose destination is a single letter says nothing at all. It
+           is a floor rather than a fixed width, so it still grows into space
+           the other slots do not need. */
+        --col-destination-min: 7rem;
         --col-minutes: 2.6rem;
         --col-badge: 2.9rem;
         --col-connection: 4.6rem;
@@ -1110,6 +1115,7 @@
 
       @media (max-width: 480px) {
         :root {
+          --col-destination-min: 5.5rem;
           --col-minutes: 2.2rem;
           --col-badge: 2.5rem;
           --col-connection: 4rem;

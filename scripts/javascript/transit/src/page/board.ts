@@ -110,10 +110,31 @@ interface Columns {
   stop: boolean;
 }
 
+/**
+ * Whether the screen is too narrow to carry every optional slot.
+ *
+ * The breakpoint is the same one the stylesheet uses for its narrow layout, in
+ * the one place a render can ask about it. A phone does not change width except
+ * when it is turned over, which `render` is told about below.
+ */
+export function narrowViewport(): boolean {
+  return typeof window !== 'undefined' && typeof window.matchMedia === 'function'
+    ? window.matchMedia('(max-width: 480px)').matches
+    : false;
+}
+
 function columnsOf(board: Board, rows: Departure[], routes: BoardRoutes | undefined): Columns {
+  const route = routes !== undefined && routes.rows.size > 0;
   return {
-    connection: board.connection !== undefined,
-    route: routes !== undefined && routes.rows.size > 0,
+    // On a phone a board with both an interchange and a journey has more fixed
+    // width than the screen, and both end up at fifty pixels, which is not a
+    // width anything is legible at. The journey wins, because it answers the
+    // same question with more in it: where to get off, what to catch, and when
+    // you arrive, chosen per row rather than configured once. On a wider screen
+    // both fit and both are shown, because the configured interchange is a
+    // question somebody asked for by name.
+    connection: board.connection !== undefined && !(route && narrowViewport()),
+    route,
     // The upstream feed reports a platform for rail and never for trams or
     // buses, so a fixed platform column would be dead space on most boards.
     // Presence is decided per board, which keeps the slots aligned within a
@@ -123,10 +144,21 @@ function columnsOf(board: Board, rows: Departure[], routes: BoardRoutes | undefi
   };
 }
 
+/**
+ * The row's columns, as a grid template.
+ *
+ * The destination carries a floor and the two wide optional slots carry a
+ * ceiling they may fall below. On a phone a board with both an interchange and
+ * a journey has more fixed width than the screen, and with every slot rigid the
+ * destination, which is the only flexible one, was squeezed to a single letter.
+ * Letting the journey and the interchange ellipsise instead costs the tail of a
+ * stop name that the tooltip still carries, and keeps every row saying where it
+ * is going.
+ */
 function gridTemplate(columns: Columns): string {
-  const parts = ['var(--col-minutes)', 'var(--col-badge)', 'minmax(0, 1fr)'];
-  if (columns.route) parts.push('var(--col-route)');
-  if (columns.connection) parts.push('var(--col-connection)');
+  const parts = ['var(--col-minutes)', 'var(--col-badge)', 'minmax(var(--col-destination-min), 1fr)'];
+  if (columns.route) parts.push('minmax(0, var(--col-route))');
+  if (columns.connection) parts.push('minmax(0, var(--col-connection))');
   if (columns.platform) parts.push('var(--col-platform)');
   parts.push('var(--col-state)', 'var(--col-alarm)');
   if (columns.stop) parts.push('var(--col-stop)');

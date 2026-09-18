@@ -509,6 +509,14 @@ async function boot(): Promise<void> {
   }
 
   installKeys();
+
+  // Which optional slots a row carries depends on how wide the screen is, and
+  // a phone changes width when it is turned over. Nothing else here reacts to
+  // a resize, because the layout is otherwise CSS's business.
+  if (typeof window.matchMedia === 'function') {
+    window.matchMedia('(max-width: 480px)').addEventListener('change', () => render());
+  }
+
   render();
 
   // The cache for every profile, so a tab switch is never a blank screen. It is

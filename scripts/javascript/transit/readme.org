@@ -564,7 +564,18 @@ In the slots too narrow to hold a full place name (the journey slot, the strip's
 destination suffixes, the board chips) names are abbreviated by one shared map
 before they are cut, so what survives distinguishes one place from another
 rather than spelling out the word "station". The full name is always still in
-the tooltip. A slot is empty when the value is absent and
+the tooltip.
+
+The destination carries a minimum width and the journey and interchange slots
+carry a maximum they may fall below, so the column that gets squeezed is one
+whose tail is in a tooltip rather than the one that says where the vehicle is
+going. On a phone a board that has *both* an interchange and a journey still
+does not fit, and there the journey wins and the interchange is not drawn: it
+answers the same question with more in it, chosen per row rather than configured
+once. On a wider screen both fit and both are shown, because a configured
+interchange is something somebody asked for by name. This is the one layout
+decision the render makes rather than the stylesheet, so the page re-renders
+when the breakpoint is crossed. A slot is empty when the value is absent and
 nothing shifts, so the eye can run down one column.
 
 Which *optional* slots exist is decided per board rather than globally: the
