@@ -40,12 +40,15 @@ the CGDirectDisplayID, which both print (`ID 0x2` and `Display ID: 2`).
 `brightness-off` and `brightness-on` (`zshlang/auto-load/others/power.zsh`) sit
 on top of these and needed no changes, as do the hyper+F1/F2 and
 hyper+shift+F1/F2 bindings in `hammerspoon/core/window-media-bindings.lua`.
-The blackout chord has since grown a third rung, hyper+cmd+F1, which blacks the
-screen and locks the macOS session on the spot — the way back is unlocking the
-session, not a chord, since a locked session delivers no keys to any tap — and
-that changes nothing down here either. The unlock is what restores the display,
-through `h-blackout-release`, which both the Swift lock watcher and
-Hammerspoon's own unlock watcher now call.
+The blackout chord has since grown a third rung, hyper+cmd+F1, and it is the one
+that does not use any of this. It ends whatever blackout is up, turns the panel
+off and locks the session, which is `display-off-lock`: `h-blackout-release`,
+then `display-off`, then `os-lock`. Nothing here is left asserted afterwards,
+and the way back is whatever wakes a sleeping display rather than anything of
+ours. It was built the other way first, as a blackout that locked, and that
+combination has no exit: the keep-blank loop goes on writing brightness 0 at a
+login window where the brightness keys cannot win and no chord is delivered at
+all. See "Blackout keyboard lock" in `hammerspoon/docs/hammerspoon.md`.
 
 `brightness-displays` prints TSV — index, backend, backend-local id, `main`,
 built-in/external, name, CGDirectDisplayID:

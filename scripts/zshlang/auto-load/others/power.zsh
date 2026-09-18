@@ -78,6 +78,40 @@ login screen the brightness keys can no longer fix."
     caffeinate-off "$caffeinate_key_blackout"
 }
 
+function display-off-lock {
+    : "Ends any blackout, turns the display off and locks the session. The top
+blackout rung, hyper+cmd+F1; see hammerspoon/core/blackout-lock.lua.
+
+Deliberately *not* a blackout. A blackout is a dark screen on a machine that
+keeps working, and it is held that way by [agfi:display-black-on-loop] plus a
+`caffeinate -d' that forbids display sleep. Both of those are exactly wrong
+once the session is locked: the loop re-asserts brightness 0 at the login
+window every few seconds, where the brightness keys can no longer win and no
+chord can reach Hammerspoon, and the assertion stops macOS doing the one thing
+that would have saved you. In clamshell that is a screen with no way back at
+all, since there is no second display and Touch ID is behind a shut lid. It
+happened; the lid had to be opened.
+
+So this hands the whole problem to macOS instead. [agfi:h-blackout-release]
+first, which stops the loop, restores the levels and gives the key up, so
+nothing is left fighting; then the panel off, then the lock. The way back is
+whatever wakes a sleeping display: any key, any click. Nothing here has to run
+again for the screen to return, which is the point -- no loop, no watcher, no
+assertion, nothing that can be dead when you need it.
+
+[agfi:os-lock] ends with a `displaysleepnow' of its own, so a lock that woke
+the panel puts it straight back to sleep."
+    ##
+    #: Escalating from a live blackout means a slow DDC restore runs here, and
+    #: the desktop is lit while it does. Accepted: the alternative is locking
+    #: first and restoring behind the login window, which trades a second of
+    #: desktop for a second of lock screen and one more way to get stuck.
+    h-blackout-release
+
+    display-off
+    os-lock
+}
+
 #: See the note in system.zsh on why only this family gets selector suffixes.
 for h_db_fn in brightness-off brightness-on ; do
     for h_db_sel in main all internal external ; do

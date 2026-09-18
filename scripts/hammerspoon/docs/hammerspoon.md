@@ -838,34 +838,53 @@ blackout up for an hour is one nobody is watching, so whoever ends it meets the
 login screen.
 
 Rung two, hyper+shift+cmd+F1, starts a blackout marked lock-first, via
-`blackoutBegin(true, false)`, and F2 then locks first at any age. Pressed during a
+`blackoutBegin(true)`, and F2 then locks first at any age. Pressed during a
 blackout that is already up it marks *that* one, through `blackoutUpgrade` —
 which sets the mark and touches nothing else. Not the garden, which would
 restart the keep-blank loop on a screen that is already black; not
 `blackoutLockOn`, which would rebuild the tap and restart the expiry from the
 press rather than from the start of the black.
 
-Rung three, hyper+cmd+F1, stops waiting for the ending and locks the session
-now. Fresh, `blackoutLockNow` blacks and locks in the same run-loop turn, black
-first: everything `blackoutChordBegin` does is non-blocking, so the lock is
-requested a fraction of a millisecond later and the band gets its turn to draw
-before the login window covers it, where the other order would draw it behind
-the lock screen and it would never be seen at all. Nothing is lost by blacking
-first — the garden does not care what the session is doing, and
-`display-black-on-loop` re-asserts gamma at the login screen just as happily.
-On a blackout already up, the mark is set *before* the lock, so a `lockScreen`
-that somehow never arrives still leaves a blackout that locks on the way out.
+Rung three, hyper+cmd+F1, is not a blackout at all. It ends whatever blackout
+is up, turns the panel off and locks the session. That is `display-off-lock` in
+the garden: `h-blackout-release`, then `display-off`, then `os-lock`. The way
+back is whatever wakes a sleeping display, meaning any key or any click, and
+nothing of ours has to run for it to work.
+
+It used to be a blackout, and that was a trap with no exit. `blackoutChordBegin`
+plus `lockScreen` left the keep-blank loop, and the `caffeinate -d` that comes
+with it, running across the lock. The loop re-asserts brightness 0, contrast 0
+and black gamma on every display every few seconds, the login window included;
+the brightness keys lose to it; no chord reaches a tap in a locked session; and
+the assertion forbids macOS the one display sleep that would have ended it. In
+clamshell there is no second display to fall back on and Touch ID is behind a
+shut lid, so the only way back in was opening the lid. `h-blackout-release`'s
+own docstring had warned about this exact shape, for the wake case.
+
+Rungs one and two keep the loop, because "stay dark while the machine keeps
+working" is what they are for, and they leave the session unlocked, so the chord
+that undoes them still arrives.
+
+`os-lock` ends with a `pmset displaysleepnow` of its own, after the
+`CGSession -suspend`, so a lock that woke the panel puts it straight back to
+sleep. `display-off` before it means the common case, a lit screen, goes dark at
+once rather than flashing the lock screen first. Escalating from a live blackout
+does show the desktop for as long as the DDC restore takes, a second or two.
+That is accepted: the alternative is locking first and restoring behind the
+login window, which trades a second of desktop for a second of lock screen and
+adds one more way to get stuck.
 
 There is no chord back from rung three, and there is not meant to be. Once the
 login window is up, no chord of any kind reaches this config: the user session
 stops receiving key events, so both taps go blind and even F18 never arrives.
 Hyper does not work at all while the session is locked. That is worth stating
 plainly, because from the outside it looks like the escape chord specifically
-has broken, and it has not — nothing is being delivered to anything.
+has broken, and it has not. Nothing is being delivered to anything.
 
-The way back is unlocking the session: Touch ID, or a password typed blind at a
-screen you cannot see. Two things listen for that unlock, and it takes both to
-make the way back trustworthy:
+From rung three that costs nothing, because the way back is the OS's: wake the
+display, meet the login window at its normal brightness, unlock. Rungs one and
+two are the ones that need something of ours to notice the way out, and two
+things listen for it:
 
 - `swift/lock_watcher.swift`, which runs `h-hook-unlock` in the garden. That is
   the whole unlock hook, the audio guard and the battery limit included, and it
@@ -876,27 +895,13 @@ make the way back trustworthy:
 
 The redundancy is not theoretical. The Swift watcher was found dead, weeks
 after quietly exiting, and with it the only way back from a black locked screen;
-see "Nothing was watching the unlock" below.
+see "Nothing was watching the unlock" below. Rung three no longer has a stake in
+that argument, which is the strongest thing to be said for the redesign: the
+rung that locks you out is the one rung that now depends on none of it.
 
 Which rung a blackout is at lives in `rung`, and like the mark it is only ever
-raised. `sessionLocked` sits beside it and records that rung three really did
-lock the session, which is the one fact the mark cannot carry on its own.
-
-That field is what stops the way out locking you out again. The mark says
-"ending this blackout should lock the screen", and after rung three that is
-already spent: the session was locked, and whoever is pressing F2 now got past
-the login window, so they have authenticated. Without `sessionLocked` the
-escape chord locked a second time and restored the display under a fresh login
-screen, which reads exactly like the chord having failed. It is persisted with
-the rest, as a third field appended to the redis value, so a reload cannot
-bring the second lock back; the parser takes it as optional, so a key written
-before rung three existed still reads, as "not locked", which is what those
-blackouts were.
-
-None of this weakens the invariant. The rule is that the keyboard lock never
-releases into an *unlocked* session on its own, and here the session was locked
-and a person unlocked it, which is the deliberate act the rule asks for. The
-expiry still locks regardless, since it passes `forceLock`.
+raised. It goes no higher than two, since rung three starts no blackout, and it
+is not persisted: a recovered blackout reads its rung back off the mark.
 
 The mark belongs to whoever *starts* the black, because the person who presses
 F2 might be an adversary; that is why there is no cmd chord on F2. The upgrade
@@ -1041,18 +1046,19 @@ Hammerspoon crash drops the tap silently while the screen stays black, until
 the next load recovers it from redis, and macOS disables a tap whose callback
 stalls. The engage alert shows before the screen goes black, since black-on is
 asynchronous through the garden and the alert is not. There is one band per
-rung, and they make a ladder of their own: a plain blackout says "Input
-locked." in the amber `warn` band, a lock-first one says "Input locked. Ending
-the blackout locks the screen." in `blood`, a far darker red, and a lock-now one
-says "Locking now. Input locked. Unlock to restore." in `midnight`, darker
-again. The colour carries the difference because nothing else can — every rung
-leaves a screen equally black, and the mark cannot be revoked once it is set, so
-it has to be legible at a glance rather than by reading. `blood` and `midnight`
-are both darker than the crimson `crit` of the Secure Input warning above,
-which can land in the very same instant. The `midnight` band is up only for
-about as long as it takes the login window to cover it, which is still the
-moment before the screen goes with the person looking at it, and that is what
-makes it worth drawing at all.
+rung, and the two of them make a ladder: a plain blackout says "Input locked."
+in the amber `warn` band, and a lock-first one says "Input locked. Ending the
+blackout locks the screen." in `blood`, a far darker red. The colour carries the
+difference because nothing else can: both rungs leave a screen equally black,
+and the mark cannot be revoked once it is set, so it has to be legible at a
+glance rather than by reading. `blood` is darker than the crimson `crit` of the
+Secure Input warning above, which can land in the very same instant.
+
+Rung three has no band of this family, having no blackout to describe. It draws
+one alert of its own, "Locking the session now." in `midnight`, darker again,
+and only when it is escalating a blackout that is already up. Fresh, it says
+nothing: the panel is about to go dark with the person looking at it, and a band
+that cannot outlive the `os-lock` behind it is not worth the draw.
 
 A rung reached *later*, on a blackout already up, says a shorter version of the
 same thing in the same colour, but by then the band is the wrong instrument: the

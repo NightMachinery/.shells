@@ -138,11 +138,12 @@ end
 -- keys above stay on hs.hotkey. See "When a hyper chord does nothing" in
 -- docs/hammerspoon.md.
 --
--- lockNow only names the rung for the band; the lock itself is placed by
--- blackoutLockNow after this returns.
-function blackoutChordBegin(lockFirst, lockNow)
+-- Rungs one and two only. hyper+cmd+F1 does not come through here: it starts
+-- no blackout, it sleeps the panel and locks, which is display-off-lock in the
+-- garden. See blackoutLockNow.
+function blackoutChordBegin(lockFirst)
     brishz_eval_hs('awaysh-fast brightness-off-all-loop')
-    if blackoutBegin then blackoutBegin(lockFirst, lockNow) end
+    if blackoutBegin then blackoutBegin(lockFirst) end
 end
 
 function blackoutChordRestore()

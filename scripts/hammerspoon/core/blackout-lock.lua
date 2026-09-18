@@ -211,12 +211,6 @@ blackoutLockState = blackoutLockState or {
     -- "the session is already locked", is macOS's own state and would be
     -- stale the moment it was read back. Recovery sets it from the mark.
     rung = nil,
-    -- Rung three actually locked the session for this blackout. The mark says
-    -- "ending this blackout should lock"; this says "it already did", and it
-    -- is what stops the escape chord locking a second time. Persisted with
-    -- the rest, because a reload that forgot it would bring the second lock
-    -- back exactly where it is hardest to notice.
-    sessionLocked = false,
     restoreTimer = nil,
     recoverTimer = nil,
     -- The chord dispatch tap; see ** Chord dispatch below. Lives here rather
@@ -337,12 +331,10 @@ end
 --- and one id either way, so the present-tense one replaces the promise in
 --- place when the note's time is up. Colours are a ladder, warn -> blood ->
 --- midnight, each darker than the last; blackoutLockOn says why.
+--- Two bands, not three. Rung three leaves no blackout for one to describe:
+--- it says its piece in blackoutLockNow and the panel is off a moment later.
 local function lockBand(rung, future)
-    if rung >= 3 then
-        return future and "Screen will lock. Input will lock. Unlock to restore."
-                      or "Locking now. Input locked. Unlock to restore.",
-               "midnight"
-    elseif rung == 2 then
+    if rung >= 2 then
         return future and "Input will lock. Ending the blackout will lock the screen."
                       or "Input locked. Ending the blackout locks the screen.",
                "blood"
@@ -367,10 +359,9 @@ local function persist(st)
         --- the previous version still reads: the parser below takes it as
         --- optional and an absent one means "not locked yet", which is what
         --- every blackout that predates rung three was.
-        redisSet(kRedisKey, string.format("%d %d %d",
+        redisSet(kRedisKey, string.format("%d %d",
                                           math.floor(st.since),
-                                          st.lockFirst and 1 or 0,
-                                          st.sessionLocked and 1 or 0))
+                                          st.lockFirst and 1 or 0))
     else
         redisDel(kRedisKey)
     end
@@ -654,14 +645,14 @@ function blackoutEnded()
     st.since = nil
     st.lockFirst = false
     st.rung = nil
-    st.sessionLocked = false
     persist(st)
 
     return true
 end
 
---- What hyper+shift+F1 calls, hyper+shift+cmd+F1 with lockFirst=true, and
---- hyper+cmd+F1 with lockNow=true as well. Records when the black began,
+--- What hyper+shift+F1 calls, and hyper+shift+cmd+F1 with lockFirst=true.
+--- Not hyper+cmd+F1: rung three starts no blackout at all any more, it sleeps
+--- the panel and locks (see blackoutLockNow). Records when the black began,
 --- whether or not the keyboard lock is on, because the lock-before-restore
 --- rule needs the age either way. A second F1 during a blackout keeps the
 --- original time, and nothing here can downgrade the mark or the rung: the
@@ -670,18 +661,15 @@ end
 --- the chords reach then, so that the garden is not sent to re-black an
 --- already black screen.
 ---
---- lockNow does not lock anything here. It only names the rung, so the band
---- blackoutLockOn is about to draw can say which chord asked for it; the lock
---- itself is blackoutLockNow's, placed after this returns.
-function blackoutBegin(lockFirst, lockNow)
+function blackoutBegin(lockFirst)
     local st = blackoutLockState
     if not st.since then
         st.since = hs.timer.secondsSinceEpoch()
     end
-    if lockFirst or lockNow then
+    if lockFirst then
         st.lockFirst = true
     end
-    st.rung = math.max(st.rung or 0, lockNow and 3 or lockFirst and 2 or 1)
+    st.rung = math.max(st.rung or 0, lockFirst and 2 or 1)
     persist(st)
     if blackoutLockEnabled then
         blackoutLockOn()
@@ -737,85 +725,73 @@ end
 --- garden. The one thing it borrows from that file is blackoutChordBegin,
 --- which is exactly what runChordNow below borrows for the other two rungs.
 ---
---- Ordering, fresh: black first, lock second, both inside one run-loop turn.
---- Everything blackoutChordBegin does is non-blocking -- the garden call goes
---- out over hs.task, the tap is installed, the band is queued -- so the lock
---- is requested a fraction of a millisecond later, and the band gets its turn
---- to draw before the login window covers it. The other way round it would be
---- drawn behind the lock screen and never seen at all. Nothing is lost by
---- blacking first: brightness-off-all-loop runs in the garden, which does not
---- care what the session is doing, and display-black-on-loop re-asserts gamma
---- at the login screen just as happily.
+--- Deliberately *not* a blackout, which is what it used to be: it called
+--- blackoutChordBegin and then lockScreen, so the keep-black loop and the
+--- `caffeinate -d' that comes with it ran on across the lock. That is a trap
+--- with no exit. The loop re-asserts brightness 0, contrast 0 and black gamma
+--- on every display every few seconds, the login window included; the
+--- brightness keys lose to it; no chord can reach a tap in a locked session;
+--- and the assertion forbids macOS the one display sleep that would have ended
+--- it. In clamshell there is no second display to fall back on and Touch ID is
+--- behind a shut lid, so the only way back in was opening the lid. It happened.
+--- h-blackout-release's own docstring already warned about this shape, for the
+--- wake case.
 ---
---- Ordering, on a blackout already up: the mark is set before the lock, so a
---- lockScreen that somehow never arrives still leaves a blackout that locks on
---- the way out.
+--- So the rung hands the job to macOS. The garden runs display-off-lock, which
+--- is release the blackout, panel off, lock, in that order. Waking a slept
+--- display is something any key does, and nothing of ours has to run for it:
+--- no loop, no assertion, no watcher that can be dead when it matters. Rungs
+--- one and two keep the loop, because "stay dark while the machine works" is
+--- what they are for and they leave the session unlocked to undo it.
+---
+--- The Lua half is undone here rather than waited for. After this there is no
+--- blackout for hyper+shift+F2 to end, so the keyboard lock goes back and the
+--- state is forgotten before the garden call is even made.
 ---
 --- No sound on a fresh start, a sound on an escalation. Sound is what this
 --- module reaches for when there is no screen left to say anything on; on a
 --- fresh start there is one, still lit, with the person looking at it. A
---- repeat press at this rung replays the cue, for the same reason
---- blackoutUpgrade re-flashes: a second press has to look like something.
+--- repeat press replays the cue, for the same reason blackoutUpgrade
+--- re-flashes: a second press has to look like something.
 ---
---- The way back is unlocking the session; the header says how that reaches
---- this module. Returns whether it started a blackout, as opposed to locking
---- one already up.
+--- Returns whether it escalated a blackout already up, as opposed to starting
+--- from a lit screen.
 function blackoutLockNow()
     local st = blackoutLockState
+    local escalated = st.since ~= nil
 
-    if not st.since then
-        if blackoutChordBegin then
-            blackoutChordBegin(true, true)
-        else
-            --- window-media-bindings.lua failed to load, so there is no garden
-            --- call to make. Arm and lock anyway: a lit screen on a locked
-            --- session beats a chord that did nothing.
-            blackoutBegin(true, true)
-        end
-        --- Recorded only when it really locked, so the dry-run knob does not
-        --- leave a blackout claiming a lock that never happened.
-        if lockSession() then
-            st.sessionLocked = true
-            persist(st)
-        end
-        return true
+    if escalated then
+        alert("Locking the session now.", {
+            id = kAlertId,
+            color = "midnight",
+            seconds = 5,
+            screens = "all",
+        })
+
+        playCue("lock-now", blackoutLockNowSound)
     end
 
-    st.lockFirst = true
-    st.rung = 3
-    persist(st)
+    --- Ours first and unconditionally: whatever becomes of the garden call,
+    --- this session must not be left holding a keyboard lock and a blackout it
+    --- believes is still up.
+    blackoutLockOff(true)
+    blackoutEnded()
 
-    alert("Locking the session now.", {
-        id = kAlertId,
-        color = "midnight",
-        seconds = 5,
-        screens = "all",
-    })
-
-    playCue("lock-now", blackoutLockNowSound)
-    if lockSession() then
-        st.sessionLocked = true
-        persist(st)
+    if not blackoutLockScreenEnabled then
+        print("blackout-lock: display-off-lock suppressed (blackoutLockScreenEnabled = false)")
+        return escalated
     end
 
-    return false
+    --- Asynchronous, like every other garden call here: never block the main
+    --- thread. display-off-lock is a zsh function so the ordering lives in one
+    --- place, next to the blackout functions it has to undo.
+    brishz_eval_hs("awaysh-fast display-off-lock", "blackout-lock-now")
+
+    return escalated
 end
 
 local function shouldLockScreen(force)
     if force then return true end
-
-    --- The mark is spent once rung three has actually locked the session.
-    --- Whoever is pressing F2 now got past the login window, so they have
-    --- authenticated; locking again protects nothing, and it is precisely
-    --- what made the way out look broken. The chord threw the person back to
-    --- the login screen instead of ending the blackout, and since the screen
-    --- was still black they could not see that it had done anything at all.
-    ---
-    --- This does not weaken the invariant. The rule is that the keyboard lock
-    --- never releases into an *unlocked* session on its own; here the session
-    --- was locked and a person unlocked it, which is the deliberate act the
-    --- rule asks for.
-    if blackoutLockState.sessionLocked then return false end
 
     if blackoutLockState.lockFirst then return true end
     local after = blackoutLockScreenAfterSeconds
@@ -1000,12 +976,12 @@ local function runChordNow(chord)
         elseif chord == "black-lock-first" then
             blackoutUpgrade()
         elseif blackoutChordBegin then
-            blackoutChordBegin(false, false)
+            blackoutChordBegin(false)
         end
     elseif chord == "black-lock-now" then
         blackoutLockNow()
     elseif kChordRung[chord] then
-        if blackoutChordBegin then blackoutChordBegin(chord == "black-lock-first", false) end
+        if blackoutChordBegin then blackoutChordBegin(chord == "black-lock-first") end
     elseif chord == "contrast-dec" or chord == "contrast-inc" then
         --- Explicit, and before the brightness arm below, which is a catch-all:
         --- anything reaching it is assumed to be a brightness step.
@@ -1286,14 +1262,8 @@ function blackoutLockRecover()
 
     st.since = tonumber(since)
     st.lockFirst = (first == "1")
-    --- Absent in a key written before rung three existed, and "not locked" is
-    --- the right reading of those: they had no way to lock the session.
-    st.sessionLocked = (locked == "1")
-    --- Rung three is not saved (see the state table), so a recovered rung-three
-    --- blackout comes back as rung two. Nothing downstream can tell: the
-    --- session is either still locked, which the login screen says for
-    --- itself, or was unlocked, in which case h-hook-unlock has ended the
-    --- blackout already and there is nothing to recover.
+    --- Rung three leaves no blackout behind at all now, so anything recovered
+    --- is rung one or two and the mark alone tells them apart.
     st.rung = st.lockFirst and 2 or 1
 
     if blackoutLockEnabled then
