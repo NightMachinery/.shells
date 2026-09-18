@@ -399,14 +399,7 @@ function renderRow(dep: Departure, board: Board, columns: Columns, context: Boar
     }
   }
 
-  const known = dep.realtimeKnown && !context.planned;
-  const state = el('span', `state ${known ? 'state-live' : 'state-plan'}`, known ? 'live' : 'plan');
-  state.title = known
-    ? 'a live time reported by the operator'
-    : context.planned
-      ? 'a timetable for the moment you picked, not a live time'
-      : 'no live time for this departure, the timetable is all there is';
-  row.append(state);
+  row.append(stateMark(dep, context));
 
   row.append(alarmMarker(dep) ?? slot('alarm'));
 
@@ -419,6 +412,33 @@ function renderRow(dep: Departure, board: Board, columns: Columns, context: Boar
 
   attachLongPress(row, () => openAlarmPopup(dep, board, row));
   return row;
+}
+
+/** How far ahead a departure still counts as one the operator ought to be reporting. */
+const REPORTING_HORIZON_MS = 60 * 60_000;
+
+/**
+ * Whether this row's time is live or off the timetable, and why.
+ *
+ * "planned" rather than "plan", because the word describes the time rather than
+ * naming a kind of object, and the pair reads as live/planned. The explanation
+ * splits on an hour because the two cases are genuinely different questions: a
+ * train leaving in twenty minutes with no live time is one the operator has not
+ * started reporting yet, and a train leaving tomorrow morning was never going to
+ * have one. Saying "no live data" for both invites the reader to worry about the
+ * second, which is simply how a timetable works.
+ */
+function stateMark(dep: Departure, context: BoardContext): HTMLElement {
+  const known = dep.realtimeKnown && !context.planned;
+  const node = el('span', `state ${known ? 'state-live' : 'state-plan'}`, known ? 'live' : 'planned');
+  node.title = known
+    ? 'a live time reported by the operator'
+    : context.planned
+      ? 'a timetable for the moment you picked, not a live time'
+      : dep.realtime - context.now <= REPORTING_HORIZON_MS
+        ? 'the operator has not started reporting this trip yet'
+        : 'timetable: too far ahead for the operator to be reporting it yet';
+  return node;
 }
 
 interface Strip {

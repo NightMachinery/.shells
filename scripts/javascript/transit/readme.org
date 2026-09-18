@@ -617,7 +617,7 @@ integrated view covers the whole horizon.
 
 A row is a grid of fixed slots: minutes, line badge, destination with its times,
 the onward connection, the journey to the destination, the platform, whether the
-time is live or a plan, a reminder marker, and the stop label.
+time is live or planned, a reminder marker, and the stop label.
 
 In the slots too narrow to hold a full place name (the journey slot, the strip's
 destination suffixes, the board chips) names are abbreviated by one shared map
@@ -662,8 +662,15 @@ worse than one that has to be scrolled to. The chips count only the rows a board
 showing, so a chip never promises a departure the board's own filter is hiding.
 
 The start time is either *now*, which moves with the clock, or a moment the
-reader picked. With a picked moment every row is labelled a plan, because there
-is no live data for a train that has not been dispatched yet.
+reader picked. With a picked moment every row is labelled *planned*, because
+there is no live data for a train that has not been dispatched yet.
+
+A row is marked =live= or =planned=, and =planned= explains itself differently
+either side of an hour: inside it the operator has not started reporting that
+trip yet, beyond it the row is simply too far ahead for reporting to have begun.
+The two are genuinely different questions, and saying "no live data" for both
+invites a reader to worry about the second, which is only how a timetable
+works.
 
 On the desktop: the number keys switch profiles, =r= refreshes, =[= and =]= step
 the horizon, and =f= toggles the board under the top of the viewport between full

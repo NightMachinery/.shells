@@ -53,7 +53,7 @@
   /* Wide enough for the word "planned", which is what most rows say: the
      column used to fit "plan" and the longer word spilled over the bell
      beside it. */
-  --col-state: 2.3rem;
+  --col-state: 3.5rem;
   --col-alarm: 1rem;
   --col-stop: 2.6rem;
   --col-route: 9rem;
