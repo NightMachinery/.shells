@@ -379,7 +379,12 @@ else beats is returned and one that something else beats is not. The early part
 of a window is sparser than the rest for the same reason. A board configured with
 a stop identifier only the primary backend carries cannot be planned at all,
 since the planner is the aggregator; that board's departures are still shown and
-the reason is reported once per stop.
+the reason is reported once per stop. The aggregator is also *asked* only once
+per origin: a 404 on the origin is remembered without an expiry, because it says
+the identifier does not exist rather than that this moment was a bad one, and a
+board that re-asked an unanswerable question twice a minute for as long as a tab
+stayed open would be a rude thing to point at a free service. Every other
+failure stays retryable.
 
 ** The route document
 

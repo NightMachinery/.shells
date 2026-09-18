@@ -294,4 +294,35 @@ describe('the plan cache', () => {
     expect(urls).toHaveLength(before);
     expect(second[0]?.best?.arrival).toBe(first[0]?.best?.arrival);
   });
+
+  test('an origin the planner does not know is asked about once, not once a refresh', async () => {
+    const { fetchImpl, urls } = mockFetch(
+      () => new Response(JSON.stringify({ error: 'no radius' }), { status: 404, headers: { 'content-type': 'application/json' } }),
+    );
+    const call = () =>
+      planBoard({
+        stop: HOME,
+        destination: DESTINATION,
+        rows: [row('U1', 10)],
+        // A different minute each time, so the itinerary cache cannot be what
+        // suppresses the second request.
+        startMs: FIXTURE_NOW,
+        baseUrl: BASE,
+        fetchImpl,
+      });
+    await expect(call()).rejects.toThrow(/404/);
+    const before = urls.length;
+    expect(before).toBeGreaterThan(0);
+    await expect(
+      planBoard({
+        stop: HOME,
+        destination: DESTINATION,
+        rows: [row('U1', 10)],
+        startMs: FIXTURE_NOW + 5 * 60_000,
+        baseUrl: BASE,
+        fetchImpl,
+      }),
+    ).rejects.toThrow(/404/);
+    expect(urls).toHaveLength(before);
+  });
 });

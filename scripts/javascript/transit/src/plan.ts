@@ -7,7 +7,7 @@ import {
   TRANSITOUS_DEFAULT_BASE_URL,
 } from './backends/transitous.ts';
 import { normaliseLine, type WalkSource } from './filter.ts';
-import { envOverride, fetchJson, type FetchLike } from './http.ts';
+import { envOverride, fetchJson, HttpError, type FetchLike } from './http.ts';
 import { departureJson, toIso } from './json.ts';
 import { SCHEMA_VERSION, type Board, type Departure } from './model.ts';
 
@@ -344,9 +344,24 @@ function cacheSet(key: string, now: number, itineraries: ParsedItinerary[]): voi
   planCache.set(key, { at: now, itineraries });
 }
 
+/**
+ * Origins the planner has answered 404 for.
+ *
+ * This is remembered without an expiry, unlike the itineraries, because it is a
+ * property of the aggregator's data rather than of the moment: a parent stop
+ * identifier the aggregator carries only at platform level will not start
+ * existing a minute later. Without it a board configured with such a stop asks
+ * the same unanswerable question on every refresh, twice a minute for as long
+ * as the tab is open, which is a rude thing to do to a free and unauthenticated
+ * service. The caller still gets the same error every time; it just stops being
+ * a request.
+ */
+const unknownOrigins = new Map<string, HttpError>();
+
 /** Drop everything cached. Tests use it so one case cannot answer another. */
 export function clearPlanCache(): void {
   planCache.clear();
+  unknownOrigins.clear();
 }
 
 function placeParam(place: PlanDestination): string {
@@ -610,20 +625,31 @@ export async function planBoard(options: PlanBoardOptions): Promise<PlannedRow[]
   const startMinute = Math.floor(options.startMs / 60_000);
   const cacheKey = `${fromPlace}|${toPlace}|${startMinute}`;
 
+  const known = unknownOrigins.get(fromPlace);
+  if (known !== undefined) throw known;
+
   let itineraries = cacheGet(cacheKey, options.startMs);
   if (itineraries === null) {
     let coverThrough = Number.NEGATIVE_INFINITY;
     for (const row of rows) if (row.realtime > coverThrough) coverThrough = row.realtime;
-    itineraries = await fetchItineraries(
-      fromPlace,
-      toPlace,
-      options.startMs,
-      coverThrough,
-      options.stop,
-      baseUrl,
-      options.fetchImpl,
-      options.onDebug,
-    );
+    try {
+      itineraries = await fetchItineraries(
+        fromPlace,
+        toPlace,
+        options.startMs,
+        coverThrough,
+        options.stop,
+        baseUrl,
+        options.fetchImpl,
+        options.onDebug,
+      );
+    } catch (error) {
+      // A 404 here means the aggregator has never heard of this origin, which
+      // is worth remembering. Any other failure is a bad moment rather than a
+      // bad identifier and must stay retryable.
+      if (error instanceof HttpError && error.status === 404) unknownOrigins.set(fromPlace, error);
+      throw error;
+    }
     cacheSet(cacheKey, options.startMs, itineraries);
   }
 
