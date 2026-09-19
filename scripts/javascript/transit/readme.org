@@ -1598,6 +1598,33 @@ Run it before every deploy. The layout pass that preceded it measured pixels and
 never tapped anything, and everything it missed was a bug that only exists under
 a finger.
 
+** bun runs code it has not checked
+
+Every harness entry point type-checks before it runs, and so must anything
+written for a single run. That is not tidiness. bun executes TypeScript by
+stripping the types, so a call with the wrong number of arguments is not an
+error, it is a parameter bound to =undefined= and another bound to whatever was
+passed in its place.
+
+What that cost, once: a throwaway reproduction script called the harness's
+Chrome cleanup with one argument instead of two, so the parameter holding the
+profile *directory* received a process object, which becomes =[object Object]=
+as a string. It went to =pgrep -f= as a pattern, matched every process whose
+command line contained any of those letters or a space, and the loop sent
+=kill -9= to each in turn. It killed the ssh agent, the window manager, a
+database, a terminal multiplexer serving other sessions, and the Finder, and it
+killed its own shell as well, which looked like a crash and was retried twice.
+Three sweeps for one missing argument.
+
+The cleanup is now built so that the same mistake cannot reach a process list:
+the directory is checked before anything is killed and must be an absolute path
+under the harness's own scratch root, the listing is matched against that
+literal string with =includes= rather than handed to a tool that would read it
+as a pattern, and the sweep refuses to return its own process or its parent.
+=test/sweep.test.ts= passes it the exact wrong argument that caused this and
+insists it throws. But the check in front of every run is what would have caught
+it in the first place, so it is the first step of every one of them.
+
 It builds the bundles itself, as the first thing it does. The directory it
 publishes contains a build artefact that is not in version control, so a fresh
 checkout has none of it and a working tree has whatever the last build left

@@ -2390,7 +2390,59 @@ export async function firstPageTarget(port: number): Promise<DevToolsTarget> {
   throw new Error('no page target appeared on the DevTools HTTP endpoint');
 }
 
+/**
+ * The pids still holding a Chrome profile directory.
+ *
+ * Pure, and separate from the killing, because of what happened when it was
+ * neither. A throwaway script called `killChromeTree(proc)` with one argument,
+ * so this directory was a `Subprocess` object, `String`-ing to
+ * `[object Object]`; that went to `pgrep -f` as a *pattern*, where it matched
+ * every process whose command line contained any of those letters or a space,
+ * and the loop sent `kill -9` to all of them in turn. It took out the ssh
+ * agent, the window manager, a database, other sessions' terminals and the
+ * Finder, three times, and the only reason it could was that bun runs
+ * TypeScript without checking it, so an arity error that `tsc` would have
+ * refused to compile ran instead.
+ *
+ * Three things follow, and all three are here rather than in a comment asking
+ * for care. The directory is checked before anything is killed, and it must be
+ * an absolute path under this harness's own scratch root, so the worst a wrong
+ * argument can now do is throw. The listing is matched with `includes` against
+ * that literal path rather than by handing a variable to a regex-shaped flag,
+ * so nothing about the string can turn into a pattern. And the sweep never
+ * returns this process or its parent, because killing the shell that is running
+ * the harness is how a plain failure became three sweeps.
+ */
+export function sweepTargets(userDataDir: unknown, psOutput: string, selfPid: number, parentPid: number): number[] {
+  if (typeof userDataDir !== 'string' || userDataDir.length === 0) {
+    throw new TypeError(`killChromeTree: the profile directory must be a non-empty string, got ${typeof userDataDir}`);
+  }
+  if (!userDataDir.startsWith('/')) {
+    throw new Error(`killChromeTree: the profile directory must be an absolute path, got ${userDataDir}`);
+  }
+  if (userDataDir !== SCRATCH_E2E_DIR && !userDataDir.startsWith(`${SCRATCH_E2E_DIR}/`)) {
+    throw new Error(`killChromeTree: refusing to sweep ${userDataDir}, which is not under ${SCRATCH_E2E_DIR}`);
+  }
+  const pids: number[] = [];
+  for (const line of psOutput.split('\n')) {
+    const match = /^\s*(\d+)\s+(.*)$/.exec(line);
+    if (match === null) continue;
+    const pid = Number(match[1]);
+    const command = match[2] ?? '';
+    if (!Number.isInteger(pid) || pid <= 1) continue;
+    if (pid === selfPid || pid === parentPid) continue;
+    if (!command.includes(userDataDir)) continue;
+    pids.push(pid);
+  }
+  return pids;
+}
+
 export async function killChromeTree(userDataDir: string, proc: Bun.Subprocess): Promise<void> {
+  const selfPid = process.pid;
+  const parentPid = typeof process.ppid === 'number' ? process.ppid : -1;
+  // Before the browser is touched, so a bad argument is a thrown error and not
+  // a half-finished cleanup.
+  sweepTargets(userDataDir, '', selfPid, parentPid);
   try {
     proc.kill();
   } catch {
@@ -2401,16 +2453,15 @@ export async function killChromeTree(userDataDir: string, proc: Bun.Subprocess):
   } catch {
     // ignore
   }
-  // Killing the parent does not kill its renderer children; sweep anything
-  // still referencing our unique profile directory. That path cannot appear
-  // in this script's own command line, so matching on it with `pgrep -f` is
-  // safe.
-  const found = Bun.spawnSync({ cmd: ['pgrep', '-f', userDataDir] });
-  const text = new TextDecoder().decode(found.stdout).trim();
-  if (text.length > 0) {
-    for (const pid of text.split('\n').map((line) => line.trim()).filter((line) => line.length > 0)) {
-      Bun.spawnSync({ cmd: ['kill', '-9', pid] });
-    }
+  // Killing the parent does not kill its renderer children, so anything still
+  // holding this run's own profile directory is swept. The listing is read and
+  // filtered here rather than by a pattern-matching tool.
+  const listed = Bun.spawnSync({ cmd: ['ps', '-axo', 'pid=,command='] });
+  const pids = sweepTargets(userDataDir, new TextDecoder().decode(listed.stdout), selfPid, parentPid);
+  if (pids.length === 0) return;
+  console.log(`[e2e] sweeping ${pids.length} process(es) still holding ${userDataDir}: ${pids.join(' ')}`);
+  for (const pid of pids) {
+    Bun.spawnSync({ cmd: ['kill', '-9', String(pid)] });
   }
 }
 

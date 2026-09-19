@@ -31,6 +31,9 @@ declare const process: {
   env: Record<string, string | undefined>;
   exit(code?: number): never;
   exitCode?: number;
+  /** This process, and the one that started it. Used to keep a sweep off itself. */
+  pid: number;
+  ppid: number;
   on(event: string, listener: (...args: unknown[]) => void): void;
   stdout: { isTTY?: boolean; write(chunk: string): unknown };
   stderr: { isTTY?: boolean; write(chunk: string): unknown };
