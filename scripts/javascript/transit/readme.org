@@ -1017,6 +1017,18 @@ at once and refreshes only when it is older than a glance. While a fetch is in
 flight a board shows skeleton rows and a progress line naming the backend and the
 page number.
 
+A board that has answered cannot go back to loading. That sounds like a detail
+and it was a bug a reader lived with: the first board on the screen showed a full
+list of departures with a progress line under it claiming it was still on page
+one, for the whole visit. Two boards on that profile share a stop, and progress
+was attributed to whichever board mentioned the stop first, so the second board's
+fetch of the shared stop reported under the first board's name minutes after the
+first board was done. Nothing takes a progress line back off the screen except
+the board's own answer, and that answer had already been given. Progress for a
+stop no board asked for is now dropped rather than charged to the first board,
+the stop a board changes at counts as that board's, and a board that has answered
+ignores anything that arrives afterwards.
+
 The shell is two pages now, the board and the expanded journey view, and they
 share =theme.css=: the palette, the type, the line badge and everything a
 journey is drawn with. Two copies of a palette drift, and these two are on the

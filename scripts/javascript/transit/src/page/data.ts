@@ -205,6 +205,30 @@ async function stopDepartures(
   return merged;
 }
 
+/**
+ * Wrap a status sink so that a board which has answered cannot go back to
+ * loading.
+ *
+ * A status is not a counter. There is no later event that takes a "loading"
+ * back off the screen: the only thing that replaces it is the board's own
+ * answer, and the board has already given that. So one progress event arriving
+ * after a board is done leaves that board reporting itself as loading for the
+ * rest of the visit, under a page number from somebody else's request. That is
+ * not a hypothesis. The first board on a reader's phone sat at "page 1" under a
+ * full list of departures until the page was closed.
+ */
+export function settling(onStatus: (boardIndex: number, status: BoardStatus) => void): (boardIndex: number, status: BoardStatus) => void {
+  const settled = new Set<number>();
+  return (index, status) => {
+    if (status.kind === 'loading') {
+      if (settled.has(index)) return;
+    } else {
+      settled.add(index);
+    }
+    onStatus(index, status);
+  };
+}
+
 export interface FetchProfileOptions {
   config: ExportedConfig;
   profile: ExportedProfile;
@@ -236,13 +260,25 @@ export async function fetchProfile(options: FetchProfileOptions): Promise<FetchP
   // number either way, because it is the same request.
   const boardOfStop = new Map<string, number>();
   for (let index = 0; index < profile.boards.length; index += 1) {
-    for (const stop of profile.boards[index]?.stops ?? []) if (!boardOfStop.has(stop)) boardOfStop.set(stop, index);
+    const exported = profile.boards[index];
+    for (const stop of exported?.stops ?? []) if (!boardOfStop.has(stop)) boardOfStop.set(stop, index);
+    // The interchange a board asks about belongs to that board too. It used to
+    // belong to no board, and an unrecognised stop was charged to board zero,
+    // which is how the first board on the screen came to sit at "page 1" for
+    // ever: a later board's onward lookup reported progress under its name long
+    // after it had finished, and nothing said it was finished a second time.
+    const via = exported?.connection?.stop;
+    if (via !== undefined && !boardOfStop.has(via)) boardOfStop.set(via, index);
   }
+  const report = settling(onStatus);
   const pages = new Map<number, number>();
   const backends = makeBackends(config, (backend, stop, page) => {
-    const index = boardOfStop.get(stop) ?? 0;
+    const index = boardOfStop.get(stop);
+    // A stop no board on this profile asked for. It cannot be attributed, and
+    // attributing it to the first board is what the bug above was.
+    if (index === undefined) return;
     pages.set(index, Math.max(pages.get(index) ?? 0, page));
-    onStatus(index, { kind: 'loading', backend, page });
+    report(index, { kind: 'loading', backend, page });
   });
 
   const used = new Set<string>();
@@ -257,7 +293,7 @@ export async function fetchProfile(options: FetchProfileOptions): Promise<FetchP
     const boardConfig = toBoardConfig(exported);
     const boardStarted = Date.now();
     const sharedBefore = takeSharedHits();
-    onStatus(index, { kind: 'loading', backend: null, page: 0 });
+    report(index, { kind: 'loading', backend: null, page: 0 });
     try {
       const multiStop = boardConfig.stops.length > 1;
       const perStop: Departure[][] = [];
@@ -312,7 +348,7 @@ export async function fetchProfile(options: FetchProfileOptions): Promise<FetchP
       if (boardConfig.walkMinutesByStop !== undefined) board.walkMinutesByStop = boardConfig.walkMinutesByStop;
       if (boardConfig.stopLabels !== undefined) board.stopLabels = boardConfig.stopLabels;
       if (boardConfig.connection !== undefined) board.connection = boardConfig.connection;
-      onStatus(index, { kind: 'ready' });
+      report(index, { kind: 'ready' });
       recordBoard(profile.key, {
         title: boardConfig.title,
         departuresMs: Date.now() - boardStarted,
@@ -321,7 +357,7 @@ export async function fetchProfile(options: FetchProfileOptions): Promise<FetchP
       });
       return board;
     } catch (error) {
-      onStatus(index, { kind: 'error', detail: error instanceof Error ? error.message : String(error) });
+      report(index, { kind: 'error', detail: error instanceof Error ? error.message : String(error) });
       recordBoard(profile.key, {
         title: boardConfig.title,
         departuresMs: Date.now() - boardStarted,
