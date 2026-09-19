@@ -20,7 +20,15 @@ import type { ExportedConfig } from '../../src/page/types.ts';
 const CHROME_PATH = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
 
 const SCRATCH_E2E_DIR = '/private/tmp/claude-501/-Users-evar-scripts/1954a689-bd87-4b52-bf28-d32b8c363927/scratchpad/e2e';
-const SCREENSHOT_DIR = '/private/tmp/claude-501/-Users-evar-scripts/1954a689-bd87-4b52-bf28-d32b8c363927/scratchpad/p2';
+/**
+ * Where the run leaves its screenshots.
+ *
+ * A directory under the system temp by default rather than a path from
+ * whatever machine last ran this, which is what it used to be: a scratch path
+ * belonging to one session, committed into a public repository, and wrong for
+ * everybody including the next run on the same machine.
+ */
+const SCREENSHOT_DIR = process.env.TRANSIT_E2E_SCREENSHOTS ?? `${process.env.TMPDIR ?? '/tmp'}/transit-e2e`;
 
 const HERE = import.meta.dir; // .../test/e2e
 const PAGE_DIR = `${HERE}/../../page`;
