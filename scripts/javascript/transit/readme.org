@@ -1219,6 +1219,64 @@ granularity, because whether a row is still catchable is decided per render
 rather than by the tick. Equal signature, same DOM, and the open sheet and any
 selection inside it survive.
 
+*** What the reader is holding onto
+
+A refresh lands every half minute whether or not anything on screen changed, and
+it used to take four things with it: the sideways scroll of the bar's control
+strip, the page's own scroll, the focus in a field, and the field's popover. The
+strip was the one that was noticed, because the start-time controls sit at its
+far end and reaching them is a deliberate act that was undone before it could be
+used. All four have one cause, and the cause is in none of the four: rendering
+the whole page from state ended in =replaceChildren= on the root, and taking an
+element out of the document, even for the instant it takes to put it back,
+resets its scroll offsets and blurs whatever inside it had focus. None of that is
+state the model holds, so nothing put any of it back.
+
+The rule now is that a data update never re-creates a control the reader can be
+in the middle of using. It has four parts, and they are separate because the
+four things were lost in four different places.
+
+The root's children are reconciled rather than replaced. A node already in the
+right position is not touched at all, which is the ordinary case: the bar, and
+every board whose signature has not moved.
+
+The bar is built once and patched from then on. It was the one part of the page
+that really was rebuilt on every render, so no amount of care further down could
+have saved the strip's scroll: the strip was a different element each time.
+Patching means text nodes, classes and disabled states; a list is replaced only
+when what it lists changes, which for the tabs is the configured profiles and
+for the jump chips is the set of boards. Two controls are left alone while they
+have focus, the destination menu and the start-time field, because writing a
+value into a control somebody is using is the same bug in miniature.
+
+The filter popover is built once per open session. It is the only part of this
+page made of controls that are operated in place rather than tapped once, and it
+is attached to a board, which is the thing that redraws. It is rebuilt only when
+what it lists changes shape, meaning a new line appeared at a stop or the board
+gained its journeys. Which lines are hidden is deliberately not part of that,
+because the box the reader just clicked is exactly the one a rebuild would take
+away from them; those are patched instead.
+
+Focus is restored across the whole sync, and it is read before anything is
+built. That ordering is the whole trick: the popover is moved into the freshly
+built board while the new nodes are being assembled, so the blur happens well
+before anything reaches the screen, and code that reads =activeElement= just
+before swapping the nodes in finds the body and concludes nothing was focused.
+The restore passes =preventScroll=, because scrolling to reach the element it is
+refocusing would take away the other thing the reader owns.
+
+A sheet keeps its scroll too, in the one case where its content is genuinely
+rebuilt under it. The rebuild happens because the journey it describes changed,
+which is real, but the new text is usually the same sentence with one number
+different, and starting it again from the top loses the reader's place for a
+reason they cannot see.
+
+The harness scrolls the strip to its end, scrolls the page, opens a popover,
+puts focus in a field inside it, then changes what the fixture says and asks for
+a refresh, and insists that all four are where they were. It insists on the
+refresh as well: the rows must actually have changed, or the assertions would
+pass against a page that had done nothing.
+
 *** Destination badges in the strip
 
 A strip is one line per line and direction and one cell per departure, which is

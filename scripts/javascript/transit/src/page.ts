@@ -6,12 +6,18 @@
 // `localStorage` for the reader's choices, and in IndexedDB for the last known
 // boards.
 //
-// The render is whole-page and idempotent: `render()` rebuilds everything from
+// The render is whole-page and idempotent: `render()` derives everything from
 // `state`. That is affordable at this size and it removes a whole class of bug
 // where a partial update and the model disagree. The one thing it cannot do is
 // run every second, because it would destroy a selection in progress and make
 // the page unscrollable, so the second-by-second countdowns are patched through
 // registered callbacks instead. See `tick()`.
+//
+// Deriving is not the same as replacing. What the reader is holding onto lives
+// on the elements rather than in `state`: a strip's sideways scroll, the page's
+// scroll, the focus in a field. So the root's children are reconciled rather
+// than swapped, the bar patches itself, and focus is read before anything is
+// built and put back afterwards.
 
 import { healMixedShell } from './page/build.ts';
 import { installIcons } from './page/icons.ts';
@@ -23,7 +29,7 @@ import { boardChrome, closeFilters, renderBoard, viewOf, type BoardContext } fro
 import { callsVersion } from './page/calls.ts';
 import { cachedRoutes, destinationNameOf, planProfile } from './page/commute.ts';
 import { fetchMessages, fetchProfile } from './page/data.ts';
-import { el, selectionInsideBoards } from './page/dom.ts';
+import { el, selectionInsideBoards, syncChildren } from './page/dom.ts';
 import { idbGet, idbSet, STORE_BOARDS } from './page/idb.ts';
 import { autoTranslate, primeMessageState, renderMessages, resetMessageFilters } from './page/messages.ts';
 import { rearm, setOnAlarmsChanged } from './page/notify.ts';
@@ -453,6 +459,21 @@ function render(): void {
   const renderStarted = performance.now();
   const app = document.getElementById('app');
   if (app === null) return;
+  // Where the keyboard was, read before anything is built.
+  //
+  // A board whose departures changed is redrawn, and a popover opened from it
+  // is moved into the new board: the element survives, but the moment it
+  // spends outside the document blurs whatever inside it had focus, and that
+  // happens while the new nodes are being assembled, well before they are put
+  // on screen. The reader was typing a number into it. Restoring focus at the
+  // end is the only way to keep it, because focus does not follow a node
+  // through a re-parent, and `preventScroll` because a refocus that scrolled
+  // to reach the element would take away the other thing the reader owns.
+  const focused = document.activeElement as HTMLElement | null;
+  const caret =
+    focused instanceof HTMLInputElement && focused.selectionStart !== null
+      ? { start: focused.selectionStart, end: focused.selectionEnd }
+      : null;
   const config = state.config;
   ticks = [];
 
@@ -571,7 +592,17 @@ function render(): void {
     if (boards.length === 0) nodes.push(el('p', 'empty', state.inFlight > 0 ? 'loading departures' : 'no departures yet'));
   }
 
-  app.replaceChildren(...nodes);
+  syncChildren(app, nodes);
+  if (focused !== null && focused !== document.body && focused !== document.activeElement && focused.isConnected) {
+    focused.focus({ preventScroll: true });
+    if (caret !== null && focused instanceof HTMLInputElement) {
+      try {
+        focused.setSelectionRange(caret.start, caret.end);
+      } catch {
+        // A number or checkbox input has no selection to restore.
+      }
+    }
+  }
   markRender(performance.now() - renderStarted);
 }
 

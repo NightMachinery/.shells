@@ -1245,6 +1245,116 @@ async function main(): Promise<void> {
       `added=${stability.added} removed=${stability.removed}`,
     );
 
+    // ----------------------------------------------- assertions: state survives data
+
+    // What a reader is in the middle of doing must survive the thirty-second
+    // refresh. All four of these were broken by the same thing: the render
+    // replaced the whole of `#app`, which detaches every element in it, and a
+    // detached element loses its scroll offsets, its focus and its identity.
+    // The assertions below scroll a strip, scroll the page, open a popover and
+    // put focus in it, then make the fixture say something new and ask for a
+    // refresh, and insist that none of the four moved.
+
+    /** Shift every fixture departure, so the next refresh genuinely redraws. */
+    const nudgeFixture = (deltaMs: number): void => {
+      for (const row of mvgBody as Array<Record<string, unknown>>) {
+        for (const field of ['plannedDepartureTime', 'realtimeDepartureTime']) {
+          const value = row[field];
+          if (typeof value === 'number') row[field] = value + deltaMs;
+        }
+      }
+    };
+
+    // The popover first: opening it taps a control, and a tap scrolls whatever
+    // it has to in order to reach one, which would make the scroll readings
+    // below measurements of the harness rather than of the page.
+    await io.tap('.board .filter-button');
+    const popoverOpened = await io.waitFor("document.querySelector('.filter-popover') !== null", 2000);
+    const marked = await io.evalJs<boolean>(`(() => {
+      const popover = document.querySelector('.filter-popover');
+      if (!popover) return false;
+      popover.dataset.probe = 'kept';
+      const box = popover.querySelector('input[type=checkbox]') || popover.querySelector('input');
+      if (box) box.focus();
+      return true;
+    })()`);
+
+    const before = await io.evalJs<{ strip: number; slack: number; page: number; pageSlack: number; focus: string; rows: string }>(`(() => {
+      const strip = document.querySelector('.bar-controls');
+      strip.scrollLeft = strip.scrollWidth;
+      // Deliberately not the bottom of the page. A refresh changes what the
+      // rows say and so, by a pixel or ten, how tall the document is, and a
+      // reader parked at the very end is moved by the browser's own clamp
+      // rather than by anything this page did.
+      window.scrollTo(0, 60);
+      const active = document.activeElement;
+      return {
+        strip: strip.scrollLeft,
+        slack: strip.scrollWidth - strip.clientWidth,
+        page: window.scrollY,
+        pageSlack: document.documentElement.scrollHeight - window.innerHeight,
+        focus: active ? (active.className || active.tagName) + '/' + (active.closest('.filter-popover') ? 'in-popover' : 'elsewhere') : 'none',
+        rows: [...document.querySelectorAll('li.row .times')].map((node) => node.textContent).join('|'),
+      };
+    })()`);
+
+    nudgeFixture(60_000);
+    // The refresh the page runs every thirty seconds, asked for now. Clicked
+    // rather than tapped for the same reason the popover was opened first: a
+    // tap would scroll to reach the button and take the measurement with it.
+    await io.evalJs("document.querySelector('.refresh').click(); void 0");
+    const changed = await io.waitFor(
+      `[...document.querySelectorAll('li.row .times')].map((node) => node.textContent).join('|') !== ${JSON.stringify(before.rows)}`,
+      10_000,
+    );
+    await sleep(250);
+
+    const after = await io.evalJs<{ strip: number; page: number; focus: string; popover: boolean; sameNode: boolean; rows: string }>(`(() => {
+      const strip = document.querySelector('.bar-controls');
+      const popover = document.querySelector('.filter-popover');
+      const active = document.activeElement;
+      return {
+        strip: strip.scrollLeft,
+        page: window.scrollY,
+        focus: active ? (active.className || active.tagName) + '/' + (active.closest('.filter-popover') ? 'in-popover' : 'elsewhere') : 'none',
+        popover: popover !== null,
+        sameNode: popover !== null && popover.dataset.probe === 'kept',
+        rows: [...document.querySelectorAll('li.row .times')].map((node) => node.textContent).join('|'),
+      };
+    })()`);
+
+    record(
+      'a refresh with new data leaves the controls strip where the reader scrolled it',
+      changed && before.slack > 1 && before.strip > 1 && after.strip === before.strip,
+      `scrollLeft ${before.strip} -> ${after.strip} of ${before.slack}px of slack; rows changed=${changed}`,
+    );
+    record(
+      'a refresh with new data leaves the page where the reader scrolled it',
+      changed && before.page > 1 && after.page === before.page,
+      `scrollY ${before.page} -> ${after.page} with ${before.pageSlack}px of page to scroll`,
+    );
+    record(
+      'an open filter popover survives a refresh as the same element',
+      popoverOpened && marked && after.popover && after.sameNode,
+      `opened=${popoverOpened} still open=${after.popover} same node=${after.sameNode}`,
+    );
+    record(
+      'focus inside the popover survives a refresh',
+      marked && after.focus === before.focus && after.focus.endsWith('in-popover'),
+      `focus ${before.focus} -> ${after.focus}`,
+    );
+
+    // Put the fixture and the page back the way the rest of the run expects
+    // them: the same departures, no popover, scrolled to the top.
+    nudgeFixture(-60_000);
+    await io.evalJs("document.querySelector('.board .filter-button').click(); window.scrollTo(0, 0); void 0");
+    await io.waitFor("document.querySelector('.filter-popover') === null", 2000);
+    // And a refresh to go with it: the plan fixture answers for the departure
+    // times it was written against, so rows left on the nudged times carry no
+    // journey and the assertions below would be looking for one.
+    await io.evalJs("document.querySelector('.refresh').click(); void 0");
+    await io.waitFor("document.querySelector('li.row:has(a.route)') !== null", 15_000);
+
     // ------------------------------------------------------------ assertion 6
 
     // Addressed by content, not position: which row sorts first depends on the

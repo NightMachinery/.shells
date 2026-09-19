@@ -988,67 +988,131 @@ function destinationChip(badge: DestinationBadge, name: string): HTMLElement {
   return node;
 }
 
-function renderFilter(board: Board, context: BoardContext, rows: Departure[]): HTMLElement {
-  const id = boardId(context.profileKey, board.title);
-  const hidden = readHidden(id);
+/**
+ * The open filter popover, kept rather than rebuilt.
+ *
+ * It is the one piece of this page made of controls the reader operates in
+ * place: two number fields they type into and a checkbox per line. A board
+ * redraws whenever its departures change, which is every thirty seconds, and
+ * redrawing the popover with it threw away a half-typed number, the caret and
+ * the focus ring. So the popover is built once per open session and patched
+ * from then on, and it is rebuilt only when what it lists has actually changed:
+ * a new line appeared at a stop, or the board gained or lost its journeys.
+ * Which lines are hidden is not part of that, because the box the reader just
+ * clicked is exactly the one a rebuild would take away from them.
+ */
+interface FilterView {
+  id: string;
+  shape: string;
+  node: HTMLElement;
+  sync: (board: Board, context: BoardContext, rows: Departure[]) => void;
+}
+let filterView: FilterView | null = null;
 
-  // What there is to filter comes from the data, not the configuration: a board
-  // that names no lines still serves several, and those are the ones a reader
-  // wants to switch off.
+/** The lines each of a board's stops is currently serving. */
+function linesByStop(board: Board): Map<string, Set<string>> {
   const byStop = new Map<string, Set<string>>();
   for (const row of board.departures) {
     const set = byStop.get(row.stop) ?? new Set<string>();
     set.add(normaliseLine(row.line));
     byStop.set(row.stop, set);
   }
+  return byStop;
+}
+
+/** What the popover is made of, as against what it currently says. */
+function filterShape(board: Board, context: BoardContext): string {
+  const parts: string[] = [];
+  for (const [stop, lines] of linesByStop(board)) {
+    parts.push(`@${stopTagOf(stop, board.stopLabels)}`);
+    for (const line of [...lines].sort()) parts.push(`${stop}/${line}`);
+  }
+  parts.push(context.routes === undefined ? 'plain' : 'planned');
+  return parts.join(';');
+}
+
+function buildFilter(board: Board, context: BoardContext): FilterView {
+  const id = boardId(context.profileKey, board.title);
+  // The context a handler reads, kept current by `sync`. Closing over the one
+  // the popover was built with would leave every control calling back into a
+  // render that has since been replaced.
+  let live = context;
+
+  // What there is to filter comes from the data, not the configuration: a board
+  // that names no lines still serves several, and those are the ones a reader
+  // wants to switch off.
+  const byStop = linesByStop(board);
   const labels = new Map<string, string>();
   for (const row of board.departures) labels.set(normaliseLine(row.line), row.line);
 
   const popover = el('div', 'filter-popover');
+  const boxes: Array<{ box: HTMLInputElement; key: string }> = [];
   const total = [...byStop.values()].reduce((sum, set) => sum + set.size, 0);
+  const emptyNote = el('p', 'filter-empty');
+
   if (total <= 1) {
     popover.append(el('p', 'filter-empty', 'only one line here, nothing to filter'));
-    appendEarlyBuffer(popover, context);
-    popover.append(el('p', 'filter-build', buildLabel()));
-    appendTiming(popover);
-    return popover;
-  }
-
-  const showStops = byStop.size > 1;
-  for (const [stop, lines] of byStop) {
-    if (showStops) {
-      const tag = stopTagOf(stop, board.stopLabels);
-      popover.append(el('p', 'filter-stop', tag));
-    }
-    for (const line of [...lines].sort()) {
-      const label = document.createElement('label');
-      label.className = 'filter-line';
-      const box = document.createElement('input');
-      box.type = 'checkbox';
-      box.checked = !hidden.has(filterKey(stop, line));
-      box.addEventListener('change', () => {
-        const next = readHidden(id);
-        if (box.checked) next.delete(filterKey(stop, line));
-        else next.add(filterKey(stop, line));
-        writeHidden(id, next);
-        context.onChange();
-      });
-      label.append(box);
-      label.append(el('span', undefined, labels.get(line) ?? line));
-      popover.append(label);
+  } else {
+    const showStops = byStop.size > 1;
+    for (const [stop, lines] of byStop) {
+      if (showStops) popover.append(el('p', 'filter-stop', stopTagOf(stop, board.stopLabels)));
+      for (const line of [...lines].sort()) {
+        const label = document.createElement('label');
+        label.className = 'filter-line';
+        const box = document.createElement('input');
+        box.type = 'checkbox';
+        const key = filterKey(stop, line);
+        box.checked = !readHidden(id).has(key);
+        box.addEventListener('change', () => {
+          const next = readHidden(id);
+          if (box.checked) next.delete(key);
+          else next.add(key);
+          writeHidden(id, next);
+          live.onChange();
+        });
+        label.append(box);
+        label.append(el('span', undefined, labels.get(line) ?? line));
+        popover.append(label);
+        boxes.push({ box, key });
+      }
     }
   }
 
-  if (rows.length === 0 && board.departures.length > 0) {
-    popover.append(el('p', 'filter-empty', 'everything is hidden'));
-  }
-  appendEarlyBuffer(popover, context);
+  const buffer = context.routes === undefined ? null : appendEarlyBuffer(popover, () => live);
   // Which build this is, somewhere a reader can find it without a console. An
   // installed app can be several deploys behind while the server is current, so
   // "which version am I looking at" has to be answerable from the screen.
-  popover.append(el('p', 'filter-build', buildLabel()));
-  appendTiming(popover);
-  return popover;
+  const buildLine = el('p', 'filter-build', buildLabel());
+  popover.append(buildLine);
+
+  const sync = (current: Board, next: BoardContext, rows: Departure[]): void => {
+    live = next;
+    for (const entry of boxes) entry.box.checked = !readHidden(id).has(entry.key);
+    const hiding = total > 1 && rows.length === 0 && current.departures.length > 0;
+    if (hiding) {
+      emptyNote.textContent = 'everything is hidden';
+      if (emptyNote.parentNode === null) popover.insertBefore(emptyNote, buffer?.first ?? buildLine);
+    } else {
+      emptyNote.remove();
+    }
+    if (buffer !== null) buffer.sync(next);
+    // The timing lines are text about the last run rather than controls, so
+    // they are the one part of the popover that is rewritten on every render.
+    for (const stale of [...popover.querySelectorAll('.filter-timing')]) stale.remove();
+    appendTiming(popover);
+  };
+
+  return { id, shape: filterShape(board, context), node: popover, sync };
+}
+
+function renderFilter(board: Board, context: BoardContext, rows: Departure[]): HTMLElement {
+  const id = boardId(context.profileKey, board.title);
+  const shape = filterShape(board, context);
+  if (filterView === null || filterView.id !== id || filterView.shape !== shape) {
+    filterView = buildFilter(board, context);
+  }
+  filterView.sync(board, context, rows);
+  return filterView.node;
 }
 
 /**
@@ -1073,8 +1137,10 @@ function appendTiming(popover: HTMLElement): void {
  * board shows and means nothing on the others, and because widening it is an
  * occasional question ("what if I run for it") rather than a setting.
  */
-function appendEarlyBuffer(popover: HTMLElement, context: BoardContext): void {
-  if (context.routes === undefined) return;
+function appendEarlyBuffer(
+  popover: HTMLElement,
+  live: () => BoardContext,
+): { first: HTMLElement; sync: (context: BoardContext) => void } {
   const label = document.createElement('label');
   label.className = 'filter-buffer';
   label.append(el('span', undefined, 'tight window'));
@@ -1083,12 +1149,12 @@ function appendEarlyBuffer(popover: HTMLElement, context: BoardContext): void {
   input.min = '0';
   input.max = '15';
   input.step = '1';
-  input.value = String(context.earlyBufferMinutes);
+  input.value = String(live().earlyBufferMinutes);
   input.title = 'how many minutes early an onward departure may be and still be offered as tight';
   input.addEventListener('change', () => {
     const value = Number(input.value);
     if (!Number.isFinite(value) || value < 0) return;
-    context.onEarlyBuffer(Math.min(15, Math.round(value)));
+    live().onEarlyBuffer(Math.min(15, Math.round(value)));
   });
   label.append(input);
   label.append(el('span', 'filter-buffer-unit', 'min'));
@@ -1105,16 +1171,34 @@ function appendEarlyBuffer(popover: HTMLElement, context: BoardContext): void {
   factor.min = '1';
   factor.max = '5';
   factor.step = '0.5';
-  factor.value = String(context.walkWeight);
+  factor.value = String(live().walkWeight);
   factor.title = 'what one minute on foot is worth in minutes on a vehicle. 1 ranks by arrival alone.';
   factor.addEventListener('change', () => {
     const value = Number(factor.value);
     if (!Number.isFinite(value) || value < 1) return;
-    context.onWalkWeight(Math.min(5, value));
+    live().onWalkWeight(Math.min(5, value));
   });
   weight.append(factor);
-  weight.append(el('span', 'filter-buffer-unit', '×'));
+  weight.append(el('span', 'filter-buffer-unit', '\u00d7'));
   popover.append(weight);
+
+  return {
+    first: label,
+    // A field the reader is typing in is theirs until they leave it. Writing the
+    // model's value into a focused number input is how a half-typed "12" becomes
+    // a "1" again.
+    sync: (context: BoardContext): void => {
+      const active = document.activeElement;
+      if (active !== input) {
+        const value = String(context.earlyBufferMinutes);
+        if (input.value !== value) input.value = value;
+      }
+      if (active !== factor) {
+        const value = String(context.walkWeight);
+        if (factor.value !== value) factor.value = value;
+      }
+    },
+  };
 }
 
 /** Which board's filter popover is open, if any. Null when none is. */
@@ -1133,6 +1217,7 @@ const seenContent = new Set<string>();
 
 export function closeFilters(): void {
   openFilter = null;
+  filterView = null;
 }
 
 export function renderBoard(board: Board, context: BoardContext): HTMLElement {

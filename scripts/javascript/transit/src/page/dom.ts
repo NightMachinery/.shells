@@ -220,6 +220,34 @@ export function selectionInsideBoards(): boolean {
 }
 
 /**
+ * Make `parent`'s children equal `next`, moving as little as possible.
+ *
+ * `replaceChildren` would say the same thing in one call and is what this page
+ * used to do, and it is wrong for a reason that does not show up in a diff of
+ * the DOM: taking an element out of the document resets the scroll offsets of
+ * it and of everything inside it, so a strip the reader had scrolled sideways
+ * and a sheet they had scrolled down both jumped back to the start every time
+ * anything re-rendered, including the thirty-second refresh that had changed
+ * nothing they were looking at. Scroll position is state the reader owns and
+ * the model does not hold, so the only way to keep it is to leave the element
+ * alone. A node already in the right place is therefore not touched at all,
+ * which is the common case: the bar and every unchanged board.
+ */
+export function syncChildren(parent: Element, next: readonly Node[]): void {
+  let index = 0;
+  for (const node of next) {
+    const current: Node | null = parent.childNodes[index] ?? null;
+    if (current !== node) parent.insertBefore(node, current);
+    index += 1;
+  }
+  while (parent.childNodes.length > next.length) {
+    const last = parent.lastChild;
+    if (last === null) break;
+    parent.removeChild(last);
+  }
+}
+
+/**
  * How a place name is shortened in a slot too narrow to hold it.
  *
  * One constant, applied wherever a place name has to fit somewhere narrow: the

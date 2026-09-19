@@ -252,7 +252,16 @@ function rebindTip(target: HTMLElement, build: () => HTMLElement, options: TipOp
   const signature = options.signature ?? null;
   if (signature !== open.signature) {
     open.signature = signature;
+    // A sheet the reader has scrolled down is a thing they are in the middle of
+    // reading. The content underneath it genuinely changed, so it is rebuilt,
+    // but jumping back to the top as well would lose their place for a reason
+    // they cannot see: the new text is usually the same sentence with one
+    // number different.
+    const nodeTop = open.node.scrollTop;
+    const bodyTop = open.body.scrollTop;
     open.body.replaceChildren(build());
+    open.node.scrollTop = nodeTop;
+    open.body.scrollTop = bodyTop;
     if (!open.node.classList.contains('tip-sheet')) placeTip(open.node, target);
   }
   return true;

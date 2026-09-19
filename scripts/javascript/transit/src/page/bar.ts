@@ -8,6 +8,17 @@ import type { ExportedConfig, PageState } from './types.ts';
 
 // The sticky bar: which profile, how far ahead, from when, how fresh, and a way
 // to jump to any board without scrolling for it.
+//
+// The bar is built once and patched from then on. It used to be rebuilt from
+// state like everything else, which is the right default for a board and the
+// wrong one here, because the controls row scrolls sideways and a scroll
+// position lives on the element rather than in the model. A reader who had
+// scrolled the row to reach the start-time nudges lost that scroll every thirty
+// seconds, to a refresh that had changed nothing they were looking at. The rule
+// this file now follows is that a data update never re-creates a control the
+// reader can be in the middle of using: text nodes, classes and disabled states
+// are patched, and a node is replaced only when the thing it lists has actually
+// changed shape.
 
 /**
  * The horizons on offer, in minutes.
@@ -81,89 +92,173 @@ function nextWallClock(fromMs: number, hour: number, timezone: string): number {
   return fromMs;
 }
 
-function renderRefresh(context: BarContext): HTMLElement {
-  const wrap = el('div', 'refresh-wrap');
-  const control = button('refresh', undefined, 'refresh now');
-  control.setAttribute('aria-label', 'refresh now');
+// ------------------------------------------------------------ patch helpers
 
-  // The ring is the same element whether or not a fetch is running, so the
-  // button does not change size when one starts. Only the spin class moves.
-  // Planning counts as work in flight. It is the slower half of a refresh, and
-  // a ring that stopped while the journeys were still being worked out said the
-  // page was idle when it was not.
-  const busy = context.state.inFlight > 0 || context.state.planInFlight > 0;
-  const ring = el('span', `refresh-ring${busy ? ' spinning' : ''}`);
-  control.append(ring);
-
-  const age = el('span', 'refresh-age');
-  const write = (): void => {
-    if (context.state.inFlight > 0) {
-      age.textContent = 'updating';
-      return;
-    }
-    if (context.state.planInFlight > 0) {
-      age.textContent = 'planning';
-      return;
-    }
-    age.textContent = context.ageSeconds === null ? 'no data' : `${context.ageSeconds}s`;
-  };
-  write();
-  context.ticks.push(write);
-  control.append(age);
-
-  control.addEventListener('click', context.onRefresh);
-  wrap.append(control);
-  return wrap;
+/** Set text only when it differs, so an unchanged label is not touched at all. */
+function setText(node: HTMLElement, text: string): void {
+  if (node.textContent !== text) node.textContent = text;
 }
 
-function renderTabs(context: BarContext): HTMLElement {
-  const nav = el('nav', 'tabs');
-  context.config.profiles.forEach((profile, index) => {
-    const tab = button(`tab${profile.key === context.state.profileKey ? ' active' : ''}`, profile.title);
-    if (index < 9) tab.title = `press ${index + 1}`;
-    tab.addEventListener('click', () => context.onProfile(profile.key));
-    nav.append(tab);
-  });
-  return nav;
+/** Add or remove one class without reading the class list twice. */
+function setClass(node: HTMLElement, name: string, on: boolean): void {
+  node.classList.toggle(name, on);
+}
+
+/** Put a node in the tree before `before`, or take it out, idempotently. */
+function setPresent(parent: HTMLElement, node: HTMLElement, present: boolean, before: Node | null = null): void {
+  const inTree = node.parentNode === parent;
+  if (present === inTree) return;
+  if (present) parent.insertBefore(node, before);
+  else node.remove();
 }
 
 /**
- * One chip per board, saying how long until its next departure and scrolling to
- * it when tapped.
+ * A slot holding one rendered instant, replaced only when the instant changes.
+ *
+ * A clock time is drawn as an element rather than as text, because it may carry
+ * a `+1` day marker, so it cannot be patched with `textContent`. Remembering the
+ * plain-text form of what is in there is what makes "has this changed" a string
+ * comparison rather than a rebuild.
+ */
+interface TimeSlot {
+  node: HTMLElement;
+  label: string | null;
+}
+
+function timeSlot(className?: string): TimeSlot {
+  return { node: el('span', className), label: null };
+}
+
+function setTime(slot: TimeSlot, epochMs: number, referenceMs: number, timezone: string): void {
+  const label = timeLabel(epochMs, referenceMs, timezone);
+  if (slot.label === label) return;
+  slot.label = label;
+  slot.node.replaceChildren(timeNode(epochMs, referenceMs, timezone));
+}
+
+// ------------------------------------------------------------------- pieces
+
+interface ChipEntry {
+  root: HTMLButtonElement;
+  title: HTMLElement;
+  when: HTMLElement;
+  /** Patched by the one-second tick and by every update. */
+  write: () => void;
+  board: Board;
+  next: Departure | undefined;
+}
+
+interface DestinationParts {
+  wrap: HTMLElement;
+  select: HTMLSelectElement;
+  sort: HTMLButtonElement;
+  /** The offered places, as one string, so the options are rebuilt only when they change. */
+  offered: string;
+}
+
+interface StartParts {
+  wrap: HTMLElement;
+  now: HTMLButtonElement;
+  input: HTMLInputElement;
+  note: HTMLElement;
+  noteTime: TimeSlot;
+}
+
+interface BarView {
+  root: HTMLElement;
+  /** The most recent context, which every event handler reads instead of closing over one. */
+  context: BarContext;
+  tabs: HTMLElement;
+  tabButtons: Map<string, HTMLButtonElement>;
+  tabsKey: string;
+  right: HTMLElement;
+  backend: HTMLElement;
+  refreshWrap: HTMLElement;
+  ring: HTMLElement;
+  age: HTMLElement;
+  writeAge: () => void;
+  chips: HTMLElement;
+  chipEntries: ChipEntry[];
+  chipsKey: string;
+  controls: HTMLElement;
+  segments: Array<{ minutes: number; node: HTMLButtonElement }>;
+  horizonEnd: TimeSlot;
+  destination: DestinationParts;
+  start: StartParts;
+  error: HTMLElement;
+}
+
+let view: BarView | null = null;
+
+/** Throw the bar away, so the next render builds a fresh one. For tests. */
+export function resetBar(): void {
+  view = null;
+}
+
+/**
+ * The jump chips, one per board, saying how long until its next departure.
  *
  * The summary counts only the rows the board is actually showing. A chip that
  * promised a departure the board's own filter is hiding would send someone to a
  * stop for a bus they had already decided not to take.
  */
-function renderChips(context: BarContext): HTMLElement | null {
-  if (context.boards.length === 0) return null;
-  const bar = el('div', 'chips');
-  context.boards.forEach((board, index) => {
-    const profileKey = context.state.profileKey;
-    if (profileKey === null) return;
-    const rows = visibleRows(profileKey, board);
-    const next = rows.find((dep) => dep.realtime >= context.now && !dep.cancelled);
-    const chip = button('chip');
-    // The chip is the narrowest thing on the page; the full title is on the
-    // tooltip below, so nothing is lost by shortening what is drawn.
-    chip.append(el('span', 'chip-title', compact(board.title)));
-    const when = el('span', 'chip-next');
-    const write = (): void => {
-      when.textContent = next === undefined ? '-' : `${minutesUntil(next.realtime, Date.now())}'`;
-    };
-    write();
-    context.ticks.push(write);
-    chip.append(when);
-    // A tap jumps to the board, so the tip opens on hover and on a long press
-    // rather than on a tap: taking the tap for an explanation would break the
-    // one thing the chip is for.
-    attachTip(chip, () => chipTip(board, next, context), { label: chipLabel(board, next, context), tapOpens: false });
-    chip.addEventListener('click', () => {
-      document.getElementById(`board-${index}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    });
-    bar.append(chip);
+function chipsKeyOf(boards: Board[]): string {
+  return boards.map((board) => board.title).join('');
+}
+
+function buildChip(bar: BarView, index: number): ChipEntry {
+  const root = button('chip');
+  // The chip is the narrowest thing on the page; the full title is on the
+  // tooltip below, so nothing is lost by shortening what is drawn.
+  const title = el('span', 'chip-title');
+  const when = el('span', 'chip-next');
+  root.append(title, when);
+  const entry: ChipEntry = {
+    root,
+    title,
+    when,
+    board: bar.context.boards[index] as Board,
+    next: undefined,
+    write: () => undefined,
+  };
+  entry.write = (): void => {
+    setText(entry.when, entry.next === undefined ? '-' : `${minutesUntil(entry.next.realtime, Date.now())}'`);
+  };
+  // A tap jumps to the board, so the tip opens on hover and on a long press
+  // rather than on a tap: taking the tap for an explanation would break the
+  // one thing the chip is for. Both the tip and its label read the entry, which
+  // the update below keeps current, so the chip itself is never rebuilt.
+  attachTip(root, () => chipTip(entry.board, entry.next, bar.context), { tapOpens: false });
+  root.addEventListener('click', () => {
+    document.getElementById(`board-${index}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   });
-  return bar;
+  return entry;
+}
+
+function updateChips(bar: BarView, context: BarContext): void {
+  const key = chipsKeyOf(context.boards);
+  if (key !== bar.chipsKey) {
+    bar.chipsKey = key;
+    bar.chipEntries = context.boards.map((_, index) => buildChip(bar, index));
+    bar.chips.replaceChildren(...bar.chipEntries.map((entry) => entry.root));
+  }
+  setPresent(bar.root, bar.chips, context.boards.length > 0, bar.controls);
+  const profileKey = context.state.profileKey;
+  bar.chipEntries.forEach((entry, index) => {
+    const board = context.boards[index];
+    if (board === undefined || profileKey === null) return;
+    entry.board = board;
+    const rows = visibleRows(profileKey, board);
+    entry.next = rows.find((dep) => dep.realtime >= context.now && !dep.cancelled);
+    setText(entry.title, compact(board.title));
+    const label = chipLabel(board, entry.next, context);
+    if (entry.root.title !== label) {
+      entry.root.title = label;
+      entry.root.setAttribute('aria-label', label);
+    }
+    entry.write();
+    context.ticks.push(entry.write);
+  });
 }
 
 /** What a jump chip says in plain text. */
@@ -196,80 +291,15 @@ function chipTip(board: Board, next: Departure | undefined, context: BarContext)
   return body;
 }
 
-function renderHorizon(context: BarContext): HTMLElement {
-  const wrap = el('div', 'horizon');
-  const group = el('div', 'segmented');
-  for (const minutes of HORIZONS) {
-    const option = button(`segment${minutes === context.state.horizonMinutes ? ' active' : ''}`, horizonLabel(minutes));
-    option.addEventListener('click', () => context.onHorizon(minutes));
-    group.append(option);
-  }
-  wrap.append(group);
-
-  // The end time rather than only the span, because "6 h" does not answer "does
-  // this reach the last train" without arithmetic the reader should not be
-  // doing on a platform.
-  const startMs = context.state.startMode === 'picked' ? context.state.startMs : context.now;
-  const endMs = startMs + context.state.horizonMinutes * 60_000;
-  const timezone = context.config.defaults.timezone;
-  const end = el('span', 'horizon-end');
-  end.append(el('span', undefined, 'to '));
-  end.append(timeNode(endMs, startMs, timezone));
-  wrap.append(end);
-  return wrap;
-}
-
-function renderStart(context: BarContext): HTMLElement {
-  const wrap = el('div', `start${context.state.startMode === 'picked' ? ' picked' : ''}`);
-  const timezone = context.config.defaults.timezone;
-  const startMs = context.state.startMode === 'picked' ? context.state.startMs : context.now;
-
-  const now = button(`start-now${context.state.startMode === 'now' ? ' active' : ''}`, 'Now', 'show what is leaving from this moment');
-  now.addEventListener('click', () => context.onStart('now', Date.now()));
-  wrap.append(now);
-
-  const input = document.createElement('input');
-  input.type = 'datetime-local';
-  input.className = 'start-input';
-  input.value = localInputValue(startMs, timezone);
-  input.min = localInputValue(context.now, timezone);
-  input.addEventListener('change', () => {
-    const picked = Date.parse(input.value);
-    if (Number.isFinite(picked)) context.onStart('picked', Math.max(picked, context.now));
-  });
-  wrap.append(input);
-
-  const nudges: Array<[string, () => number]> = [
-    ['-15', () => startMs - 15 * 60_000],
-    ['+15', () => startMs + 15 * 60_000],
-    ['+1 h', () => startMs + 60 * 60_000],
-    ['08:00', () => nextWallClock(context.now, 8, timezone)],
-  ];
-  for (const [label, compute] of nudges) {
-    const nudge = button('start-nudge', label);
-    nudge.addEventListener('click', () => context.onStart('picked', Math.max(compute(), context.now)));
-    wrap.append(nudge);
-  }
-
-  if (context.state.startMode === 'picked') {
-    const note = el('span', 'start-note');
-    note.append(el('span', undefined, 'showing '));
-    note.append(timeNode(startMs, context.now, timezone));
-    note.title = 'a timetable for the moment you picked. Nothing here is live.';
-    wrap.append(note);
-  }
-  return wrap;
-}
-
 /**
  * Where the commute view plans to, and whether rows are ordered by arrival.
  *
- * Only rendered when the configuration carries places and the visible profile
- * has at least one board that opted in. A picker offering nowhere to go, or
+ * Only shown when the configuration carries places and the visible profile has
+ * at least one board that opted in. A picker offering nowhere to go, or
  * governing nothing, is worse than no picker: it invites a reader to try it and
  * then shows them the same screen.
  */
-function renderDestination(context: BarContext): HTMLElement | null {
+function destinationOffered(context: BarContext): Array<{ name: string; label: string }> | null {
   const places = context.config.places ?? [];
   if (places.length === 0) return null;
   const profile = context.config.profiles.find((entry) => entry.key === context.state.profileKey);
@@ -279,15 +309,6 @@ function renderDestination(context: BarContext): HTMLElement | null {
   // than no control: the reader tries it, and concludes the page is broken.
   if (profile.boards.every((board) => !board.commute || (board.destination ?? null) !== null)) return null;
 
-  const wrap = el('div', 'destination-pick');
-  wrap.append(el('span', 'destination-label', 'to'));
-
-  const select = document.createElement('select');
-  select.className = 'destination-select';
-  const off = document.createElement('option');
-  off.value = '';
-  off.textContent = 'nowhere';
-  select.append(off);
   // Doorsteps first, then the stations a reader travels to, unless the profile
   // names its own order. A doorstep is where a journey usually ends, so those
   // are the answers worth putting under the thumb; a station is picked
@@ -303,25 +324,253 @@ function renderDestination(context: BarContext): HTMLElement | null {
     }
     return Number(a.stop !== null) - Number(b.stop !== null);
   });
-  for (const place of offered) {
-    const option = document.createElement('option');
-    option.value = place.name;
+  return offered.map((place) => ({
+    name: place.name,
     // A stop place says what it is called; a doorstep borrows the tab's title,
     // which is the name a reader recognises, and falls back to the raw key.
-    option.textContent =
-      place.label ?? context.config.profiles.find((entry) => entry.key === place.name)?.title ?? place.name;
-    select.append(option);
-  }
-  select.value = context.state.destinationKey ?? '';
-  select.addEventListener('change', () => context.onDestination(select.value === '' ? null : select.value));
-  wrap.append(select);
+    label: place.label ?? context.config.profiles.find((entry) => entry.key === place.name)?.title ?? place.name,
+  }));
+}
 
-  if (context.state.destinationKey !== null) {
-    const sort = button(`sort-arrival${context.state.sortByArrival ? ' active' : ''}`, 'by arrival', 'order commute rows by when they get you there, not when they leave');
-    sort.addEventListener('click', () => context.onSort(!context.state.sortByArrival));
-    wrap.append(sort);
+function updateDestination(bar: BarView, context: BarContext): void {
+  const offered = destinationOffered(context);
+  setPresent(bar.controls, bar.destination.wrap, offered !== null, bar.start.wrap);
+  if (offered === null) return;
+  const key = offered.map((place) => `${place.name}:${place.label}`).join('');
+  if (key !== bar.destination.offered) {
+    bar.destination.offered = key;
+    const options: HTMLOptionElement[] = [];
+    const off = document.createElement('option');
+    off.value = '';
+    off.textContent = 'nowhere';
+    options.push(off);
+    for (const place of offered) {
+      const option = document.createElement('option');
+      option.value = place.name;
+      option.textContent = place.label;
+      options.push(option);
+    }
+    bar.destination.select.replaceChildren(...options);
   }
-  return wrap;
+  // Never while the reader has the menu open: setting `value` on a focused
+  // select is how a picker changes under a thumb that is already on it.
+  const wanted = context.state.destinationKey ?? '';
+  if (document.activeElement !== bar.destination.select && bar.destination.select.value !== wanted) {
+    bar.destination.select.value = wanted;
+  }
+  setClass(bar.destination.sort, 'active', context.state.sortByArrival);
+  setPresent(bar.destination.wrap, bar.destination.sort, context.state.destinationKey !== null);
+}
+
+function updateStart(bar: BarView, context: BarContext): void {
+  const picked = context.state.startMode === 'picked';
+  const timezone = context.config.defaults.timezone;
+  const startMs = picked ? context.state.startMs : context.now;
+  setClass(bar.start.wrap, 'picked', picked);
+  setClass(bar.start.now, 'active', !picked);
+  // The value is the reader's if they are typing in it. A `datetime-local`
+  // being rewritten mid-entry loses the digits already typed and the caret.
+  if (document.activeElement !== bar.start.input) {
+    const value = localInputValue(startMs, timezone);
+    if (bar.start.input.value !== value) bar.start.input.value = value;
+  }
+  const min = localInputValue(context.now, timezone);
+  if (bar.start.input.min !== min) bar.start.input.min = min;
+  setPresent(bar.start.wrap, bar.start.note, picked);
+  if (picked) setTime(bar.start.noteTime, startMs, context.now, timezone);
+}
+
+// -------------------------------------------------------------------- build
+
+function createBar(context: BarContext): BarView {
+  const root = el('header', 'bar');
+  const top = el('div', 'bar-row bar-top');
+  const tabs = el('nav', 'tabs');
+  const right = el('div', 'bar-right');
+  const backend = el('span', 'bar-backend');
+  const refreshWrap = el('div', 'refresh-wrap');
+  const control = button('refresh', undefined, 'refresh now');
+  control.setAttribute('aria-label', 'refresh now');
+  // The ring is the same element whether or not a fetch is running, so the
+  // button does not change size when one starts. Only the spin class moves.
+  const ring = el('span', 'refresh-ring');
+  const age = el('span', 'refresh-age');
+  control.append(ring, age);
+  refreshWrap.append(control);
+  right.append(refreshWrap);
+  top.append(tabs, right);
+  root.append(top);
+
+  const chips = el('div', 'chips');
+
+  const controls = el('div', 'bar-row bar-controls');
+  const horizon = el('div', 'horizon');
+  const group = el('div', 'segmented');
+  const segments = HORIZONS.map((minutes) => {
+    const node = button('segment', horizonLabel(minutes));
+    group.append(node);
+    return { minutes, node };
+  });
+  horizon.append(group);
+  // The end time rather than only the span, because "6 h" does not answer "does
+  // this reach the last train" without arithmetic the reader should not be
+  // doing on a platform.
+  const horizonEnd = timeSlot('horizon-end-time');
+  const end = el('span', 'horizon-end');
+  end.append(el('span', undefined, 'to '), horizonEnd.node);
+  horizon.append(end);
+  controls.append(horizon);
+
+  const destinationWrap = el('div', 'destination-pick');
+  destinationWrap.append(el('span', 'destination-label', 'to'));
+  const select = document.createElement('select');
+  select.className = 'destination-select';
+  destinationWrap.append(select);
+  const sort = button('sort-arrival', 'by arrival', 'order commute rows by when they get you there, not when they leave');
+
+  const startWrap = el('div', 'start');
+  const startNow = button('start-now', 'Now', 'show what is leaving from this moment');
+  startWrap.append(startNow);
+  const input = document.createElement('input');
+  input.type = 'datetime-local';
+  input.className = 'start-input';
+  startWrap.append(input);
+  const noteTime = timeSlot('start-note-time');
+  const note = el('span', 'start-note');
+  note.append(el('span', undefined, 'showing '), noteTime.node);
+  note.title = 'a timetable for the moment you picked. Nothing here is live.';
+
+  // Before the start-time control, which is wider and used far less often. The
+  // controls row scrolls sideways on a phone, so what comes first is what a
+  // reader can reach without scrolling, and "where am I going" beats "nudge the
+  // clock by a quarter of an hour".
+  controls.append(startWrap);
+  root.append(controls);
+
+  const error = el('p', 'bar-error');
+
+  const bar: BarView = {
+    root,
+    context,
+    tabs,
+    tabButtons: new Map(),
+    tabsKey: '',
+    right,
+    backend,
+    refreshWrap,
+    ring,
+    age,
+    writeAge: () => undefined,
+    chips,
+    chipEntries: [],
+    chipsKey: ' never',
+    controls,
+    segments,
+    horizonEnd,
+    destination: { wrap: destinationWrap, select, sort, offered: ' never' },
+    start: { wrap: startWrap, now: startNow, input, note, noteTime },
+    error,
+  };
+
+  control.addEventListener('click', () => bar.context.onRefresh());
+  for (const segment of segments) {
+    segment.node.addEventListener('click', () => bar.context.onHorizon(segment.minutes));
+  }
+  select.addEventListener('change', () => bar.context.onDestination(select.value === '' ? null : select.value));
+  sort.addEventListener('click', () => bar.context.onSort(!bar.context.state.sortByArrival));
+  startNow.addEventListener('click', () => bar.context.onStart('now', Date.now()));
+  input.addEventListener('change', () => {
+    const value = Date.parse(input.value);
+    if (Number.isFinite(value)) bar.context.onStart('picked', Math.max(value, bar.context.now));
+  });
+  const nudges: Array<[string, () => number]> = [
+    ['-15', () => startOf(bar) - 15 * 60_000],
+    ['+15', () => startOf(bar) + 15 * 60_000],
+    ['+1 h', () => startOf(bar) + 60 * 60_000],
+    ['08:00', () => nextWallClock(bar.context.now, 8, bar.context.config.defaults.timezone)],
+  ];
+  for (const [label, compute] of nudges) {
+    const nudge = button('start-nudge', label);
+    nudge.addEventListener('click', () => bar.context.onStart('picked', Math.max(compute(), bar.context.now)));
+    startWrap.append(nudge);
+  }
+  // Appended after the nudges so it stays the last thing in the row.
+  startWrap.append(note);
+  note.remove();
+
+  bar.writeAge = (): void => {
+    const state = bar.context.state;
+    if (state.inFlight > 0) {
+      setText(age, 'updating');
+      return;
+    }
+    // Planning counts as work in flight. It is the slower half of a refresh,
+    // and a ring that stopped while the journeys were still being worked out
+    // said the page was idle when it was not.
+    if (state.planInFlight > 0) {
+      setText(age, 'planning');
+      return;
+    }
+    setText(age, bar.context.ageSeconds === null ? 'no data' : `${bar.context.ageSeconds}s`);
+  };
+
+  markScrollEdges(controls);
+  return bar;
+}
+
+/** The instant the start control is nudging from. */
+function startOf(bar: BarView): number {
+  return bar.context.state.startMode === 'picked' ? bar.context.state.startMs : bar.context.now;
+}
+
+function updateTabs(bar: BarView, context: BarContext): void {
+  const key = context.config.profiles.map((profile) => `${profile.key}:${profile.title}`).join('');
+  if (key !== bar.tabsKey) {
+    bar.tabsKey = key;
+    bar.tabButtons = new Map();
+    const nodes = context.config.profiles.map((profile, index) => {
+      const tab = button('tab', profile.title);
+      if (index < 9) tab.title = `press ${index + 1}`;
+      tab.addEventListener('click', () => bar.context.onProfile(profile.key));
+      bar.tabButtons.set(profile.key, tab);
+      return tab;
+    });
+    bar.tabs.replaceChildren(...nodes);
+  }
+  for (const [profileKey, tab] of bar.tabButtons) {
+    setClass(tab, 'active', profileKey === context.state.profileKey);
+  }
+}
+
+function updateBar(bar: BarView, context: BarContext): void {
+  updateTabs(bar, context);
+
+  // The provenance sits with the freshness rather than with the controls: both
+  // answer "how much do I trust what I am looking at", and a board repeats its
+  // own backend only when it disagrees with this one.
+  setPresent(bar.right, bar.backend, context.backends.length > 0, bar.refreshWrap);
+  if (context.backends.length > 0) {
+    setText(bar.backend, context.backends.join(' + '));
+    bar.backend.title =
+      (context.backends.length === 1
+        ? `every board here was answered by ${context.backends[0]}`
+        : 'two sources answered: the live one for the near window and the timetable for the rest') + `\n${buildLabel()}`;
+  }
+  setClass(bar.ring, 'spinning', context.state.inFlight > 0 || context.state.planInFlight > 0);
+  bar.writeAge();
+  context.ticks.push(bar.writeAge);
+
+  updateChips(bar, context);
+
+  for (const segment of bar.segments) setClass(segment.node, 'active', segment.minutes === context.state.horizonMinutes);
+  const startMs = context.state.startMode === 'picked' ? context.state.startMs : context.now;
+  setTime(bar.horizonEnd, startMs + context.state.horizonMinutes * 60_000, startMs, context.config.defaults.timezone);
+
+  updateDestination(bar, context);
+  updateStart(bar, context);
+
+  setPresent(bar.root, bar.error, context.state.lastError !== null);
+  if (context.state.lastError !== null) setText(bar.error, `last refresh failed: ${context.state.lastError}`);
 }
 
 /**
@@ -350,43 +599,8 @@ export function markScrollEdges(strip: HTMLElement): void {
 }
 
 export function renderBar(context: BarContext): HTMLElement {
-  const bar = el('header', 'bar');
-
-  const top = el('div', 'bar-row bar-top');
-  top.append(renderTabs(context));
-  // The provenance sits with the freshness rather than with the controls: both
-  // answer "how much do I trust what I am looking at", and a board repeats its
-  // own backend only when it disagrees with this one.
-  const right = el('div', 'bar-right');
-  if (context.backends.length > 0) {
-    const source = el('span', 'bar-backend', context.backends.join(' + '));
-    source.title =
-      (context.backends.length === 1
-        ? `every board here was answered by ${context.backends[0]}`
-        : 'two sources answered: the live one for the near window and the timetable for the rest') + `\n${buildLabel()}`;
-    right.append(source);
-  }
-  right.append(renderRefresh(context));
-  top.append(right);
-  bar.append(top);
-
-  const chips = renderChips(context);
-  if (chips !== null) bar.append(chips);
-
-  const controls = el('div', 'bar-row bar-controls');
-  controls.append(renderHorizon(context));
-  // Before the start-time control, which is wider and used far less often. The
-  // controls row scrolls sideways on a phone, so what comes first is what a
-  // reader can reach without scrolling, and "where am I going" beats "nudge the
-  // clock by a quarter of an hour".
-  const destination = renderDestination(context);
-  if (destination !== null) controls.append(destination);
-  controls.append(renderStart(context));
-  markScrollEdges(controls);
-  bar.append(controls);
-
-  if (context.state.lastError !== null) {
-    bar.append(el('p', 'bar-error', `last refresh failed: ${context.state.lastError}`));
-  }
-  return bar;
+  if (view === null) view = createBar(context);
+  view.context = context;
+  updateBar(view, context);
+  return view.root;
 }
