@@ -54,6 +54,11 @@ export function departureJson(dep: Departure, board: WalkSource, now: number, mu
     // unless this stop overrides it.
     walk_minutes: walkMinutes,
     backend: dep.backend,
+    // Present only when a board filters by a place the vehicle must call at, and
+    // only on the rows that could not be checked against it. A board that looks
+    // too permissive is answered by this field and by nothing else.
+    ...(dep.viaUnverified === true ? { via_unverified: true } : {}),
+    ...(dep.tripId === undefined ? {} : { trip_id: dep.tripId }),
     stop: dep.stop,
     stop_tag: multiStop ? (dep.stopTag ?? stopTag(dep.stop, board.stopLabels)) : null,
     connection:
