@@ -30,6 +30,24 @@ export const DEFAULT_CONFIG_RELATIVE_PATH = '.address-config/address.toml';
 export const DEFAULT_PLAN_MODES: readonly string[] = ['SUBURBAN', 'SUBWAY', 'TRAM', 'BUS', 'REGIONAL_RAIL'];
 
 export const DEFAULT_HORIZON_MINUTES = 120;
+
+/**
+ * How far past the horizon a board is fetched anyway, in minutes.
+ *
+ * A departure near the end of the horizon has nothing after it: no later
+ * service for its onward connection to point at, and no room for the journey
+ * planner to find the change it would have to make. Both of those exist in the
+ * world; they were missing only because nobody had asked for them. So the
+ * fetch and the journey search both reach past the edge, and the rows that
+ * come back from past it are kept and never drawn.
+ *
+ * Long enough to cover a wait plus a ride to a first interchange, which is the
+ * longest gap this package ever has to bridge, and short enough not to double
+ * the request count of the shortest horizon on offer. It is one number rather
+ * than two because the page and the command line have to agree about where a
+ * board ends, and a knob with two homes is a knob that disagrees with itself.
+ */
+export const BEYOND_HORIZON_EXTENSION_MINUTES = 120;
 export const DEFAULT_BACKEND = 'mvg';
 export const DEFAULT_FALLBACK = 'transitous';
 export const DEFAULT_TRANSPORT_TYPES: readonly Mode[] = ALL_MODES;

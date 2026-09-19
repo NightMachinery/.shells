@@ -6,6 +6,7 @@ import type { Backend, DepartureOptions, Window } from './backends/types.ts';
 import { createCache, lookupCacheAdapter, withCache, type TransitCache } from './cache.ts';
 import {
   BACKEND_NAMES,
+  BEYOND_HORIZON_EXTENSION_MINUTES,
   findProfile,
   HOME_ALIAS,
   loadConfig,
@@ -288,6 +289,10 @@ function boardBackend(runtime: Runtime, stops: string[], rows: Departure[]): str
 
 async function buildBoard(runtime: Runtime, boardConfig: BoardConfig, now: number): Promise<Board> {
   const window = runtime.window(now);
+  // Fetched wider than it is printed; see `BEYOND_HORIZON_EXTENSION_MINUTES`.
+  // A row near the end of `window` still needs something past it to plan a
+  // journey with and to attach an onward connection to.
+  const fetchWindow = { fromMs: window.fromMs, toMs: window.toMs + BEYOND_HORIZON_EXTENSION_MINUTES * 60_000 };
   const multiStop = boardConfig.stops.length > 1;
   // A board that names its categories asks for those and no others. The page
   // limit is spent on rows the board can use instead of on five categories it
@@ -299,7 +304,7 @@ async function buildBoard(runtime: Runtime, boardConfig: BoardConfig, now: numbe
       : undefined;
   const perStop: Departure[][] = [];
   for (const stop of boardConfig.stops) {
-    const rows = await runtime.backend.departures(stop, window, options);
+    const rows = await runtime.backend.departures(stop, fetchWindow, options);
     // The mode filter inside `applyFilters` is now redundant for such a board,
     // and stays anyway: the hint is a hint, and a backend that ignores it must
     // not be able to widen a board.
@@ -307,23 +312,34 @@ async function buildBoard(runtime: Runtime, boardConfig: BoardConfig, now: numbe
     if (multiStop) for (const row of filtered) row.stopTag = stopTag(row.stop, boardConfig.stopLabels);
     perStop.push(filtered);
   }
-  const departures = mergeBoards(perStop);
+  const merged = mergeBoards(perStop);
 
   const connection = boardConfig.connection;
   if (connection !== undefined) {
-    // The onward window is this board's window shifted by the whole journey to
-    // the interchange: nothing leaving before that is reachable from any row
-    // here, and nothing after the last row plus that shift is ever consulted.
+    // The onward window is this board's fetch window shifted by the whole
+    // journey to the interchange: nothing leaving before that is reachable from
+    // any row here, and nothing after the last row plus that shift is ever
+    // consulted. Shifting the extended end rather than the printed one is what
+    // keeps the last few printed rows from losing their onward slot.
     const reach = (connection.rideMinutes + connection.transferMinutes) * 60_000;
     try {
-      const onward = await runtime.backend.departures(connection.stop, { fromMs: window.fromMs + reach, toMs: window.toMs + reach });
-      attachConnections(departures, onward, connection);
+      const onward = await runtime.backend.departures(connection.stop, {
+        fromMs: fetchWindow.fromMs + reach,
+        toMs: fetchWindow.toMs + reach,
+      });
+      attachConnections(merged, onward, connection);
     } catch {
       // An interchange that cannot be reached leaves the slot empty rather than
       // failing the board; the departures are what the caller asked for.
-      for (const row of departures) row.connection = null;
+      for (const row of merged) row.connection = null;
     }
   }
+
+  // Split after filtering, merging and the connection lookup, exactly as the
+  // page does it: everything through `window` prints, everything fetched past
+  // it for the planner's and the connections' sake does not.
+  const departures = merged.filter((row) => row.realtime <= window.toMs);
+  const beyond = merged.filter((row) => row.realtime > window.toMs);
 
   const board: Board = {
     title: boardConfig.title,
@@ -332,6 +348,7 @@ async function buildBoard(runtime: Runtime, boardConfig: BoardConfig, now: numbe
     departures,
     walkMinutes: boardConfig.walkMinutes,
   };
+  if (beyond.length > 0) board.beyond = beyond;
   if (boardConfig.walkMinutesByStop !== undefined) board.walkMinutesByStop = boardConfig.walkMinutesByStop;
   if (boardConfig.stopLabels !== undefined) board.stopLabels = boardConfig.stopLabels;
   if (connection !== undefined) board.connection = connection;
@@ -472,6 +489,11 @@ async function commandRoute(runtime: Runtime, args: string[], flags: Flags): Pro
   // The commute view plans what it prints, and what it prints is the near
   // window: past that the board itself stops showing individual rows.
   const boundary = now + NEAR_WINDOW_MINUTES * 60_000;
+  // A row right at that boundary needs an onward change to search for same as
+  // any other row does; without this the search window handed to the planner
+  // would stop exactly where the last row leaves, which is the one place it
+  // must not stop.
+  const coverThroughMs = boundary + BEYOND_HORIZON_EXTENSION_MINUTES * 60_000;
 
   const views: PlannedBoardView[] = [];
   for (const boardConfig of boardConfigs) {
@@ -507,6 +529,7 @@ async function commandRoute(runtime: Runtime, args: string[], flags: Flags): Pro
             targets,
             rows,
             startMs: now,
+            coverThroughMs,
             earlyBufferMinutes,
             walkWeight: runtime.config.defaults.walkWeight,
             planModes: runtime.config.defaults.planModes,

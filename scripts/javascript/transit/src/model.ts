@@ -67,6 +67,26 @@ export interface Board {
   /** The backend that answered, or `"mixed"` when a board's stops disagree. */
   backend: string;
   departures: Departure[];
+  /**
+   * Rows fetched past the visible horizon, kept only so the journey planner and
+   * the last visible rows' onward connections have something beyond the edge to
+   * find. Nothing renders this: every board view draws `departures` and stops
+   * there, and a row only moves out of this list and onto the board once the
+   * horizon itself grows to cover it (the reader picks a longer horizon, or a
+   * later refresh's `startMs` walks forward until the row falls inside it).
+   */
+  beyond?: Departure[];
+  /**
+   * The instant this board was actually fetched through, epoch milliseconds.
+   *
+   * Recorded rather than inferred from `beyond`, because the two are not the
+   * same fact. A sparse board can be fetched two hours past its horizon and
+   * have nothing at all come back for that stretch, and the journey planner
+   * still has to search those two hours: the row at the edge needs a change to
+   * catch, and the change it needs is on some other line. Reading the last row
+   * of `beyond` would give up exactly on the boards that need this most.
+   */
+  fetchedThrough?: number;
   walkMinutes: number;
   /** Per-stop overrides of `walkMinutes`, keyed by stop id. */
   walkMinutesByStop?: Record<string, number>;

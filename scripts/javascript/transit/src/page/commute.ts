@@ -63,6 +63,20 @@ export function rowKey(dep: Departure): string {
   return `${normaliseLine(dep.line)}|${dep.planned}|${dep.stop}`;
 }
 
+/**
+ * How far a plan for this board must search, past what it renders.
+ *
+ * `board.departures` stops at the visible horizon, and the planner's own rule
+ * is to search as far as the last row it was handed. That is precisely the
+ * wrong answer for the row at the edge: the change it needs to make leaves
+ * after it does, so a search that stops where it leaves finds nothing and the
+ * last minutes of every horizon come back blank. The board was fetched further
+ * than it draws for this reason, and this is that further point.
+ */
+function coverThroughOf(board: Board): number | undefined {
+  return board.fetchedThrough;
+}
+
 /** The place a profile key names, or null when the configuration has none. */
 export function placeOf(config: ExportedConfig, key: string | null): ExportedPlace | null {
   if (key === null) return null;
@@ -236,6 +250,7 @@ export async function planProfile(options: PlanProfileOptions): Promise<ProfileR
     jobs.map(async ({ index, board, stop, destinationKey }) => {
       try {
         let origin: OriginLevel | null = null;
+        const coverThroughMs = coverThroughOf(board);
         const planned = await planBoard({
           stop,
           targets: targetsFor(destinationKey),
@@ -243,6 +258,7 @@ export async function planProfile(options: PlanProfileOptions): Promise<ProfileR
           startMs: options.startMs,
           baseUrl: options.config.backends.transitous_base_url,
           originCache,
+          ...(coverThroughMs === undefined ? {} : { coverThroughMs }),
           ...(planModes === undefined ? {} : { planModes }),
           ...(options.walkWeight === undefined ? {} : { walkWeight: options.walkWeight }),
           onOrigin: (resolved) => {

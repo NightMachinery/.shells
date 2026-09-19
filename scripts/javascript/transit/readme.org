@@ -308,6 +308,40 @@ The aggregator pages by following a cursor instead, and the endpoint used here
 carries no category parameter, so a narrowing there changes only what is kept.
 Its per-request row count is sized from the length of the window.
 
+** Asking past the edge
+
+Every board is fetched further than it shows, by the extension named in
+=src/config.ts=. Without it a departure near the end of the horizon has nothing
+after it: no later service for its onward connection to point at, and no room
+for the journey planner to find the change it would have to make. Neither
+absence is real. A rider on the last row of a one hour board still changes
+somewhere and still catches something; it was only that nobody had asked. The
+symptom was the last several minutes of whichever horizon was picked going blank
+in the connection column and in the journey slot, which reads as a board that
+has stopped working rather than as a window that has ended.
+
+Three things use the extension. The stop requests reach past the horizon, the
+onward lookup at an interchange reaches past it too, and the journey search is
+told to cover through that further point rather than through the last row it was
+handed. The third is the one the planner actually needs: a search that stops
+where the last row leaves stops exactly where that row's change would have to
+leave from.
+
+The rows that come back from past the edge are kept on the board rather than
+thrown away, under their own field, and nothing draws them. Every board view
+reads the visible list and stops there, which is why "nothing in the window"
+still means the window the reader picked and not the wider one the network saw.
+A row crosses over when the horizon itself reaches it, either because a longer
+one was picked or because a later refresh has walked the start time forward.
+
+How far the search has to reach is recorded on the board as the instant it was
+fetched through, rather than read back off the last row that came in past the
+edge. Those are different facts. A sparse board can be fetched two hours past
+its horizon and have nothing at all come back for that stretch, and the row at
+its edge still needs the planner to search those two hours, because the change
+it is going to make is on some other line. Reading the last row would give up on
+exactly the boards that need this most.
+
 * Journey planning
 
 A board says when vehicles leave. It does not say which of them gets you to the
@@ -1049,6 +1083,28 @@ It is on the page rather than in a profiler because the device the question is
 about is a phone, and a phone has no profiler. Numbers measured on a laptop on a
 wired connection answer a different question from the one a reader is asking
 when they say it feels slow.
+
+** What asking past the edge costs
+
+The extension is not free and the harness measures the price rather than
+estimating it. Under four times CPU throttling and a slow mobile connection, on
+the same fixtures, a board's departures fetch goes from about 640 ms to about
+1260 ms and the time until the journey slots are filled goes from about 2.75 s to
+about 3.39 s. Time to the first rows does not move, because that is one round
+trip on a slow link and no amount of fetching changes how long the first answer
+takes to arrive. The primary backend pages at roughly forty minutes of departures
+per request, so the shape of the cost is no surprise: the one hour picker was
+asking for a little over an hour and is now asking for a little over three.
+
+Where that money goes is worth being exact about, because it is not all being
+spent. Three things needed the extension: the journey search had to be told to
+cover past the last row it was handed, the onward lookup at an interchange had to
+reach past the horizon, and the board's own stops had to be fetched past it. The
+first is a number and costs nothing. The second costs one stop's extra pages and
+only on boards that declare an interchange. The third is where nearly all of the
+measured cost sits, and nothing currently reads those rows: they are kept on the
+board under their own field, as asked, against a view that would show them. Until
+something does, that part of the bill is buying an option rather than a feature.
 
 ** Asking once, and asking together
 

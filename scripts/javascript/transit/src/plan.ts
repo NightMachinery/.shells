@@ -231,6 +231,15 @@ export interface PlanBoardOptions {
   targets: readonly PlanTarget[];
   rows: Departure[];
   startMs: number;
+  /**
+   * How far out a journey search must reach, epoch milliseconds. Absent means
+   * the old rule: the latest `realtime` among `rows`. A caller that fetched
+   * further than it renders (a board's beyond-the-horizon rows, in particular)
+   * passes that further point here, because otherwise a row near the end of
+   * what is shown would be planned with a search window that stops right where
+   * its own onward change would have to leave from, and never find it.
+   */
+  coverThroughMs?: number;
   earlyBufferMinutes?: number;
   /** What a walked minute costs in ridden minutes; defaults to `DEFAULT_WALK_WEIGHT`. */
   walkWeight?: number;
@@ -1006,8 +1015,14 @@ export async function planBoard(options: PlanBoardOptions): Promise<PlannedRow[]
   const known = unknownOrigins.get(fromPlace);
   if (known !== undefined) throw known;
 
-  let coverThrough = Number.NEGATIVE_INFINITY;
-  for (const row of rows) if (row.realtime > coverThrough) coverThrough = row.realtime;
+  // The caller's own figure wins when it gives one; otherwise the last row this
+  // function was handed is the only thing it can go on, which is the behaviour
+  // this option exists to let a caller override.
+  let coverThrough = options.coverThroughMs;
+  if (coverThrough === undefined) {
+    coverThrough = Number.NEGATIVE_INFINITY;
+    for (const row of rows) if (row.realtime > coverThrough) coverThrough = row.realtime;
+  }
 
   // One search per destination, all at once. They are independent questions to
   // the same service and running them one after another would multiply the
@@ -1024,8 +1039,13 @@ export async function planBoard(options: PlanBoardOptions): Promise<PlannedRow[]
       const resolvedTarget = await resolveTarget(target, options);
       const toPlace = resolvedTarget.place;
       // The modes are part of the key: two searches over different modes are two
-      // different searches, and one must not answer the other.
-      const cacheKey = `${fromPlace}|${toPlace}|${startMinute}|${planModes.join(',')}`;
+      // different searches, and one must not answer the other. The cover-through
+      // minute is too, for the same reason: the same origin, destination and
+      // start minute asked with two different cover-through points are two
+      // different questions, one of them widening the search past where the
+      // other one stopped, and a cached answer to the narrower question must
+      // never be handed back for the wider one.
+      const cacheKey = `${fromPlace}|${toPlace}|${startMinute}|${planModes.join(',')}|${Math.floor(coverThrough / 60_000)}`;
       const cached = cacheGet(cacheKey, options.startMs);
       if (cached !== null) return cached;
       let fetched: ParsedItinerary[];
