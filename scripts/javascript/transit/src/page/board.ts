@@ -1,3 +1,4 @@
+import { buildLabel } from './build.ts';
 import { catchableOnBoard, describeWalk, normaliseLine, walkMinutesFor } from '../filter.ts';
 import type { Board, Departure } from '../model.ts';
 import { handoffFor, routeUrl } from '../route-link.ts';
@@ -746,6 +747,7 @@ function renderFilter(board: Board, context: BoardContext, rows: Departure[]): H
   if (total <= 1) {
     popover.append(el('p', 'filter-empty', 'only one line here, nothing to filter'));
     appendEarlyBuffer(popover, context);
+    popover.append(el('p', 'filter-build', buildLabel()));
     return popover;
   }
 
@@ -778,6 +780,10 @@ function renderFilter(board: Board, context: BoardContext, rows: Departure[]): H
     popover.append(el('p', 'filter-empty', 'everything is hidden'));
   }
   appendEarlyBuffer(popover, context);
+  // Which build this is, somewhere a reader can find it without a console. An
+  // installed app can be several deploys behind while the server is current, so
+  // "which version am I looking at" has to be answerable from the screen.
+  popover.append(el('p', 'filter-build', buildLabel()));
   return popover;
 }
 

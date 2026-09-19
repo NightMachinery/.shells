@@ -898,6 +898,50 @@ a worker that served stale departures would do it silently, with no age and no
 way for the page to know, which is the one failure this page exists to avoid. The
 departures come back from IndexedDB instead, with their age on screen.
 
+*** A shell change that does not change the worker is invisible
+
+A browser decides whether to install a new service worker by comparing that
+worker's own bytes. Nothing else is consulted. So a deploy that rebuilds the page
+and leaves the worker file identical is a deploy an installed client never
+notices: it keeps the cache it has, keeps answering from it, and shows a version
+that no longer exists anywhere on the server. There is no error, no warning and
+nothing on screen that differs from a page that is simply up to date, and
+checking that the server is serving the new bytes says nothing at all, because it
+is.
+
+That happened here, twice in a row. Two rounds of fixes were published, both
+verified on the server, and the phone kept showing the bugs they had fixed.
+
+So the worker's cache name carries a hash of every shell file, written in when
+the page is published. A changed shell then cannot leave the worker unchanged,
+which turns the failure from silent into impossible. The same hash is stamped
+into both pages as a build id, readable from the filter popover and from the
+tooltip on the bar's backend label, and exposed as =window.__BUILD__= so a test
+can assert which build is running. An unpublished checkout carries the
+placeholder instead and reports no build id, which is true: it was never
+published.
+
+The page also asks the browser to check for a new worker on every load rather
+than waiting for its own schedule, which is measured in hours, and when one
+arrives it offers the reader a reload instead of taking it. Reloading underneath
+somebody reading a departure time is worse than being one version behind for a
+few more seconds.
+
+The touch harness has a test for exactly this: it publishes one build, installs
+the worker, publishes a second build that differs only in the stamp, and asserts
+that the reader is offered the reload and lands on the second build. Removing the
+hash from the worker makes that test fail, which is the only evidence worth
+having that it is testing anything.
+
+*** What may be cached
+
+Only responses that are =ok=, of type =basic=, and whose final URL is on this
+origin. The first condition alone is not enough on a site behind an access gate:
+an expired session answers a request for the shell with a redirect to a login
+page, and following that redirect produces a perfectly successful response that
+is not this page. Cached, it would replace the app with a login screen that
+outlives the session it belonged to, and would keep being served offline.
+
 ** Reminders and disruptions
 
 A long press on a row opens a reminder popup: an optional "keep walk time"

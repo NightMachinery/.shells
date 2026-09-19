@@ -8,10 +8,16 @@
 // age and no way for the page to know it was stale, which is the one failure
 // this whole page is built to avoid.
 //
-// Bumping CACHE invalidates everything. Do that when the shell changes shape in
-// a way the stale-while-revalidate below cannot heal on its own.
+// The cache name carries a hash of every shell file, written in when the page is
+// published. This is not a nicety. A browser decides whether to install a new
+// worker by comparing the worker's own bytes, so a deploy that changes the page
+// but not this file is a deploy the installed app never notices: it keeps the
+// old cache, keeps answering from it, and the reader sees a version that is
+// gone. The only way to make that impossible is to make a changed shell change
+// this file, which is what the hash does. An unpublished copy says the
+// placeholder and is still a valid, if permanent, cache name.
 
-const CACHE = 'transit-shell-v2';
+const CACHE = 'transit-shell-__SHELL_HASH__';
 
 /**
  * The shell, relative to this worker's scope so the same bytes work wherever
@@ -75,7 +81,16 @@ self.addEventListener('fetch', (event) => {
     caches.match(request).then((cached) => {
       const network = fetch(request)
         .then((response) => {
-          if (response.ok) {
+          // `ok` is not enough on a site behind an access gate. An expired
+          // session answers a request for the shell with a redirect to a login
+          // page, and following that redirect produces a perfectly successful
+          // response that is not this page. Cached, it would replace the app
+          // with a login screen that outlives the session it belonged to and
+          // would be served offline for ever. `basic` means the bytes came from
+          // this origin without a cross-origin hop, which is the only case
+          // worth keeping, and the final URL is checked too because a
+          // same-origin redirect can still land somewhere else.
+          if (response.ok && response.type === 'basic' && new URL(response.url || request.url).origin === self.location.origin) {
             const copy = response.clone();
             void caches.open(CACHE).then((cache) => cache.put(request, copy));
           }

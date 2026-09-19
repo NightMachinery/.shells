@@ -1,3 +1,4 @@
+import { buildLabel } from './build.ts';
 import type { Board, Departure } from '../model.ts';
 import { visibleRows } from './board.ts';
 import { button, compact, el, minutesUntil, timeLabel, timeNode } from './dom.ts';
@@ -335,9 +336,9 @@ export function renderBar(context: BarContext): HTMLElement {
   if (context.backends.length > 0) {
     const source = el('span', 'bar-backend', context.backends.join(' + '));
     source.title =
-      context.backends.length === 1
+      (context.backends.length === 1
         ? `every board here was answered by ${context.backends[0]}`
-        : 'two sources answered: the live one for the near window and the timetable for the rest';
+        : 'two sources answered: the live one for the near window and the timetable for the rest') + `\n${buildLabel()}`;
     right.append(source);
   }
   right.append(renderRefresh(context));

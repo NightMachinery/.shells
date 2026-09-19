@@ -644,12 +644,53 @@ function injectColors(): void {
  */
 function installServiceWorker(): void {
   if (!('serviceWorker' in navigator)) return;
+  // A page nothing was controlling is a first visit. The worker taking charge
+  // then is not a new version arriving, it is the first one, and offering to
+  // reload for it would be a prompt with nothing behind it.
+  const hadController = navigator.serviceWorker.controller !== null;
   window.addEventListener('load', () => {
-    void navigator.serviceWorker.register('sw.js').catch(() => {
-      // An unregistrable worker costs the page nothing; it just means no
-      // offline shell. Not worth a message to the reader.
-    });
+    void navigator.serviceWorker
+      .register('sw.js')
+      .then((registration) => {
+        // Asked for on every open rather than left to the browser, which checks
+        // on a schedule measured in hours. An installed app is opened for ten
+        // seconds at a bus stop, so "it will notice eventually" means the reader
+        // sees a version that is gone and has no way to tell.
+        void registration.update().catch(() => undefined);
+        registration.addEventListener('updatefound', () => {
+          const installing = registration.installing;
+          if (installing === null) return;
+          installing.addEventListener('statechange', () => {
+            if (installing.state === 'installed' && hadController) offerReload();
+          });
+        });
+      })
+      .catch(() => {
+        // An unregistrable worker costs the page nothing; it just means no
+        // offline shell. Not worth a message to the reader.
+      });
+    if (hadController) {
+      navigator.serviceWorker.addEventListener('controllerchange', () => offerReload());
+    }
   });
+}
+
+/**
+ * Offer the reader the new version, rather than taking it.
+ *
+ * The worker claims the page as soon as it activates, but the HTML and the
+ * script already running came from the old one, so the page is a mixture until
+ * it reloads. Reloading underneath somebody reading a departure time is worse
+ * than being one version behind for another few seconds, so this asks. It is
+ * the only thing on this page that interrupts, which is why it is one line and
+ * why tapping anywhere on it is the answer.
+ */
+function offerReload(): void {
+  if (document.querySelector('.update-toast') !== null) return;
+  const toast = el('button', 'update-toast', 'new version, tap to reload');
+  toast.setAttribute('type', 'button');
+  toast.addEventListener('click', () => window.location.reload());
+  document.body.append(toast);
 }
 
 async function boot(): Promise<void> {

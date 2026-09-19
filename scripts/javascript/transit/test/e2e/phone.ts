@@ -365,6 +365,18 @@ async function main(): Promise<void> {
   const config = buildConfig();
   const configJson = JSON.stringify(config);
 
+  // Which build this server is publishing. The publish script stamps these two
+  // placeholders into the shell for real; here the harness plays that part, so
+  // it can put out a second build without rebuilding anything and watch what an
+  // installed client does about it.
+  let servedBuild = 'build-a';
+  let servedShell = 'aaaaaaaaaaaa';
+  const publish = (build: string, shell: string): void => {
+    servedBuild = build;
+    servedShell = shell;
+  };
+  const STAMPED = new Set(['index.html', 'route.html', 'sw.js']);
+
   const server = Bun.serve({
     hostname: '127.0.0.1',
     port: 0,
@@ -379,10 +391,21 @@ async function main(): Promise<void> {
       const relative = pathname.replace(/^\/+/, '');
       if (relative.includes('..')) return new Response('forbidden', { status: 403 });
       const filePath = `${PAGE_DIR}/${relative}`;
+      const stamp = STAMPED.has(relative);
       return fileAt(filePath)
         .exists()
         .then((exists) => {
           if (!exists) return new Response('not found', { status: 404 });
+          if (stamp) {
+            return fileAt(filePath)
+              .text()
+              .then(
+                (body) =>
+                  new Response(body.replaceAll('__BUILD_ID__', servedBuild).replaceAll('__SHELL_HASH__', servedShell), {
+                    headers: { 'content-type': contentTypeFor(filePath) },
+                  }),
+              );
+          }
           return fileAt(filePath)
             .arrayBuffer()
             .then((body) => new Response(body, { headers: { 'content-type': contentTypeFor(filePath) } }));
@@ -843,6 +866,76 @@ async function main(): Promise<void> {
       stillOpen && survivedMarker === marker,
       `stillOpen=${stillOpen} markerSurvived=${survivedMarker === marker} textChanged=${beforeText !== afterText}`,
     );
+
+    // --------------------------------------------- assertion: the update flow
+    //
+    // The test this section exists for, written after two deploys in a row
+    // reached the server and neither reached the phone. A browser decides
+    // whether to install a new service worker by comparing that worker's own
+    // bytes, so a deploy that changes the page and not the worker is a deploy
+    // an installed client never notices: it keeps its cache, keeps answering
+    // from it, and shows a version that is gone. Checking the server had the
+    // new bytes proved nothing, because it did.
+    //
+    // Every other assertion in this file bypasses the service worker, which is
+    // right everywhere else and exactly wrong here, so this turns it back on.
+
+    await cdp.send('Network.setBypassServiceWorker', { bypass: false });
+    publish('aaaaaaa-20260101', 'aaaaaaaaaaaa');
+
+    // A clean slate, or the worker left over from an earlier run decides this.
+    await io.evalJs(
+      `(async () => {
+        const regs = await navigator.serviceWorker.getRegistrations();
+        await Promise.all(regs.map((r) => r.unregister()));
+        const keys = await caches.keys();
+        await Promise.all(keys.map((k) => caches.delete(k)));
+        return true;
+      })()`,
+      true,
+    );
+
+    await cdp.send('Page.navigate', { url: `${localOrigin}/index.html` });
+    await io.waitFor("document.querySelectorAll('li.row').length > 0", 15_000);
+    const controlled = await io.waitFor('navigator.serviceWorker.controller !== null', 10_000, 100);
+    // Once more, so this load is genuinely served by the worker rather than
+    // being the load that installed it.
+    await cdp.send('Page.reload', {});
+    await io.waitFor("document.querySelectorAll('li.row').length > 0", 15_000);
+    const buildA = await io.evalJs<string | null>('window.__BUILD__ ?? null');
+    record(
+      'build A is installed and controlling',
+      controlled && buildA === 'aaaaaaa-20260101',
+      `controller=${controlled} window.__BUILD__=${String(buildA)}`,
+    );
+
+    // The deploy. Only the stamp changes, which is precisely the case that used
+    // to be invisible: same page, same script, different shell hash.
+    publish('bbbbbbb-20260202', 'bbbbbbbbbbbb');
+    await cdp.send('Page.reload', {});
+    await io.waitFor("document.querySelectorAll('li.row').length > 0", 15_000);
+    const toastShown = await io.waitFor("document.querySelector('.update-toast') !== null", 15_000, 100);
+    record(
+      'a new shell offers the reader a reload',
+      toastShown,
+      toastShown ? 'the update toast appeared' : 'no .update-toast within 15s of the new shell being published',
+    );
+
+    if (toastShown) {
+      const toastRect = await io.rectOfExpr("document.querySelector('.update-toast')");
+      if (toastRect !== null) {
+        await io.dispatchTap(toastRect.left + toastRect.width / 2, toastRect.top + toastRect.height / 2);
+      }
+      await io.waitFor("document.querySelectorAll('li.row').length > 0", 15_000);
+      const buildB = await io.evalJs<string | null>('window.__BUILD__ ?? null');
+      record(
+        'tapping the toast lands on build B',
+        buildB === 'bbbbbbb-20260202',
+        `window.__BUILD__=${String(buildB)}`,
+      );
+    }
+
+    await cdp.send('Network.setBypassServiceWorker', { bypass: true });
 
     // --------------------------------------------------------------- summary
 
