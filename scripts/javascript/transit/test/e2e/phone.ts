@@ -409,7 +409,30 @@ async function main(): Promise<void> {
     servedBuild = build;
     servedShell = shell;
   };
+  // The script's own idea of which build it is, which the publish script stamps
+  // into the bundle separately from the shell. Null means "the same build the
+  // shell says", which is every honest deploy. Setting it to something else is
+  // how the harness builds the one thing a real deploy must never produce: a
+  // page from one build with a script from another.
+  let servedBundle: string | null = null;
+  const publishBundle = (build: string | null): void => {
+    servedBundle = build;
+  };
+  // Serve one mixed load and heal on the next, which is what a real repair looks
+  // like: the mixture is in a cache, the server has one consistent build, and
+  // asking again gets it.
+  // Counted in loads rather than in requests, because the flip has to land
+  // between them: the script of a load is fetched after that load's page, so a
+  // server that healed while answering for the page would heal the very load it
+  // was supposed to break.
+  let mixedLoadsLeft = 0;
+  let healing = false;
+  const healAfterOneMixedLoad = (): void => {
+    mixedLoadsLeft = 1;
+    healing = true;
+  };
   const STAMPED = new Set(['index.html', 'route.html', 'sw.js']);
+  const BUNDLE_STAMPED = new Set(['app.js', 'route.js']);
 
   const server = Bun.serve({
     hostname: '127.0.0.1',
@@ -426,6 +449,13 @@ async function main(): Promise<void> {
       if (relative.includes('..')) return new Response('forbidden', { status: 403 });
       const filePath = `${PAGE_DIR}/${relative}`;
       const stamp = STAMPED.has(relative);
+      const bundleStamp = BUNDLE_STAMPED.has(relative);
+      if (relative === 'index.html' && mixedLoadsLeft > 0) {
+        mixedLoadsLeft -= 1;
+      } else if (relative === 'index.html' && servedBundle !== null && healing) {
+        healing = false;
+        servedBundle = null;
+      }
       return fileAt(filePath)
         .exists()
         .then((exists) => {
@@ -436,6 +466,20 @@ async function main(): Promise<void> {
               .then(
                 (body) =>
                   new Response(body.replaceAll('__BUILD_ID__', servedBuild).replaceAll('__SHELL_HASH__', servedShell), {
+                    headers: { 'content-type': contentTypeFor(filePath) },
+                  }),
+              );
+          }
+          if (bundleStamp) {
+            // Only the bundle's own placeholder. The shell's placeholder also
+            // appears in the bundle, as the string the build module compares
+            // against to answer "was this ever published", and stamping that
+            // would make every published page report itself as unpublished.
+            return fileAt(filePath)
+              .text()
+              .then(
+                (body) =>
+                  new Response(body.replaceAll('__BUNDLE_BUILD_ID__', servedBundle ?? servedBuild), {
                     headers: { 'content-type': contentTypeFor(filePath) },
                   }),
               );
@@ -1445,6 +1489,74 @@ async function main(): Promise<void> {
     }
 
     await cdp.send('Network.setBypassServiceWorker', { bypass: true });
+
+    // ------------------------------------------- assertions: the mixed shell
+    //
+    // The failure this pair was written for reached a reader's phone. The old
+    // worker refreshed its cache one file at a time, so a client could hold a
+    // script from one build beside a page and a stylesheet from another, and a
+    // board drawn by one build under the layout of another does not degrade
+    // politely: rows ran off the side of the screen, the state word spilled out
+    // of a badge that had nowhere to sit, and the whole page panned sideways.
+    // Nothing on the server was wrong, which is why no check against the server
+    // saw it for two deploys.
+    //
+    // The worker no longer writes anything outside its install, and the shell's
+    // files carry the version in their URL, so the mixture cannot form any more.
+    // This is the third line of defence, for a mixture that got into a cache
+    // before either of those existed: the page and the script each carry a build
+    // id, and a page that finds they disagree repairs itself.
+
+    const mixedState = async (): Promise<{ build: string | null; rows: number; navigation: string; marker: boolean }> =>
+      io.evalJs(`(() => {
+        const nav = performance.getEntriesByType('navigation')[0];
+        return {
+          build: window.__BUILD__ ?? null,
+          rows: document.querySelectorAll('li.row').length,
+          navigation: nav ? nav.type : 'unknown',
+          marker: window.__e2eMarker === true,
+        };
+      })()`);
+
+    // Case one: the server has a consistent build and the mixture is only in the
+    // client, which is the real case. The first load is served mixed, the repair
+    // asks again, and the second load is whole.
+    await io.evalJs('sessionStorage.clear(); void 0');
+    publish('ccccccc-20260303', 'cccccccccccc');
+    publishBundle('ddddddd-20260404');
+    healAfterOneMixedLoad();
+    await cdp.send('Page.navigate', { url: `${localOrigin}/index.html` });
+    const healedRows = await io.waitFor("document.querySelectorAll('li.row').length > 0", 25_000, 100);
+    const healed = await mixedState();
+    const healedOverflow = await measureOverflow();
+    record(
+      'a mixed shell reloads itself onto one build',
+      healedRows && healed.build === 'ccccccc-20260303' && healed.navigation === 'reload' && healedOverflow.worstRight <= 391,
+      `rows=${healed.rows} window.__BUILD__=${String(healed.build)} navigationType=${healed.navigation} ` +
+        `worstRight=${healedOverflow.worstRight}px (${healedOverflow.worstSelector})`,
+    );
+
+    // Case two: the disagreement survives the reload, which means it is the
+    // server's and not a cache's. The page must reload once, give up, and draw
+    // itself rather than reloading for ever. A marker set after the rows appear
+    // is the loop detector: another reload would wipe it.
+    await io.evalJs('sessionStorage.clear(); void 0');
+    publish('eeeeeee-20260505', 'eeeeeeeeeeee');
+    publishBundle('fffffff-20260606');
+    await cdp.send('Page.navigate', { url: `${localOrigin}/index.html` });
+    const stuckRows = await io.waitFor("document.querySelectorAll('li.row').length > 0", 25_000, 100);
+    await io.evalJs('window.__e2eMarker = true; void 0');
+    await sleep(3_000);
+    const stuck = await mixedState();
+    const stuckOverflow = await measureOverflow();
+    record(
+      'a disagreement the reload cannot fix stops rather than loops',
+      stuckRows && stuck.navigation === 'reload' && stuck.marker && stuck.rows > 0 && stuckOverflow.worstRight <= 391,
+      `rows=${stuck.rows} markerSurvived=${stuck.marker} navigationType=${stuck.navigation} ` +
+        `window.__BUILD__=${String(stuck.build)} worstRight=${stuckOverflow.worstRight}px`,
+    );
+
+    publishBundle(null);
 
     // --------------------------------------------------------------- summary
 

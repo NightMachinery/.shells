@@ -16,30 +16,48 @@
 // gone. The only way to make that impossible is to make a changed shell change
 // this file, which is what the hash does. An unpublished copy says the
 // placeholder and is still a valid, if permanent, cache name.
+//
+// A shell is all of a piece, and this file's second job is to make sure a reader
+// is never served half of one. The rule is: the only thing that ever writes to
+// the cache is an install, which writes every shell file together or none of
+// them. Nothing is revalidated at fetch time. See "Why nothing is written at
+// fetch time" below, which is a bug report as much as a comment.
 
-const CACHE = 'transit-shell-__SHELL_HASH__';
+const SHELL_VERSION = '__SHELL_HASH__';
+const CACHE = `transit-shell-${SHELL_VERSION}`;
 
 /**
  * The shell, relative to this worker's scope so the same bytes work wherever
  * the page is mounted. `data/config.json` is in here because the page cannot
  * draw a single tab without it, and it is a small file that changes only when
  * the configuration does.
+ *
+ * The three files the two pages link carry the shell version in their URL, and
+ * the pages ask for them by exactly these URLs. That is what stops any cache
+ * anywhere, this one or the browser's own, from pairing a script with a
+ * stylesheet from a different build: the two builds do not share a URL, so one
+ * cannot stand in for the other.
  */
 const SHELL = [
   './',
   './index.html',
-  './app.js',
-  './theme.css',
+  `./app.js?v=${SHELL_VERSION}`,
+  `./theme.css?v=${SHELL_VERSION}`,
   // The expanded view of one journey. It is in the shell because it is opened
   // from a board, often underground, and it needs nothing but itself and its
   // own URL to render: caching it is what makes that true offline as well.
   './route.html',
-  './route.js',
+  `./route.js?v=${SHELL_VERSION}`,
   './icon.png',
   './icon-180.png',
   './manifest.webmanifest',
   './data/config.json',
 ];
+
+/** The shell as absolute URLs, which is what a request can be compared against. */
+const SHELL_URLS = new Set(SHELL.map((path) => new URL(path, self.location.href).href));
+
+const INDEX_URL = new URL('./index.html', self.location.href).href;
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
@@ -62,6 +80,24 @@ self.addEventListener('activate', (event) => {
   );
 });
 
+// Why nothing is written at fetch time.
+//
+// This used to answer from the cache and refresh the entry behind the reader,
+// one file at a time. Each file separately: that is the whole bug. A client that
+// opened the page while a deploy was half-fetched kept the old worker, and the
+// old worker quietly replaced whichever files that visit happened to touch. It
+// ended up holding a script from one build and the page and stylesheet from
+// another, in one cache, with a cache name that still claimed to be a single
+// shell. On a phone that is not a subtle failure: the script drew a row the way
+// the new build draws it, the stylesheet laid it out the way the old build laid
+// it out, and the board ran off the side of the screen with the state word
+// spilling out of a badge that had nowhere to sit. Nothing on the server was
+// wrong, and no check against the server could have seen it, because the mixture
+// only ever existed inside one browser's cache.
+//
+// So the cache is written by exactly one thing, the install step, which writes
+// every shell file at once or none of them, and a new version arrives only as a
+// new worker. Being one open behind is the price of never being half a build.
 self.addEventListener('fetch', (event) => {
   const request = event.request;
   if (request.method !== 'GET') return;
@@ -73,31 +109,31 @@ self.addEventListener('fetch', (event) => {
   if (url.origin !== self.location.origin) return;
   if (!url.pathname.startsWith(new URL('./', self.location.href).pathname)) return;
 
-  // Stale while revalidate: answer from the cache at once so the app opens
-  // instantly, and refresh the entry in the background so the next open has the
-  // new deploy. One open behind is the price of opening at all when there is no
-  // network, and a deploy here is never urgent.
+  // A navigation is the one request that cannot be matched by URL alone: the
+  // reader can arrive at the directory, at the page, or at either with a query
+  // on it, and all three mean the same document.
+  if (request.mode === 'navigate') {
+    event.respondWith(
+      caches
+        .open(CACHE)
+        .then((cache) => cache.match(request, { ignoreSearch: true }).then((hit) => hit ?? cache.match(INDEX_URL)))
+        .then((hit) => hit ?? fetch(request)),
+    );
+    return;
+  }
+
+  // Everything else that is not the shell is the network's business. There is
+  // nothing to gain by caching it and a great deal to lose by caching it stale.
+  if (!SHELL_URLS.has(url.href)) return;
+
   event.respondWith(
-    caches.match(request).then((cached) => {
-      const network = fetch(request)
-        .then((response) => {
-          // `ok` is not enough on a site behind an access gate. An expired
-          // session answers a request for the shell with a redirect to a login
-          // page, and following that redirect produces a perfectly successful
-          // response that is not this page. Cached, it would replace the app
-          // with a login screen that outlives the session it belonged to and
-          // would be served offline for ever. `basic` means the bytes came from
-          // this origin without a cross-origin hop, which is the only case
-          // worth keeping, and the final URL is checked too because a
-          // same-origin redirect can still land somewhere else.
-          if (response.ok && response.type === 'basic' && new URL(response.url || request.url).origin === self.location.origin) {
-            const copy = response.clone();
-            void caches.open(CACHE).then((cache) => cache.put(request, copy));
-          }
-          return response;
-        })
-        .catch(() => cached ?? Response.error());
-      return cached ?? network;
-    }),
+    caches
+      .open(CACHE)
+      .then((cache) => cache.match(url.href))
+      // A miss here means an install that did not finish. The network is the
+      // right answer, and it is deliberately not written back: a cache entry
+      // this worker did not install is exactly the mixture this file exists to
+      // prevent.
+      .then((hit) => hit ?? fetch(request)),
   );
 });

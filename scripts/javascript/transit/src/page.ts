@@ -13,6 +13,7 @@
 // the page unscrollable, so the second-by-second countdowns are patched through
 // registered callbacks instead. See `tick()`.
 
+import { healMixedShell } from './page/build.ts';
 import { installIcons } from './page/icons.ts';
 import { cssCustomProperties } from './colors.ts';
 import { normaliseLine } from './filter.ts';
@@ -719,6 +720,10 @@ function offerReload(): void {
 }
 
 async function boot(): Promise<void> {
+  // Before anything is drawn, because the thing being checked for is a page
+  // that would be drawn wrong: a script from one build laying out a shell from
+  // another. If it reloads, nothing below this line is worth doing.
+  if (healMixedShell()) return;
   injectColors();
   installIcons();
   publishTiming();

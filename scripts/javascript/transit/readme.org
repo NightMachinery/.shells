@@ -1063,7 +1063,7 @@ that the reader is offered the reload and lands on the second build. Removing th
 hash from the worker makes that test fail, which is the only evidence worth
 having that it is testing anything.
 
-*** What may be cached
+*** What may be cached, and who is allowed to write it
 
 Only responses that are =ok=, of type =basic=, and whose final URL is on this
 origin. The first condition alone is not enough on a site behind an access gate:
@@ -1071,6 +1071,59 @@ an expired session answers a request for the shell with a redirect to a login
 page, and following that redirect produces a perfectly successful response that
 is not this page. Cached, it would replace the app with a login screen that
 outlives the session it belonged to, and would keep being served offline.
+
+Those three conditions used to be checked at fetch time, because the worker
+answered from the cache and then refreshed the entry behind the reader, one file
+at a time. One file at a time is the whole bug, and it is worth stating plainly
+because it cost a reader two days of a broken page.
+
+*** Half a shell is worse than an old one
+
+A browser holds the page, the stylesheet and the script as three separate cache
+entries. A worker that refreshes them independently can therefore end up holding
+one of each from two different deploys, in one cache, under a cache name that
+still claims to be a single shell. That is what happened: a phone opened the page
+during a deploy, kept its old worker, and that worker replaced whichever files
+that visit happened to touch. What came out was a board drawn by one build and
+laid out by another.
+
+That does not degrade politely. The rows ran off the side of the screen so the
+whole page panned sideways, the sticky bar was cut off, the state word spilled
+out of a badge the older stylesheet had nowhere to put, and the destinations were
+squeezed to four characters. Nothing on the server was wrong for a moment of it,
+which is why every check against the server passed while the reader was looking
+at it.
+
+Three things now stand between a reader and that.
+
+The worker's cache is written by exactly one thing: the install step, which
+writes every shell file together or writes none of them. Nothing is revalidated
+at fetch time, and a shell file that is missing from the cache is fetched without
+being written back. A new version therefore arrives only as a new worker, and a
+worker either has a whole shell or it has nothing. Being one open behind is the
+price of never being half a build, and it is a much better trade than it sounds:
+the page already asks for a new worker on every load and offers the reader the
+reload.
+
+The two pages link their script and their stylesheet with the shell version in
+the URL. Two builds then do not share a URL for those files, so no cache
+anywhere, the worker's or the browser's own, can serve one where the other was
+asked for. It is not cache busting in the usual sense, which is about freshness;
+it is about making a mismatched pair unnameable.
+
+The page and the script each carry a build id, stamped separately at publish
+time, and the page compares them before it draws anything. If they disagree, it
+asks the worker to update and reloads once, which is the repair for a mixture
+that got into a cache before either of the defences above existed. If the
+disagreement survives that reload it is the server's and not a cache's, so the
+page says so in the console and carries on rather than reloading for ever. The
+flag that makes it once rather than for ever is per tab and remembers which pair
+it reloaded for.
+
+The harness proves both halves: one mixed shell that the server can repair, where
+the page must come back reloaded and on one build, and one the server cannot,
+where the page must reload once, give up and draw itself. A marker set after the
+rows appear is the loop detector, because a second reload would wipe it.
 
 ** Reminders and disruptions
 

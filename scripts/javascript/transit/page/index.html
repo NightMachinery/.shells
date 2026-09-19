@@ -23,7 +23,14 @@
     <!-- The tokens, the base type and everything a journey is drawn with live in
          one file, because the expanded journey page draws the same things and two
          copies of a palette drift. What is only ever on this page stays below. -->
-    <link rel="stylesheet" href="theme.css" />
+    <!-- The version in the query is not a cache-busting habit, it is the fix for a
+         real failure: a browser holds the page, the stylesheet and the script as
+         separate cache entries, and anything that fills them one at a time can
+         end up pairing a script from one build with a stylesheet from another.
+         Two builds now cannot share a URL for these files, so one can never
+         stand in for the other. The placeholder is stamped at publish time; see
+         `page/sw.js` and the refresh script. -->
+    <link rel="stylesheet" href="theme.css?v=__SHELL_HASH__" />
     <style>
       /* ------------------------------------------------------------- the bar */
 
@@ -1421,6 +1428,6 @@
     <!-- Replaced when this shell is published; see src/page/build.ts. An
          unpublished shell keeps the placeholder and reports no build id. -->
     <script>window.__BUILD__ = "__BUILD_ID__";</script>
-    <script src="app.js"></script>
+    <script src="app.js?v=__SHELL_HASH__"></script>
   </body>
 </html>

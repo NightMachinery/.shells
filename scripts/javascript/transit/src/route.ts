@@ -10,6 +10,7 @@
 // page in. This file is the page half: the fragment, the title and the address
 // bar. Everything below that line is shared with the overlay.
 
+import { healMixedShell } from './page/build.ts';
 import { installIcons } from './page/icons.ts';
 import { cssCustomProperties } from './colors.ts';
 import { decodeRoute, encodeRoute } from './route-link.ts';
@@ -22,6 +23,9 @@ function injectColors(): void {
 }
 
 function boot(): void {
+  // The same repair as the board page makes, for the same reason: this page is
+  // in the shell too, and a mixture reaches it the same way.
+  if (healMixedShell()) return;
   injectColors();
   installIcons();
   const app = document.getElementById('app');
