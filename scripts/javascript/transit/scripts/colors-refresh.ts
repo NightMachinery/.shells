@@ -125,7 +125,11 @@ function findEndOfCentralDirectory(view: DataView): number {
 }
 
 async function inflateRaw(bytes: Uint8Array): Promise<string> {
-  const source = new Response(bytes).body;
+  // The cast is the DOM lib's, not the runtime's: `BodyInit` is declared as a
+  // handful of named types rather than as anything that is a buffer source, so
+  // a plain `Uint8Array` is rejected by the checker and accepted by every
+  // engine this has ever run on.
+  const source = new Response(bytes as unknown as BodyInit).body;
   if (source === null) throw new Error('empty deflate stream');
   return await new Response(source.pipeThrough(new DecompressionStream('deflate-raw'))).text();
 }
