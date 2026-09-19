@@ -591,6 +591,17 @@
         font-size: 14px;
       }
 
+      /* The hint beside a regional service's times: where the run goes after
+         here. Quiet, because it is context for the destination rather than a
+         fact the reader came for, and truncated rather than wrapped, because a
+         row that grows a line is a row fewer on the screen. */
+      .row-via {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        min-width: 0;
+      }
+
       .row-times,
       .times {
         display: flex;

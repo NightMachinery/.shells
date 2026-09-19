@@ -35,6 +35,7 @@ import {
   loadMvgBody,
   loadPlanBody,
   loadStoptimesBody,
+  loadTripBody,
   readDevToolsUrl,
   sleep,
   type FetchRequestPausedEvent,
@@ -92,6 +93,7 @@ async function main(): Promise<void> {
   const mvgBody = await loadMvgBody();
   const planBody = await loadPlanBody();
   const stoptimesBody = await loadStoptimesBody();
+  const tripBody = await loadTripBody();
 
   const userDataDir = `${SCRATCH_E2E_DIR}/shots-profile-${ANCHOR_MS}-${Math.floor(Math.random() * 1_000_000)}`;
   Bun.spawnSync({ cmd: ['mkdir', '-p', userDataDir] });
@@ -127,7 +129,7 @@ async function main(): Promise<void> {
     await cdp.ready();
 
     cdp.on('Fetch.requestPaused', (params) => {
-      void handleRequestPaused(cdp as Cdp, params as FetchRequestPausedEvent, localOrigin, mvgBody, planBody, stoptimesBody);
+      void handleRequestPaused(cdp as Cdp, params as FetchRequestPausedEvent, localOrigin, mvgBody, planBody, stoptimesBody, tripBody);
     });
 
     await cdp.send('Page.enable');

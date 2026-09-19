@@ -1,0 +1,105 @@
+{
+  "_comment": "The aggregator's answer to GET /trip?tripId=trip-re72-e2e, the identifier transitous-stoptimes.json's RE72 row resolves to for the board's RE72 departure (line RE72, offset 14 min, at de:00000:1). The first place is that same stop, so src/trip.ts's callsAfter drops it as the row's own origin; everything after it is what src/page/calls.ts renders as the sheet's call list and the row's 'via' hint. Eleven stops follow the origin, one more than fits in SHEET_CALLS (8), so the sheet's 'and N more' control has something to expand. Times are OffsetMin fields, turned into ISO timestamps against the run's own ANCHOR_MS by loadTripBody. Every id and name is made up.",
+  "legs": [
+    {
+      "from": {
+        "name": "Nordweg",
+        "stopId": "de-DELFI_de:00000:1:8:8",
+        "arrivalOffsetMin": 14,
+        "departureOffsetMin": 14,
+        "scheduledArrivalOffsetMin": 14,
+        "scheduledDepartureOffsetMin": 14
+      },
+      "intermediateStops": [
+        {
+          "name": "Fuchsau",
+          "stopId": "de-DELFI_de:00000:20:1:1",
+          "arrivalOffsetMin": 17,
+          "departureOffsetMin": 18,
+          "scheduledArrivalOffsetMin": 17,
+          "scheduledDepartureOffsetMin": 18
+        },
+        {
+          "name": "Lindwiese",
+          "stopId": "de-DELFI_de:00000:21:1:1",
+          "arrivalOffsetMin": 20,
+          "departureOffsetMin": 21,
+          "scheduledArrivalOffsetMin": 20,
+          "scheduledDepartureOffsetMin": 21
+        },
+        {
+          "name": "Rabenfeld",
+          "stopId": "de-DELFI_de:00000:22:1:1",
+          "arrivalOffsetMin": 23,
+          "departureOffsetMin": 24,
+          "scheduledArrivalOffsetMin": 23,
+          "scheduledDepartureOffsetMin": 24
+        },
+        {
+          "name": "Steinbrunn",
+          "stopId": "de-DELFI_de:00000:23:1:1",
+          "arrivalOffsetMin": 26,
+          "departureOffsetMin": 27,
+          "scheduledArrivalOffsetMin": 26,
+          "scheduledDepartureOffsetMin": 27
+        },
+        {
+          "name": "Hirschtal",
+          "stopId": "de-DELFI_de:00000:24:1:1",
+          "arrivalOffsetMin": 29,
+          "departureOffsetMin": 30,
+          "scheduledArrivalOffsetMin": 29,
+          "scheduledDepartureOffsetMin": 30
+        },
+        {
+          "name": "Wolfsholz",
+          "stopId": "de-DELFI_de:00000:25:1:1",
+          "arrivalOffsetMin": 32,
+          "departureOffsetMin": 33,
+          "scheduledArrivalOffsetMin": 32,
+          "scheduledDepartureOffsetMin": 33
+        },
+        {
+          "name": "Bärenmoos",
+          "stopId": "de-DELFI_de:00000:26:1:1",
+          "arrivalOffsetMin": 35,
+          "departureOffsetMin": 36,
+          "scheduledArrivalOffsetMin": 35,
+          "scheduledDepartureOffsetMin": 36
+        },
+        {
+          "name": "Kranichau",
+          "stopId": "de-DELFI_de:00000:27:1:1",
+          "arrivalOffsetMin": 38,
+          "departureOffsetMin": 39,
+          "scheduledArrivalOffsetMin": 38,
+          "scheduledDepartureOffsetMin": 39
+        },
+        {
+          "name": "Falkenrode",
+          "stopId": "de-DELFI_de:00000:28:1:1",
+          "arrivalOffsetMin": 41,
+          "departureOffsetMin": 42,
+          "scheduledArrivalOffsetMin": 41,
+          "scheduledDepartureOffsetMin": 42
+        },
+        {
+          "name": "Adlerstein",
+          "stopId": "de-DELFI_de:00000:29:1:1",
+          "arrivalOffsetMin": 44,
+          "departureOffsetMin": 45,
+          "scheduledArrivalOffsetMin": 44,
+          "scheduledDepartureOffsetMin": 45
+        }
+      ],
+      "to": {
+        "name": "Maxmonument",
+        "stopId": "de-DELFI_de:00000:30:1:1",
+        "arrivalOffsetMin": 48,
+        "departureOffsetMin": 48,
+        "scheduledArrivalOffsetMin": 48,
+        "scheduledDepartureOffsetMin": 48
+      }
+    }
+  ]
+}

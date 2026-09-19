@@ -274,8 +274,73 @@ export async function loadPlanBody(): Promise<unknown> {
   return { itineraries, nextPageCursor: raw.nextPageCursor ?? '' };
 }
 
+interface StoptimesFixturePlace {
+  departureOffsetMin?: number;
+  scheduledDepartureOffsetMin?: number;
+  [key: string]: unknown;
+}
+
+interface StoptimesFixtureRow {
+  place?: StoptimesFixturePlace;
+  [key: string]: unknown;
+}
+
+interface StoptimesFixture {
+  stopTimes?: StoptimesFixtureRow[];
+  [key: string]: unknown;
+}
+
 export async function loadStoptimesBody(): Promise<unknown> {
-  return JSON.parse(await fileAt(`${FIXTURES_DIR}/transitous-stoptimes.json`).text());
+  const raw = JSON.parse(await fileAt(`${FIXTURES_DIR}/transitous-stoptimes.json`).text()) as StoptimesFixture;
+  const stopTimes = (raw.stopTimes ?? []).map((row) => {
+    if (row.place === undefined) return row;
+    const { departureOffsetMin, scheduledDepartureOffsetMin, ...restPlace } = row.place;
+    const place: Record<string, unknown> = { ...restPlace };
+    if (departureOffsetMin !== undefined) place.departure = isoAt(departureOffsetMin);
+    if (scheduledDepartureOffsetMin !== undefined) place.scheduledDeparture = isoAt(scheduledDepartureOffsetMin);
+    return { ...row, place };
+  });
+  return { ...raw, stopTimes };
+}
+
+interface TripFixturePlace {
+  arrivalOffsetMin?: number;
+  departureOffsetMin?: number;
+  scheduledArrivalOffsetMin?: number;
+  scheduledDepartureOffsetMin?: number;
+  [key: string]: unknown;
+}
+
+interface TripFixtureLeg {
+  from?: TripFixturePlace;
+  to?: TripFixturePlace;
+  intermediateStops?: TripFixturePlace[];
+}
+
+interface TripFixture {
+  legs?: TripFixtureLeg[];
+  [key: string]: unknown;
+}
+
+function tripPlaceFromOffsets(place: TripFixturePlace | undefined): Record<string, unknown> | undefined {
+  if (place === undefined) return undefined;
+  const { arrivalOffsetMin, departureOffsetMin, scheduledArrivalOffsetMin, scheduledDepartureOffsetMin, ...rest } = place;
+  const out: Record<string, unknown> = { ...rest };
+  if (arrivalOffsetMin !== undefined) out.arrival = isoAt(arrivalOffsetMin);
+  if (departureOffsetMin !== undefined) out.departure = isoAt(departureOffsetMin);
+  if (scheduledArrivalOffsetMin !== undefined) out.scheduledArrival = isoAt(scheduledArrivalOffsetMin);
+  if (scheduledDepartureOffsetMin !== undefined) out.scheduledDeparture = isoAt(scheduledDepartureOffsetMin);
+  return out;
+}
+
+export async function loadTripBody(): Promise<unknown> {
+  const raw = JSON.parse(await fileAt(`${FIXTURES_DIR}/transitous-trip.json`).text()) as TripFixture;
+  const legs = (raw.legs ?? []).map((leg) => ({
+    from: tripPlaceFromOffsets(leg.from),
+    to: tripPlaceFromOffsets(leg.to),
+    intermediateStops: (leg.intermediateStops ?? []).map((stop) => tripPlaceFromOffsets(stop)),
+  }));
+  return { legs };
 }
 
 // ----------------------------------------------------------------- CDP wire
@@ -502,6 +567,17 @@ async function main(): Promise<void> {
   const mvgBody = await loadMvgBody();
   const planBody = await loadPlanBody();
   const stoptimesBody = await loadStoptimesBody();
+  const tripBody = await loadTripBody();
+
+  // Which of this run's rows are BAHN mode, read off the fixture rather than
+  // hardcoded: the DOM carries no mode marker, so this is the only honest way
+  // to count "distinct BAHN rows rendered" for the laziness assertion below
+  // without silently drifting from whatever mvg-departures.json says.
+  const bahnLineLabels = new Set(
+    (mvgBody as Array<{ transportType?: unknown; label?: unknown }>)
+      .filter((row) => row.transportType === 'BAHN')
+      .map((row) => String(row.label ?? '')),
+  );
 
   // ----------------------------------------------------------- chrome start
 
@@ -549,7 +625,7 @@ async function main(): Promise<void> {
     });
 
     cdp.on('Fetch.requestPaused', (params) => {
-      void handleRequestPaused(cdp as Cdp, params as FetchRequestPausedEvent, localOrigin, mvgBody, planBody, stoptimesBody);
+      void handleRequestPaused(cdp as Cdp, params as FetchRequestPausedEvent, localOrigin, mvgBody, planBody, stoptimesBody, tripBody);
     });
 
     await cdp.send('Page.enable');
@@ -1202,6 +1278,158 @@ async function main(): Promise<void> {
       stillOpen && survivedMarker === marker,
       `stillOpen=${stillOpen} markerSurvived=${survivedMarker === marker} textChanged=${beforeText !== afterText}`,
     );
+
+    // ------------------------------------------ onward calls: src/page/calls.ts
+    //
+    // Where a departure goes after it leaves. `bahnLineLabels` came off the
+    // fixture itself rather than a hardcoded line name, so a `.badge` matching
+    // one of them is a BAHN row by construction, no matter which line the
+    // fixture happens to carry.
+    const bahnLabelsJson = JSON.stringify([...bahnLineLabels]);
+    const bahnRowsExpr = `[...document.querySelectorAll('li.row')].filter((row) => ${bahnLabelsJson}.includes(row.querySelector(':scope > .badge')?.textContent ?? ''))`;
+    const bahnRowExpr = `(${bahnRowsExpr})[0]`;
+
+    await io.closeSheetIfOpen();
+    const bahnRowCount = await io.evalJs<number>(`(${bahnRowsExpr}).length`);
+    const tripCountAfterRender = tripRequestsFulfilled();
+    let lazinessPass: boolean;
+    let lazinessNote: string;
+    if (bahnRowCount === 0) {
+      // Nothing on screen asks about a run unless it is opened, hovered, or a
+      // BAHN row, and none of those happened yet at this point in the run.
+      lazinessPass = tripCountAfterRender === 0;
+      lazinessNote = `no BAHN rows on screen; /trip requests so far=${tripCountAfterRender}`;
+    } else {
+      // Measured: this fixture's stop is queried by two boards on the primary
+      // profile (Nordweg and Talbogen), and the fixture answers every
+      // /departures query alike, so the same RE72 run appears as two separate
+      // `li.row` elements, each asking calls.ts on its own. Both resolve to the
+      // same aggregator tripId, and src/trip.ts's `tripCalls` caches by tripId
+      // across the whole page rather than by row, so the network sees one
+      // /trip request for two rows that asked. Fewer requests than BAHN rows is
+      // that cache working as intended, not a leak; what would be a leak is
+      // more requests than rows, or zero.
+      lazinessPass = tripCountAfterRender >= 1 && tripCountAfterRender <= bahnRowCount;
+      lazinessNote = `${bahnRowCount} BAHN row(s) on screen; /trip requests so far=${tripCountAfterRender}`;
+    }
+    record('no run is looked up before anything asks', lazinessPass, lazinessNote);
+
+    const callsRowTap = await io.tapOpensSheet(bahnRowExpr);
+    if (!callsRowTap.opened) throw new Error('no BAHN row sheet opened for the onward-calls assertions');
+    await io.waitFor("document.querySelectorAll('.tip-sheet .tip-call-list li.tip-call').length > 0", 5000);
+    // This row has no matching itinerary in the plan fixture, so the sheet's
+    // journey section is still waiting on the plan to resolve when the calls
+    // list first appears; that resolution replaces the sheet body a moment
+    // later (same mechanism as `callsSignature` above), which raced the "more"
+    // tap below and made it land on a button already detached from the page.
+    // Waiting out the spinner first is what the rest of this section assumes.
+    await io.waitFor("document.querySelector('.tip-sheet .tip-planning') === null", 5000);
+
+    const firstCalls = await io.evalJs<Array<{ name: string; time: string }>>(`(() => {
+      return [...document.querySelectorAll('.tip-sheet .tip-call-list li.tip-call')].map((item) => ({
+        name: item.querySelector('.tip-call-name')?.textContent ?? '',
+        time: item.querySelector('.tip-call-time')?.textContent ?? '',
+      }));
+    })()`);
+    // The trip fixture's own origin name (transitous-trip.json's leg.from.name),
+    // which callsAfter is supposed to drop because it is where this row's
+    // reader is already standing.
+    const tripOriginName = 'Nordweg';
+    record(
+      "a row's sheet says where the train goes",
+      firstCalls.length >= 2 &&
+        firstCalls.every((call) => call.name.length > 0 && /^\d{1,2}:\d{2}$/.test(call.time)) &&
+        firstCalls[0]?.name !== tripOriginName,
+      `${firstCalls.length} calls; first three: ${firstCalls
+        .slice(0, 3)
+        .map((call) => `${call.name} ${call.time}`)
+        .join(', ')}`,
+    );
+
+    // Marked on `.tip-sheet` itself, not `.tip-sheet-body`: expanding the list
+    // changes the sheet's signature (src/page/board.ts's `callsSignature`), and
+    // a changed signature rebuilds the body from scratch (src/page/tip.ts's
+    // `rebindTip` does `open.body.replaceChildren(build())`). The outer sheet
+    // is what stays the same node across that, the same one assertion 5 above
+    // proves survives a render; the body underneath it does not, and is not
+    // supposed to.
+    await io.evalJs(
+      `(() => { const sheet = document.querySelector('.tip-sheet'); if (sheet) sheet.__e2eCallsMarker = 'calls-marker'; return null; })()`,
+    );
+    const moreLabel = await io.evalJs<string>("document.querySelector('.tip-sheet button.tip-more')?.textContent ?? ''");
+    const callsBefore = await io.evalJs<number>("document.querySelectorAll('.tip-sheet .tip-call-list li.tip-call').length");
+    // Scrolled into view first: a call list long enough to need "and N more"
+    // is long enough to push the button below the fold of a sheet that
+    // scrolls, and a tap at its rect's coordinates lands on nothing if the
+    // sheet has not been scrolled there. A synthetic touch tap on this
+    // particular button, inside a container CDP had just scrolled
+    // programmatically, did not reliably turn into a click; a real mouse
+    // click at the same point did, every time it was tried, so this falls
+    // back to one exactly the way the anchor taps above fall back from a
+    // blocked touch tap to a mouse click.
+    await io.scrollIntoViewExpr("document.querySelector('.tip-sheet button.tip-more')");
+    await sleep(60);
+    const moreRect = await io.rectOfExpr("document.querySelector('.tip-sheet button.tip-more')");
+    if (moreRect === null) throw new Error('button.tip-more not found before expanding the call list');
+    const moreX = moreRect.left + moreRect.width / 2;
+    const moreY = moreRect.top + moreRect.height / 2;
+    await io.dispatchTap(moreX, moreY);
+    let expandedListTapped = await io.waitFor("document.querySelector('.tip-sheet button.tip-more') === null", 800);
+    if (!expandedListTapped) {
+      await cdp.send('Input.dispatchMouseEvent', { type: 'mousePressed', x: moreX, y: moreY, button: 'left', clickCount: 1 });
+      await cdp.send('Input.dispatchMouseEvent', { type: 'mouseReleased', x: moreX, y: moreY, button: 'left', clickCount: 1 });
+      expandedListTapped = await io.waitFor("document.querySelector('.tip-sheet button.tip-more') === null", 800);
+    }
+    const sheetSameNode = await io.evalJs<boolean>(
+      "document.querySelector('.tip-sheet')?.__e2eCallsMarker === 'calls-marker'",
+    );
+    const sheetStillOpen = await io.evalJs<boolean>("document.querySelector('.tip-sheet') !== null");
+    const moreGone = await io.evalJs<boolean>("document.querySelector('.tip-sheet button.tip-more') === null");
+    const callsAfterExpand = await io.evalJs<number>(
+      "document.querySelectorAll('.tip-sheet .tip-call-list li.tip-call').length",
+    );
+    record(
+      'the rest of the list is one tap away',
+      /^and \d+ more$/.test(moreLabel) && (sheetSameNode || sheetStillOpen) && moreGone && callsAfterExpand > callsBefore,
+      `"${moreLabel}" tapped; sheet same node=${sheetSameNode} still open=${sheetStillOpen} tip-more gone=${moreGone} calls ${callsBefore} -> ${callsAfterExpand}`,
+    );
+
+    const sheetOverflow = await io.evalJs<{ scrollWidth: number; worstOverPx: number; worstClass: string }>(`(() => {
+      const sheet = document.querySelector('.tip-sheet');
+      const de = document.documentElement;
+      if (!sheet) return { scrollWidth: de.scrollWidth, worstOverPx: -1, worstClass: '(no .tip-sheet)' };
+      const sheetRect = sheet.getBoundingClientRect();
+      let worst = 0; let worstClass = '';
+      for (const element of sheet.querySelectorAll('*')) {
+        const r = element.getBoundingClientRect();
+        if (r.width === 0 && r.height === 0) continue; // a truly empty box cannot overflow
+        const over = r.right - sheetRect.right;
+        if (over > worst) { worst = over; worstClass = element.className || element.tagName; }
+      }
+      return { scrollWidth: de.scrollWidth, worstOverPx: Math.round(worst * 100) / 100, worstClass };
+    })()`);
+    record(
+      'a sheet that says where the train goes still fits the phone',
+      sheetOverflow.scrollWidth <= 390 && sheetOverflow.worstOverPx <= 1,
+      `scrollWidth=${sheetOverflow.scrollWidth} worst right overshoot=${sheetOverflow.worstOverPx}px in .${sheetOverflow.worstClass}`,
+    );
+
+    await io.closeSheetIfOpen();
+
+    if (bahnRowCount > 0) {
+      const viaText = await io.evalJs<string>(`(${bahnRowExpr})?.querySelector('.row-via')?.textContent ?? ''`);
+      const rowBudgetWithVia = await measureContainment();
+      record(
+        'a regional row says where it goes on the row itself',
+        /^via .+/.test(viaText) && rowBudgetWithVia.worstOverflowPx <= 1,
+        `via text "${viaText}"; row containment worst overflow ${rowBudgetWithVia.worstOverflowPx}px in .${rowBudgetWithVia.worstClass} across ${rowBudgetWithVia.rows} rows`,
+      );
+    } else {
+      // mvg-departures.json's RE72 row is this fixture's only BAHN-mode entry;
+      // if that ever stops being true, the row's own "via" hint goes untested
+      // here rather than being asserted against a row invented for the purpose.
+      console.log('[e2e] no BAHN rows in this fixture; the row-via assertion was skipped');
+    }
 
     // ------------------------------------------------ timing, under a phone's
     //
@@ -1858,6 +2086,22 @@ const CORS_HEADERS = [
  */
 let upstreamDelayMs = 0;
 
+/**
+ * How many `/trip?tripId=...` requests this run has fulfilled.
+ *
+ * The whole point of `src/page/calls.ts` is that nothing asks the aggregator
+ * about a vehicle's run until something on screen needs to know, so this is
+ * the harness's only window onto whether that held: counted here, at the one
+ * place every such request actually lands, rather than guessed at from the
+ * page's own state.
+ */
+let tripRequestCount = 0;
+
+/** Read-only outside this module; only `handleRequestPaused` increments it. */
+export function tripRequestsFulfilled(): number {
+  return tripRequestCount;
+}
+
 async function fulfillJson(cdp: Cdp, requestId: string, body: unknown): Promise<void> {
   if (upstreamDelayMs > 0) await sleep(upstreamDelayMs);
   const text = JSON.stringify(body);
@@ -1884,6 +2128,7 @@ export async function handleRequestPaused(
   mvgBody: unknown[],
   planBody: unknown,
   stoptimesBody: unknown,
+  tripBody: unknown,
 ): Promise<void> {
   const { requestId, request } = event;
   try {
@@ -1913,6 +2158,11 @@ export async function handleRequestPaused(
       }
       if (parsed.pathname.endsWith('/stoptimes')) {
         await fulfillJson(cdp, requestId, stoptimesBody);
+        return;
+      }
+      if (parsed.pathname.endsWith('/trip')) {
+        tripRequestCount += 1;
+        await fulfillJson(cdp, requestId, tripBody);
         return;
       }
       if (parsed.pathname.endsWith('/reverse-geocode') || parsed.pathname.endsWith('/geocode')) {

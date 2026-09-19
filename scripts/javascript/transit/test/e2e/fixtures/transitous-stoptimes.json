@@ -1,6 +1,26 @@
 {
-  "_comment": "A minimal, always-successful answer to the aggregator's stoptimes probe (used by origin resolution) and to any departures fan-out. Every id is synthetic; nothing here is a real stop.",
-  "stopTimes": [],
+  "_comment": "The aggregator's stoptimes probe, served for every stop regardless of the query (this fixture does not vary by stopId). Mostly empty, which is what keeps it 'always successful' for origin resolution and any departures fan-out. The one real row is the aggregator's own sighting of the RE72 run in mvg-departures.json (line RE72, offset 14 min): line and planned-minute agreement is what lets src/via.ts's matchTrips find this row's tripId for the BAHN board row, which is the identifier the onward-calls lookup (src/page/calls.ts) needs to ask /trip for the rest of the run. Times are OffsetMin fields, turned into ISO timestamps against the run's own ANCHOR_MS by loadStoptimesBody, the same convention transitous-plan.json uses. Every id and name is made up.",
+  "stopTimes": [
+    {
+      "place": {
+        "name": "Nordweg",
+        "stopId": "de-DELFI_de:00000:1:8:8",
+        "track": "8",
+        "scheduledTrack": "8",
+        "departureOffsetMin": 14,
+        "scheduledDepartureOffsetMin": 14
+      },
+      "mode": "REGIONAL_RAIL",
+      "realTime": false,
+      "headsign": "Maxmonument",
+      "agencyName": "Regionalbahn",
+      "routeShortName": "RE72",
+      "routeColor": "336699",
+      "directionId": 1,
+      "cancelled": false,
+      "tripId": "trip-re72-e2e"
+    }
+  ],
   "nextPageCursor": "",
   "previousPageCursor": ""
 }

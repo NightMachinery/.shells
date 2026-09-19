@@ -12,12 +12,31 @@ import { alternativeLine, journeySummary, lineBadge, renderJourney, slotHead } f
 import { attachTip } from './tip.ts';
 import { alarmMarker, attachLongPress, openAlarmPopup } from './notify.ts';
 import { stopTagOf } from './data.ts';
+import { callsExpanded, expandCalls, onwardCalls, peekCalls } from './calls.ts';
 import { arrivalOf, rowKey, usualExits, type BoardRoutes } from './commute.ts';
 import { boardId, filterKey, readHidden, readView, writeHidden, writeView } from './store.ts';
 import type { BoardStatus, BoardView } from './types.ts';
 
 // One board on the page: its header, its three view states, its filter, and the
 // two ways it can draw its departures.
+
+/**
+ * How many onward calls a sheet names before it offers the rest behind a tap.
+ *
+ * Enough to answer "does it stop where I am going" for a journey inside the
+ * city without expanding anything, and short enough that the journey section
+ * below it is still on the screen.
+ */
+const SHEET_CALLS = 8;
+
+/**
+ * How many a short hint beside a destination names.
+ *
+ * Two, because the slot is one line on a phone and the hint is there to
+ * separate two regional services that both end up somewhere far away, which the
+ * first call or two already does.
+ */
+const HINT_CALLS = 2;
 
 /** How many destinations a strip row names before it gives up and says "and more". */
 const STRIP_DESTINATIONS = 2;
@@ -112,7 +131,9 @@ export function visibleRows(profileKey: string, board: Board): Departure[] {
  * line as well as by colour, so the distinction survives a monochrome screen
  * and a reader who does not distinguish red from green.
  */
-function timeGroup(dep: Departure, timezone: string, referenceMs: number): HTMLElement {
+function timeGroup(dep: Departure, context: BoardContext): HTMLElement {
+  const timezone = context.timezone;
+  const referenceMs = context.now;
   const wrap = el('span', `times${dep.cancelled ? ' cancelled' : ''}`);
   const late = dep.delayMin > 0;
   const early = dep.delayMin < 0;
@@ -121,7 +142,7 @@ function timeGroup(dep: Departure, timezone: string, referenceMs: number): HTMLE
   if (dep.delayMin !== 0) wrap.append(el('span', 'time-planned', `(${clockTime(dep.planned, timezone)})`));
   // Hover only. On a touch screen the whole row is one tap target and opens the
   // sheet, so a tip here as well would be two answers competing for one tap.
-  attachTip(wrap, () => departureTip(dep, timezone, referenceMs), {
+  attachTip(wrap, () => departureTip(dep, context), {
     label: departureLabel(dep, timezone, referenceMs),
     tapOpens: false,
   });
@@ -138,7 +159,9 @@ function departureLabel(dep: Departure, timezone: string, referenceMs: number): 
 }
 
 /** The same, as the tooltip everything on this page uses. */
-function departureTip(dep: Departure, timezone: string, referenceMs: number): HTMLElement {
+function departureTip(dep: Departure, context: BoardContext): HTMLElement {
+  const timezone = context.timezone;
+  const referenceMs = context.now;
   const body = el('div', 'tip-body');
   const head = el('div', 'tip-head');
   head.append(lineBadge(dep));
@@ -158,6 +181,8 @@ function departureTip(dep: Departure, timezone: string, referenceMs: number): HT
   row('delay', dep.delayMin === 0 ? 'on time' : `${dep.delayMin > 0 ? '+' : ''}${dep.delayMin} min`);
   if (dep.platform !== null) row('platform', dep.platform);
   body.append(rows);
+  const hint = viaHint(dep, context, SHEET_CALLS);
+  if (hint !== null) body.append(el('p', 'tip-next', hint));
   if (dep.viaUnverified === true) {
     // This board keeps only the departures whose vehicle still calls at a place,
     // and this one could not be checked against it. Saying so is the honest
@@ -464,11 +489,99 @@ function rowTipKey(dep: Departure, context: BoardContext): string {
  * would have produced the same list. Different rebuilds the body in place,
  * because then the journey really has changed under them.
  */
-function rowTipSignature(dep: Departure, planned: BoardRoutes['rows'] extends Map<string, infer V> ? V | undefined : never, planning: boolean): string {
-  const head = `${dep.realtime}|${dep.delayMin}|${dep.cancelled}|${dep.platform ?? ''}|${dep.realtimeKnown}`;
+function rowTipSignature(
+  dep: Departure,
+  planned: BoardRoutes['rows'] extends Map<string, infer V> ? V | undefined : never,
+  planning: boolean,
+  calls: string,
+): string {
+  const head = `${dep.realtime}|${dep.delayMin}|${dep.cancelled}|${dep.platform ?? ''}|${dep.realtimeKnown}|${calls}`;
   if (planning && planned === undefined) return `${head}|planning`;
   const options = planned?.options ?? [];
   return `${head}|${options.map((option) => `${option.exitStop}:${option.arrival}:${option.transfers}:${option.tight}`).join(',')}`;
+}
+
+/**
+ * What the open sheet's call list currently says, cheaply.
+ *
+ * Peeked rather than asked: this runs for every row on the board on every
+ * render, and asking would start a lookup per row, which is the one thing the
+ * lazy loading is there to prevent. A row nothing has opened contributes the
+ * same constant every time and so never rebuilds anything.
+ */
+function callsSignature(dep: Departure, context: BoardContext): string {
+  const key = rowTipKey(dep, context);
+  const state = peekCalls(key);
+  if (state === undefined) return 'none';
+  if (state.kind !== 'ready') return state.kind;
+  return `${state.calls.length}|${callsExpanded(key) ? 'all' : 'head'}`;
+}
+
+/**
+ * Where this run goes next, in a few words.
+ *
+ * Only for the rows where it settles something. A rapid-transit line calls
+ * everywhere and its next two stops say nothing a rider does not know; a
+ * regional service calls at the places worth naming and only at those, so its
+ * next two calls are the difference between the train that runs through the
+ * centre and the one that turns off before it.
+ */
+function viaHint(dep: Departure, context: BoardContext, count: number): string | null {
+  const state = onwardCalls(rowTipKey(dep, context), dep);
+  if (state.kind !== 'ready') return null;
+  const names = state.calls.slice(0, count).map((call) => compact(call.name));
+  if (names.length === 0) return null;
+  return `via ${names.join(' \u00b7 ')}`;
+}
+
+/**
+ * The run's remaining calls, as the sheet's own section.
+ *
+ * Arrival times rather than a bare list of names: the question behind "does it
+ * stop there" is almost always "and when would I be there", and the two
+ * together also say how long the ride is, which no other part of the page does.
+ */
+function callsSection(dep: Departure, context: BoardContext): HTMLElement {
+  const key = rowTipKey(dep, context);
+  const state = onwardCalls(key, dep);
+  if (state.kind === 'loading') {
+    const wait = el('p', 'tip-planning');
+    wait.append(el('span', 'spinner'));
+    wait.append(el('span', undefined, 'reading where this goes\u2026'));
+    return wait;
+  }
+  if (state.kind === 'unknown') {
+    return el('p', 'tip-note', 'Where this run goes after here is not published for it.');
+  }
+  if (state.calls.length === 0) {
+    return el('p', 'tip-note', 'This is the last stop of the run.');
+  }
+
+  const wrap = el('div', 'tip-calls');
+  wrap.append(el('h4', 'tip-section', 'Calls at'));
+  const whole = callsExpanded(key);
+  const shown = whole ? state.calls : state.calls.slice(0, SHEET_CALLS);
+  const list = el('ul', 'tip-call-list');
+  for (const call of shown) {
+    const item = el('li', 'tip-call');
+    item.append(el('span', 'tip-call-name', call.name));
+    item.append(el('span', 'tip-call-time', clockTime(call.arrivalMs, context.timezone)));
+    list.append(item);
+  }
+  wrap.append(list);
+  const rest = state.calls.length - shown.length;
+  if (rest > 0) {
+    // One way only. The sheet is a glance, and a control that folds a list the
+    // reader just unfolded is a second decision about something they have
+    // already decided.
+    const more = button('tip-more', `and ${rest} more`);
+    more.addEventListener('click', () => {
+      expandCalls(key);
+      context.onChange();
+    });
+    wrap.append(more);
+  }
+  return wrap;
 }
 
 /**
@@ -521,6 +634,8 @@ function rowSheet(dep: Departure, board: Board, context: BoardContext, usual: Ma
   }
   if (dep.cancelled) body.append(el('p', 'tip-warning', 'This departure is cancelled.'));
   if (dep.sev) body.append(el('p', 'tip-note', 'A replacement service, not the usual vehicle.'));
+
+  body.append(callsSection(dep, context));
 
   const planned = context.routes?.rows.get(rowKey(dep));
   const options = planned?.options ?? [];
@@ -616,8 +731,16 @@ function renderRow(dep: Departure, board: Board, columns: Columns, context: Boar
   // earns it. An on-time departure with none of those is one line, and its
   // clock time is on the sheet with everything else. On a wider screen the line
   // is free, so it is always drawn there and the rows stay aligned.
+  // Regional services only; see `viaHint`. It goes on the second line rather
+  // than beside the destination, because the destination column is already the
+  // one that runs out of room first and a hint is not worth truncating a name
+  // the reader is looking for.
+  if (dep.mode === 'BAHN') {
+    const hint = viaHint(dep, context, HINT_CALLS);
+    if (hint !== null) meta.append(el('span', 'row-via', hint));
+  }
   const notable = dep.delayMin !== 0 || dep.cancelled || dep.sev;
-  if (!columns.terseTimes || notable) meta.append(timeGroup(dep, context.timezone, context.now));
+  if (!columns.terseTimes || notable) meta.append(timeGroup(dep, context));
   if (dep.sev) meta.append(el('span', 'flag sev', 'SEV'));
   if (dep.cancelled) meta.append(el('span', 'flag cancelled-flag', 'cancelled'));
   if (meta.childNodes.length > 0) main.append(meta);
@@ -659,7 +782,7 @@ function renderRow(dep: Departure, board: Board, columns: Columns, context: Boar
   // cells there have their own hover explanations anyway.
   attachTip(row, () => rowSheet(dep, board, context, usual), {
     key: rowTipKey(dep, context),
-    signature: rowTipSignature(dep, context.routes?.rows.get(rowKey(dep)), context.planning !== null),
+    signature: rowTipSignature(dep, context.routes?.rows.get(rowKey(dep)), context.planning !== null, callsSignature(dep, context)),
     hoverOpens: false,
   });
   return row;
@@ -768,7 +891,7 @@ function renderStrip(rows: Departure[], board: Board, context: BoardContext, usu
       attachTip(cell, () => rowSheet(dep, board, context, usual), {
         label: departureLabel(dep, context.timezone, context.now),
         key: rowTipKey(dep, context),
-        signature: rowTipSignature(dep, context.routes?.rows.get(rowKey(dep)), context.planning !== null),
+        signature: rowTipSignature(dep, context.routes?.rows.get(rowKey(dep)), context.planning !== null, callsSignature(dep, context)),
       });
       times.append(cell);
     }

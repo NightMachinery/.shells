@@ -1094,6 +1094,41 @@ than a query string because a fragment never leaves the browser. The cost is
 that a link is a snapshot, so the page says when it was planned and carries a
 button that plans that one row again and rewrites the fragment.
 
+*** Where the train goes after it leaves
+
+A row names a line and a terminus, and at a junction neither answers the
+question a rider actually has, which is whether it stops at the place they are
+going to. The sheet therefore carries the run's remaining calls with the time it
+reaches each of them, the first several of them and then a control that unfolds
+the rest. Times as well as names, because "does it stop there" is almost always
+followed by "and when would I be there", and the pair also says how long the
+ride is, which nothing else on the page does.
+
+Asked only when something asks. That is one request per vehicle and a board is
+two hundred rows, so nothing is fetched until a sheet opens on a particular
+departure or a pointer rests on its time. The answer is remembered for the life
+of the page under the row's key, and so is a failure to find one: a run that
+nothing could identify at half past four is still unidentifiable at half past
+four, and re-asking on every render would be a request loop with a spinner on
+top. The signature the board computes for every row to decide whether an open
+sheet is still current therefore peeks at what is known rather than asking,
+because asking there would start a lookup for every row on the board, which is
+the one thing this arrangement exists to prevent.
+
+A regional service also carries the first calls beside its times on the row
+itself. Only a regional one: a rapid-transit line calls everywhere and its next
+two stops tell a reader nothing they did not know, while a regional service
+calls only at the places worth naming, so its next two calls are the difference
+between the train that runs through the centre and the one that turns off before
+it. Where the board already filters by a place the vehicle must call at, those
+runs have been fetched and the hint costs nothing further.
+
+Rows whose backend publishes no trip identifier are recognised in the
+aggregator's own view of the same stop, by the cascade described under "One run,
+seen twice". The filter there is stricter about an ambiguous match than this is,
+and for a good reason: it is deciding whether to hide a departure, while this is
+deciding what to print on one that is staying either way.
+
 *** Nothing moves that did not change
 
 Skeleton rows are a promise that something is coming, and they are the right
@@ -1561,7 +1596,9 @@ row are all in =src/plan.ts=, and the transit modes a journey may use and what a
 walked minute costs are in =src/config.ts= with the other defaults. The
 abbreviations used in slots too narrow for a full place name are a single
 constant in =src/page/dom.ts=, and the filler words a destination badge drops
-are one in =src/page/badges.ts=. How long a pointer rests before a tooltip opens,
+are one in =src/page/badges.ts=. How many of a run's onward calls a sheet names
+before it offers the rest, and how many a regional row's own hint names, are in
+=src/page/board.ts=. How long a pointer rests before a tooltip opens,
 how long a press may last and how far it may travel and still be a tap, and the
 width below which the tooltip becomes a sheet, are all in =src/page/tip.ts=; the
 length of the long press that opens the reminder popup instead is in

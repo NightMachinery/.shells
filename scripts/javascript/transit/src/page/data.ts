@@ -1,6 +1,7 @@
 import { chain } from '../backends/chain.ts';
 import { BEYOND_HORIZON_EXTENSION_MINUTES } from '../config.ts';
 import { share, withLimit } from '../inflight.ts';
+import { configureCalls } from './calls.ts';
 import { recordBoard } from './timing.ts';
 import { createMvgBackend, MVG_DEFAULT_BASE_URL } from '../backends/mvg.ts';
 import { createTransitousBackend, TRANSITOUS_DEFAULT_BASE_URL } from '../backends/transitous.ts';
@@ -238,6 +239,8 @@ export interface FetchProfileOptions {
   horizonMinutes: number;
   /** Reports each board's progress so the page can draw a skeleton with a page count. */
   onStatus: (boardIndex: number, status: BoardStatus) => void;
+  /** Called when a sheet's onward calls land, so the open sheet can draw them. */
+  onCallsLoaded?: () => void;
 }
 
 export interface FetchProfileResult {
@@ -281,6 +284,15 @@ export async function fetchProfile(options: FetchProfileOptions): Promise<FetchP
     if (index === undefined) return;
     pages.set(index, Math.max(pages.get(index) ?? 0, page));
     report(index, { kind: 'loading', backend, page });
+  });
+
+  // What the sheets ask when a reader wants to know where a train goes. Pointed
+  // at this fetch's backends and window rather than set up once, because both
+  // are built per fetch and the horizon is the reader's to change.
+  configureCalls({
+    ...(config.backends.transitous_base_url ? { baseUrl: config.backends.transitous_base_url } : {}),
+    rows: (stop) => timetableRows(backends.timetable, stop, window, undefined),
+    onLoaded: options.onCallsLoaded ?? ((): void => {}),
   });
 
   const used = new Set<string>();

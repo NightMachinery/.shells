@@ -20,6 +20,7 @@ import { normaliseLine } from './filter.ts';
 import type { Board, Message } from './model.ts';
 import { renderBar, HORIZONS } from './page/bar.ts';
 import { boardChrome, closeFilters, renderBoard, viewOf, type BoardContext } from './page/board.ts';
+import { callsVersion } from './page/calls.ts';
 import { cachedRoutes, destinationNameOf, planProfile } from './page/commute.ts';
 import { fetchMessages, fetchProfile } from './page/data.ts';
 import { el, selectionInsideBoards } from './page/dom.ts';
@@ -138,6 +139,7 @@ function boardSignature(board: Board, context: BoardContext, view: string): stri
     context.barBackend,
     Math.floor(context.now / 60_000),
     boardEpoch,
+    callsVersion(),
   ].join('\u0001');
 }
 /** The visible profile's planning run, which the other profiles queue behind. */
@@ -313,6 +315,9 @@ async function refreshProfile(profileKey: string, force = false): Promise<void> 
       horizonMinutes: state.horizonMinutes,
       onStatus: (index, status) => {
         setStatus(profileKey, index, status);
+        if (profileKey === state.profileKey) render();
+      },
+      onCallsLoaded: () => {
         if (profileKey === state.profileKey) render();
       },
     });
