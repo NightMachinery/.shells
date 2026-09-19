@@ -866,6 +866,34 @@ read and where the slot is narrowest. A control with its own primary action,
 like a jump chip, keeps its tap and opens the tooltip on hover or a long press
 instead.
 
+The other way out is the expanded view: one journey, every leg, the alternatives
+in full. In a browser tab that is a second document, opened in a new tab so the
+board stays exactly where it was, with its own address so it can be shared,
+bookmarked and reloaded. See *The route document*.
+
+Installed to a home screen there are no tabs. The page runs standalone, and a
+link to a second document then has nowhere to go: it either does nothing or it
+replaces the only window there is, and either way the board is gone. So in
+standalone the same view is drawn over the board instead, as a full screen
+overlay, by the same module the page itself calls. The view is a render function
+over a container for exactly this reason: two ways in, one thing to maintain,
+and no chance of the overlay and the page disagreeing about what a journey looks
+like.
+
+Opening it pushes a history entry. That is what makes it feel like part of the
+system rather than a pane somebody bolted on: the Android back gesture pops the
+entry, the overlay's own back control does nothing except pop the same entry,
+and the close happens on =popstate= in both cases, so there is one path out and
+no way for the history to end up holding an entry for an overlay that is no
+longer there. Nothing underneath is torn down, so the board is still scrolled
+where it was and the sheet is still open when it closes. The overlay carries a
+control that copies the address the view would have as a page, because the one
+thing a tab gave the reader that an overlay does not is something to share.
+
+The trailing link in the sheet says where it goes, and where it goes depends on
+whether there is anywhere to go: "a new tab" is a promise the installed app
+cannot keep.
+
 *** One tap target per row
 
 On a touch screen the row is the tap target, not the cells inside it, and a tap
@@ -1224,7 +1252,14 @@ response, and the processor throttle is a multiplier on this machine rather than
 a model of any particular phone. What it does measure honestly is whether the
 page waits for its requests one after another or all at once.
 
-Two things it is worth knowing about writing assertions here. Service workers
+It also runs the page once as the installed app, by overriding the standalone
+media query before the document loads, which is the only way to get there: no
+protocol call puts a page in standalone, and the page asks the question once, on
+the tap. That pass checks that the expanded view opens over the board, that it
+pushes exactly one history entry, that nothing was opened in a tab, and that
+going back closes the overlay and leaves the sheet where it was.
+
+Three things it is worth knowing about writing assertions here. Service workers
 must be bypassed or the run measures the previous deploy rather than the build
 in front of it. A regular expression inside an evaluated template literal needs
 its backslash doubled, because a template literal eats the first one and =\s=

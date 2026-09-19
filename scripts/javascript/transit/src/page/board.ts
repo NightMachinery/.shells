@@ -3,7 +3,8 @@ import { buildLabel } from './build.ts';
 import { describe, describeBoards, lastRun } from './timing.ts';
 import { catchableOnBoard, describeWalk, normaliseLine, walkMinutesFor } from '../filter.ts';
 import type { Board, Departure } from '../model.ts';
-import { handoffFor, routeUrl } from '../route-link.ts';
+import { handoffFor, routeUrl, type RouteHandoff } from '../route-link.ts';
+import { openRouteOverlay, standalone } from './route-overlay.ts';
 import type { RouteOption } from '../plan.ts';
 import { button, clockTime, compact, countdownLabel, el, minutesUntil, slot, timeLabel, timeNode } from './dom.ts';
 import { destinationBadges, type DestinationBadge } from './badges.ts';
@@ -236,6 +237,38 @@ function gridTemplate(columns: Columns): string {
 }
 
 /**
+ * A link to the expanded view of one journey.
+ *
+ * In a browser tab it is exactly what it looks like: an anchor to a second
+ * document, opened in a new tab so the board stays where it was, with every
+ * affordance a link has (long press to copy, middle click, "open in") working
+ * because nothing here reimplemented them.
+ *
+ * Installed to a home screen there are no tabs. A new-tab link then either does
+ * nothing or throws the reader out into the browser, and either way the board
+ * is gone. So the href stays, because it is still the address this journey has
+ * and still the thing a share carries, and the tap is intercepted to draw the
+ * same view over the board instead.
+ */
+function routeAnchor(handoff: RouteHandoff, className: string, text?: string): HTMLAnchorElement {
+  const node = document.createElement('a');
+  node.className = className;
+  if (text !== undefined) node.textContent = text;
+  node.href = routeUrl(handoff);
+  if (standalone()) {
+    node.addEventListener('click', (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      openRouteOverlay(handoff);
+    });
+  } else {
+    node.target = '_blank';
+    node.rel = 'noopener';
+  }
+  return node;
+}
+
+/**
  * The commute slot: where this departure puts you down, what you catch there,
  * and when you arrive. A tight option is one that only works if the first leg
  * runs early, so it is never the recommendation and says so when asked.
@@ -265,9 +298,7 @@ function renderRoute(dep: Departure, board: Board, context: BoardContext, usual:
   // A link, not a span: the expanded view is a page with its own address, so it
   // opens in a new tab, it can be shared, and the browser's own affordances for
   // "this goes somewhere" all work without being reimplemented.
-  const node = document.createElement('a');
-  node.className = `route${option.tight ? ' tight' : ''}${better && !option.tight ? ' better' : ''}${stale}`;
-  node.href = routeUrl(
+  const node = routeAnchor(
     handoffFor({
       board: board.title,
       destination: context.destinationName,
@@ -278,9 +309,8 @@ function renderRoute(dep: Departure, board: Board, context: BoardContext, usual:
       from: board.title,
       options,
     }),
+    `route${option.tight ? ' tight' : ''}${better && !option.tight ? ' better' : ''}${stale}`,
   );
-  node.target = '_blank';
-  node.rel = 'noopener';
 
   node.append(slotHead(option));
   node.append(timeNode(option.arrival, context.now, context.timezone, 'route-arrival'));
@@ -340,12 +370,7 @@ function routeTip(
         detail.hidden = !detail.hidden;
       });
       item.append(toggle);
-      const open = document.createElement('a');
-      open.className = 'tip-alternative-open';
-      open.textContent = 'open';
-      open.target = '_blank';
-      open.rel = 'noopener';
-      open.href = routeUrl(
+      const open = routeAnchor(
         handoffFor({
           board: board.title,
           destination: context.destinationName,
@@ -357,6 +382,8 @@ function routeTip(
           options: [...options],
           first: offset + 1,
         }),
+        'tip-alternative-open',
+        'open',
       );
       item.append(open);
       item.append(detail);
@@ -370,12 +397,9 @@ function routeTip(
     body.append(el('p', 'tip-note', `from the last visit, ${age} s old; planning again now`));
   }
 
-  const open = document.createElement('a');
-  open.className = 'tip-open';
-  open.textContent = 'Open in a new tab';
-  open.target = '_blank';
-  open.rel = 'noopener';
-  open.href = routeUrl(
+  // The label says where it goes, and where it goes depends on whether there is
+  // anywhere to go. "a new tab" is a promise the installed app cannot keep.
+  const open = routeAnchor(
     handoffFor({
       board: board.title,
       destination: context.destinationName,
@@ -386,6 +410,8 @@ function routeTip(
       from: board.title,
       options: [...options],
     }),
+    'tip-open',
+    standalone() ? 'Open full view' : 'Open in a new tab',
   );
   body.append(open);
   return body;

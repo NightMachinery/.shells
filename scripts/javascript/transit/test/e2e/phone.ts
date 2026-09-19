@@ -1126,6 +1126,107 @@ async function main(): Promise<void> {
       uploadThroughput: -1,
     });
 
+    // ------------------------------------ assertion: the installed app's overlay
+
+    // Installed to a home screen the page runs standalone, and standalone has
+    // no tabs. Every "open" on this page was written for a browser, where a new
+    // tab is free and leaves the board exactly where it was; in the installed
+    // app the same link has nowhere to go. So in standalone the expanded view is
+    // drawn over the board instead, with a history entry behind it so that the
+    // system back gesture closes it without the page having to guess.
+    //
+    // Emulated by overriding the media query before the document runs, which is
+    // the only way: there is no protocol call that puts a page in standalone,
+    // and the page asks the question once, on the tap.
+
+    const standaloneShim = await cdp.send<{ identifier: string }>('Page.addScriptToEvaluateOnNewDocument', {
+      source: `(() => {
+        const real = window.matchMedia.bind(window);
+        window.matchMedia = (query) =>
+          String(query).includes('display-mode: standalone')
+            ? { matches: true, media: query, addListener() {}, removeListener() {}, addEventListener() {}, removeEventListener() {}, dispatchEvent() { return false; } }
+            : real(query);
+      })()`,
+    });
+    await cdp.send('Page.navigate', { url: `${localOrigin}/index.html` });
+    await io.waitFor("document.querySelectorAll('li.row').length > 0", 15_000);
+    await io.waitFor("document.querySelector('li.row a.route') !== null", 20_000, 100);
+
+    const sheetOpened = await io.tapOpensSheet("document.querySelector('li.row:has(a.route)')");
+    record(
+      'standalone: a row with a journey still opens its sheet',
+      sheetOpened.opened,
+      sheetOpened.opened ? `opened in ${sheetOpened.ms}ms` : 'no .tip-sheet within 1s',
+    );
+
+    const trailingLabel = await io.evalJs<string>(
+      `(document.querySelector('.tip-sheet .tip-open')?.textContent ?? '').trim()`,
+    );
+    record(
+      'standalone: the trailing link does not promise a tab',
+      trailingLabel === 'Open full view',
+      `the link reads "${trailingLabel}"`,
+    );
+
+    // Whichever "open" the sheet is showing. The alternatives list carries the
+    // short one and is what the reader taps most, so it is preferred.
+    const openExpr =
+      "(document.querySelector('.tip-sheet .tip-alternative-open') ?? document.querySelector('.tip-sheet .tip-open'))";
+    const historyBefore = await io.evalJs<number>('history.length');
+    const tabsBeforeOverlay = seenTargets.filter((entry) => entry.type === 'page').length;
+    const openRect = await io.rectOfExpr(openExpr);
+    if (openRect === null) {
+      record('standalone: tapping "open" draws the journey over the board', false, 'no open link in the sheet');
+    } else {
+      await io.dispatchTap(openRect.left + openRect.width / 2, openRect.top + openRect.height / 2);
+      const overlayUp = await io.waitFor("document.querySelector('.route-overlay') !== null", 3000, 25);
+      const historyAfter = await io.evalJs<number>('history.length');
+      const drewJourney = await io.evalJs<boolean>(
+        "document.querySelector('.route-overlay .route-option') !== null || document.querySelector('.route-overlay .empty') !== null",
+      );
+      const newTabs = seenTargets.filter((entry) => entry.type === 'page').length;
+      record(
+        'standalone: tapping "open" draws the journey over the board',
+        overlayUp && drewJourney,
+        `overlay=${overlayUp} journey drawn=${drewJourney}`,
+      );
+      record(
+        'standalone: opening pushes exactly one history entry',
+        historyAfter === historyBefore + 1,
+        `history.length ${historyBefore} -> ${historyAfter}`,
+      );
+      record(
+        'standalone: nothing is opened in a tab',
+        newTabs === tabsBeforeOverlay,
+        `${newTabs - tabsBeforeOverlay} target(s) created by the tap`,
+      );
+
+      await io.evalJs('history.back()');
+      const overlayGone = await io.waitFor("document.querySelector('.route-overlay') === null", 3000, 25);
+      const sheetSurvived = await io.evalJs<boolean>("document.querySelector('.tip-sheet') !== null");
+      record(
+        'standalone: the back gesture closes the overlay and leaves the sheet',
+        overlayGone && sheetSurvived,
+        `overlay gone=${overlayGone} sheet still open=${sheetSurvived}`,
+      );
+    }
+
+    await cdp.send('Page.removeScriptToEvaluateOnNewDocument', { identifier: standaloneShim.identifier });
+    await cdp.send('Page.navigate', { url: `${localOrigin}/index.html` });
+    await io.waitFor("document.querySelectorAll('li.row').length > 0", 15_000);
+    const browserLabel = await io.evalJs<string>(
+      `(() => {
+        const row = document.querySelector('li.row:has(a.route)');
+        if (row === null) return 'no planned row';
+        return document.querySelector('.tip-open')?.textContent?.trim() ?? 'sheet closed';
+      })()`,
+    );
+    record(
+      'in a tab the behaviour is unchanged',
+      browserLabel === 'sheet closed' || browserLabel === 'Open in a new tab',
+      `with no standalone shim the sheet's link reads "${browserLabel}"`,
+    );
+
     // --------------------------------------------- assertion: the update flow
     //
     // The test this section exists for, written after two deploys in a row
