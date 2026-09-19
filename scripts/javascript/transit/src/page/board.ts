@@ -158,6 +158,19 @@ function departureTip(dep: Departure, timezone: string, referenceMs: number): HT
   row('delay', dep.delayMin === 0 ? 'on time' : `${dep.delayMin > 0 ? '+' : ''}${dep.delayMin} min`);
   if (dep.platform !== null) row('platform', dep.platform);
   body.append(rows);
+  if (dep.viaUnverified === true) {
+    // This board keeps only the departures whose vehicle still calls at a place,
+    // and this one could not be checked against it. Saying so is the honest
+    // report: hiding what cannot be verified teaches a reader to distrust the
+    // board, and keeping it silently teaches them to distrust the filter.
+    body.append(
+      el(
+        'p',
+        'tip-note',
+        'Direction unverified: this run could not be checked against the route this board asks for, so it is shown on its direction letter alone.',
+      ),
+    );
+  }
   if (dep.cancelled) body.append(el('p', 'tip-warning', 'This departure is cancelled.'));
   if (dep.sev) body.append(el('p', 'tip-note', 'A replacement service, not the usual vehicle.'));
   return body;
@@ -493,6 +506,19 @@ function rowSheet(dep: Departure, board: Board, context: BoardContext, usual: Ma
   row('times from', dep.realtimeKnown && !context.planned ? `${dep.backend}, live` : `${dep.backend}, timetable`);
   body.append(rows);
 
+  if (dep.viaUnverified === true) {
+    // This board keeps only the departures whose vehicle still calls at a place,
+    // and this one could not be checked against it. Saying so is the honest
+    // report: hiding what cannot be verified teaches a reader to distrust the
+    // board, and keeping it silently teaches them to distrust the filter.
+    body.append(
+      el(
+        'p',
+        'tip-note',
+        'Direction unverified: this run could not be checked against the route this board asks for, so it is shown on its direction letter alone.',
+      ),
+    );
+  }
   if (dep.cancelled) body.append(el('p', 'tip-warning', 'This departure is cancelled.'));
   if (dep.sev) body.append(el('p', 'tip-note', 'A replacement service, not the usual vehicle.'));
 

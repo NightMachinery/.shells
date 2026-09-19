@@ -146,6 +146,7 @@ export function configExportDocument(config: Config, options: ConfigExportOption
         modes: board.modes ?? null,
         lines: board.lines ?? null,
         direction: board.direction ?? null,
+        via: board.via ?? null,
         destinations: board.destinations ?? null,
         walk_minutes: board.walkMinutes,
         walk_minutes_by_stop: board.walkMinutesByStop ?? null,

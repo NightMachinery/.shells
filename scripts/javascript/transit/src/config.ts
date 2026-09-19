@@ -406,6 +406,21 @@ function parseBoard(profileKey: string, index: number, raw: unknown, issues: str
     }
   }
 
+  if (raw.via !== undefined) {
+    // One or several, because one station can be several identifiers: a main
+    // station with an underground rapid-transit hall publishes that hall
+    // separately, and a board that wants "still goes through the middle" means
+    // both of them.
+    const list = typeof raw.via === 'string' ? [raw.via] : stringList(raw.via);
+    const cleaned = (list ?? []).map((value) => value.trim()).filter((value) => value.length > 0);
+    if (cleaned.length === 0) {
+      issues.push(`${where}.via: must be a stop id, or a list of them, that the vehicle has to call at`);
+      failed = true;
+    } else {
+      board.via = cleaned;
+    }
+  }
+
   if (raw.destinations !== undefined) {
     const list = stringList(raw.destinations);
     if (list === null || list.length === 0) {

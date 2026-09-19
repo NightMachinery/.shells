@@ -7,6 +7,7 @@ import { createTransitousBackend, TRANSITOUS_DEFAULT_BASE_URL } from '../backend
 import type { Backend } from '../backends/types.ts';
 import { attachConnections } from '../connect.ts';
 import { applyFilters, mergeBoards, normaliseLine } from '../filter.ts';
+import { applyVia } from '../via.ts';
 import type { Board, BoardConfig, ConnectionConfig, Departure, Message } from '../model.ts';
 import type { BoardStatus, ExportedBoard, ExportedConfig, ExportedProfile } from './types.ts';
 
@@ -103,6 +104,7 @@ export function toBoardConfig(board: ExportedBoard): BoardConfig {
   if (board.modes !== null) config.modes = board.modes;
   if (board.lines !== null) config.lines = board.lines;
   if (board.direction !== null) config.direction = board.direction;
+  if (board.via !== null && board.via !== undefined) config.via = board.via;
   if (board.destinations !== null) config.destinations = board.destinations;
   if (board.walk_minutes_by_stop !== null) config.walkMinutesByStop = board.walk_minutes_by_stop;
   if (board.stop_labels !== null) config.stopLabels = board.stop_labels;
@@ -298,7 +300,16 @@ export async function fetchProfile(options: FetchProfileOptions): Promise<FetchP
       const multiStop = boardConfig.stops.length > 1;
       const perStop: Departure[][] = [];
       for (const stop of boardConfig.stops) {
-        const rows = applyFilters(await stopDepartures(backends, stop, window, boardConfig), boardConfig);
+        let rows = applyFilters(await stopDepartures(backends, stop, window, boardConfig), boardConfig);
+        // After the cheap filters, never before. Every row this asks about costs
+        // a request about that vehicle's own run, so the modes, the lines and the
+        // letter get to throw away what they can first.
+        if (boardConfig.via !== undefined) {
+          rows = await applyVia(rows, {
+            via: boardConfig.via,
+            aggregatorRows: () => timetableRows(backends.timetable, stop, window, boardConfig.modes),
+          });
+        }
         if (multiStop) for (const row of rows) row.stopTag = stopTagOf(row.stop, boardConfig.stopLabels);
         perStop.push(rows);
       }

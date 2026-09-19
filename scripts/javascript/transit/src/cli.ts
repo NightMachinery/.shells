@@ -19,6 +19,7 @@ import {
 } from './config.ts';
 import { attachConnections } from './connect.ts';
 import { applyFilters, mergeBoards } from './filter.ts';
+import { applyVia } from './via.ts';
 import { boardsDocument, configExportDocument, stopTag } from './json.ts';
 import { envOverride, HttpError } from './http.ts';
 import type { Board, BoardConfig, Departure, Direction, Message, Profile } from './model.ts';
@@ -219,6 +220,14 @@ interface Runtime {
   backend: Backend;
   /** Set when a fallback is configured, so per-stop outcomes are observable. */
   chained: ChainedBackend | null;
+  /**
+   * The aggregator, whoever the primary backend is.
+   *
+   * A board that filters by a place the vehicle must call at needs trip
+   * identifiers, and only the aggregator publishes them. Built on demand so the
+   * ordinary run of the program never constructs a backend it will not use.
+   */
+  aggregator(): Backend;
   primaryName: string;
   /** Set only under `--verbose`; handed on to anything that makes its own requests. */
   debug: ((line: string) => void) | undefined;
@@ -259,9 +268,16 @@ async function makeRuntime(flags: Flags): Promise<Runtime> {
     backend = chained;
   }
 
+  let aggregatorBackend: Backend | null = null;
+  const aggregator = (): Backend => {
+    if (aggregatorBackend === null) aggregatorBackend = makeBackend('transitous', config, cache, debug);
+    return aggregatorBackend;
+  };
+
   const horizon = flags.horizon ?? config.defaults.horizonMinutes;
   return {
     config,
+    aggregator,
     cache,
     backend,
     chained,
@@ -309,7 +325,16 @@ async function buildBoard(runtime: Runtime, boardConfig: BoardConfig, now: numbe
     // The mode filter inside `applyFilters` is now redundant for such a board,
     // and stays anyway: the hint is a hint, and a backend that ignores it must
     // not be able to widen a board.
-    const filtered = applyFilters(rows, boardConfig);
+    let filtered = applyFilters(rows, boardConfig);
+    // After the cheap filters, never before: every row this asks about costs a
+    // request about that vehicle's whole run.
+    if (boardConfig.via !== undefined) {
+      filtered = await applyVia(filtered, {
+        via: boardConfig.via,
+        aggregatorRows: () => runtime.aggregator().departures(stop, window, options),
+        ...(runtime.debug === undefined ? {} : { onDebug: runtime.debug }),
+      });
+    }
     if (multiStop) for (const row of filtered) row.stopTag = stopTag(row.stop, boardConfig.stopLabels);
     perStop.push(filtered);
   }

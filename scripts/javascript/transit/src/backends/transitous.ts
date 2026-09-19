@@ -125,6 +125,7 @@ interface RawStopTime {
   routeColor?: string;
   directionId?: number | string;
   cancelled?: boolean;
+  tripId?: string;
 }
 
 interface RawStopTimes {
@@ -213,6 +214,10 @@ export function createTransitousBackend(options: TransitousOptions = {}): Backen
       stop,
       realtimeKnown: row.realTime === true,
       color: normaliseColor(row.routeColor),
+      // Carried because it is the only handle on the rest of this vehicle's
+      // run. Everything a board wants to say about where a train goes after it
+      // leaves has to start here.
+      ...(typeof row.tripId === 'string' && row.tripId.length > 0 ? { tripId: row.tripId } : {}),
     };
   }
 

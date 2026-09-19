@@ -55,6 +55,26 @@ export interface Departure {
    * is configured; null means one is and nothing was catchable in the window.
    */
   connection?: { line: string; departure: number } | null;
+  /**
+   * The aggregator's identifier for the vehicle's whole run, when this row came
+   * from a source that publishes one.
+   *
+   * It is what turns a departure into a journey: the run's remaining stops are
+   * a request away with it and unavailable without it. The primary backend does
+   * not publish one, so a row from there carries this only if it was matched to
+   * the aggregator's stop time for the same line and minute.
+   */
+  tripId?: string;
+  /**
+   * Set when a board filtered by a place the vehicle must call at and this row
+   * could not be checked against it.
+   *
+   * The row is shown anyway, on the strength of the direction letter, because a
+   * board that hides everything it could not verify is worse than one that says
+   * which rows it is unsure about. Absent means the row was verified, or that
+   * the board asked no such question.
+   */
+  viaUnverified?: boolean;
   /** False when only a scheduled time exists; the page draws a hollow dot. */
   realtimeKnown: boolean;
   color?: string | null;
@@ -98,6 +118,15 @@ export interface BoardConfig {
   modes?: Mode[];
   lines?: string[];
   direction?: Exclude<Direction, null>;
+  /**
+   * A stop every kept row's vehicle must still call at.
+   *
+   * The honest version of `direction` at a station where the letter is not what
+   * it looks like. A letter belongs to a line rather than to a compass, so at a
+   * junction served by lines that start in the city and lines that end in it,
+   * one letter marks both ways. This asks the vehicle's own run instead.
+   */
+  via?: string[];
   /** Regular expression sources; a row passes when any of them matches. */
   destinations?: string[];
   /** Walking time to this board's stops, used when no per-stop value applies. */

@@ -19,6 +19,8 @@ export interface ExportedBoard {
   modes: Mode[] | null;
   lines: string[] | null;
   direction: 'H' | 'R' | null;
+  /** Stops a kept row's vehicle must still call at; see `BoardConfig`. */
+  via: string[] | null;
   destinations: string[] | null;
   walk_minutes: number;
   walk_minutes_by_stop: Record<string, number> | null;

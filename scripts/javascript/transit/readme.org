@@ -308,6 +308,55 @@ The aggregator pages by following a cursor instead, and the endpoint used here
 carries no category parameter, so a narrowing there changes only what is kept.
 Its per-request row count is sized from the length of the window.
 
+** When a direction letter is not a direction
+
+A board can filter by the direction letter its backend puts on a line, and at a
+junction that letter does not mean what it looks like it means. It belongs to the
+line rather than to the compass: it is the line's primary direction as its
+operator publishes it, which is "away from where the line starts". A city that is
+where some regional lines start and where others end therefore has one letter
+meaning both things at the same station, and a board asking for "towards the
+centre" keeps the trains leaving it.
+
+That is not a rare corner. It was observed at one large western junction where
+seven regional lines carry the same letter away from the city and five carry it
+towards, alongside every rapid-transit line, which carries it towards. The board
+showed trains to towns a hundred kilometres the wrong way and the letter was
+right about every one of them.
+
+So a board may instead name a place its vehicles have to call at, with the =via=
+key, and the check is made against the vehicle's own run. The aggregator
+publishes a trip's whole stop sequence against the identifier its stop times
+carry, so a row with such an identifier can be asked directly: does this run
+still call there after it leaves here. "After" is load bearing. A line that runs
+through the centre and out the other side calls at the centre once, and a rider
+boarding beyond it wants the call that is still ahead of them.
+
+The key takes several identifiers because one station can be several of them. A
+main station with an underground rapid-transit hall publishes that hall as its
+own station: the long-distance trains call at one identifier and the local ones
+at another, under one name on every sign in the building. Named only the first,
+the filter threw away exactly the services the board existed for.
+
+The primary backend publishes no trip identifier, so a row from there is matched
+to the aggregator's stop time for the same line and timetabled minute, which is
+the key the journey planner already matches on and for the same reason. Trips are
+fetched once and remembered for the life of the page: a trip identifier names one
+vehicle on one day, and a delay moves its times without moving its sequence, so
+there is nothing for an expiry to protect against. Without that cache a board
+that refreshes every minute would ask about every row every minute.
+
+A row that cannot be checked is kept and marked, never dropped. The letter is
+still doing the work for those rows, and the sheet says so. A board that silently
+hides what it could not verify teaches a reader to distrust the whole board, and
+one that silently keeps it teaches them to distrust the filter; the mark is the
+only version of this that stays truthful when the network is down.
+
+The cost is one request per distinct vehicle, which is why the letter, the modes
+and the line list all run first: they are free and they throw away most of it. On
+the junction above, a ninety minute window costs about thirty trip lookups on the
+first load and none on any refresh after it.
+
 ** Asking past the edge
 
 A board is planned further than it shows, by the extension named in
@@ -1459,7 +1508,8 @@ covering the other one.
 Every tunable value lives in exactly one place in the code, which is the only
 place to look it up. The horizon, the default backend and fallback, the
 transport types, the time zone and the default walking time are in
-=src/config.ts=. The request timeout and the user agent are in =src/http.ts=.
+=src/config.ts=. The request timeout and the user agent are in =src/http.ts=. How many trip
+lookups a via filter may have in the air at once is in =src/trip.ts=.
 The page cap that stops a pathological stop from being walked forever is in
 =src/backends/types.ts=, the primary backend's rows-per-page limit is in
 =src/backends/mvg.ts=, and the per-request row counts for the aggregator are
