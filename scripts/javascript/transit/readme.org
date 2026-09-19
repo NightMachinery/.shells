@@ -338,13 +338,47 @@ own station: the long-distance trains call at one identifier and the local ones
 at another, under one name on every sign in the building. Named only the first,
 the filter threw away exactly the services the board existed for.
 
-The primary backend publishes no trip identifier, so a row from there is matched
-to the aggregator's stop time for the same line and timetabled minute, which is
-the key the journey planner already matches on and for the same reason. Trips are
-fetched once and remembered for the life of the page: a trip identifier names one
-vehicle on one day, and a delay moves its times without moving its sequence, so
-there is nothing for an expiry to protect against. Without that cache a board
-that refreshes every minute would ask about every row every minute.
+*** One run, seen twice
+
+The primary backend publishes no trip identifier, so a row from there has to be
+recognised in the aggregator's own view of the same stop before its run can be
+looked up. Two feeds of one railway share no identifier and disagree about
+spelling constantly, so this asks several questions in a fixed order and stops at
+the first one that answers.
+
+Agreement on the timetabled minute plus agreement on the line is the strong case
+and covers almost every row. Agreement on the expected minute comes next and is
+worth less, because two runs of one line share an expected minute whenever the
+earlier one is late: the real failure was a rapid-transit row timetabled for one
+minute and running five late, matched against the following service, which was
+timetabled for exactly that later minute. Agreement on the timetable outranks
+agreement on the clock, so that pair is no longer a pair.
+
+Then the line is dropped and the headsign used instead, because the two feeds do
+not always agree on what a line is called: one wrote a regional service =RE 89=
+where the other wrote =RB89=, and published the same train a second time under
+another route name at the same minute. Several matches come back there, and the
+run is only accepted when every one of them gives the same answer about the place
+the board asks for. Two names for one train agree; two genuinely different trains
+do not, and then the row is marked unchecked rather than guessed at.
+
+Last, when even the minute disagrees, the line and the platform together, within
+the tolerance named in =src/via.ts=, and only while there is exactly one
+candidate that close. The disagreement this is for is not rounding: one feed was
+running an older working timetable and had a train leaving eight minutes before
+the other had it leaving, under a different headsign, because the portion it
+carries splits later. A line that comes every few minutes has several candidates
+that close, and there the match is refused instead of guessed.
+
+Because the two clocks differ, "still ahead" is measured on the run's own clock,
+not on the row's: the floor is the run's departure from this station as the run
+itself publishes it. Measured from the row instead, a run matched across a
+timetable version can have its next call appear to be in the past.
+
+Trips are fetched once and remembered for the life of the page: a trip identifier
+names one vehicle on one day, and a delay moves its times without moving its
+sequence, so there is nothing for an expiry to protect against. Without that cache
+a board that refreshes every minute would ask about every row every minute.
 
 A row that cannot be checked is kept and marked, never dropped. The letter is
 still doing the work for those rows, and the sheet says so. A board that silently
@@ -1509,7 +1543,9 @@ Every tunable value lives in exactly one place in the code, which is the only
 place to look it up. The horizon, the default backend and fallback, the
 transport types, the time zone and the default walking time are in
 =src/config.ts=. The request timeout and the user agent are in =src/http.ts=. How many trip
-lookups a via filter may have in the air at once is in =src/trip.ts=.
+lookups a via filter may have in the air at once is in =src/trip.ts=, and how far
+apart two feeds may time one run and still be recognised as one run is in
+=src/via.ts=.
 The page cap that stops a pathological stop from being walked forever is in
 =src/backends/types.ts=, the primary backend's rows-per-page limit is in
 =src/backends/mvg.ts=, and the per-request row counts for the aggregator are

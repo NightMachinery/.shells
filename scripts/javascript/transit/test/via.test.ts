@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, test } from 'bun:test';
-import { applyVia } from '../src/via.ts';
-import { callsAfter, callsAtAfter, clearTripCache, parseTrip, stationOf } from '../src/trip.ts';
+import { applyVia, matchTrips } from '../src/via.ts';
+import { callsAfter, callsAtAfter, clearTripCache, departureFrom, parseTrip, stationOf } from '../src/trip.ts';
 import type { Departure } from '../src/model.ts';
 import { mockFetch } from './helpers.ts';
 
@@ -188,5 +188,100 @@ describe('filtering a board by a place the vehicle must call at', () => {
     const kept = await applyVia(rows, { via: [CITY], baseUrl: BASE, fetchImpl });
     expect(kept).toHaveLength(2);
     expect(urls.filter((url) => url.includes('tripId=')).length).toBe(1);
+  });
+});
+
+// The two feeds disagree about more than they agree about, and each of these is
+// a disagreement that was seen in the real ones: a line written "RE 89" in one
+// and "RB89" in the other, a train published under two route names at one
+// minute, a run timetabled eight minutes apart in the two because one feed is
+// on an older timetable version, and a later service delayed onto the minute
+// this one is timetabled for.
+describe('recognising one run in two feeds', () => {
+  const aggRow = (overrides: Partial<Departure>): Departure =>
+    row({ backend: 'transitous', ...overrides });
+
+  test('the timetabled minute and the line identify a run', () => {
+    const found = matchTrips(row(), [
+      aggRow({ planned: AT, realtime: AT, tripId: 'right' }),
+      aggRow({ planned: AT + 300_000, realtime: AT + 300_000, tripId: 'later' }),
+    ]);
+    expect(found).toEqual(['right']);
+  });
+
+  test('a later service delayed onto this minute is not this run', () => {
+    // The row is timetabled at AT and expected five minutes late; the following
+    // service is timetabled for exactly that later minute. Agreement on the
+    // timetable outranks agreement on the clock, so only the first is a match.
+    const found = matchTrips(row({ realtime: AT + 300_000, delayMin: 5 }), [
+      aggRow({ planned: AT, realtime: AT + 300_000, tripId: 'right' }),
+      aggRow({ planned: AT + 300_000, realtime: AT + 540_000, tripId: 'following' }),
+    ]);
+    expect(found).toEqual(['right']);
+  });
+
+  test('a line the two feeds spell differently is matched on where it is going', () => {
+    const found = matchTrips(row({ line: 'RE 89', destination: 'Hauptplatz' }), [
+      aggRow({ line: 'RB89', destination: 'Hauptplatz', tripId: 'one' }),
+      aggRow({ line: 'RE80', destination: 'Hauptplatz', tripId: 'two' }),
+    ]);
+    expect(found).toEqual(['one', 'two']);
+  });
+
+  test('a run the two feeds time differently is matched on its line and platform', () => {
+    const found = matchTrips(row({ line: 'RB 68', destination: 'Feldkirchen', platform: '4' }), [
+      aggRow({ line: 'RB68', destination: 'Weitental', platform: '4', planned: AT + 480_000, realtime: AT + 480_000, tripId: 'shifted' }),
+    ]);
+    expect(found).toEqual(['shifted']);
+  });
+
+  test('two runs of one line at one platform identify nothing', () => {
+    const found = matchTrips(row({ line: 'S3', platform: '4' }), [
+      aggRow({ line: 'S3', platform: '4', planned: AT + 240_000, realtime: AT + 240_000, tripId: 'one' }),
+      aggRow({ line: 'S3', platform: '4', planned: AT + 480_000, realtime: AT + 480_000, tripId: 'two' }),
+    ]);
+    expect(found).toEqual([]);
+  });
+
+  test('one train under two route names is one verdict', async () => {
+    const { fetchImpl } = server({ 'route-a': THROUGH_THE_CITY, 'route-b': THROUGH_THE_CITY });
+    const aggregatorRows = async (): Promise<Departure[]> => [
+      aggRow({ line: 'RB89', destination: 'Hauptplatz', tripId: 'route-a' }),
+      aggRow({ line: 'RE80', destination: 'Hauptplatz', tripId: 'route-b' }),
+    ];
+    const kept = await applyVia([row({ line: 'RE 89', destination: 'Hauptplatz' })], {
+      via: [CITY],
+      baseUrl: BASE,
+      fetchImpl,
+      aggregatorRows,
+    });
+    expect(kept).toHaveLength(1);
+    expect(kept[0]?.viaUnverified).toBeUndefined();
+  });
+
+  test('candidates that answer differently leave the row unchecked', async () => {
+    const { fetchImpl } = server({ 'route-a': THROUGH_THE_CITY, 'route-b': AWAY_FROM_THE_CITY });
+    const aggregatorRows = async (): Promise<Departure[]> => [
+      aggRow({ line: 'RB89', destination: 'Hauptplatz', tripId: 'route-a' }),
+      aggRow({ line: 'RE80', destination: 'Hauptplatz', tripId: 'route-b' }),
+    ];
+    const kept = await applyVia([row({ line: 'RE 89', destination: 'Hauptplatz' })], {
+      via: [CITY],
+      baseUrl: BASE,
+      fetchImpl,
+      aggregatorRows,
+    });
+    expect(kept).toHaveLength(1);
+    expect(kept[0]?.viaUnverified).toBe(true);
+  });
+
+  test('what is still ahead is measured on the run own clock', () => {
+    const calls = parseTrip(THROUGH_THE_CITY);
+    expect(departureFrom(calls, `${STOP}:6:6`, AT)).toBe(AT);
+    expect(departureFrom(calls, 'de:00000:999', AT)).toBeNull();
+    // A row timetabled eight minutes after the run's own departure would put the
+    // floor past a call the run makes before then; the run's clock does not.
+    const early = parseTrip(AWAY_FROM_THE_CITY);
+    expect(departureFrom(early, STOP, AT + 480_000)).toBe(AT);
   });
 });

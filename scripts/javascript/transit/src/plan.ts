@@ -9,6 +9,7 @@ import {
 } from './backends/transitous.ts';
 import { DEFAULT_PLAN_MODES, DEFAULT_WALK_WEIGHT } from './config.ts';
 import { normaliseLine, type WalkSource } from './filter.ts';
+import { sameDestinationLabel, samePlatformLabel } from './label.ts';
 import { resolveOrigin, type OriginCache, type OriginLevel, type ResolvedOrigin } from './origin.ts';
 import { envOverride, fetchJson, HttpError, type FetchLike } from './http.ts';
 import { departureJson, toIso } from './json.ts';
@@ -846,32 +847,6 @@ function sameVehicle(row: Departure, leg: ParsedLeg): boolean {
   if (row.platform !== null && leg.fromTrack !== null && samePlatformLabel(row.platform, leg.fromTrack)) return true;
   if (row.platform === null || leg.fromTrack === null) return true;
   return sameDestinationLabel(row.destination, leg.headsign);
-}
-
-function samePlatformLabel(rowPlatform: string, legTrack: string): boolean {
-  return rowPlatform.trim().toLowerCase() === legTrack.trim().toLowerCase();
-}
-
-/**
- * Whether two feeds are naming the same place as a destination.
- *
- * Folded rather than compared, because the two spell a terminus differently
- * often enough that equality would answer no to trains that are plainly the
- * same: punctuation, the bracketed district a long-distance feed likes to add,
- * and the spacing around it.
- */
-function sameDestinationLabel(rowDestination: string, headsign: string | null): boolean {
-  if (headsign === null) return false;
-  const fold = (value: string): string =>
-    value
-      .toLowerCase()
-      .replace(/\(.*?\)/g, ' ')
-      .replace(/[^a-z0-9äöüß]+/g, ' ')
-      .trim();
-  const a = fold(rowDestination);
-  const b = fold(headsign);
-  if (a.length === 0 || b.length === 0) return false;
-  return a === b || a.startsWith(b) || b.startsWith(a);
 }
 
 /** A line label and a departure minute, folded into one comparable string. */

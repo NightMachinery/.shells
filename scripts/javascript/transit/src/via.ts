@@ -14,32 +14,92 @@
 
 import type { Departure } from './model.ts';
 import { normaliseLine } from './filter.ts';
-import { callsAtAfter, stationOf, tripCalls, type TripOptions } from './trip.ts';
+import { sameDestinationLabel, samePlatformLabel } from './label.ts';
+import { callsAtAfter, departureFrom, stationOf, tripCalls, type TripOptions } from './trip.ts';
 
-/** A line and the minute it is timetabled for, folded into one key. */
-function key(line: string, epochMs: number): string {
-  return `${normaliseLine(line)}|${Math.floor(epochMs / 60_000)}`;
+/**
+ * How far apart two feeds may time the same run and still be recognised as one
+ * run, in minutes, when nothing but the timetabled minute disagrees.
+ *
+ * Wide enough to cover a feed that is running a different timetable version,
+ * which is how the disagreement actually shows up: not a minute or two of
+ * rounding but a whole revision of the working timetable, where one feed has a
+ * train leaving several minutes before the other has it leaving. Narrow enough
+ * that a following service on the same line and platform is outside it, and the
+ * match is refused anyway unless there is exactly one candidate inside it.
+ */
+export const NEAR_MINUTES = 10;
+
+function minuteOf(epochMs: number): number {
+  return Math.floor(epochMs / 60_000);
 }
 
 /**
- * Trip identifiers for rows that came from a backend that publishes none,
- * taken from the aggregator's own view of the same stop and window.
+ * The aggregator's identifiers for the run a board row describes.
  *
- * The same key the journey planner matches on, for the same reason: the
- * timetabled minute is the one field two feeds of one timetable must agree
+ * The same run seen twice, which is the whole problem: a row from the primary
+ * backend and a row from the aggregator are two feeds describing one train, and
+ * nothing in either of them is a shared identifier. Four fields are available to
+ * recognise it by, and each of them is wrong sometimes, so this asks them in
+ * order of how often they are right.
+ *
+ * The timetabled minute is the field two feeds of one timetable usually agree
  * about, and the expected minute is the one they disagree about whenever
- * anything runs late.
+ * anything runs late, so a shared minute plus agreement on either the line or
+ * the destination identifies the run. That is the common case and it is exact.
+ *
+ * When the minute itself disagrees, which happens when one feed is running an
+ * older timetable version, the line and the platform together identify it, but
+ * only while there is exactly one such candidate nearby. A line that comes every
+ * few minutes has several, and then this answers nothing rather than guessing.
+ *
+ * Several identifiers may come back, because two feeds sometimes publish one
+ * train under two route names at the same minute. The caller decides what to do
+ * with a run it cannot narrow to one; see `applyVia`.
  */
-export function tripIndex(rows: readonly Departure[]): Map<string, string> {
-  const index = new Map<string, string>();
-  for (const row of rows) {
-    if (row.tripId === undefined) continue;
-    const scheduled = key(row.line, row.planned);
-    if (!index.has(scheduled)) index.set(scheduled, row.tripId);
-    const expected = key(row.line, row.realtime);
-    if (!index.has(expected)) index.set(expected, row.tripId);
+export function matchTrips(row: Departure, aggregator: readonly Departure[]): string[] {
+  // In descending order of how much a tier proves. A timetabled minute that two
+  // feeds agree on is the strongest single fact available, and the expected
+  // minute is next: two runs of one line can share an expected minute when one
+  // of them is late, so agreement there is worth less than agreement on the
+  // timetable. The line is worth more than the headsign because two lines can
+  // terminate in the same place, and a run is only ever one line.
+  const byLinePlanned: string[] = [];
+  const byLineExpected: string[] = [];
+  const byHeadsignPlanned: string[] = [];
+  const byHeadsignExpected: string[] = [];
+  const nearby: string[] = [];
+
+  for (const candidate of aggregator) {
+    const tripId = candidate.tripId;
+    if (tripId === undefined) continue;
+    const line = normaliseLine(candidate.line) === normaliseLine(row.line);
+    const headsign = sameDestinationLabel(row.destination, candidate.destination);
+    const planned = minuteOf(candidate.planned) === minuteOf(row.planned);
+    const expected = minuteOf(candidate.realtime) === minuteOf(row.realtime);
+    if (line && planned) byLinePlanned.push(tripId);
+    else if (line && expected) byLineExpected.push(tripId);
+    else if (headsign && planned) byHeadsignPlanned.push(tripId);
+    else if (headsign && expected) byHeadsignExpected.push(tripId);
+    else if (
+      line &&
+      row.platform !== null &&
+      candidate.platform !== null &&
+      samePlatformLabel(row.platform, candidate.platform) &&
+      Math.abs(candidate.planned - row.planned) <= NEAR_MINUTES * 60_000
+    ) {
+      nearby.push(tripId);
+    }
   }
-  return index;
+
+  const distinct = (ids: readonly string[]): string[] => [...new Set(ids)];
+  for (const tier of [byLinePlanned, byLineExpected, byHeadsignPlanned, byHeadsignExpected]) {
+    if (tier.length > 0) return distinct(tier);
+  }
+  // Only ever one. A line that comes every few minutes has several candidates
+  // this close, and guessing between them is worse than saying nothing.
+  const only = distinct(nearby);
+  return only.length === 1 ? only : [];
 }
 
 export interface ViaOptions extends TripOptions {
@@ -71,31 +131,47 @@ export async function applyVia(rows: Departure[], options: ViaOptions): Promise<
   const stations = options.via.map(stationOf);
   if (stations.length === 0) return rows;
 
-  let index: Map<string, string> | null = null;
+  let aggregator: readonly Departure[] = [];
   if (rows.some((row) => row.tripId === undefined) && options.aggregatorRows !== undefined) {
     try {
-      index = tripIndex(await options.aggregatorRows());
+      aggregator = await options.aggregatorRows();
     } catch {
       // No aggregator answer means no trip identifiers for the rows that lack
       // one, which means those rows are unverified. It is not a reason to empty
       // the board.
-      index = null;
+      aggregator = [];
     }
   }
 
   const verdicts = await Promise.all(
     rows.map(async (row): Promise<Departure | null> => {
-      const tripId = row.tripId ?? index?.get(key(row.line, row.planned)) ?? index?.get(key(row.line, row.realtime));
-      if (tripId === undefined) return { ...row, viaUnverified: true };
-      let calls;
-      try {
-        calls = await tripCalls(tripId, options);
-      } catch {
-        return { ...row, viaUnverified: true };
+      const candidates = row.tripId !== undefined ? [row.tripId] : matchTrips(row, aggregator);
+      const unverified = (): Departure => ({ ...row, viaUnverified: true });
+      if (candidates.length === 0) return unverified();
+
+      const answers: Array<{ tripId: string; callsThere: boolean }> = [];
+      for (const tripId of candidates) {
+        let calls;
+        try {
+          calls = await tripCalls(tripId, options);
+        } catch {
+          continue;
+        }
+        if (calls.length === 0) continue;
+        // The run's own clock, not the row's: a run matched across a timetable
+        // version leaves at a different minute in each feed, and "still ahead"
+        // has to mean ahead of the call this row describes.
+        const leaves = departureFrom(calls, row.stop, row.planned) ?? row.planned;
+        answers.push({ tripId, callsThere: callsAtAfter(calls, stations, leaves) });
       }
-      if (calls.length === 0) return { ...row, viaUnverified: true };
-      if (!callsAtAfter(calls, stations, row.planned)) return null;
-      const kept = { ...row, tripId };
+
+      // Nothing answered, or the candidates answered differently: the run was
+      // never identified, whatever the count of identifiers suggested.
+      if (answers.length === 0) return unverified();
+      const first = answers[0] as { tripId: string; callsThere: boolean };
+      if (answers.some((answer) => answer.callsThere !== first.callsThere)) return unverified();
+      if (!first.callsThere) return null;
+      const kept = { ...row, tripId: first.tripId };
       delete kept.viaUnverified;
       return kept;
     }),

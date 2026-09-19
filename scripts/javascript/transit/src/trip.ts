@@ -196,6 +196,27 @@ export function callsAtAfter(calls: TripCall[], stations: readonly string[], aft
 }
 
 /**
+ * When this run leaves a station, by the run's own clock.
+ *
+ * The board row and the trip are two feeds of one train, and they do not always
+ * time it alike: one may be running an older timetable version and have it
+ * leaving several minutes earlier or later. Anything that asks "what is still
+ * ahead of this departure" has to ask it on one clock, and the run's own clock
+ * is the one the rest of its calls are on. Null when the run's list never names
+ * the station, which happens when the two feeds disagree about which station an
+ * edge belongs to.
+ */
+export function departureFrom(calls: readonly TripCall[], fromStation: string, nearMs: number): number | null {
+  const wanted = stationOf(fromStation);
+  let best: number | null = null;
+  for (const call of calls) {
+    if (stationOf(call.stopId) !== wanted) continue;
+    if (best === null || Math.abs(call.departureMs - nearMs) < Math.abs(best - nearMs)) best = call.departureMs;
+  }
+  return best;
+}
+
+/**
  * The calls still ahead of a departure, in order.
  *
  * The first one is dropped when it is the stop being left from: a list of where
