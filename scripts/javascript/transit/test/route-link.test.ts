@@ -9,7 +9,7 @@ const base = Date.parse('2024-03-05T22:00:00Z');
 function option(index: number): RouteOption {
   return {
     exitStop: `de:00000:${index}`,
-    exitStopName: 'Gießing – Süd (Straße)',
+    exitStopName: 'Talbogen – Süd (Straße)',
     destinationName: 'Zuhause',
     arrival: base + DAY + 9 * 60_000,
     transfers: 2,
@@ -17,9 +17,9 @@ function option(index: number): RouteOption {
     tightBy: index === 2 ? 2 : 0,
     walkMinutes: 13.5,
     legs: [
-      { kind: 'transit', line: 'S8', mode: 'SBAHN', from: 'Süd', to: 'Gießing', departure: base, arrival: base + 600_000 },
-      { kind: 'walk', line: '', mode: 'WALK', from: 'Gießing', to: 'Gießing Nord', departure: base + 600_000, arrival: base + 780_000 },
-      { kind: 'transit', line: 'U4', mode: 'UBAHN', from: 'Gießing Nord', to: 'Zuhause', departure: base + 900_000, arrival: base + DAY },
+      { kind: 'transit', line: 'S8', mode: 'SBAHN', from: 'Süd', to: 'Talbogen', departure: base, arrival: base + 600_000 },
+      { kind: 'walk', line: '', mode: 'WALK', from: 'Talbogen', to: 'Talbogen Nord', departure: base + 600_000, arrival: base + 780_000 },
+      { kind: 'transit', line: 'U4', mode: 'UBAHN', from: 'Talbogen Nord', to: 'Zuhause', departure: base + 900_000, arrival: base + DAY },
     ],
   };
 }
@@ -27,7 +27,7 @@ function option(index: number): RouteOption {
 const departure: Departure = {
   line: 'S8',
   mode: 'SBAHN',
-  destination: 'Gießing Nord',
+  destination: 'Talbogen Nord',
   planned: base,
   realtime: base + 120_000,
   delayMin: 2,
@@ -54,7 +54,7 @@ describe('route hand-off', () => {
     });
     const back = decodeRoute(`#${encodeRoute(handoff)}`);
     expect(back).toEqual(handoff);
-    expect(back?.options[0]?.exitStopName).toBe('Gießing – Süd (Straße)');
+    expect(back?.options[0]?.exitStopName).toBe('Talbogen – Süd (Straße)');
     expect(back?.options[0]?.arrival).toBe(base + DAY + 9 * 60_000);
   });
 
