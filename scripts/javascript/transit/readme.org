@@ -381,10 +381,22 @@ sequence, so there is nothing for an expiry to protect against. Without that cac
 a board that refreshes every minute would ask about every row every minute.
 
 A row that cannot be checked is kept and marked, never dropped. The letter is
-still doing the work for those rows, and the sheet says so. A board that silently
-hides what it could not verify teaches a reader to distrust the whole board, and
-one that silently keeps it teaches them to distrust the filter; the mark is the
-only version of this that stays truthful when the network is down.
+still doing the work for those rows. A board that silently hides what it could
+not verify teaches a reader to distrust the whole board, and one that silently
+keeps it teaches them to distrust the filter; the mark is the only version of
+this that stays truthful when the network is down.
+
+The mark is on the row itself and not only in the sheet that explains it. A
+reader glancing down a board is deciding which train to walk to, and a mark that
+appears only once they have tapped a row is a mark for a decision they have
+already made. The terminal prints the same caveat as a word on the same row.
+
+What is left after all of that, measured on the board this exists for, is about
+one row in sixty: a regional service that the aggregator's stop times for the
+station do not carry at all, at any minute, on any platform. Nothing identifies
+a run that one of the two feeds has never heard of, and pairing it with the
+service on the same platform a minute earlier would pair it with a train going
+the other way. That row is exactly what the mark is for.
 
 The cost is one request per distinct vehicle, which is why the letter, the modes
 and the line list all run first: they are free and they throw away most of it. On

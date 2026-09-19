@@ -743,6 +743,18 @@ function renderRow(dep: Departure, board: Board, columns: Columns, context: Boar
   if (!columns.terseTimes || notable) meta.append(timeGroup(dep, context));
   if (dep.sev) meta.append(el('span', 'flag sev', 'SEV'));
   if (dep.cancelled) meta.append(el('span', 'flag cancelled-flag', 'cancelled'));
+  // On the row and not only in the sheet. This board keeps only the departures
+  // whose vehicle still calls at a place, and this one could not be checked
+  // against it, so it is here on its direction letter alone. A reader glancing
+  // down the board is deciding which train to walk to, and a mark that only
+  // appears once they have tapped a row is a mark for a decision they have
+  // already made. What it means is in the sheet, one tap away.
+  if (dep.viaUnverified === true) {
+    const flag = el('span', 'flag unverified-flag', '?');
+    flag.title = 'direction not verified';
+    flag.setAttribute('aria-label', 'direction not verified');
+    meta.append(flag);
+  }
   if (meta.childNodes.length > 0) main.append(meta);
   row.append(main);
 
