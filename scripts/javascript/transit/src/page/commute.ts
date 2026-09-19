@@ -66,15 +66,14 @@ export function rowKey(dep: Departure): string {
 /**
  * How far a plan for this board must search, past what it renders.
  *
- * `board.departures` stops at the visible horizon, and the planner's own rule
- * is to search as far as the last row it was handed. That is precisely the
- * wrong answer for the row at the edge: the change it needs to make leaves
- * after it does, so a search that stops where it leaves finds nothing and the
- * last minutes of every horizon come back blank. The board was fetched further
- * than it draws for this reason, and this is that further point.
+ * The planner's own rule is to search as far as the last row it was handed,
+ * which is precisely the wrong answer for the row at the edge of the horizon:
+ * the change it needs to make leaves after it does, so a search that stops
+ * where it leaves finds nothing and the last minutes of every horizon come back
+ * blank. The board carries the further point it has to reach.
  */
 function coverThroughOf(board: Board): number | undefined {
-  return board.fetchedThrough;
+  return board.planThroughMs;
 }
 
 /** The place a profile key names, or null when the configuration has none. */

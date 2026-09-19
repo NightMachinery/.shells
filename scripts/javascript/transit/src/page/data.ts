@@ -223,10 +223,12 @@ export interface FetchProfileResult {
 export async function fetchProfile(options: FetchProfileOptions): Promise<FetchProfileResult> {
   const { config, profile, startMs, horizonMinutes, onStatus } = options;
   const window = { fromMs: startMs, toMs: startMs + horizonMinutes * 60_000 };
-  // Fetched over more than what is shown; see `BEYOND_HORIZON_EXTENSION_MINUTES`.
-  // Every stop request below asks for this wider range, and each board splits
-  // its rows back down to `window` after filtering and merging.
-  const fetchWindow = { fromMs: window.fromMs, toMs: window.toMs + BEYOND_HORIZON_EXTENSION_MINUTES * 60_000 };
+  // How far past the end of the window anything has to look; see
+  // `BEYOND_HORIZON_EXTENSION_MINUTES`. Two things reach that far and the
+  // board's own stops are not among them: what the reader is shown is the
+  // window they picked, and rows past it were fetched for a while and read by
+  // nothing, which is a doubled request count for an option nobody took up.
+  const reachThroughMs = window.toMs + BEYOND_HORIZON_EXTENSION_MINUTES * 60_000;
 
   // Which board a stop belongs to, so progress can be reported while every board
   // is being fetched at once. A stop that two boards share reports to the first
@@ -260,27 +262,26 @@ export async function fetchProfile(options: FetchProfileOptions): Promise<FetchP
       const multiStop = boardConfig.stops.length > 1;
       const perStop: Departure[][] = [];
       for (const stop of boardConfig.stops) {
-        const rows = applyFilters(await stopDepartures(backends, stop, fetchWindow, boardConfig), boardConfig);
+        const rows = applyFilters(await stopDepartures(backends, stop, window, boardConfig), boardConfig);
         if (multiStop) for (const row of rows) row.stopTag = stopTagOf(row.stop, boardConfig.stopLabels);
         perStop.push(rows);
       }
-      const merged = mergeBoards(perStop);
+      const departures = mergeBoards(perStop);
 
       if (boardConfig.connection !== undefined) {
         const connection = boardConfig.connection;
         // The onward window has to start where the last catchable change would:
         // a rider on the final row of this board still needs the ride and the
-        // transfer added before anything at the interchange is useful. It has to
-        // reach as far as `fetchWindow` does too, for the same reason the
-        // departures themselves are fetched that far: a row near the end of the
-        // visible horizon still needs a real onward departure to point at, not
-        // just the last one that happened to fall inside the un-extended window.
+        // transfer added before anything at the interchange is useful. Its end
+        // reaches past the window rather than stopping with it: the last row on
+        // the board still needs a real onward departure to point at, and the one
+        // it needs leaves after the window the reader picked has closed.
         const reach = (connection.rideMinutes + connection.transferMinutes) * 60_000;
         try {
           const onward = await stopDepartures(
             backends,
             connection.stop,
-            { fromMs: fetchWindow.fromMs + reach, toMs: fetchWindow.toMs + reach },
+            { fromMs: window.fromMs + reach, toMs: reachThroughMs + reach },
             {
               title: '',
               stops: [connection.stop],
@@ -289,25 +290,13 @@ export async function fetchProfile(options: FetchProfileOptions): Promise<FetchP
               lines: connection.lines,
             },
           );
-          // Attached before the split below, so a row that ends up on `beyond`
-          // still carries a correct connection field rather than an unset one;
-          // nothing renders it, but nothing here would benefit from a special
-          // case either.
-          attachConnections(merged, onward, connection);
+          attachConnections(departures, onward, connection);
         } catch {
           // No onward data is a board with empty connection slots, not a failed
           // board: the departures themselves are what the reader came for.
-          for (const row of merged) row.connection = null;
+          for (const row of departures) row.connection = null;
         }
       }
-
-      // Split after filtering, merging and the connection lookup, so the split
-      // sees exactly the rows that would otherwise have been shown: everything
-      // through the visible horizon renders as `departures`, and everything
-      // fetched past it for the planner's and the connections' sake is set aside
-      // on `beyond` and drawn by nothing.
-      const departures = merged.filter((row) => row.realtime <= window.toMs);
-      const beyond = merged.filter((row) => row.realtime > window.toMs);
 
       const names = new Set<string>();
       for (const stop of boardConfig.stops) names.add(backends.outcomes.get(stop)?.backend ?? config.defaults.backend);
@@ -319,8 +308,7 @@ export async function fetchProfile(options: FetchProfileOptions): Promise<FetchP
         departures,
         walkMinutes: boardConfig.walkMinutes,
       };
-      if (beyond.length > 0) board.beyond = beyond;
-      board.fetchedThrough = fetchWindow.toMs;
+      board.planThroughMs = reachThroughMs;
       if (boardConfig.walkMinutesByStop !== undefined) board.walkMinutesByStop = boardConfig.walkMinutesByStop;
       if (boardConfig.stopLabels !== undefined) board.stopLabels = boardConfig.stopLabels;
       if (boardConfig.connection !== undefined) board.connection = boardConfig.connection;
