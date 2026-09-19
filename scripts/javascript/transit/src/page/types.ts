@@ -24,6 +24,10 @@ export interface ExportedBoard {
   walk_minutes_by_stop: Record<string, number> | null;
   stop_labels: Record<string, string> | null;
   commute: boolean;
+  /** The place this board always plans towards, overriding the picker. */
+  destination?: string | null;
+  /** The identifier the planner is given for this board's stop, when it differs. */
+  plan_stop?: string | null;
   connection: ExportedConnection | null;
 }
 

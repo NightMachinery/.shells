@@ -207,6 +207,28 @@ arrives sooner fourteen minutes away and is never offered at all. Naming the
 near station makes that journey exist; the ranking above then decides between
 them. The searches run at once rather than one after another.
 
+### Boards that know where they are going
+
+A board can name the place it plans towards, and then the destination picker
+does not apply to it. That is for a profile whose boards are grouped by where
+they go rather than by which line they carry: standing in a main station the
+question is never "where does this line go", it is "which platform gets me
+home", and that is a fact about the platform rather than something to ask the
+reader. Such a board says where it is going under its title, and a profile whose
+planning boards all name one shows no picker at all.
+
+A board can also name the identifier the planner should be given for its stop,
+separately from the identifier its departures come from. A large station is
+several stops and the two services need not agree on which: the departure feed
+publishes a main station's suburban trains under the main-line station, while
+the planner models those platforms as a station of their own underneath it. Ask
+the planner about the main-line station and every journey it offers begins by
+walking to a stop the board has never heard of, so the board matches none of
+them and every row says "no route found" while the trains run past. The rule
+that produces that is worth keeping, because "a few minutes' walk away"
+describes both the platform downstairs and the stop on the next street, so the
+exception is declared rather than guessed.
+
 ### Which identifier the planner is given
 
 The planner is a different service from the departure board, and it does not

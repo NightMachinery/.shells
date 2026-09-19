@@ -152,6 +152,37 @@ A place declares one or the other, never both. A profile may list
 the doorsteps come first and the stations after, which is the order the everyday
 answers come in.
 
+A board may also set =destination = "<place key>"=, and then it plans towards
+that place whatever the picker says. This is for a profile whose boards are
+grouped by where they go rather than by which line they carry: standing in a
+main station the question is never "where does this line go", it is "which
+platform gets me home", and the answer is a property of the platform. Such a
+board says where it is going under its title, and when every planning board of a
+profile sets one the picker is not shown at all, because every answer it could
+give is already written on a board. Do not confuse it with =destinations= on a
+board, which filters the rows by the destination text the operator publishes.
+
+** Which stop the planner is told about
+
+A board may set =plan_stop = "<stop id>"=. It changes nothing about which
+departures the board shows, which still come from =stops=; it changes only the
+identifier the journey planner is given.
+
+It exists because a large station is several stops and the two services need not
+agree on which. The departure feed publishes the main station's S-Bahn under the
+identifier of the main-line station; the planner models those platforms as a
+station of their own underneath it. Ask the planner about the main-line station
+and every journey it offers begins by walking to a stop the board has never
+heard of, so the board matches none of them and every row says "no route found"
+while the trains run past. That is the whole failure: no error, no empty result
+from the planner, just a board that has given up for reasons it cannot state.
+
+The rule that produces it is deliberate and stays: an itinerary whose first ride
+is boarded somewhere other than this board's stop is a journey from somewhere
+else, and this board cannot put anybody on it. The exception has to be declared
+rather than guessed, because "a few minutes' walk away" describes both the
+platform downstairs and the stop on the next street.
+
 * Commands
 
 =board <profile|stop...>= renders a profile's boards, or an ad-hoc board for

@@ -113,6 +113,36 @@ export interface BoardConfig {
    * not journeys anyone plans: they are "is there a bus soon".
    */
   commute?: boolean;
+  /**
+   * The place this board's journeys always end at, named by its key.
+   *
+   * For a profile whose boards are grouped by where they go rather than by which
+   * line they are: a departure hall has one set of platforms for one direction
+   * and another set for another, and "which destination am I planning towards"
+   * is then a property of the board and not a question to ask the reader. When
+   * every board of a profile sets it, the destination picker is not shown at all.
+   *
+   * Not to be confused with `destinations`, which filters the rows of a board by
+   * the destination text the operator publishes. This one names a place in
+   * `[places]` and decides where the journey planner is asked to go.
+   */
+  destinationPlace?: string;
+  /**
+   * The identifier the journey planner should treat this board's stop as.
+   *
+   * A large station is several stops, and the two services do not have to agree
+   * on which. Munich's main station publishes its S-Bahn departures under the
+   * identifier of the main-line station, while the planner models those
+   * platforms as a station of their own underneath it; ask the planner about the
+   * main-line station and every journey it offers begins with a walk to a stop
+   * the board does not know, so the board matches none of them and says "no
+   * route found" while the trains run past.
+   *
+   * This is the one place to say "these departures are boarded there". It
+   * changes nothing about which departures the board shows: those still come
+   * from `stops`.
+   */
+  planStop?: string;
 }
 
 /**

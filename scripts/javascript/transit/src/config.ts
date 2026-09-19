@@ -443,6 +443,24 @@ function parseBoard(profileKey: string, index: number, raw: unknown, issues: str
     }
   }
 
+  if (raw.destination !== undefined) {
+    if (typeof raw.destination !== 'string' || raw.destination.trim().length === 0) {
+      issues.push(`${where}.destination: must be the key of a place in [places]`);
+      failed = true;
+    } else {
+      board.destinationPlace = raw.destination.trim();
+    }
+  }
+
+  if (raw.plan_stop !== undefined) {
+    if (typeof raw.plan_stop !== 'string' || raw.plan_stop.trim().length === 0) {
+      issues.push(`${where}.plan_stop: must be a stop id`);
+      failed = true;
+    } else {
+      board.planStop = raw.plan_stop.trim();
+    }
+  }
+
   if (raw.commute !== undefined) {
     if (typeof raw.commute !== 'boolean') {
       issues.push(`${where}.commute: must be true or false`);
@@ -573,6 +591,12 @@ export function parseConfig(raw: unknown, path: string): Config {
         issues.push(`profiles.${profile.key}.destinations: no place named ${name} is declared`);
       }
     }
+    profile.boards.forEach((board, index) => {
+      const name = board.destinationPlace;
+      if (name !== undefined && places[name] === undefined) {
+        issues.push(`profiles.${profile.key}.boards[${index}].destination: no place named ${name} is declared`);
+      }
+    });
   }
 
   if (defaults.home !== null && !profiles.some((profile) => profile.key === defaults.home)) {

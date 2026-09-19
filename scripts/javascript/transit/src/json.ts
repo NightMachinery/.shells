@@ -151,6 +151,8 @@ export function configExportDocument(config: Config, options: ConfigExportOption
         walk_minutes_by_stop: board.walkMinutesByStop ?? null,
         stop_labels: board.stopLabels ?? null,
         commute: board.commute === true,
+        destination: board.destinationPlace ?? null,
+        plan_stop: board.planStop ?? null,
         connection: connectionJson(board.connection),
       })),
     })),

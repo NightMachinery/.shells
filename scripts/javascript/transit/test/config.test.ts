@@ -278,3 +278,93 @@ describe('places', () => {
     expect(parseConfig({ profiles, defaults: { walk_weight: 3 } }, PATH).defaults.walkWeight).toBe(3);
   });
 });
+
+describe('a board that fixes its own destination', () => {
+  const places = { home: { lat: 1, lon: 2 }, work: { lat: 3, lon: 4 } };
+
+  test('parses, exports and is told apart from the row filter of the same name', () => {
+    const config = parseConfig(
+      {
+        places,
+        profiles: {
+          hall: {
+            title: 'Hall',
+            boards: [
+              {
+                title: 'westbound',
+                stops: ['de:00000:1'],
+                walk_minutes: 2,
+                commute: true,
+                destination: 'home',
+                // The other `destinations` is a row filter over the operator's
+                // own destination text, and the two must not be confused.
+                destinations: ['^West'],
+              },
+            ],
+          },
+        },
+      },
+      PATH,
+    );
+    const board = config.profiles[0]?.boards[0];
+    expect(board?.destinationPlace).toBe('home');
+    expect(board?.destinations).toHaveLength(1);
+
+    const document = configExportDocument(config, { mvgBaseUrl: 'a', transitousBaseUrl: 'b' }) as {
+      profiles: Array<{ boards: Array<{ destination: string | null; commute: boolean }> }>;
+    };
+    expect(document.profiles[0]?.boards[0]?.destination).toBe('home');
+    expect(document.profiles[0]?.boards[0]?.commute).toBe(true);
+  });
+
+  test('a board without one exports null, which is what leaves the picker in charge', () => {
+    const config = parseConfig(
+      { places, profiles: { hall: { title: 'Hall', boards: [{ title: 'b', stops: ['de:00000:1'], walk_minutes: 2 }] } } },
+      PATH,
+    );
+    const document = configExportDocument(config, { mvgBaseUrl: 'a', transitousBaseUrl: 'b' }) as {
+      profiles: Array<{ boards: Array<{ destination: string | null }> }>;
+    };
+    expect(document.profiles[0]?.boards[0]?.destination).toBeNull();
+  });
+
+  test('a destination that names no declared place is a config error', () => {
+    expect(() =>
+      parseConfig(
+        { places, profiles: { hall: { title: 'Hall', boards: [{ title: 'b', stops: ['de:00000:1'], walk_minutes: 2, destination: 'nowhere' }] } } },
+        PATH,
+      ),
+    ).toThrow(/no place named nowhere is declared/);
+  });
+
+  test('a board may name the identifier the planner should use for its stop', () => {
+    const config = parseConfig(
+      {
+        places,
+        profiles: {
+          hall: {
+            title: 'Hall',
+            boards: [{ title: 'b', stops: ['de:00000:1'], walk_minutes: 2, commute: true, destination: 'home', plan_stop: 'de:00000:2' }],
+          },
+        },
+      },
+      PATH,
+    );
+    // The departures still come from `stops`; only the planner is told otherwise.
+    expect(config.profiles[0]?.boards[0]?.stops).toEqual(['de:00000:1']);
+    expect(config.profiles[0]?.boards[0]?.planStop).toBe('de:00000:2');
+    const document = configExportDocument(config, { mvgBaseUrl: 'a', transitousBaseUrl: 'b' }) as {
+      profiles: Array<{ boards: Array<{ plan_stop: string | null }> }>;
+    };
+    expect(document.profiles[0]?.boards[0]?.plan_stop).toBe('de:00000:2');
+  });
+
+  test('a destination that is not a string is a config error', () => {
+    expect(() =>
+      parseConfig(
+        { places, profiles: { hall: { title: 'Hall', boards: [{ title: 'b', stops: ['de:00000:1'], walk_minutes: 2, destination: 7 }] } } },
+        PATH,
+      ),
+    ).toThrow(/must be the key of a place/);
+  });
+});

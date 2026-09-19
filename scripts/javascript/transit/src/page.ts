@@ -415,7 +415,12 @@ function render(): void {
   if (profileKey !== null) {
     const barBackend = backendsUsed.length === 1 ? (backendsUsed[0] ?? '') : '';
     const routes = state.routes.get(profileKey);
+    const exported = config.profiles.find((entry) => entry.key === profileKey);
     boards.forEach((board, index) => {
+      // A board may fix where its journeys end, and then the picker does not
+      // apply to it and the board says where it is going itself.
+      const fixed = exported?.boards[index]?.destination ?? null;
+      const destinationKey = fixed ?? state.destinationKey;
       const context: BoardContext = {
         profileKey,
         index,
@@ -437,8 +442,9 @@ function render(): void {
         ...(routes?.boards.get(index) === undefined ? {} : { routes: routes.boards.get(index) }),
         routesStale: routes !== undefined && routes.stale,
         routesAt: routes?.at ?? null,
-        destinationName: destinationNameOf(config, state.destinationKey),
-        destinationKey: state.destinationKey ?? '',
+        destinationName: destinationNameOf(config, destinationKey),
+        destinationKey: destinationKey ?? '',
+        destinationFixed: fixed !== null,
         planning: planningFor(profileKey, index, boards),
         walkWeight: state.walkWeight,
         onWalkWeight: (value) => {

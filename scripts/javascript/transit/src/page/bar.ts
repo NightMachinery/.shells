@@ -273,6 +273,10 @@ function renderDestination(context: BarContext): HTMLElement | null {
   if (places.length === 0) return null;
   const profile = context.config.profiles.find((entry) => entry.key === context.state.profileKey);
   if (profile === undefined || !profile.boards.some((board) => board.commute)) return null;
+  // Every commute board here already knows where it is going, so there is
+  // nothing left to pick. A control whose every setting changes nothing is worse
+  // than no control: the reader tries it, and concludes the page is broken.
+  if (profile.boards.every((board) => !board.commute || (board.destination ?? null) !== null)) return null;
 
   const wrap = el('div', 'destination-pick');
   wrap.append(el('span', 'destination-label', 'to'));

@@ -1,6 +1,6 @@
 import { normaliseLine } from '../filter.ts';
 import type { Board, Departure } from '../model.ts';
-import { planBoard, type PlannedRow, type RouteOption } from '../plan.ts';
+import { planBoard, type PlannedRow, type PlanTarget, type RouteOption } from '../plan.ts';
 import { destinationLabel, planTargets, type DestinationPlace } from '../targets.ts';
 import type { OriginCache, OriginLevel } from '../origin.ts';
 import { idbGet, idbSet, STORE_ORIGINS, STORE_ROUTES } from './idb.ts';
@@ -22,6 +22,8 @@ import type { ExportedConfig, ExportedPlace, ExportedProfile } from './types.ts'
 export interface BoardRoutes {
   rows: Map<string, PlannedRow>;
   origin: OriginLevel | null;
+  /** The place these journeys end at, which a board may fix for itself. */
+  destinationKey?: string;
 }
 
 /** Plans for one profile: per board, plus how old and how trustworthy they are. */
@@ -139,8 +141,10 @@ export interface PlanProfileOptions {
  */
 function planKey(options: PlanProfileOptions): string {
   const counts = options.boards.map((board) => board.departures.length).join(',');
+  const fixed = options.profile.boards.map((board) => board.destination ?? '').join(',');
   return [
     options.destinationKey ?? '',
+    fixed,
     Math.floor(options.startMs / 60_000),
     options.earlyBufferMinutes ?? '',
     options.walkWeight ?? '',
@@ -158,10 +162,12 @@ function routesKey(profileKey: string): string {
  * Marked stale, which is what makes the page dim them and say how old they are.
  */
 export async function cachedRoutes(profileKey: string, destinationKey: string | null): Promise<ProfileRoutes | null> {
-  if (destinationKey === null) return null;
   const stored = await idbGet<ProfileRoutes>(STORE_ROUTES, routesKey(profileKey));
   if (stored === null || !(stored.boards instanceof Map)) return null;
-  if (stored.destinationKey !== destinationKey) return null;
+  // A profile whose boards each fix their own destination has no picker and so
+  // no key here; what it stored is still the answer to the same question,
+  // because that question is in the configuration rather than on screen.
+  if (stored.destinationKey !== (destinationKey ?? '')) return null;
   return { ...stored, stale: true };
 }
 
@@ -175,32 +181,51 @@ export async function cachedRoutes(profileKey: string, destinationKey: string | 
  * question than a departure board and most boards are "is there a bus soon".
  */
 export async function planProfile(options: PlanProfileOptions): Promise<ProfileRoutes | null> {
-  const place = placeOf(options.config, options.destinationKey);
-  if (place === null || options.destinationKey === null) return null;
-
   const previous = options.previous;
   const key = planKey(options);
   // Asked and answered within this same minute: hand back what is on screen.
   if (previous !== undefined && !previous.stale && previous.key === key) return previous;
 
-  // A coordinate place is also a profile's doorstep, so its own boards' stops
-  // become targets too; see `planTargets` for why that is not redundant.
-  const destinationProfile = options.config.profiles.find((entry) => entry.key === place.name);
-  const targets = planTargets(place as DestinationPlace, (destinationProfile?.boards ?? []).map((board) => ({
-    stops: board.stops,
-    walkMinutes: board.walk_minutes,
-    walkMinutesByStop: board.walk_minutes_by_stop,
-  })));
-  if (targets.length === 0) return null;
+  /**
+   * The places to ask about for one destination key, worked out once per key.
+   *
+   * A coordinate place is also a profile's doorstep, so its own boards' stops
+   * become targets too; see `planTargets` for why that is not redundant.
+   */
+  const targetCache = new Map<string, readonly PlanTarget[]>();
+  const targetsFor = (destinationKey: string): readonly PlanTarget[] => {
+    const known = targetCache.get(destinationKey);
+    if (known !== undefined) return known;
+    const place = placeOf(options.config, destinationKey);
+    const profile = options.config.profiles.find((entry) => entry.key === destinationKey);
+    const targets =
+      place === null
+        ? []
+        : planTargets(place as DestinationPlace, (profile?.boards ?? []).map((board) => ({
+            stops: board.stops,
+            walkMinutes: board.walk_minutes,
+            walkMinutesByStop: board.walk_minutes_by_stop,
+          })));
+    targetCache.set(destinationKey, targets);
+    return targets;
+  };
 
-  const jobs: Array<{ index: number; board: Board; stop: string }> = [];
+  // A board may name its own destination, and then the picker does not apply to
+  // it: a departure hall is laid out by where a platform goes, so "which way am
+  // I heading" is a fact about the board rather than a question for the reader.
+  const jobs: Array<{ index: number; board: Board; stop: string; destinationKey: string }> = [];
   for (let index = 0; index < options.boards.length; index += 1) {
     const board = options.boards[index];
     const exported = options.profile.boards[index];
     if (board === undefined || exported === undefined || !exported.commute) continue;
-    const stop = board.stops[0];
+    const destinationKey = exported.destination ?? options.destinationKey;
+    if (destinationKey === null) continue;
+    if (targetsFor(destinationKey).length === 0) continue;
+    // The identifier the planner is given, which is not always the one the
+    // departures came from; see `planStop` on the board configuration.
+    const stop = exported.plan_stop ?? board.stops[0];
     if (stop === undefined) continue;
-    jobs.push({ index, board, stop });
+    jobs.push({ index, board, stop, destinationKey });
   }
   if (jobs.length === 0) return null;
 
@@ -208,12 +233,12 @@ export async function planProfile(options: PlanProfileOptions): Promise<ProfileR
   options.onProgress?.(0, jobs.length);
   const planModes = options.config.defaults.plan_modes;
   const results = await Promise.all(
-    jobs.map(async ({ index, board, stop }) => {
+    jobs.map(async ({ index, board, stop, destinationKey }) => {
       try {
         let origin: OriginLevel | null = null;
         const planned = await planBoard({
           stop,
-          targets,
+          targets: targetsFor(destinationKey),
           rows: board.departures,
           startMs: options.startMs,
           baseUrl: options.config.backends.transitous_base_url,
@@ -227,7 +252,7 @@ export async function planProfile(options: PlanProfileOptions): Promise<ProfileR
         });
         const byKey = new Map<string, PlannedRow>();
         for (const row of planned) byKey.set(rowKey(row.departure), row);
-        return { index, routes: { rows: byKey, origin } as BoardRoutes };
+        return { index, routes: { rows: byKey, origin, destinationKey } as BoardRoutes };
       } catch {
         // A board with no plan is a board without the commute slot, not a broken
         // board. The departures are still correct and still the main thing.
@@ -246,7 +271,7 @@ export async function planProfile(options: PlanProfileOptions): Promise<ProfileR
   const routes: ProfileRoutes = {
     boards,
     at: Date.now(),
-    destinationKey: options.destinationKey,
+    destinationKey: options.destinationKey ?? '',
     stale: false,
     key,
   };

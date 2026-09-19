@@ -21,7 +21,7 @@ import { applyFilters, mergeBoards } from './filter.ts';
 import { boardsDocument, configExportDocument, stopTag } from './json.ts';
 import { envOverride, HttpError } from './http.ts';
 import type { Board, BoardConfig, Departure, Direction, Message, Profile } from './model.ts';
-import { DEFAULT_EARLY_BUFFER_MINUTES, planBoard, routeDocument, type PlannedRow } from './plan.ts';
+import { DEFAULT_EARLY_BUFFER_MINUTES, planBoard, routeDocument, type PlannedRow, type PlanTarget } from './plan.ts';
 import { UnresolvableOriginError, type OriginLevel } from './origin.ts';
 import { destinationLabel, planTargets } from './targets.ts';
 
@@ -424,21 +424,27 @@ async function commandRoute(runtime: Runtime, args: string[], flags: Flags): Pro
   }
   const profile = target.profile;
 
+  const commuting = profile.boards.filter((board) => board.commute === true);
+  // A profile may answer the question itself: when every board that plans
+  // anything names the place it plans towards, there is no destination left to
+  // ask for and `--to` would have nothing to override.
+  const selfDirected = commuting.length > 0 && commuting.every((board) => board.destinationPlace !== undefined);
+
   const wanted = flags.to ?? defaultDestinationKey(runtime.config, profile, target.requested);
-  if (wanted === null) {
+  if (wanted === null && !selfDirected) {
     process.stderr.write(
       `route: no destination. Pass --to, or name the ${HOME_ALIAS} profile to go to ${WORK_KEY}, ` +
         `or ${WORK_KEY} to come back\n`,
     );
     return EXIT_CONFIG;
   }
-  const place = resolveDestination(runtime.config, wanted);
-  if (place === undefined) {
+  const place = wanted === null ? undefined : resolveDestination(runtime.config, wanted);
+  if (wanted !== null && place === undefined) {
     process.stderr.write(`route: no place named ${wanted} in ${runtime.config.path}\n`);
     return EXIT_CONFIG;
   }
 
-  const boardConfigs = profile.boards.filter((board) => board.commute === true);
+  const boardConfigs = commuting;
   if (boardConfigs.length === 0) {
     // Not an error: most boards are "is there a bus soon" and were never meant
     // to be planned. Saying so and stopping is the honest answer.
@@ -448,9 +454,15 @@ async function commandRoute(runtime: Runtime, args: string[], flags: Flags): Pro
 
   // Where the plan actually goes: the place itself, and, when it is a profile's
   // doorstep, every stop that profile is built from. See `planTargets`.
-  const destinationProfile = findProfile(runtime.config, place.name);
-  const targets = planTargets(place, destinationProfile?.boards ?? []);
-  if (targets.length === 0) {
+  const targetCache = new Map<string, readonly PlanTarget[]>();
+  const targetsFor = (destination: Place): readonly PlanTarget[] => {
+    const known = targetCache.get(destination.name);
+    if (known !== undefined) return known;
+    const targets = planTargets(destination, findProfile(runtime.config, destination.name)?.boards ?? []);
+    targetCache.set(destination.name, targets);
+    return targets;
+  };
+  if (place !== undefined && targetsFor(place).length === 0) {
     process.stderr.write(`route: ${place.name} declares neither coordinates nor a stop\n`);
     return EXIT_CONFIG;
   }
@@ -463,6 +475,16 @@ async function commandRoute(runtime: Runtime, args: string[], flags: Flags): Pro
 
   const views: PlannedBoardView[] = [];
   for (const boardConfig of boardConfigs) {
+    // A board that names its own destination is planned towards that one, and
+    // `--to` does not reach it: it is a fact about where those platforms go.
+    const fixed = boardConfig.destinationPlace === undefined ? undefined : runtime.config.places[boardConfig.destinationPlace];
+    const destination = fixed ?? place;
+    if (destination === undefined) continue;
+    const targets = targetsFor(destination);
+    if (targets.length === 0) {
+      process.stderr.write(`route: ${destination.name} declares neither coordinates nor a stop\n`);
+      continue;
+    }
     const board = await buildBoard(runtime, boardConfig, now);
     const byStop = new Map<string, Departure[]>();
     for (const row of board.departures) {
@@ -481,7 +503,7 @@ async function commandRoute(runtime: Runtime, args: string[], flags: Flags): Pro
       try {
         planned.push(
           ...(await planBoard({
-            stop,
+            stop: boardConfig.planStop ?? stop,
             targets,
             rows,
             startMs: now,
@@ -515,15 +537,23 @@ async function commandRoute(runtime: Runtime, args: string[], flags: Flags): Pro
       }
     }
     planned.sort((a, b) => a.departure.realtime - b.departure.realtime);
-    views.push({ board, rows: planned, origin });
+    views.push({ board, rows: planned, origin, destination: destinationLabel(destination) });
   }
+
+  // What the run as a whole was towards. With no picker at all it is the set of
+  // destinations the boards named, which is the honest answer and reads as one
+  // when they agree.
+  const headline =
+    place !== undefined
+      ? destinationLabel(place)
+      : [...new Set(views.map((view) => view.destination ?? ''))].filter((name) => name !== '').join(' and ');
 
   if (flags.json) {
     const document = routeDocument({
       profile: profile.key,
       requestedProfile: target.requested,
-      destinationKey: wanted,
-      destinationName: destinationLabel(place),
+      destinationKey: wanted ?? '',
+      destinationName: headline,
       earlyBufferMinutes,
       walkWeight: runtime.config.defaults.walkWeight,
       boards: views,
@@ -533,7 +563,7 @@ async function commandRoute(runtime: Runtime, args: string[], flags: Flags): Pro
     return EXIT_OK;
   }
 
-  process.stdout.write(`${renderPlannedBoards(views, destinationLabel(place), { ...runtime.terminal, now })}\n`);
+  process.stdout.write(`${renderPlannedBoards(views, headline, { ...runtime.terminal, now })}\n`);
   return EXIT_OK;
 }
 

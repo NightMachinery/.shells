@@ -40,6 +40,8 @@ export interface BoardContext {
   destinationName: string;
   /** The place key it is, so the expanded page can plan the same journey again. */
   destinationKey: string;
+  /** True when the board itself names where its journeys end, not the picker. */
+  destinationFixed?: boolean;
   /** Where this board sits in a planning run, or null when none is running. */
   planning: { position: number; done: number; total: number } | null;
   /** What a walked minute costs in ridden minutes, shown in the filter popover. */
@@ -727,6 +729,13 @@ export function renderBoard(board: Board, context: BoardContext): HTMLElement {
   marks.append(filterButton);
   header.append(marks);
   section.append(header);
+
+  // A board that fixes its own destination says so under its title. Without it
+  // a hall full of boards all called "platform 11 to 14" would be four boards
+  // with no visible difference and four different answers.
+  if (context.destinationFixed === true && context.destinationName !== '') {
+    section.append(el('p', 'board-destination', `to ${context.destinationName}`));
+  }
 
   if (view === 'collapsed') {
     const next = rows.find((dep) => dep.realtime >= context.now);

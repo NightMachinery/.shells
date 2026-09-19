@@ -311,6 +311,8 @@ export interface PlannedBoardView {
    * stop itself and a reader checking a surprising route should see that.
    */
   origin?: OriginLevel | null;
+  /** Where this board's journeys end, when the board fixes that for itself. */
+  destination?: string;
 }
 
 /** What the heading says about an origin that was not simply the stop. */
@@ -364,5 +366,8 @@ export function renderPlannedBoard(view: PlannedBoardView, destination: string, 
 }
 
 export function renderPlannedBoards(views: PlannedBoardView[], destination: string, options: TerminalOptions): string {
-  return views.map((view) => renderPlannedBoard(view, destination, options)).join('\n\n');
+  // A board that named its own destination says that one in its heading, not the
+  // run's: on a profile grouped by where its platforms go, the heading is the
+  // only thing that tells two otherwise identical boards apart.
+  return views.map((view) => renderPlannedBoard(view, view.destination ?? destination, options)).join('\n\n');
 }
