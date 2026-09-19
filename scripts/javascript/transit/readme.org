@@ -682,6 +682,21 @@ decision the render makes rather than the stylesheet, so the page re-renders
 when the breakpoint is crossed. A slot is empty when the value is absent and
 nothing shifts, so the eye can run down one column.
 
+On a phone the platform gives up its column and rides on the row's second line
+instead, beside the time. Two characters were costing the destination a quarter
+of its width, and the destination is what the row is about; the second line is
+short and has the room to spare. That is the second layout decision the render
+makes rather than the stylesheet, and it crosses the same breakpoint.
+
+The numbers this has to add up to are not the ones the screen reports. A row is
+narrower than the page by the page's gutter, the card's border and the card's
+own padding, and a grid whose fixed tracks exceed the row it is in neither wraps
+nor ellipsises: it runs the last column off the side of the card, where the card
+clips it and the page reports no overflow at all, because at the page level
+there is none. The touch harness asserts every row child stays inside its row
+for exactly this reason. It found the case above, where the columns had been
+budgeted against the page's width rather than a row's.
+
 Which *optional* slots exist is decided per board rather than globally: the
 platform column appears only when that board's rows actually carry platforms, the
 connection column only when the board declares an interchange, the journey

@@ -1125,11 +1125,10 @@
              gutter, the card's border and the card's padding all come off first.
              Getting that wrong does not wrap or ellipsise anything, it runs the
              last column off the side of the card where nothing shows it. */
-          --col-destination-min: 2rem;
+          --col-destination-min: 3.4rem;
           --col-minutes: 2.1rem;
           --col-badge: 2.5rem;
           --col-connection: 4rem;
-          --col-platform: 1.4rem;
           --col-state: 2.6rem;
           --col-alarm: 0.9rem;
           --col-stop: 2rem;
@@ -1187,9 +1186,14 @@
           padding: 0 2px;
         }
 
-        .platform {
+        /* No longer a column here: it sits on the row's second line, beside the
+           time, where the line is short and the two characters cost nothing.
+           Sized to its own content rather than stretched to a track. */
+        .row-times .platform {
+          width: auto;
+          justify-self: auto;
           font-size: 9px;
-          padding: 0 2px;
+          padding: 0 4px;
         }
       }
     </style>

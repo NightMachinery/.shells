@@ -472,7 +472,7 @@ async function main(): Promise<void> {
     }
     await sleep(150); // let the render settle before measuring anything
 
-    await io.screenshot('r6-rows.png');
+    await io.screenshot('r6b-rows.png');
 
     // ---------------------------------------------------------- assertion 8
 
@@ -611,6 +611,51 @@ async function main(): Promise<void> {
         : 'no li.row .state with text "planned" found',
     );
 
+    // ------------------------------------- destination width on a planned row
+
+    // The destination is the row's subject and it is the column that yields
+    // first, so it is the one worth measuring rather than trusting. Measured
+    // against a sample word rendered in the cell's own font rather than against
+    // a character count, because "at least eight characters" is a different
+    // number of pixels in every font the page might be served in.
+    const SAMPLE = 'Talbogen';
+    const destWidth = await io.evalJs<{
+      found: boolean;
+      clientWidth: number;
+      scrollWidth: number;
+      sampleWidth: number;
+      text: string;
+    }>(`(() => {
+      const row = document.querySelector('li.row:has(a.route)');
+      const cell = row === null ? null : row.querySelector('.destination');
+      if (cell === null) return { found: false, clientWidth: 0, scrollWidth: 0, sampleWidth: 0, text: '' };
+      const probe = document.createElement('span');
+      const style = window.getComputedStyle(cell);
+      probe.style.position = 'absolute';
+      probe.style.visibility = 'hidden';
+      probe.style.whiteSpace = 'pre';
+      probe.style.font = style.font;
+      probe.style.letterSpacing = style.letterSpacing;
+      probe.textContent = ${JSON.stringify(SAMPLE)};
+      document.body.append(probe);
+      const sampleWidth = probe.getBoundingClientRect().width;
+      probe.remove();
+      return {
+        found: true,
+        clientWidth: cell.clientWidth,
+        scrollWidth: cell.scrollWidth,
+        sampleWidth,
+        text: cell.textContent ?? '',
+      };
+    })()`);
+    record(
+      `destination on a row with a journey fits "${SAMPLE}" or its own full text`,
+      destWidth.found && (destWidth.clientWidth >= destWidth.sampleWidth || destWidth.scrollWidth <= destWidth.clientWidth),
+      destWidth.found
+        ? `clientWidth=${destWidth.clientWidth.toFixed(2)} needs=${destWidth.sampleWidth.toFixed(2)} for "${SAMPLE}", own text "${destWidth.text}" wants ${destWidth.scrollWidth}`
+        : 'no li.row with an a.route and a .destination found',
+    );
+
     // ------------------------------------------------- assertions 1, 3, 7
 
     const firstRowTap = await io.tapOpensSheet("document.querySelectorAll('li.row')[0]");
@@ -624,7 +669,7 @@ async function main(): Promise<void> {
       firstRowTap.selectionCollapsed,
       `isCollapsed=${firstRowTap.selectionCollapsed}`,
     );
-    await io.screenshot('r6-sheet.png');
+    await io.screenshot('r6b-sheet.png');
 
     const backdropRect = await io.rectOfExpr("document.querySelector('.tip-backdrop')");
     let backdropClosed = false;
@@ -675,7 +720,7 @@ async function main(): Promise<void> {
       popupOpened && !sheetOpenedDuringLongPress,
       `popupOpened=${popupOpened} sheetOpened=${sheetOpenedDuringLongPress}`,
     );
-    if (popupOpened) await io.screenshot('r6-popup.png');
+    if (popupOpened) await io.screenshot('r6b-popup.png');
     await io.evalJs("document.querySelector('.alarm-popup')?.remove(); void 0");
     await io.closeSheetIfOpen();
 

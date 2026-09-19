@@ -164,6 +164,15 @@ interface Columns {
   connection: boolean;
   route: boolean;
   platform: boolean;
+  /**
+   * Whether the platform rides on the row's second line instead of a column.
+   *
+   * A phone row cannot afford a column for it. The number is two characters and
+   * the destination it was squeezing is the row's actual subject, so on a narrow
+   * screen the badge moves down beside the time, where the line it shares is
+   * short and has room to spare.
+   */
+  platformInline: boolean;
   stop: boolean;
 }
 
@@ -196,7 +205,8 @@ function columnsOf(board: Board, rows: Departure[], routes: BoardRoutes | undefi
     // buses, so a fixed platform column would be dead space on most boards.
     // Presence is decided per board, which keeps the slots aligned within a
     // board without spending a column that can never be filled.
-    platform: rows.some((row) => row.platform !== null),
+    platform: rows.some((row) => row.platform !== null) && !narrowViewport(),
+    platformInline: rows.some((row) => row.platform !== null) && narrowViewport(),
     stop: board.stops.length > 1,
   };
 }
@@ -481,6 +491,13 @@ function rowSheet(dep: Departure, board: Board, context: BoardContext, usual: Ma
   return body;
 }
 
+/** The platform number, as a badge that cannot be mistaken for a line. */
+function platformBadge(platform: string): HTMLElement {
+  const node = el('span', 'platform', platform);
+  node.title = `platform ${platform}`;
+  return node;
+}
+
 function renderRow(dep: Departure, board: Board, columns: Columns, context: BoardContext, usual: Map<string, string>): HTMLElement {
   const reachable = catchableOnBoard(dep, board, context.now);
   const row = el('li', `row${reachable ? '' : ' unreachable'}${dep.cancelled ? ' row-cancelled' : ''}`);
@@ -501,6 +518,7 @@ function renderRow(dep: Departure, board: Board, columns: Columns, context: Boar
   main.append(destination);
   const meta = el('span', 'row-times');
   meta.append(timeGroup(dep, context.timezone, context.now));
+  if (columns.platformInline && dep.platform !== null) meta.append(platformBadge(dep.platform));
   if (dep.sev) meta.append(el('span', 'flag sev', 'SEV'));
   if (dep.cancelled) meta.append(el('span', 'flag cancelled-flag', 'cancelled'));
   main.append(meta);
@@ -522,14 +540,7 @@ function renderRow(dep: Departure, board: Board, columns: Columns, context: Boar
     }
   }
 
-  if (columns.platform) {
-    if (dep.platform === null) row.append(slot('platform'));
-    else {
-      const platform = el('span', 'platform', dep.platform);
-      platform.title = `platform ${dep.platform}`;
-      row.append(platform);
-    }
-  }
+  if (columns.platform) row.append(dep.platform === null ? slot('platform') : platformBadge(dep.platform));
 
   row.append(stateMark(dep, context));
 
