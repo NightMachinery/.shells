@@ -740,14 +740,6 @@ function renderRow(dep: Departure, board: Board, columns: Columns, context: Boar
   // earns it. An on-time departure with none of those is one line, and its
   // clock time is on the sheet with everything else. On a wider screen the line
   // is free, so it is always drawn there and the rows stay aligned.
-  // Regional services only; see `viaHint`. It goes on the second line rather
-  // than beside the destination, because the destination column is already the
-  // one that runs out of room first and a hint is not worth truncating a name
-  // the reader is looking for.
-  if (dep.mode === 'BAHN') {
-    const hint = viaHint(dep, context, HINT_CALLS);
-    if (hint !== null) meta.append(el('span', 'row-via', hint));
-  }
   const notable = dep.delayMin !== 0 || dep.cancelled || dep.sev;
   if (!columns.terseTimes || notable) meta.append(timeGroup(dep, context));
   if (dep.sev) meta.append(el('span', 'flag sev', 'SEV'));
@@ -765,6 +757,17 @@ function renderRow(dep: Departure, board: Board, columns: Columns, context: Boar
     meta.append(flag);
   }
   if (meta.childNodes.length > 0) main.append(meta);
+
+  // Regional services only; see `viaHint`. On a line of its own, under the
+  // times rather than beside them: sharing a line, it was the thing that lost
+  // when a delay needed the space, and what was left of it read "vi\u2026",
+  // which is a line of a row spent saying nothing. Not beside the destination
+  // either, because that column is the one that runs out of room first and a
+  // hint is not worth truncating the name the reader is looking for.
+  if (dep.mode === 'BAHN') {
+    const hint = viaHint(dep, context, HINT_CALLS);
+    if (hint !== null) main.append(el('span', 'row-via', hint));
+  }
   row.append(main);
 
   if (columns.route) row.append(renderRoute(dep, board, context, usual));
