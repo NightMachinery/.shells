@@ -24,7 +24,12 @@
 // fetch time" below, which is a bug report as much as a comment.
 
 const SHELL_VERSION = '__SHELL_HASH__';
-const CACHE = `transit-shell-${SHELL_VERSION}`;
+// Written out rather than composed from the line above, which would be tidier
+// and would break the publish script: it refuses to publish a shell whose worker
+// does not name it, and it looks for the name by reading this file. A guard that
+// can be defeated by a template literal is not a guard, so the duplication
+// stays, and the publish script is the thing that keeps the two honest.
+const CACHE = 'transit-shell-__SHELL_HASH__';
 
 /**
  * The shell, relative to this worker's scope so the same bytes work wherever
