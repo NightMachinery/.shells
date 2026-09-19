@@ -150,8 +150,12 @@ export function createRouteView(container: HTMLElement, options: RouteViewOption
       top.append(el('span', 'route-page-delay', `${data.row.delayMin > 0 ? '+' : ''}${data.row.delayMin} min`));
     }
     header.append(top);
-    header.append(el('p', 'route-page-where', `${data.from} → ${data.destination}`));
-    if (data.row.platform !== null) header.append(el('p', 'route-page-platform', `platform ${data.row.platform}`));
+    // Where and from which platform, on one line. Both are one short phrase
+    // and the head is sticky, so a line of its own for "platform 3" was a line
+    // taken off every screen of the journey below it for three characters.
+    const where = el('p', 'route-page-where', `${data.from} → ${data.destination}`);
+    if (data.row.platform !== null) where.append(el('span', 'route-page-platform', `platform ${data.row.platform}`));
+    header.append(where);
     if (data.row.cancelled) header.append(el('p', 'route-page-cancelled', 'This departure is cancelled.'));
 
     const foot = el('div', 'route-page-foot');

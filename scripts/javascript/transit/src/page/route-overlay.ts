@@ -17,6 +17,7 @@
 import type { RouteHandoff } from '../route-link.ts';
 import { encodeRoute } from '../route-link.ts';
 import { button, el } from './dom.ts';
+import { TIP_SHIELD_CLASS } from './tip.ts';
 import { icon } from './icons.ts';
 import { createRouteView, shareUrl, type RouteView } from './route-view.ts';
 
@@ -118,7 +119,10 @@ export function openRouteOverlay(handoff: RouteHandoff): void {
   install();
   if (open !== null) closeOverlay();
 
-  const root = el('div', 'route-overlay');
+  // The sheet underneath dismisses itself on any pointer it does not own, and
+  // this view is one it does: it was opened from that sheet and closes back
+  // onto it.
+  const root = el('div', `route-overlay ${TIP_SHIELD_CLASS}`);
   root.setAttribute('role', 'dialog');
   root.setAttribute('aria-modal', 'true');
 

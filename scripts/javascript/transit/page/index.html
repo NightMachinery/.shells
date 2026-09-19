@@ -31,8 +31,8 @@
         position: sticky;
         top: 0;
         z-index: 20;
-        margin: 0 -16px 12px;
-        padding: calc(env(safe-area-inset-top, 0px) + 8px) 16px 8px;
+        margin: 0 -16px 10px;
+        padding: calc(env(safe-area-inset-top, 0px) + 6px) 16px 6px;
         background: color-mix(in srgb, var(--bg) 92%, transparent);
         backdrop-filter: blur(10px);
         border-bottom: 1px solid var(--line);
@@ -144,7 +144,7 @@
       .chips {
         display: flex;
         gap: 6px;
-        margin-top: 6px;
+        margin-top: 5px;
         overflow-x: auto;
         scrollbar-width: none;
       }
@@ -178,7 +178,7 @@
       }
 
       .bar-controls {
-        margin-top: 6px;
+        margin-top: 5px;
         overflow-x: auto;
         scrollbar-width: none;
       }
@@ -387,22 +387,64 @@
         background: var(--card);
         border: 1px solid var(--line);
         border-radius: var(--radius);
-        padding: 10px 12px 12px;
+        padding: 7px 12px 9px;
         margin-bottom: var(--gap);
       }
 
+      /* Title, standing facts and controls on one line. The note in the middle
+         is the part that yields: it is the only thing here that can be read
+         once and forgotten, so it shrinks and then ellipsises while the title
+         and the gear stay whole. */
       .board-header {
         display: flex;
         align-items: baseline;
-        justify-content: space-between;
-        gap: 10px;
+        gap: 8px;
       }
 
       .board-title {
-        font-size: 16px;
+        font-size: 15px;
         font-weight: 600;
         text-align: left;
+        flex: none;
+        max-width: 60%;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      /* The note takes whatever the line has spare, which is what keeps the
+         gear against the card's right edge without a `justify-content` that
+         would also push the note away from the title it belongs to. */
+      .board-note {
+        display: flex;
+        align-items: baseline;
+        gap: 6px;
+        flex: 1 1 auto;
         min-width: 0;
+        overflow: hidden;
+        white-space: nowrap;
+        font-size: 11px;
+        color: var(--ink-soft);
+      }
+
+      .board-destination,
+      .board-note .board-walk {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        margin: 0;
+        font-size: inherit;
+        color: inherit;
+      }
+
+      /* The destination is the half worth keeping when only half fits: the walk
+         is three characters of a number the reader already knows, and where the
+         board goes is what tells two boards apart. */
+      .board-note .board-walk {
+        flex: 0 1 auto;
+      }
+
+      .board-destination {
+        flex: 0 2 auto;
       }
 
       .board-marks {
@@ -424,22 +466,14 @@
         padding: 2px 4px;
       }
 
-      /* A board that fixes its own destination says so here, under the title. */
-      .board-destination {
-        margin: 2px 0 0;
-        font-size: 12px;
-        color: var(--ink-soft);
-      }
-
-      .board-walk,
       .board-progress {
         margin: 2px 0 0;
-        font-size: 12px;
+        font-size: 11px;
         color: var(--ink-soft);
       }
 
       .board-error {
-        margin: 8px 0 0;
+        margin: 6px 0 0;
         font-size: 13px;
         color: var(--late);
         display: flex;
@@ -457,7 +491,7 @@
       .rows,
       .strips {
         list-style: none;
-        margin: 8px 0 0;
+        margin: 5px 0 0;
         padding: 0;
       }
 
@@ -468,8 +502,16 @@
       .row {
         display: grid;
         align-items: baseline;
+        /* The row is one tap target, so it carries a floor rather than only
+           padding: a finger aims at a band, and a band under about forty
+           pixels is one the reader hits the neighbouring departure on. The
+           padding is what a row gets when its content is already taller, the
+           floor is what it gets when it is not, and `align-content` is what
+           puts the content in the middle of the difference. */
+        align-content: center;
+        min-height: 40px;
         column-gap: 7px;
-        padding: 5px 0;
+        padding: 3px 0;
         border-top: 1px solid var(--line);
         /* So the live/planned disc can be placed in the row's corner. It is the
            only thing on the page positioned out of its own flow, and it is
@@ -491,7 +533,7 @@
       }
 
       .minutes {
-        font-size: 20px;
+        font-size: 19px;
         font-weight: 600;
         font-variant-numeric: tabular-nums;
         text-align: right;
@@ -584,27 +626,34 @@
          it reads as part of the row's edge rather than as something floating on
          top of it: no margin, and the two corners that lie along the row's own
          edges stay square so the badge fuses with them. Only the corner that
-         faces into the row is rounded.
-
-         Centred by line-height rather than by flex alignment, because a flex
-         box on a row whose items are baseline-aligned inherits a baseline it
-         should not have, and the digit then sits a pixel low in some fonts and
-         not in others. A line-height equal to the height cannot drift. */
+         faces into the row is rounded. */
       .platform {
         position: absolute;
         top: 0;
         right: 0;
-        min-width: 18px;
-        height: 15px;
-        line-height: 15px;
+        /* Taller than it was, and no taller. A row is forty pixels now so a
+           finger can hit it, and the fifteen-pixel mark that suited a
+           twenty-nine pixel row looked stuck on top of this one. Running it the
+           row's full height was tried and is worse: it turns the right edge of
+           the board into a column of solid colour that outshouts the line
+           badges, and a mark that tall stops reading as a property of the row
+           and starts reading as a property of the card.
+
+           Centred by line-height rather than by flex alignment, because a flex
+           box on a row whose items are baseline-aligned inherits a baseline it
+           should not have, and the digit then sits a pixel low in some fonts
+           and not in others. A line-height equal to the height cannot drift. */
+        min-width: 19px;
+        height: 18px;
+        line-height: 18px;
         box-sizing: border-box;
         padding: 0 3px;
         overflow: hidden;
-        font-size: 10px;
+        font-size: 11px;
         font-weight: 700;
         font-variant-numeric: tabular-nums;
         text-align: center;
-        border-radius: 0 0 0 6px;
+        border-radius: 0 0 0 7px;
         color: #fff;
       }
 
@@ -612,7 +661,7 @@
          whether the time is live and the corner still looks like one thing. It
          is a square rather than a slot with nothing in it. */
       .platform-empty {
-        min-width: 15px;
+        min-width: 18px;
         padding: 0;
       }
 
@@ -761,13 +810,20 @@
         white-space: nowrap;
       }
 
+      /* The times run on from the line and its destination rather than
+         underneath them. A group with one departure in it was two full lines
+         for one time, which is worse than the rows view it exists to compress;
+         flowing means a strip is one line until it genuinely needs two, and the
+         wrap still happens at the same place when it does. */
       .times-strip {
         display: flex;
         flex-wrap: wrap;
-        gap: 7px;
+        align-items: center;
+        gap: 2px 7px;
         font-variant-numeric: tabular-nums;
         font-size: 13px;
-        flex: 1 1 100%;
+        flex: 1 1 auto;
+        min-width: 0;
       }
 
       .time.late {
@@ -1218,17 +1274,21 @@
              group, so a few characters cost the reader nothing.
 
              These numbers have to add up to less than a row is wide, and a row
-             is narrower than the viewport by more than it looks: the page's own
-             gutter, the card's border and the card's padding all come off first.
-             Getting that wrong does not wrap or ellipsise anything, it runs the
-             last column off the side of the card where nothing shows it. */
+             is narrower than the viewport by more than it looks: the card's
+             border and the card's padding come off first. Getting that wrong
+             does not wrap or ellipsise anything, it runs the last column off
+             the side of the card where nothing shows it. */
           --col-destination-min: 3.4rem;
+          /* No ceiling on a phone: there is no space spare for the journey to
+             take, so every pixel the fixed slots do not need belongs to the
+             destination. */
+          --col-destination-max: 1fr;
           /* Wide enough for the widest the countdown can be, which is an hour
              count, a colon and two minutes at the far end of the longest
              horizon. Sized for a font wider than this one, because the one that
              renders it is not this one, and confirmed by the harness rather than
              estimated here. */
-          --col-minutes: 2.85rem;
+          --col-minutes: 3.85rem;
           --col-badge: 2.5rem;
           --col-connection: 4rem;
           --col-alarm: 0.9rem;
@@ -1239,37 +1299,51 @@
              above the floor would come straight out of the destination. */
           --col-route: 8rem;
           --col-route-min: 8rem;
+          --gap: 8px;
         }
 
+        /* No gutter and no side borders: the cards run to both edges of the
+           screen. The gutter, the two borders and the card's own inset were
+           twenty-four pixels of a three-hundred-and-ninety pixel screen, spent
+           on white space either side of a list that is already separated from
+           the screen by the screen's own edge. Every one of them goes into the
+           destination, which is the column that yields first and the one a row
+           is least useful without. The cards still read as cards: the page
+           colour shows between them, and the rounded corners that are visible
+           on a phone are the ones on the top and bottom edges. */
         #app {
-          padding: 0 12px 32px;
+          padding: 0 0 20px;
+        }
+
+        .board {
+          border-left: none;
+          border-right: none;
+          border-radius: 0;
+          padding: 5px 8px 7px;
         }
 
         /* A denser row on a phone. A pixel a column is not something a reader
            sees, and six of them are the difference between a destination that
-           names a station and one that ellipsises it away. The vertical padding
-           comes down for the same reason in the other direction: what is bought
-           there is one more departure on the screen. */
+           names a station and one that ellipsises it away. */
         .row {
           column-gap: 4px;
-          padding: 3px 0;
-        }
-
-        /* Less padding than the desktop card. The gutter outside the card
-           already separates it from the screen edge, so a wide inset here is
-           paid for twice, and on a phone it is paid out of the row. */
-        .board {
-          padding: 10px 8px 12px;
+          padding: 2px 0;
         }
 
         .bar {
-          margin: 0 -12px 10px;
+          margin: 0 0 8px;
           padding-left: 12px;
           padding-right: 12px;
         }
 
+        /* The largest thing on the row, because it is the only number the
+           reader came for: everything else on a row answers "which departure",
+           and this answers "do I leave now". The extra two points cost the
+           countdown's column a little more width, which comes out of the
+           destination, which has enough of it since the cards went full
+           bleed. */
         .minutes {
-          font-size: 16px;
+          font-size: 18px;
         }
 
         /* The two lines of a row sit directly on top of one another here. The
@@ -1283,7 +1357,32 @@
           font-size: 13px;
         }
 
+        /* Times in a strip are tap targets too, and the only ones that view
+           has: the group header opens nothing. So each one carries the same
+           forty-pixel floor a row does, which also gives a wrapped strip the
+           same rhythm as the rows above it. A block rather than a padded inline,
+           because padding on an inline box grows the hit area without moving
+           the line it sits on, and two targets that overlap are worse than one
+           that is small. */
+        .times-strip .time {
+          display: block;
+          min-height: 40px;
+          line-height: 40px;
+        }
+
+        .strip {
+          padding: 2px 0;
+        }
+
+        /* Centred rather than sat on a shared baseline. The times are
+           forty-pixel bands here and the line badge beside them is not, and a
+           baseline they share puts the badge at the top of the band with the
+           time floating in the middle of it. */
+        .strip-main {
+          align-items: center;
+        }
       }
+
     </style>
   </head>
   <body>

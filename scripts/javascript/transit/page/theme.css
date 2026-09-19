@@ -35,8 +35,8 @@
   --late: #c62828;
   --early: #2e7d32;
   --warn: #a8690a;
-  --radius: 12px;
-  --gap: 12px;
+  --radius: 10px;
+  --gap: 10px;
 
   /* The fixed row slots. Named here rather than inlined so a board's grid
      template is assembled from the same widths everywhere, and so one
@@ -46,13 +46,24 @@
      is a floor rather than a fixed width, so it still grows into space
      the other slots do not need. */
   --col-destination-min: 7rem;
-  /* The countdown's widest form is an hour count, a colon and two minutes. */
-  --col-minutes: 3.4rem;
+  /* And the ceiling it stops growing at on a row that also carries a journey.
+     A station name is not longer for having a wider screen behind it, so past
+     this the extra pixels only push the journey away from the departure. */
+  --col-destination-max: 13rem;
+  /* The countdown's widest form is an hour count, a colon and two minutes, and
+     this has to hold that string at the size the countdown is drawn at, in a
+     font wider than this machine's. It held it at the body size for a long
+     time instead, and the harness agreed, because its probe was measuring at
+     the body size too; see the countdown probe in the e2e harness. */
+  --col-minutes: 4.1rem;
   --col-badge: 2.9rem;
   --col-connection: 4.6rem;
   --col-alarm: 1rem;
   --col-stop: 2.6rem;
-  --col-route: 9rem;
+  /* The journey slot is what grows here, so it is a fraction rather than a
+     width: an exit name that had to be cut to seven characters on a phone can
+     be spelled out where there is room for it. */
+  --col-route: 1fr;
   /* The journey slot's floor: enough for a short exit name, the onward line
      and the arrival time on one line. Below this the slot names no station,
      which is worse than a destination squeezed by the same amount. */
@@ -109,10 +120,17 @@ body {
   -webkit-text-size-adjust: 100%;
 }
 
+/* Narrower than the screen it is read on, on purpose.
+   A row is a countdown, a line, a destination and a journey, and none of them
+   grows with the window: at 780px the destination took four hundred pixels it
+   had no use for and pushed the journey slot half a screen away from the
+   departure it belongs to, so a row had to be read in two glances instead of
+   one. At this width the four cells sit together and the eye travels down the
+   countdowns rather than across the gaps. */
 #app {
-  max-width: 780px;
+  max-width: 620px;
   margin: 0 auto;
-  padding: 0 16px 40px;
+  padding: 0 16px 28px;
 }
 
 button {
@@ -158,7 +176,7 @@ button {
   border: 1px solid var(--line);
   border-radius: var(--radius);
   box-shadow: 0 8px 28px rgb(0 0 0 / 22%);
-  padding: 10px 12px;
+  padding: 9px 11px;
   font-size: 13px;
 }
 
@@ -177,7 +195,7 @@ button {
   max-height: 85vh;
   overflow: auto;
   overscroll-behavior: contain;
-  padding-top: 14px;
+  padding-top: 12px;
 }
 
 /* Under the sheet and over everything else. It is what makes a tap anywhere
@@ -229,7 +247,7 @@ button {
 }
 
 .tip-section {
-  margin: 10px 0 4px;
+  margin: 8px 0 3px;
   font-size: 12px;
   text-transform: uppercase;
   letter-spacing: 0.06em;
@@ -286,10 +304,15 @@ button {
   font-weight: 700;
 }
 
+/* Two facts to a line rather than one. Every entry is a short label and a
+   shorter value, so one pair a line spent half the sheet on white space to the
+   right of "on time" and pushed the journey, which is the thing the sheet was
+   opened for, down the screen. The pairs still read in their own order, across
+   and then down. */
 .tip-rows {
   display: grid;
-  grid-template-columns: auto 1fr;
-  gap: 2px 10px;
+  grid-template-columns: auto minmax(0, 1fr) auto minmax(0, 1fr);
+  gap: 1px 8px;
   margin: 0;
 }
 
@@ -405,13 +428,19 @@ button {
 
 /* The legs, as a timeline. A walk is a row of its own, because a walk is
    a thing the reader does and fourteen minutes of it at the end decides
-   whether a journey was worth recommending. */
+   whether a journey was worth recommending.
+
+   A step smaller than the text around them. A leg is a station, a time, an
+   arrow, a second station and a second time, which at the body size wraps in
+   the middle of the phrase on a phone and turns a four-leg journey into eight
+   lines that no longer read as a sequence. */
 .legs {
   list-style: none;
-  margin: 6px 0 0;
+  margin: 5px 0 0;
   padding: 0 0 0 2px;
   display: grid;
-  gap: 3px;
+  gap: 2px;
+  font-size: 13px;
   border-left: 2px solid var(--line);
 }
 
@@ -460,7 +489,7 @@ button {
   display: flex;
   flex-wrap: wrap;
   gap: 4px;
-  margin-top: 6px;
+  margin-top: 5px;
 }
 
 .journey-note {
@@ -488,8 +517,8 @@ button {
   position: sticky;
   top: 0;
   z-index: 10;
-  margin: 0 -16px 14px;
-  padding: calc(env(safe-area-inset-top, 0px) + 10px) 16px 10px;
+  margin: 0 -16px 10px;
+  padding: calc(env(safe-area-inset-top, 0px) + 8px) 16px 8px;
   background: color-mix(in srgb, var(--bg) 92%, transparent);
   backdrop-filter: blur(10px);
   border-bottom: 1px solid var(--line);
@@ -503,7 +532,7 @@ button {
 }
 
 .route-page-time {
-  font-size: 26px;
+  font-size: 23px;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
 }
@@ -519,7 +548,7 @@ button {
 }
 
 .route-page-platform {
-  margin: 2px 0 0;
+  margin-left: 8px;
   color: var(--ink-soft);
   font-size: 12px;
 }
@@ -562,8 +591,8 @@ button {
   background: var(--card);
   border: 1px solid var(--line);
   border-radius: var(--radius);
-  padding: 12px 14px;
-  margin-bottom: 12px;
+  padding: 9px 11px;
+  margin-bottom: 8px;
 }
 
 .route-option-best {
@@ -584,7 +613,7 @@ button {
 
 .route-option-title {
   margin: 0;
-  font-size: 16px;
+  font-size: 15px;
 }
 
 .route-option-mark {
@@ -599,7 +628,7 @@ button {
   display: flex;
   align-items: baseline;
   gap: 8px;
-  margin: 10px 0 0;
+  margin: 7px 0 0;
 }
 
 .route-arrival-label {
@@ -607,13 +636,13 @@ button {
 }
 
 .route-arrival-time {
-  font-size: 24px;
+  font-size: 21px;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
 }
 @media (max-width: 480px) {
   .route-page-head {
-    margin: 0 -12px 12px;
+    margin: 0 -12px 10px;
     padding-left: 12px;
     padding-right: 12px;
   }
@@ -630,7 +659,7 @@ button {
   overflow-y: auto;
   overscroll-behavior: contain;
   background: var(--bg);
-  padding: 0 16px 32px;
+  padding: 0 16px 24px;
 }
 
 .route-back {
@@ -663,6 +692,6 @@ button {
 
 @media (max-width: 480px) {
   .route-overlay {
-    padding: 0 12px 32px;
+    padding: 0 12px 20px;
   }
 }

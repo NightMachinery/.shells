@@ -51,3 +51,18 @@ declare namespace Bun {
 
   function sleep(ms: number): Promise<void>;
 }
+
+/**
+ * Whether this module is the file bun was invoked with.
+ *
+ * The harness needs it because it has two entry points over one body of setup:
+ * the assertion suite and the screenshot run beside it. Without the guard, the
+ * screenshot run's `import` of the suite would execute the suite.
+ *
+ * Merged into the `ImportMeta` in `src/bun.d.ts` rather than added there, for
+ * the reason at the top of this file: that one is the package's surface and
+ * nothing under `src/` asks this question.
+ */
+interface ImportMeta {
+  readonly main: boolean;
+}

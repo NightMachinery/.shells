@@ -211,7 +211,21 @@ function columnsOf(board: Board, routes: BoardRoutes | undefined): Columns {
 }
 
 function gridTemplate(columns: Columns): string {
-  const parts = ['var(--col-minutes)', 'var(--col-badge)', 'minmax(var(--col-destination-min), 1fr)'];
+  // Which of the two wide cells absorbs the space a screen has spare.
+  //
+  // On a phone there is none to absorb, so the destination takes it and the
+  // journey is pinned; the widths in the narrow media query say so. On a wide
+  // screen there is a great deal, and giving it to the destination put four
+  // hundred pixels of nothing between a departure and the journey it belongs
+  // to, which is two glances to read one row. So there the destination is
+  // capped at a width a station name fits in and the journey takes the rest,
+  // which also buys back the characters of the exit name it was ellipsising.
+  // A row with no journey has nothing else to give the space to, so the
+  // destination keeps it.
+  const destination = columns.route
+    ? 'minmax(var(--col-destination-min), var(--col-destination-max))'
+    : 'minmax(var(--col-destination-min), 1fr)';
+  const parts = ['var(--col-minutes)', 'var(--col-badge)', destination];
   // The journey keeps a floor the destination does not. When the row runs out of
   // room something has to give, and the destination is the cheaper thing to
   // squeeze: it is already abbreviated, the same word is on every row of the
@@ -938,25 +952,40 @@ export function renderBoard(board: Board, context: BoardContext): HTMLElement {
     context.onChange();
   });
   marks.append(filterButton);
+
+  // Where this board goes and how far away it starts, on the header's own line
+  // rather than on two lines under it.
+  //
+  // Both are standing facts about the board: they do not change between
+  // refreshes and nobody re-reads them. Two full-width lines each was three
+  // lines of chrome before the first departure, repeated once per board, which
+  // on a phone is most of a departure per board given away to text the reader
+  // learned the first time. Beside the title they are still there to be read
+  // and cost nothing, because the title never fills its line.
+  //
+  // A board that fixes its own destination has to say so: a screen of boards
+  // all called "platform 11 to 14" would otherwise be four boards with no
+  // visible difference and four different answers.
+  const note = el('span', 'board-note');
+  if (context.destinationFixed === true && context.destinationName !== '') {
+    note.append(el('span', 'board-destination', `to ${context.destinationName}`));
+  }
+  const collapsed = view === 'collapsed';
+  if (collapsed) {
+    // A collapsed board has nothing else to say, so the slot that would carry
+    // the walk carries why there is nothing under the title instead.
+    const next = rows.find((dep) => dep.realtime >= context.now);
+    note.append(
+      el('span', 'board-walk', next === undefined ? 'collapsed, nothing in the window' : `collapsed, next in ${minutesUntil(next.realtime, context.now)} min`),
+    );
+  } else {
+    note.append(el('span', 'board-walk', describeWalk(board.stops, board, (stop) => stopTagOf(stop, board.stopLabels))));
+  }
+  header.append(note);
   header.append(marks);
   section.append(header);
+  if (collapsed) return section;
 
-  // A board that fixes its own destination says so under its title. Without it
-  // a hall full of boards all called "platform 11 to 14" would be four boards
-  // with no visible difference and four different answers.
-  if (context.destinationFixed === true && context.destinationName !== '') {
-    section.append(el('p', 'board-destination', `to ${context.destinationName}`));
-  }
-
-  if (view === 'collapsed') {
-    const next = rows.find((dep) => dep.realtime >= context.now);
-    section.append(
-      el('p', 'board-walk', next === undefined ? 'collapsed, nothing in the window' : `collapsed, next in ${minutesUntil(next.realtime, context.now)} min`),
-    );
-    return section;
-  }
-
-  section.append(el('p', 'board-walk', describeWalk(board.stops, board, (stop) => stopTagOf(stop, board.stopLabels))));
   if (openFilter === id) section.append(renderFilter(board, context, rows));
 
   if (context.status.kind === 'error') {

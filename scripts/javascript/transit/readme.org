@@ -766,6 +766,20 @@ there is none. The touch harness asserts every row child stays inside its row
 for exactly this reason. It found the case above, where the columns had been
 budgeted against the page's width rather than a row's.
 
+On a phone the cards are full bleed: no page gutter, no side borders, square
+corners, and one card separated from the next by the page colour showing
+through. A card inset from the edge spends the same margin twice, once outside
+it and once inside, and on a phone that margin comes out of the row rather than
+out of the screen. What it bought went to the destination.
+
+Which of the two wide cells absorbs a screen's spare width depends on the
+screen. On a phone there is none to absorb, so the destination takes what there
+is and the journey slot is pinned to its floor. On a wide screen there is a
+great deal, and giving it to the destination put a few hundred pixels of nothing
+between a departure and the journey that belongs to it, which makes a row take
+two glances instead of one. There the destination is capped at a width a station
+name fits in and the journey takes the rest.
+
 What the destination ends up with is the whole point of the arithmetic, so the
 harness measures that rather than trusting it: on a board with a journey slot at
 a phone's width, the destination must hold twelve characters of a long station
@@ -879,6 +893,13 @@ overlay, by the same module the page itself calls. The view is a render function
 over a container for exactly this reason: two ways in, one thing to maintain,
 and no chance of the overlay and the page disagreeing about what a journey looks
 like.
+
+It is shielded from the sheet underneath. A sheet closes on a pointer landing
+anywhere it does not own, which is right for a page and wrong for a view the
+sheet itself put on top: a reader tapping a control in there is still inside the
+answer they opened. Anything drawn over a sheet and opened from it says so with
+one class, so the rule stays in the sheet's own code rather than the sheet
+learning the names of the things that may cover it.
 
 Opening it pushes a history entry. That is what makes it feel like part of the
 system rather than a pane somebody bolted on: the Android back gesture pops the
@@ -1244,6 +1265,18 @@ it, and every row's track count must equal the number of children the grid
 actually places. That last one is how a slot that quietly came back would be
 found.
 
+It loads the route page too, rather than only reading the href of the links that
+point at it. That view became a render function that two callers share and its
+styles moved into the shared stylesheet, and both of those are refactors that
+break a page in a way nothing else here would notice.
+
+Where a control has to be reachable, it is tapped rather than driven. The
+overlay's back control is a case in point: closing it through the history passed
+while tapping it did not, because the sheet underneath dismisses itself on any
+pointer it does not own, so the reader came back to a board instead of to where
+they were. A test that calls the function the button would have called proves
+the function and not the button.
+
 It also measures a refresh with the processor slowed to a quarter and the
 network held to a slow mobile connection, and prints what it found. Two limits
 are worth stating: the fixtures are fulfilled through the debugging protocol, so
@@ -1259,11 +1292,19 @@ the tap. That pass checks that the expanded view opens over the board, that it
 pushes exactly one history entry, that nothing was opened in a tab, and that
 going back closes the overlay and leaves the sheet where it was.
 
-Three things it is worth knowing about writing assertions here. Service workers
+Four things it is worth knowing about writing assertions here. Service workers
 must be bypassed or the run measures the previous deploy rather than the build
 in front of it. A regular expression inside an evaluated template literal needs
 its backslash doubled, because a template literal eats the first one and =\s=
 silently becomes the letter =s=, which is a passing test that measures nothing.
+A probe that copies a cell's font must copy the longhands one at a time and
+never the =font= shorthand: that shorthand serialises to the empty string
+whenever a longhand it does not cover is at a non-initial value, and the
+countdown cell sets =font-variant-numeric=, so the assignment did nothing, the
+probe measured at the page's own size, and the assertion passed while the
+countdown was clipping its leading digit on a wider font. An assertion that
+measures the wrong thing is worse than no assertion, because it is also a
+claim that somebody checked.
 And a tap that opens a second tab must close that tab again before the run
 continues: a browser that has moved its foreground elsewhere can
 leave the next evaluation waiting for a reply that never comes, which looks

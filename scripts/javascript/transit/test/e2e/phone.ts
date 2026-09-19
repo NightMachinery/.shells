@@ -17,9 +17,17 @@ import type { ExportedConfig } from '../../src/page/types.ts';
 
 // --------------------------------------------------------------------- paths
 
-const CHROME_PATH = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
+export const CHROME_PATH = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
 
-const SCRATCH_E2E_DIR = '/private/tmp/claude-501/-Users-evar-scripts/1954a689-bd87-4b52-bf28-d32b8c363927/scratchpad/e2e';
+/**
+ * Chrome's profile and the run's other scratch files.
+ *
+ * Derived rather than written down, for the same reason as the screenshots
+ * below: what was here was one agent session's scratch path on one machine,
+ * committed to a public repository, carrying a home directory name and a
+ * session identifier and wrong for every other run.
+ */
+export const SCRATCH_E2E_DIR = process.env.TRANSIT_E2E_SCRATCH ?? `${process.env.TMPDIR ?? '/tmp'}/transit-e2e-run`;
 /**
  * Where the run leaves its screenshots.
  *
@@ -31,27 +39,27 @@ const SCRATCH_E2E_DIR = '/private/tmp/claude-501/-Users-evar-scripts/1954a689-bd
 const SCREENSHOT_DIR = process.env.TRANSIT_E2E_SCREENSHOTS ?? `${process.env.TMPDIR ?? '/tmp'}/transit-e2e`;
 
 const HERE = import.meta.dir; // .../test/e2e
-const PAGE_DIR = `${HERE}/../../page`;
+export const PAGE_DIR = `${HERE}/../../page`;
 const FIXTURES_DIR = `${HERE}/fixtures`;
 
 // -------------------------------------------------------------------- utils
 
-function sleep(ms: number): Promise<void> {
+export function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 /** The `Bun.file` slice this harness uses, cast past the package's narrower ambient type. */
-interface FileLike {
+export interface FileLike {
   text(): Promise<string>;
   exists(): Promise<boolean>;
   arrayBuffer(): Promise<ArrayBuffer>;
 }
 
-function fileAt(path: string): FileLike {
+export function fileAt(path: string): FileLike {
   return Bun.file(path) as unknown as FileLike;
 }
 
-function contentTypeFor(path: string): string {
+export function contentTypeFor(path: string): string {
   if (path.endsWith('.html')) return 'text/html; charset=utf-8';
   if (path.endsWith('.js')) return 'text/javascript; charset=utf-8';
   if (path.endsWith('.css')) return 'text/css; charset=utf-8';
@@ -70,7 +78,7 @@ function toBase64(text: string): string {
   return btoa(binary);
 }
 
-function base64ToBytes(b64: string): Uint8Array {
+export function base64ToBytes(b64: string): Uint8Array {
   const binary = atob(b64);
   const bytes = new Uint8Array(binary.length);
   for (let index = 0; index < binary.length; index += 1) bytes[index] = binary.charCodeAt(index);
@@ -102,7 +110,7 @@ const TRANSITOUS_BASE_URL = 'https://api.transitous.org/api/v1';
  * profiles, commute boards, a board naming a destination place, and a places
  * list. Every stop id is `de:00000:<n>`; every place name is invented.
  */
-function buildConfig(): ExportedConfig {
+export function buildConfig(): ExportedConfig {
   return {
     schema_version: 1,
     defaults: {
@@ -200,7 +208,7 @@ function buildConfig(): ExportedConfig {
 // ------------------------------------------------------- fixtures & rewrite
 
 /** Captured once, so every request within the run sees the same "now". */
-const ANCHOR_MS = Date.now();
+export const ANCHOR_MS = Date.now();
 
 function isoAt(offsetMin: number): string {
   return new Date(ANCHOR_MS + offsetMin * 60_000).toISOString();
@@ -212,7 +220,7 @@ interface MvgFixtureRow {
   [key: string]: unknown;
 }
 
-async function loadMvgBody(): Promise<unknown[]> {
+export async function loadMvgBody(): Promise<unknown[]> {
   const raw = JSON.parse(await fileAt(`${FIXTURES_DIR}/mvg-departures.json`).text()) as MvgFixtureRow[];
   return raw.map((row) => {
     const { plannedOffsetMin, realtimeOffsetMin, ...rest } = row;
@@ -242,7 +250,7 @@ interface PlanFixture {
   nextPageCursor?: string;
 }
 
-async function loadPlanBody(): Promise<unknown> {
+export async function loadPlanBody(): Promise<unknown> {
   const raw = JSON.parse(await fileAt(`${FIXTURES_DIR}/transitous-plan.json`).text()) as PlanFixture;
   const itineraries = raw.itineraries.map((itinerary) => {
     const legs = itinerary.legs.map((leg) => {
@@ -262,7 +270,7 @@ async function loadPlanBody(): Promise<unknown> {
   return { itineraries, nextPageCursor: raw.nextPageCursor ?? '' };
 }
 
-async function loadStoptimesBody(): Promise<unknown> {
+export async function loadStoptimesBody(): Promise<unknown> {
   return JSON.parse(await fileAt(`${FIXTURES_DIR}/transitous-stoptimes.json`).text());
 }
 
@@ -284,7 +292,7 @@ interface CdpMessage {
 /** How long any single CDP call may wait for its reply, in milliseconds. */
 const CDP_TIMEOUT_MS = 20_000;
 
-class Cdp {
+export class Cdp {
   private ws: WebSocket;
   private nextId = 0;
   private pending = new Map<number, { resolve: (value: unknown) => void; reject: (error: Error) => void }>();
@@ -753,7 +761,21 @@ async function main(): Promise<void> {
       probe.style.position = 'absolute';
       probe.style.visibility = 'hidden';
       probe.style.whiteSpace = 'pre';
-      probe.style.font = style.font;
+      // One property at a time, never the \`font\` shorthand.
+      //
+      // \`getComputedStyle().font\` serialises to the empty string whenever any
+      // longhand it does not cover is at a non-initial value, and this cell sets
+      // \`font-variant-numeric: tabular-nums\`, which is exactly such a longhand.
+      // Assigning that empty string does nothing, so the probe stayed at the
+      // page's own 15px and this assertion measured a countdown two sizes
+      // smaller than the one on the screen: it passed with 41px of need against
+      // a column that really needed 58px, which is a leading digit cut off a
+      // right-aligned time on the reader's phone and a green line here.
+      probe.style.fontFamily = style.fontFamily;
+      probe.style.fontSize = style.fontSize;
+      probe.style.fontWeight = style.fontWeight;
+      probe.style.fontStyle = style.fontStyle;
+      probe.style.fontStretch = style.fontStretch;
       probe.style.fontVariantNumeric = style.fontVariantNumeric;
       probe.style.letterSpacing = style.letterSpacing;
       probe.textContent = ${JSON.stringify(WIDEST_COUNTDOWN)};
@@ -795,7 +817,16 @@ async function main(): Promise<void> {
       probe.style.position = 'absolute';
       probe.style.visibility = 'hidden';
       probe.style.whiteSpace = 'pre';
-      probe.style.font = style.font;
+      // Longhands rather than the shorthand, for the reason spelled out in the
+      // countdown's probe above. This cell's shorthand does serialise today,
+      // and it would stop the day anything gives the destination a font feature
+      // the shorthand cannot carry, silently and in the passing direction.
+      probe.style.fontFamily = style.fontFamily;
+      probe.style.fontSize = style.fontSize;
+      probe.style.fontWeight = style.fontWeight;
+      probe.style.fontStyle = style.fontStyle;
+      probe.style.fontStretch = style.fontStretch;
+      probe.style.fontVariantNumeric = style.fontVariantNumeric;
       probe.style.letterSpacing = style.letterSpacing;
       probe.textContent = ${JSON.stringify(SAMPLE)};
       document.body.append(probe);
@@ -1134,6 +1165,38 @@ async function main(): Promise<void> {
       uploadThroughput: -1,
     });
 
+    // ------------------------------------------- assertion: the route page
+
+    // The expanded view was a page and became a render function that the page
+    // and the in-app overlay both call, and its styles moved out of the page's
+    // own document into the shared one. Both of those are refactors that break
+    // the page silently: every other assertion here reads the href of a link to
+    // it and none of them ever loaded it. So this one does.
+
+    const routeHref = await io.evalJs<string | null>(
+      "(() => { const a = document.querySelector('a.route') ?? document.querySelector('.tip-open'); return a ? a.getAttribute('href') : null; })()",
+    );
+    if (routeHref === null) {
+      record('the route page still renders a journey it is handed', false, 'no route link on the board to follow');
+    } else {
+      await cdp.send('Page.navigate', { url: `${localOrigin}/${routeHref}` });
+      const rendered = await io.waitFor("document.querySelector('.route-option') !== null", 10_000, 50);
+      const styled = await io.evalJs<{ head: string; option: string; title: string }>(`(() => {
+        const head = document.querySelector('.route-page-head');
+        const option = document.querySelector('.route-option');
+        return {
+          head: head === null ? '' : window.getComputedStyle(head).position,
+          option: option === null ? '' : window.getComputedStyle(option).borderTopWidth,
+          title: document.title,
+        };
+      })()`);
+      record(
+        'the route page still renders a journey it is handed',
+        rendered && styled.head === 'sticky' && styled.option !== '0px',
+        `journey drawn=${rendered}, its head is ${styled.head || 'absent'}, its card border is ${styled.option || 'absent'}, title "${styled.title}"`,
+      );
+    }
+
     // ------------------------------------ assertion: the installed app's overlay
 
     // Installed to a home screen the page runs standalone, and standalone has
@@ -1209,14 +1272,25 @@ async function main(): Promise<void> {
         `${newTabs - tabsBeforeOverlay} target(s) created by the tap`,
       );
 
-      await io.evalJs('history.back()');
-      const overlayGone = await io.waitFor("document.querySelector('.route-overlay') === null", 3000, 25);
-      const sheetSurvived = await io.evalJs<boolean>("document.querySelector('.tip-sheet') !== null");
-      record(
-        'standalone: the back gesture closes the overlay and leaves the sheet',
-        overlayGone && sheetSurvived,
-        `overlay gone=${overlayGone} sheet still open=${sheetSurvived}`,
-      );
+      // Tapped rather than driven through the history, because the control has
+      // to be reachable by a finger as well as correct: the overlay is drawn
+      // over a sheet that has its own backdrop, and a stacking order that put
+      // the sheet on top would leave a view that renders perfectly and cannot
+      // be dismissed. Going back through the history would have passed.
+      const backRect = await io.rectOfExpr("document.querySelector('.route-overlay .route-back')");
+      if (backRect === null) {
+        record('standalone: the overlay\'s back control closes it and leaves the sheet', false, 'no .route-back in the overlay');
+      } else {
+        await io.dispatchTap(backRect.left + backRect.width / 2, backRect.top + backRect.height / 2);
+        const overlayGone = await io.waitFor("document.querySelector('.route-overlay') === null", 3000, 25);
+        const sheetSurvived = await io.evalJs<boolean>("document.querySelector('.tip-sheet') !== null");
+        const historyBack = await io.evalJs<number>('history.length');
+        record(
+          'standalone: the overlay\'s back control closes it and leaves the sheet',
+          overlayGone && sheetSurvived,
+          `tapped .route-back: overlay gone=${overlayGone} sheet still open=${sheetSurvived} history.length=${historyBack}`,
+        );
+      }
     }
 
     await cdp.send('Page.removeScriptToEvaluateOnNewDocument', { identifier: standaloneShim.identifier });
@@ -1343,7 +1417,7 @@ interface AnchorCheck {
   href: string;
 }
 
-class PageIo {
+export class PageIo {
   constructor(private cdp: Cdp) {}
 
   async evalJs<T>(expression: string, awaitPromise = false): Promise<T> {
@@ -1505,7 +1579,7 @@ class PageIo {
 
 // --------------------------------------------------------------- chrome glue
 
-async function readDevToolsUrl(proc: Bun.Subprocess): Promise<string> {
+export async function readDevToolsUrl(proc: Bun.Subprocess): Promise<string> {
   const reader = proc.stderr.getReader();
   const decoder = new TextDecoder();
   let buffer = '';
@@ -1530,7 +1604,7 @@ interface DevToolsTarget {
   webSocketDebuggerUrl: string;
 }
 
-async function firstPageTarget(port: number): Promise<DevToolsTarget> {
+export async function firstPageTarget(port: number): Promise<DevToolsTarget> {
   for (let attempt = 0; attempt < 20; attempt += 1) {
     try {
       const response = await fetch(`http://127.0.0.1:${port}/json/list`);
@@ -1545,7 +1619,7 @@ async function firstPageTarget(port: number): Promise<DevToolsTarget> {
   throw new Error('no page target appeared on the DevTools HTTP endpoint');
 }
 
-async function killChromeTree(userDataDir: string, proc: Bun.Subprocess): Promise<void> {
+export async function killChromeTree(userDataDir: string, proc: Bun.Subprocess): Promise<void> {
   try {
     proc.kill();
   } catch {
@@ -1571,7 +1645,7 @@ async function killChromeTree(userDataDir: string, proc: Bun.Subprocess): Promis
 
 // -------------------------------------------------------- fetch interception
 
-interface FetchRequestPausedEvent {
+export interface FetchRequestPausedEvent {
   requestId: string;
   request: { url: string; method: string };
 }
@@ -1620,7 +1694,7 @@ async function fulfillPreflight(cdp: Cdp, requestId: string): Promise<void> {
   });
 }
 
-async function handleRequestPaused(
+export async function handleRequestPaused(
   cdp: Cdp,
   event: FetchRequestPausedEvent,
   localOrigin: string,
@@ -1676,4 +1750,9 @@ async function handleRequestPaused(
   }
 }
 
-void main();
+// Only when this file *is* the command. The screenshot-only entry point beside
+// it imports the server, the Chrome start and the fixtures from here, and an
+// import that ran the whole assertion suite as a side effect would make that
+// impossible. `import.meta.main` is true for the file bun was invoked with and
+// false for anything it pulled in.
+if (import.meta.main) void main();

@@ -1,6 +1,18 @@
 import { icon } from './icons.ts';
 import { button, el } from './dom.ts';
 
+/**
+ * Marks a thing that a sheet opened, which is therefore not "outside" it.
+ *
+ * A sheet closes on a pointer that lands anywhere it does not own. That is the
+ * right rule for a page and the wrong one for a view the sheet itself put on
+ * top: the reader tapping a control in there is still inside the answer they
+ * opened, and dismissing the sheet under it means they come back to the board
+ * rather than to where they were. Anything drawn over a sheet and opened from
+ * it carries this class.
+ */
+export const TIP_SHIELD_CLASS = 'tip-shield';
+
 // The one tooltip on this page.
 //
 // The native `title` attribute was doing this job and it cannot: it takes plain
@@ -192,6 +204,12 @@ export function showTip(target: HTMLElement, build: () => HTMLElement, options: 
     // to run first and take the anchor out of the document before the browser
     // got as far as following it.
     if (hit instanceof Node && (node.contains(hit) || target.contains(hit))) return;
+    // And a pointer inside something a sheet opened is not outside it either.
+    // The installed app draws the expanded journey over the board rather than
+    // in a tab it has no way to open, and that view is opened from this sheet
+    // and closes back onto it: dismissing the sheet under it would mean the
+    // reader comes back to a board instead of to where they were.
+    if (hit instanceof Element && hit.closest(`.${TIP_SHIELD_CLASS}`) !== null) return;
     closeTip();
   };
   const onKey = (event: KeyboardEvent): void => {
