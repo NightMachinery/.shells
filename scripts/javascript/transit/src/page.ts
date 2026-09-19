@@ -17,7 +17,7 @@ import { cssCustomProperties } from './colors.ts';
 import { normaliseLine } from './filter.ts';
 import type { Board, Message } from './model.ts';
 import { renderBar, HORIZONS } from './page/bar.ts';
-import { closeFilters, renderBoard, viewOf, type BoardContext } from './page/board.ts';
+import { boardChrome, closeFilters, renderBoard, viewOf, type BoardContext } from './page/board.ts';
 import { cachedRoutes, destinationNameOf, planProfile } from './page/commute.ts';
 import { fetchMessages, fetchProfile } from './page/data.ts';
 import { el, selectionInsideBoards } from './page/dom.ts';
@@ -69,6 +69,74 @@ const state: PageState = {
 
 /** Callbacks the current render registered for the one-second tick. */
 let ticks: Array<() => void> = [];
+
+/**
+ * The boards drawn last time, so an unchanged board is not drawn again.
+ *
+ * The page is built around rendering the whole thing from state, which is what
+ * makes it impossible for two parts of it to disagree. The cost is that a
+ * refresh that changed nothing still replaced every row, and on a phone that is
+ * a visible flash twice a minute for no information at all. So a board keeps its
+ * DOM when nothing it draws has changed, and the signature below is the whole
+ * definition of "changed".
+ *
+ * The clock is in the signature at minute granularity, because a row's own
+ * minute count is patched by the tick but whether it is still catchable, and
+ * whether its time is late enough to be reported, are decided per render. One
+ * rebuild a minute is the price of those being right.
+ */
+interface RenderedBoard {
+  signature: string;
+  node: HTMLElement;
+  ticks: Array<() => void>;
+}
+const renderedBoards = new Map<string, RenderedBoard>();
+/** Bumped whenever something outside the board data changes what a board draws. */
+let boardEpoch = 0;
+
+/** Everything a board's DOM is derived from, as one string. */
+function boardSignature(board: Board, context: BoardContext, view: string): string {
+  const departures = board.departures
+    .map(
+      (dep) =>
+        `${dep.stop}|${dep.line}|${dep.planned}|${dep.realtime}|${dep.delayMin}|${dep.cancelled ? 1 : 0}|${dep.platform ?? ''}|${dep.destination}|${dep.realtimeKnown ? 1 : 0}|${dep.sev ? 1 : 0}|${dep.direction}`,
+    )
+    .join(';');
+  const status = context.status;
+  const statusPart =
+    status.kind === 'loading'
+      ? `loading|${status.backend ?? ''}|${status.page}`
+      : status.kind === 'error'
+        ? `error|${status.detail}`
+        : status.kind;
+  const routes = context.routes;
+  const routePart =
+    routes === undefined
+      ? 'none'
+      : `${routes.origin ?? ''}|${[...routes.rows]
+          .map(([key, row]) => `${key}:${row.options.map((option) => `${option.exitStop}/${option.arrival}/${option.transfers}/${option.tight ? 1 : 0}`).join('+')}`)
+          .join(';')}`;
+  return [
+    board.title,
+    board.backend,
+    view,
+    departures,
+    statusPart,
+    routePart,
+    context.routesStale ? 1 : 0,
+    context.routesAt ?? '',
+    context.planning === null ? '' : `${context.planning.position}/${context.planning.done}/${context.planning.total}`,
+    context.destinationName,
+    context.destinationKey,
+    context.walkWeight,
+    context.earlyBufferMinutes,
+    context.sortByArrival ? 1 : 0,
+    context.planned ? 1 : 0,
+    context.barBackend,
+    Math.floor(context.now / 60_000),
+    boardEpoch,
+  ].join('\u0001');
+}
 /** The visible profile's planning run, which the other profiles queue behind. */
 let visiblePlan: Promise<void> = Promise.resolve();
 /** Backends that answered the visible profile's most recent fetch. */
@@ -453,9 +521,22 @@ function render(): void {
           render();
           replanVisible();
         },
-        ticks,
+        ticks: [],
       };
-      nodes.push(renderBoard(board, context));
+      const signature = boardSignature(board, context, boardChrome(profileKey, board, routes?.boards.has(index) === true));
+      const id = `${profileKey}|${index}|${board.title}`;
+      const drawn = renderedBoards.get(id);
+      if (drawn !== undefined && drawn.signature === signature) {
+        // Nothing this board draws has changed, so it keeps the DOM it has,
+        // including any sheet opened from it and any text selection inside it.
+        ticks.push(...drawn.ticks);
+        nodes.push(drawn.node);
+        return;
+      }
+      const node = renderBoard(board, context);
+      renderedBoards.set(id, { signature, node, ticks: context.ticks });
+      ticks.push(...context.ticks);
+      nodes.push(node);
     });
     if (boards.length === 0) nodes.push(el('p', 'empty', state.inFlight > 0 ? 'loading departures' : 'no departures yet'));
   }
@@ -574,7 +655,12 @@ function installServiceWorker(): void {
 async function boot(): Promise<void> {
   injectColors();
   installServiceWorker();
-  setOnAlarmsChanged(render);
+  setOnAlarmsChanged(() => {
+    // A reminder is drawn on the row it belongs to, and nothing else in the
+    // signature knows about it.
+    boardEpoch += 1;
+    render();
+  });
   render();
 
   try {

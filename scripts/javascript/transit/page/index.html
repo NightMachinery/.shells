@@ -359,6 +359,11 @@
       /* A journey restored from the last visit. Dimmed and italic, because an
          arrival time is the one number here that looks exactly as convincing
          when it is an hour old as when it is a second old. */
+      .route-planning {
+        display: flex;
+        align-items: center;
+      }
+
       .route-stale {
         opacity: 0.55;
         font-style: italic;
@@ -417,6 +422,13 @@
         font-size: 13px;
         color: var(--ink-soft);
         padding: 2px 4px;
+      }
+
+      /* A board that fixes its own destination says so here, under the title. */
+      .board-destination {
+        margin: 2px 0 0;
+        font-size: 12px;
+        color: var(--ink-soft);
       }
 
       .board-walk,
@@ -557,13 +569,23 @@
         text-overflow: ellipsis;
       }
 
+      /* The platform is a number, and a number on its own in a row of numbers
+         is ambiguous: readers were reading it as part of the time beside it. It
+         is a badge now, in a blue that belongs to no line in the colour table,
+         so it cannot be mistaken for the line pill on its left or for a
+         destination badge in the strip. */
       .platform {
-        font-size: 11px;
+        justify-self: center;
+        min-width: 100%;
+        box-sizing: border-box;
+        padding: 0 3px;
+        font-size: 10px;
+        font-weight: 700;
         font-variant-numeric: tabular-nums;
         text-align: center;
-        border: 1px solid var(--line);
         border-radius: 4px;
-        color: var(--ink-soft);
+        background: var(--platform-bg);
+        color: #fff;
       }
 
       .state {
@@ -1137,6 +1159,20 @@
 
         .destination {
           font-size: 13px;
+        }
+
+        /* The state badge has the whole word "planned" to fit into a column
+           that a phone can barely spare. Measured on the device rather than in
+           the emulator: the letter spacing and a pixel of padding either side
+           were the difference between fitting and lying across the bell. */
+        .state {
+          letter-spacing: 0;
+          padding: 0 2px;
+        }
+
+        .platform {
+          font-size: 9px;
+          padding: 0 2px;
         }
       }
     </style>

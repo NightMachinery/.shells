@@ -66,6 +66,10 @@
      how saturated and how light a badge is belongs to the colour scheme,
      which is the only thing that knows whether it is drawing on paper
      white or on near black. */
+  /* The platform badge. A deep indigo that appears nowhere in the operator's
+     line table, so it reads as "this is a platform number" and not as a line. */
+  --platform-bg: #242f7e;
+
   --dest-badge-s: 62%;
   --dest-badge-l: 34%;
   --dest-badge-ink: #ffffff;
@@ -83,6 +87,9 @@
     --late: #ff6b6b;
     --early: #7bd88f;
     --warn: #e0a458;
+    /* Lighter on a dark card, so white text on it still clears the contrast
+       floor and it does not read as a hole in the row. */
+    --platform-bg: #3b49a8;
     --dest-badge-s: 55%;
     --dest-badge-l: 68%;
     --dest-badge-ink: #16181b;
@@ -157,6 +164,113 @@ button {
   box-shadow: 0 8px 28px rgb(0 0 0 / 22%);
   padding: 10px 12px;
   font-size: 13px;
+}
+
+/*
+ * The sheet, on a phone. An anchored popover the width of the screen is a sheet
+ * already; making it one means it can be centred, dismissed by tapping anywhere,
+ * and scrolled internally without taking the board with it.
+ */
+.tip-sheet {
+  position: fixed;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: min(92vw, 420px);
+  max-width: none;
+  max-height: 85vh;
+  overflow: auto;
+  overscroll-behavior: contain;
+  padding-top: 14px;
+}
+
+/* Under the sheet and over everything else. It is what makes a tap anywhere
+   mean "never mind", and it is also what stops the board scrolling underneath. */
+.tip-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 39;
+  background: rgb(0 0 0 / 38%);
+  touch-action: none;
+}
+
+.tip-close {
+  position: absolute;
+  top: 4px;
+  right: 6px;
+  width: 32px;
+  height: 32px;
+  font-size: 20px;
+  line-height: 1;
+  color: var(--ink-soft);
+}
+
+.tip-close:hover {
+  color: var(--ink);
+}
+
+/* Acknowledge the finger before anything is decided. A phone that does not
+   respond to a touch reads as a phone that did not receive it, and the reader
+   taps again, which is how one tap becomes two. */
+.pressed {
+  opacity: 0.55;
+}
+
+/*
+ * On a touch screen a row is one tap target, so nothing inside it may answer a
+ * tap with a text selection or a zoom. The desktop keeps both: selecting a
+ * destination or a time off this page is a thing people do, and a mouse can aim
+ * at a word.
+ */
+@media (pointer: coarse) {
+  .row,
+  .times-strip .time {
+    user-select: none;
+    -webkit-user-select: none;
+    -webkit-touch-callout: none;
+    touch-action: manipulation;
+  }
+}
+
+.tip-section {
+  margin: 10px 0 4px;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--ink-soft);
+}
+
+.tip-planning {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--ink-soft);
+  margin: 8px 0 0;
+}
+
+/* Something is happening and it is this row's journey. A spinner rather than a
+   word, because the word is already in the sheet and the slot is too narrow for
+   it twice. */
+.spinner {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border: 2px solid var(--line);
+  border-top-color: var(--ink-soft);
+  border-radius: 50%;
+  animation: spin 900ms linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .spinner {
+    animation-duration: 3s;
+  }
 }
 
 .tip-head {

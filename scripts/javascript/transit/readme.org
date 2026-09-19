@@ -650,6 +650,11 @@ A row is a grid of fixed slots: minutes, line badge, destination with its times,
 the onward connection, the journey to the destination, the platform, whether the
 time is live or planned, a reminder marker, and the stop label.
 
+The platform is a badge rather than bare text, in a blue that belongs to no line
+in the operator's table. A number on its own in a row of numbers is ambiguous,
+and readers were reading it as part of the time beside it; a badge in a colour
+that names nothing else says "this is a platform" without a word.
+
 In the slots too narrow to hold a full place name (the strip's legend, the board
 chips) names are abbreviated by one shared map before they are cut, so what
 survives distinguishes one place from another rather than spelling out the word
@@ -764,22 +769,82 @@ yet asked".
 A journey slot is two centimetres wide and the answer is a paragraph, so the
 slot is a summary with two ways out of it.
 
-Hovering it, or tapping it on a touch screen, opens the page's tooltip: the
-recommended journey with every leg listed, walks included, then the other
-options as one-liners that expand where they stand. The same tooltip carries the
-times in the rows and the strip, and the jump chips in the bar. It replaced the
-native =title= attribute, which takes plain text only and never appears at all
-on a phone, which is where this page is read and where the slot is narrowest.
-A control with its own primary action, like a jump chip, keeps its tap and opens
-the tooltip on hover or a long press instead.
+Hovering it opens the page's tooltip: the recommended journey with every leg
+listed, walks included, then the other options as one-liners that expand where
+they stand. The same tooltip carries the times in the rows and the strip, and
+the jump chips in the bar. It replaced the native =title= attribute, which takes
+plain text only and never appears at all on a phone, which is where this page is
+read and where the slot is narrowest. A control with its own primary action,
+like a jump chip, keeps its tap and opens the tooltip on hover or a long press
+instead.
 
-Clicking the slot opens =route.html= in a new tab: one row's journeys in full,
+*** One tap target per row
+
+On a touch screen the row is the tap target, not the cells inside it, and a tap
+anywhere on it opens that departure as a sheet: a dimmed backdrop, the departure
+at the top with its planned and expected times, delay, platform, stop and where
+the times came from, then the journey below when there is one. Tapping the
+backdrop, the close button, Escape or the row again dismisses it.
+
+The cells were the tap targets before and every one of them was wrong in its own
+way. The destination answered a tap by starting a text selection, the line badge
+by doing nothing, and the journey slot by opening a new tab that the browser
+then refused. That last one is worth writing down, because it looked like
+nothing happening at all: the tap handler was on the =click= event, filtered to
+touch by testing whether the event was a =PointerEvent=, which is a browser
+detail rather than a guarantee. Where the click arrives as a plain mouse event
+the filter rejected it, the handler returned without preventing the default, the
+slot followed its own link, and a new tab from a gesture the browser had not
+classified as one is silently blocked. Everything now hangs off pointer events
+from end to end, which say what kind of pointer they are by definition: a press
+under four hundred milliseconds that has not travelled more than ten pixels is a
+tap, a longer one belongs to the reminder popup, and the press is acknowledged
+the moment a finger lands rather than when the gesture is decided.
+
+Rows take =user-select: none= and =touch-action: manipulation= on coarse
+pointers only, so a tap cannot start a selection or a double-tap zoom, while a
+mouse can still select a destination or a time to copy. Links inside the sheet
+are ordinary anchors with nothing between the tap and the navigation, and the
+handler that closes the sheet on an outside pointer ignores any pointer that
+started inside it: it used to run first and take the anchor out of the document
+before the browser got as far as following it.
+
+A sheet is bound to the departure rather than to the element it was opened from,
+so a refresh no longer closes it. The board is rebuilt from scratch several times
+a minute and the element the sheet came from does not survive its own
+explanation; the replacement claims the open sheet by the same key, and the
+content is rebuilt in place only when the journey actually changed. An
+explanation with a thirty second life expectancy through no fault of the reader's
+was the single worst thing about the page on a phone.
+
+Clicking the slot on a desktop, or an "open" link in the sheet on a phone, opens
+=route.html= in a new tab: one row's journeys in full,
 as vertical timelines. It takes its whole state from the URL fragment, as
 base64url of a small JSON object, which is why it opens instantly, opens
 underground, and cannot disagree with the board it came from. A fragment rather
 than a query string because a fragment never leaves the browser. The cost is
 that a link is a snapshot, so the page says when it was planned and carries a
 button that plans that one row again and rewrites the fragment.
+
+*** Nothing moves that did not change
+
+Skeleton rows are a promise that something is coming, and they are the right
+answer exactly once: the first time a board is drawn with nothing in it. After
+that the board has real rows, and replacing them with grey bars on every refresh
+takes information away in order to show that work is happening, which the
+progress line already says without moving anything. "Nothing in the window" is a
+claim about a completed answer and is never made while a fetch is in flight; a
+board that is merely slow used to look like a board that was over for the night.
+
+A board also keeps the DOM it has when nothing it draws has changed. The page is
+built around rendering the whole thing from state, which is what makes it
+impossible for two parts of it to disagree, and the cost was a visible flash
+twice a minute for no new information at all. So every board is drawn to a
+signature of everything it reads: its departures down to the minute and the
+delay, its status, its journeys, its view, its filters, and the clock at minute
+granularity, because whether a row is still catchable is decided per render
+rather than by the tick. Equal signature, same DOM, and the open sheet and any
+selection inside it survive.
 
 *** Destination badges in the strip
 
@@ -917,8 +982,11 @@ row are all in =src/plan.ts=, and the transit modes a journey may use and what a
 walked minute costs are in =src/config.ts= with the other defaults. The
 abbreviations used in slots too narrow for a full place name are a single
 constant in =src/page/dom.ts=, and the filler words a destination badge drops
-are one in =src/page/badges.ts=. How long a pointer rests before a tooltip opens
-is in =src/page/tip.ts=. The
+are one in =src/page/badges.ts=. How long a pointer rests before a tooltip opens,
+how long a press may last and how far it may travel and still be a tap, and the
+width below which the tooltip becomes a sheet, are all in =src/page/tip.ts=; the
+length of the long press that opens the reminder popup instead is in
+=src/page/notify.ts=. The
 watch interval, the discovery sample count and the key the commute view pairs
 with the home profile are in =src/cli.ts=, and the page's refresh and tick
 intervals are in =src/page.ts=.

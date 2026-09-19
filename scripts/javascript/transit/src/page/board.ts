@@ -65,6 +65,19 @@ function nextView(view: BoardView): BoardView {
   return 'integrated';
 }
 
+/**
+ * Everything about a board that lives outside its data: which view it is in,
+ * which lines are hidden, whether its filter popover is open, and whether the
+ * viewport is narrow enough to drop a column.
+ *
+ * Exported so the page can tell an unchanged board from a changed one without
+ * knowing where any of that is kept, which is here and in local storage.
+ */
+export function boardChrome(profileKey: string, board: Board, commuting: boolean): string {
+  const id = boardId(profileKey, board.title);
+  return `${viewOf(profileKey, board, commuting)}|${[...readHidden(id)].sort().join(',')}|${openFilter === id ? 1 : 0}|${narrowViewport() ? 1 : 0}`;
+}
+
 export function viewOf(profileKey: string, board: Board, commuting = false): BoardView {
   // A board being planned opens as rows, because the answer the commute view
   // exists to give lives in a row's own slot and would be invisible in a strip.
@@ -102,7 +115,12 @@ function timeGroup(dep: Departure, timezone: string, referenceMs: number): HTMLE
   const main = timeNode(dep.realtime, referenceMs, timezone, `time-main${late ? ' late' : ''}${early ? ' early' : ''}`);
   wrap.append(main);
   if (dep.delayMin !== 0) wrap.append(el('span', 'time-planned', `(${clockTime(dep.planned, timezone)})`));
-  attachTip(wrap, () => departureTip(dep, timezone, referenceMs), { label: departureLabel(dep, timezone, referenceMs) });
+  // Hover only. On a touch screen the whole row is one tap target and opens the
+  // sheet, so a tip here as well would be two answers competing for one tap.
+  attachTip(wrap, () => departureTip(dep, timezone, referenceMs), {
+    label: departureLabel(dep, timezone, referenceMs),
+    tapOpens: false,
+  });
   return wrap;
 }
 
@@ -226,7 +244,16 @@ function renderRoute(dep: Departure, board: Board, context: BoardContext, usual:
   if (dep.cancelled) return slot('route');
   const planned = context.routes?.rows.get(rowKey(dep));
   const option = planned?.best ?? planned?.options[0];
-  if (option === undefined) return slot('route');
+  if (option === undefined) {
+    // A row whose plan is still being worked on says so rather than looking like
+    // a row with no journey. The two are different answers and a reader acts on
+    // them differently.
+    if (context.planning === null) return slot('route');
+    const waiting = el('span', 'route route-planning');
+    waiting.append(el('span', 'spinner'));
+    waiting.setAttribute('aria-label', 'planning this journey');
+    return waiting;
+  }
   const options = planned?.options ?? [option];
 
   const better = usual.get(normaliseLine(dep.line)) !== undefined && usual.get(normaliseLine(dep.line)) !== option.exitStop;
@@ -255,13 +282,13 @@ function renderRoute(dep: Departure, board: Board, context: BoardContext, usual:
   node.append(timeNode(option.arrival, context.now, context.timezone, 'route-arrival'));
 
   const notes = { better, origin: context.routes?.origin };
+  // On a desktop this is the anchored popover on hover, and a click follows the
+  // link. On a phone the row above it opens the sheet, which carries this same
+  // journey and the links out of it: one tap target per row, because a row two
+  // centimetres tall divided into six of them is six ways to miss.
   attachTip(node, () => routeTip(dep, board, context, options, notes), {
     label: journeySummary(option, context.timezone, context.now),
-    // The link is the tap target's primary action on a desktop; on a touch
-    // screen a tap opens the tooltip instead, and the tooltip carries its own
-    // button to the page. Otherwise the only way to see the alternatives on a
-    // phone would be to leave the board.
-    tapOpens: true,
+    tapOpens: false,
   });
   return node;
 }
@@ -360,6 +387,94 @@ function routeTip(
   return body;
 }
 
+/**
+ * What a row's sheet is about, stable across re-renders.
+ *
+ * The board is rebuilt from scratch several times a minute, so the element a
+ * sheet was opened from does not survive its own explanation. The key is how the
+ * replacement claims it: same departure, same sheet, re-pointed rather than
+ * closed.
+ */
+function rowTipKey(dep: Departure, context: BoardContext): string {
+  return `row|${context.profileKey}|${rowKey(dep)}|${dep.direction}`;
+}
+
+/**
+ * What the sheet currently says, cheaply.
+ *
+ * Compared on every render. Equal leaves the open sheet alone, which is the
+ * point: a reader halfway down a leg list is not interrupted by a redraw that
+ * would have produced the same list. Different rebuilds the body in place,
+ * because then the journey really has changed under them.
+ */
+function rowTipSignature(dep: Departure, planned: BoardRoutes['rows'] extends Map<string, infer V> ? V | undefined : never, planning: boolean): string {
+  const head = `${dep.realtime}|${dep.delayMin}|${dep.cancelled}|${dep.platform ?? ''}|${dep.realtimeKnown}`;
+  if (planning && planned === undefined) return `${head}|planning`;
+  const options = planned?.options ?? [];
+  return `${head}|${options.map((option) => `${option.exitStop}:${option.arrival}:${option.transfers}:${option.tight}`).join(',')}`;
+}
+
+/**
+ * The whole of one departure, as the sheet a tap on its row opens.
+ *
+ * One sheet rather than one per cell. A row is a line badge, a destination, two
+ * times, a journey, a platform and a state mark inside about two centimetres of
+ * height, and asking a finger to choose between them is asking it to miss: the
+ * destination answered a tap by starting a text selection, and the line badge
+ * answered by doing nothing at all. Everything a row knows is in here, in the
+ * order it is asked about: what it is and when it goes, then how to ride it to
+ * where you are going.
+ */
+function rowSheet(dep: Departure, board: Board, context: BoardContext, usual: Map<string, string>): HTMLElement {
+  const body = el('div', 'tip-body tip-sheet-body');
+
+  const head = el('div', 'tip-head');
+  head.append(lineBadge(dep));
+  head.append(el('span', 'tip-title', dep.destination));
+  body.append(head);
+
+  const rows = el('dl', 'tip-rows');
+  const row = (term: string, value: Node | string): void => {
+    rows.append(el('dt', undefined, term));
+    const dd = el('dd');
+    if (typeof value === 'string') dd.textContent = value;
+    else dd.append(value);
+    rows.append(dd);
+  };
+  row('planned', timeNode(dep.planned, context.now, context.timezone));
+  row('expected', timeNode(dep.realtime, context.now, context.timezone));
+  row('delay', dep.delayMin === 0 ? 'on time' : `${dep.delayMin > 0 ? '+' : ''}${dep.delayMin} min`);
+  if (dep.platform !== null) row('platform', dep.platform);
+  row('stop', dep.stopTag ?? stopTagOf(dep.stop, board.stopLabels));
+  row('times from', dep.realtimeKnown && !context.planned ? `${dep.backend}, live` : `${dep.backend}, timetable`);
+  body.append(rows);
+
+  if (dep.cancelled) body.append(el('p', 'tip-warning', 'This departure is cancelled.'));
+  if (dep.sev) body.append(el('p', 'tip-note', 'A replacement service, not the usual vehicle.'));
+
+  const planned = context.routes?.rows.get(rowKey(dep));
+  const options = planned?.options ?? [];
+  if (options.length > 0) {
+    const best = planned?.best ?? options[0];
+    const better =
+      best !== undefined && usual.get(normaliseLine(dep.line)) !== undefined && usual.get(normaliseLine(dep.line)) !== best.exitStop;
+    body.append(el('h4', 'tip-section', `To ${context.destinationName}`));
+    body.append(routeTip(dep, board, context, options, { better, origin: context.routes?.origin }));
+  } else if (context.planning !== null) {
+    // The sheet opens before the plan exists rather than refusing to open. It
+    // fills itself in when the plan lands, because the sheet is bound to the
+    // departure and not to the element it was opened from.
+    const wait = el('p', 'tip-planning');
+    wait.append(el('span', 'spinner'));
+    wait.append(el('span', undefined, `planning the journey to ${context.destinationName}\u2026`));
+    body.append(wait);
+  } else if (!dep.cancelled && context.routes !== undefined) {
+    body.append(el('p', 'tip-note', `No journey to ${context.destinationName} from this departure.`));
+  }
+
+  return body;
+}
+
 function renderRow(dep: Departure, board: Board, columns: Columns, context: BoardContext, usual: Map<string, string>): HTMLElement {
   const reachable = catchableOnBoard(dep, board, context.now);
   const row = el('li', `row${reachable ? '' : ' unreachable'}${dep.cancelled ? ' row-cancelled' : ''}`);
@@ -422,6 +537,14 @@ function renderRow(dep: Departure, board: Board, columns: Columns, context: Boar
   }
 
   attachLongPress(row, () => openAlarmPopup(dep, board, row));
+  // The whole row is the tap target, and only on touch: on a desktop a tip that
+  // followed the pointer down two hundred rows would be a cursor trail, and the
+  // cells there have their own hover explanations anyway.
+  attachTip(row, () => rowSheet(dep, board, context, usual), {
+    key: rowTipKey(dep, context),
+    signature: rowTipSignature(dep, context.routes?.rows.get(rowKey(dep)), context.planning !== null),
+    hoverOpens: false,
+  });
   return row;
 }
 
@@ -490,7 +613,7 @@ function stripLabel(group: Strip): { text: string; title: string } {
   return { text, title: `${code}. Destinations: ${ordered.join(', ')}` };
 }
 
-function renderStrip(rows: Departure[], board: Board, context: BoardContext): HTMLElement {
+function renderStrip(rows: Departure[], board: Board, context: BoardContext, usual: Map<string, string>): HTMLElement {
   const list = el('ul', 'strips');
   const multiStop = board.stops.length > 1;
   // Computed over the whole board rather than per group, so a destination that
@@ -542,8 +665,13 @@ function renderStrip(rows: Departure[], board: Board, context: BoardContext): HT
       // When they agree it is on the row, once, which is where a reader looks.
       if (uniform === undefined && dep.platform !== null) cell.append(el('span', 'time-note', `pl ${dep.platform}`));
       if (dep.cancelled) cell.append(el('span', 'time-note', '✕'));
-      attachTip(cell, () => departureTip(dep, context.timezone, context.now), {
+      // The same sheet a row opens, from the same departure. In the strip a time
+      // is the only thing there is to tap, so it is the tap target; the group
+      // header is a heading and opens nothing.
+      attachTip(cell, () => rowSheet(dep, board, context, usual), {
         label: departureLabel(dep, context.timezone, context.now),
+        key: rowTipKey(dep, context),
+        signature: rowTipSignature(dep, context.routes?.rows.get(rowKey(dep)), context.planning !== null),
       });
       times.append(cell);
     }
@@ -690,6 +818,17 @@ function appendEarlyBuffer(popover: HTMLElement, context: BoardContext): void {
 /** Which board's filter popover is open, if any. Null when none is. */
 let openFilter: string | null = null;
 
+/**
+ * Boards that have had departures in them at some point this session.
+ *
+ * Skeleton rows are a promise that something is coming, and they are the right
+ * answer exactly once: the first time a board is drawn with nothing in it. After
+ * that the board has real rows, and replacing them with grey bars during every
+ * refresh is taking information away to show that work is happening, which the
+ * progress line already says without moving anything.
+ */
+const seenContent = new Set<string>();
+
 export function closeFilters(): void {
   openFilter = null;
 }
@@ -758,7 +897,9 @@ export function renderBoard(board: Board, context: BoardContext): HTMLElement {
     return section;
   }
 
-  if (context.status.kind === 'loading' && board.departures.length === 0) {
+  if (board.departures.length > 0) seenContent.add(id);
+
+  if (context.status.kind === 'loading' && !seenContent.has(id)) {
     const note = context.status.backend === null ? 'loading' : `${context.status.backend} · page ${context.status.page}`;
     section.append(el('p', 'board-progress', note));
     const skeleton = el('ul', 'rows skeleton');
@@ -768,7 +909,21 @@ export function renderBoard(board: Board, context: BoardContext): HTMLElement {
   }
 
   if (rows.length === 0) {
-    section.append(el('p', 'empty', board.departures.length === 0 ? 'nothing in the window' : 'every line here is hidden'));
+    if (board.departures.length > 0) {
+      // A filter fact, not a fetch fact: true while a fetch is in flight and
+      // true afterwards, and the reader is the one who made it true.
+      section.append(el('p', 'empty', 'every line here is hidden'));
+      return section;
+    }
+    // "Nothing in the window" is a claim about a completed answer. Saying it
+    // while the answer is still on its way is how a board that is merely slow
+    // comes to look like a board that is over for the night.
+    if (context.status.kind === 'loading') {
+      const note = context.status.backend === null ? 'refreshing' : `${context.status.backend} · page ${context.status.page}`;
+      section.append(el('p', 'board-progress', note));
+      return section;
+    }
+    section.append(el('p', 'empty', 'nothing in the window'));
     return section;
   }
 
@@ -791,7 +946,7 @@ export function renderBoard(board: Board, context: BoardContext): HTMLElement {
   }
 
   if (view === 'integrated') {
-    section.append(renderStrip(rows, board, context));
+    section.append(renderStrip(rows, board, context, usualExits(context.routes?.rows ?? new Map())));
     return section;
   }
 
