@@ -1,5 +1,5 @@
 {
-  "_comment": "Two synthetic itineraries that both match the U6 row (line U6, offset 6 minutes) fixed in mvg-departures.json / de:00000:1, so the commute planner produces two real alternatives for that row: enough to exercise the tip sheet's alternative-open control as well as the final open-in-new-tab control. Every id and place name is made up.",
+  "_comment": "Two synthetic itineraries that both match the U6 row (line U6, offset 6 minutes) fixed in mvg-departures.json / de:00000:1, so the commute planner produces two real alternatives for that row: enough to exercise the tip sheet's alternative-open control as well as the final open-in-new-tab control. A third, single-leg itinerary matches the RE72 row (line RE72, offset 14 minutes, platform 8) so that row carries both a filled route slot and, via transitous-stoptimes.json / transitous-trip.json, resolvable onward calls -- the one row the sheet-ordering assertions in phone.ts need to open. Its from/to stop ids reuse the ones transitous-trip.json already gives that same run's origin and terminus. Every id and place name is made up.",
   "itineraries": [
     {
       "startTimeOffsetMin": 6,
@@ -59,6 +59,24 @@
           "startTimeOffsetMin": 19,
           "endTimeOffsetMin": 30,
           "scheduledStartTimeOffsetMin": 19,
+          "intermediateStops": []
+        }
+      ]
+    },
+    {
+      "startTimeOffsetMin": 14,
+      "endTimeOffsetMin": 48,
+      "legs": [
+        {
+          "mode": "REGIONAL_RAIL",
+          "tripId": "trip-re72-plan-e2e",
+          "routeShortName": "RE72",
+          "agencyName": "Regionalbahn",
+          "from": { "name": "Nordweg", "stopId": "de-DELFI_de:00000:1:8:8", "track": "8" },
+          "to": { "name": "Maxmonument", "stopId": "de-DELFI_de:00000:30:1:1" },
+          "startTimeOffsetMin": 14,
+          "endTimeOffsetMin": 48,
+          "scheduledStartTimeOffsetMin": 14,
           "intermediateStops": []
         }
       ]

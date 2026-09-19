@@ -343,6 +343,21 @@ export async function loadTripBody(): Promise<unknown> {
   return { legs };
 }
 
+/**
+ * How many onward calls a sheet names before "and N more", read off
+ * `src/page/board.ts` itself rather than copied in as a literal.
+ *
+ * The number moved once already (8 -> 3, see the file's own comment on
+ * `SHEET_CALLS`), and a copy here would have gone stale exactly the way the
+ * two onward-calls assertions below did until this read replaced the guess.
+ */
+export async function sheetCallsFromSource(): Promise<number> {
+  const source = await fileAt(`${HERE}/../../src/page/board.ts`).text();
+  const match = /const SHEET_CALLS = (\d+);/.exec(source);
+  if (match === null) throw new Error('SHEET_CALLS not found in src/page/board.ts; did it move or get renamed?');
+  return Number(match[1]);
+}
+
 // ----------------------------------------------------------------- CDP wire
 
 interface CdpErrorPayload {
@@ -463,6 +478,17 @@ async function main(): Promise<void> {
     process.exit(0);
   }
 
+  // ------------------------------------------------------------ the bundle
+
+  // The server below publishes `page/`, and `page/app.js` in it is a build
+  // artefact that nothing else in this run regenerates. It is not in version
+  // control either, so a checkout has none and a working tree has whatever the
+  // last build left. Both failure modes are silent and both are worse than a
+  // broken harness: the run goes green against the previous bundle, which is a
+  // harness reporting on code that is no longer there. So the build is part of
+  // the run.
+  buildPage();
+
   // ---------------------------------------------------------- static server
 
   const config = buildConfig();
@@ -568,6 +594,7 @@ async function main(): Promise<void> {
   const planBody = await loadPlanBody();
   const stoptimesBody = await loadStoptimesBody();
   const tripBody = await loadTripBody();
+  const SHEET_CALLS = await sheetCallsFromSource();
 
   // Which of this run's rows are BAHN mode, read off the fixture rather than
   // hardcoded: the DOM carries no mode marker, so this is the only honest way
@@ -1317,12 +1344,15 @@ async function main(): Promise<void> {
     const callsRowTap = await io.tapOpensSheet(bahnRowExpr);
     if (!callsRowTap.opened) throw new Error('no BAHN row sheet opened for the onward-calls assertions');
     await io.waitFor("document.querySelectorAll('.tip-sheet .tip-call-list li.tip-call').length > 0", 5000);
-    // This row has no matching itinerary in the plan fixture, so the sheet's
-    // journey section is still waiting on the plan to resolve when the calls
-    // list first appears; that resolution replaces the sheet body a moment
-    // later (same mechanism as `callsSignature` above), which raced the "more"
+    // This is also the one row transitous-plan.json gives a matching itinerary
+    // under the RE72 line (see that fixture's own comment), so the sheet's
+    // journey section and its calls section can each still be mid-resolve for
+    // a moment after the sheet opens; either one landing replaces the sheet
+    // body (same mechanism as `callsSignature` above), which raced the "more"
     // tap below and made it land on a button already detached from the page.
-    // Waiting out the spinner first is what the rest of this section assumes.
+    // Waiting out both spinners first, `.tip-planning` covers each of them
+    // since rowSheet's own wait and callsSection's share the class, is what
+    // the rest of this section assumes.
     await io.waitFor("document.querySelector('.tip-sheet .tip-planning') === null", 5000);
 
     const firstCalls = await io.evalJs<Array<{ name: string; time: string }>>(`(() => {
@@ -1344,6 +1374,98 @@ async function main(): Promise<void> {
         .slice(0, 3)
         .map((call) => `${call.name} ${call.time}`)
         .join(', ')}`,
+    );
+
+    // Sheet order, fit, and collapse: all three read this same sheet before the
+    // "more" tap below touches it, and that placement is load-bearing rather
+    // than cosmetic. `expandCalls` (src/page/calls.ts) marks a row's key
+    // expanded in a module-level Set that nothing here ever clears, so once
+    // this row's "more" is tapped its calls list stays expanded, on this open
+    // sheet and on every sheet this key opens again, for the rest of the run.
+    // A collapsed-list assertion after that tap would not be testing the
+    // collapse; it would be testing whatever was left over from testing the
+    // expansion. This is also the one row transitous-plan.json now gives a
+    // matching RE72 itinerary (see that fixture's comment), so it is the one
+    // sheet in this fixture set that carries both a journey and a calls list at
+    // once, which is what the ordering and fit checks below need.
+
+    const sheetOrder = await io.evalJs<string[]>(`(() => {
+      const sheet = document.querySelector('.tip-sheet');
+      if (!sheet) return [];
+      return [...sheet.querySelectorAll('.tip-journey, .tip-calls')].map((node) => node.className);
+    })()`);
+    const journeyPresent = await io.evalJs<boolean>(
+      "document.querySelector('.tip-sheet .tip-body.tip-journey') !== null",
+    );
+    const callsPresent = await io.evalJs<boolean>("document.querySelector('.tip-sheet .tip-calls') !== null");
+    const journeyIndex = sheetOrder.findIndex((cls) => cls.includes('tip-journey'));
+    const callsIndex = sheetOrder.findIndex((cls) => cls.includes('tip-calls'));
+    record(
+      'the journey comes before the calls in the sheet',
+      journeyPresent && callsPresent && journeyIndex !== -1 && callsIndex !== -1 && journeyIndex < callsIndex,
+      `order: [${sheetOrder.join(', ')}]`,
+    );
+
+    // journeyBottom against sheetBottom rather than against the viewport: the
+    // sheet is what caps itself at 85vh and scrolls internally (page/theme.css),
+    // so a journey that fits the sheet is a journey the reader sees without
+    // touching it, whatever the sheet's own position on the screen is. The
+    // 844px viewport check is the belt to that suspenders, in case a future
+    // change centres a sheet taller than the phone itself.
+    //
+    // Worth knowing what this one does and does not catch. Reordering the sheet
+    // does not change how tall it is, and at this fixture's size the whole thing
+    // is well under the 85vh cap, so the cap never binds here and reordering
+    // alone cannot make this assertion fail. The assertion above it, on document
+    // order, is the one that reproduces the report; this is the guard against
+    // the sheet growing until the journey no longer fits, which is the shape the
+    // bug took on real data, where a journey carries alternatives and a call
+    // list carries a real run.
+    const fit = await io.evalJs<{
+      scrollTop: number;
+      journeyTop: number;
+      journeyBottom: number;
+      sheetTop: number;
+      sheetBottom: number;
+      clientHeight: number;
+      scrollHeight: number;
+    } | null>(`(() => {
+      const sheet = document.querySelector('.tip-sheet');
+      const journey = document.querySelector('.tip-sheet .tip-body.tip-journey');
+      if (!sheet || !journey) return null;
+      const sheetRect = sheet.getBoundingClientRect();
+      const journeyRect = journey.getBoundingClientRect();
+      return {
+        scrollTop: sheet.scrollTop,
+        journeyTop: journeyRect.top,
+        journeyBottom: journeyRect.bottom,
+        sheetTop: sheetRect.top,
+        sheetBottom: sheetRect.bottom,
+        clientHeight: sheet.clientHeight,
+        scrollHeight: sheet.scrollHeight,
+      };
+    })()`);
+    record(
+      'the journey is on screen without scrolling the sheet',
+      fit !== null && fit.scrollTop === 0 && fit.journeyBottom <= fit.sheetBottom + 1 && fit.sheetBottom <= 844 + 1,
+      fit === null
+        ? 'no .tip-sheet or .tip-sheet .tip-body.tip-journey found'
+        : `journey top=${Math.round(fit.journeyTop)} bottom=${Math.round(fit.journeyBottom)}; ` +
+          `sheet top=${Math.round(fit.sheetTop)} bottom=${Math.round(fit.sheetBottom)} clientHeight=${fit.clientHeight} scrollHeight=${fit.scrollHeight}`,
+    );
+
+    const collapse = await io.evalJs<{ count: number; moreText: string | null }>(`(() => {
+      const sheet = document.querySelector('.tip-sheet');
+      if (!sheet) return { count: 0, moreText: null };
+      return {
+        count: sheet.querySelectorAll('.tip-call-list li.tip-call').length,
+        moreText: sheet.querySelector('button.tip-more')?.textContent ?? null,
+      };
+    })()`);
+    record(
+      'the calls list is collapsed until asked',
+      collapse.count === SHEET_CALLS && collapse.moreText !== null,
+      `count=${collapse.count} (SHEET_CALLS=${SHEET_CALLS}) button text="${collapse.moreText ?? ''}"`,
     );
 
     // Marked on `.tip-sheet` itself, not `.tip-sheet-body`: expanding the list
@@ -1429,6 +1551,76 @@ async function main(): Promise<void> {
       // if that ever stops being true, the row's own "via" hint goes untested
       // here rather than being asserted against a row invented for the purpose.
       console.log('[e2e] no BAHN rows in this fixture; the row-via assertion was skipped');
+    }
+
+    // board.ts's renderRow appends `.row-via` to `.row-times`, a sibling of the
+    // route anchor under `.row-main`'s neighbour, not a child of `.route` and
+    // not a competitor for its grid track. This is the same claim the sheet's
+    // journey-before-calls order makes about the sheet: a later addition to a
+    // row must not narrow or displace what was already there. RE72 is both this
+    // fixture's one BAHN row (so the only one that can carry `.row-via`) and,
+    // since transitous-plan.json's third itinerary, one with a filled `.route`
+    // too, so the strong form below (equal widths) is what actually runs here;
+    // the weaker form stays in as the fallback this assertion degrades to if a
+    // future fixture change ever separates those two facts again.
+    if (bahnRowCount > 0) {
+      const viaSlotCheck = await io.evalJs<{
+        bahnRouteWidth: number | null;
+        bahnRouteLeft: number | null;
+        bahnRouteRight: number | null;
+        otherRouteWidth: number | null;
+        viaInsideRoute: boolean | null;
+        viaOverlapsRoute: boolean | null;
+        bahnHasVia: boolean;
+        bahnRouteFilled: boolean;
+      }>(`(() => {
+        const bahnRow = ${bahnRowExpr};
+        const otherRow = ${plannedRowExpr};
+        const bahnRoute = bahnRow ? bahnRow.querySelector('.route') : null;
+        const bahnVia = bahnRow ? bahnRow.querySelector('.row-via') : null;
+        const otherRoute = otherRow ? otherRow.querySelector('.route') : null;
+        const bahnRouteRect = bahnRoute ? bahnRoute.getBoundingClientRect() : null;
+        const viaRect = bahnVia ? bahnVia.getBoundingClientRect() : null;
+        let viaOverlapsRoute = null;
+        if (bahnRouteRect && viaRect) {
+          viaOverlapsRoute = viaRect.left < bahnRouteRect.right && viaRect.right > bahnRouteRect.left;
+        }
+        return {
+          bahnRouteWidth: bahnRouteRect ? bahnRouteRect.width : null,
+          bahnRouteLeft: bahnRouteRect ? bahnRouteRect.left : null,
+          bahnRouteRight: bahnRouteRect ? bahnRouteRect.right : null,
+          otherRouteWidth: otherRoute ? otherRoute.getBoundingClientRect().width : null,
+          viaInsideRoute: bahnRoute && bahnVia ? bahnRoute.contains(bahnVia) : null,
+          viaOverlapsRoute,
+          bahnHasVia: bahnVia !== null,
+          bahnRouteFilled: bahnRoute !== null && !bahnRoute.classList.contains('slot-empty'),
+        };
+      })()`);
+
+      if (viaSlotCheck.bahnHasVia && viaSlotCheck.bahnRouteFilled && viaSlotCheck.otherRouteWidth !== null) {
+        const widthDiff = Math.abs((viaSlotCheck.bahnRouteWidth ?? 0) - (viaSlotCheck.otherRouteWidth ?? 0));
+        record(
+          "a regional row's via text does not take the journey's slot",
+          viaSlotCheck.viaInsideRoute === false && widthDiff <= 1,
+          `route width with via=${viaSlotCheck.bahnRouteWidth}px, without via=${viaSlotCheck.otherRouteWidth}px; ` +
+            `.row-via inside .route=${viaSlotCheck.viaInsideRoute}`,
+        );
+      } else {
+        // No row in this fixture carries both a filled `.route` and a
+        // `.row-via` at once (the fixture edit above is what makes RE72 carry
+        // both; if that ever regresses, fall back to the weaker claim: the via
+        // text is never nested inside the route slot and never shares its
+        // horizontal extent, so it cannot be squeezing it even without a
+        // same-board row to compare widths against).
+        record(
+          "a regional row's via text does not take the journey's slot",
+          viaSlotCheck.viaInsideRoute !== true && viaSlotCheck.viaOverlapsRoute !== true,
+          `no row with both a filled route and a via hint; falling back to the weaker claim: ` +
+            `.row-via inside .route=${viaSlotCheck.viaInsideRoute}, overlaps .route=${viaSlotCheck.viaOverlapsRoute}`,
+        );
+      }
+    } else {
+      console.log("[e2e] no BAHN rows in this fixture; the via-vs-route-slot assertion was skipped");
     }
 
     // ------------------------------------------------ timing, under a phone's
@@ -1989,6 +2181,30 @@ export class PageIo {
 }
 
 // --------------------------------------------------------------- chrome glue
+
+/**
+ * Rebuild the page bundles the static server is about to publish.
+ *
+ * The same command `bun run build` runs, spelled out here rather than shelled
+ * out to the package script, so this cannot silently start testing whatever a
+ * renamed script happens to do.
+ */
+export function buildPage(): void {
+  const root = `${HERE}/../..`;
+  for (const [entry, out] of [
+    ['src/page.ts', 'page/app.js'],
+    ['src/route.ts', 'page/route.js'],
+  ] as const) {
+    const built = Bun.spawnSync({
+      cmd: ['bun', 'build', `${root}/${entry}`, '--target', 'browser', '--outfile', `${root}/${out}`],
+      stdout: 'pipe',
+      stderr: 'pipe',
+    });
+    if (built.exitCode !== 0) {
+      throw new Error(`[e2e] building ${out} failed:\n${new TextDecoder().decode(built.stderr)}`);
+    }
+  }
+}
 
 export async function readDevToolsUrl(proc: Bun.Subprocess): Promise<string> {
   const reader = proc.stderr.getReader();

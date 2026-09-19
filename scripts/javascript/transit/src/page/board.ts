@@ -23,11 +23,14 @@ import type { BoardStatus, BoardView } from './types.ts';
 /**
  * How many onward calls a sheet names before it offers the rest behind a tap.
  *
- * Enough to answer "does it stop where I am going" for a journey inside the
- * city without expanding anything, and short enough that the journey section
- * below it is still on the screen.
+ * Three, because the sheet is opened to decide which train to get on and the
+ * journey is that decision; the calls are context for it. Eight of them, which
+ * is what this was, is a screen's worth of context sitting between the reader
+ * and the answer, and on a phone it pushed the journey off the bottom of the
+ * sheet. Three name the next places the run reaches, which is enough to
+ * recognise the direction, and the rest is one tap away.
  */
-const SHEET_CALLS = 8;
+const SHEET_CALLS = 3;
 
 /**
  * How many a short hint beside a destination names.
@@ -635,8 +638,6 @@ function rowSheet(dep: Departure, board: Board, context: BoardContext, usual: Ma
   if (dep.cancelled) body.append(el('p', 'tip-warning', 'This departure is cancelled.'));
   if (dep.sev) body.append(el('p', 'tip-note', 'A replacement service, not the usual vehicle.'));
 
-  body.append(callsSection(dep, context));
-
   const planned = context.routes?.rows.get(rowKey(dep));
   const options = planned?.options ?? [];
   if (options.length > 0) {
@@ -664,6 +665,14 @@ function rowSheet(dep: Departure, board: Board, context: BoardContext, usual: Ma
     if (miss !== undefined) note.append(el('span', 'tip-miss', ` No journey: ${miss}.`));
     body.append(note);
   }
+
+  // Last, and deliberately. The reader opened this to choose a train, and the
+  // journey is that choice; where the train calls afterwards is what confirms
+  // it. Put above the journey, as it first was, a call list long enough to be
+  // useful pushed the journey past the bottom of a sheet that is capped at a
+  // fraction of the screen, so the answer was there and off-screen, which reads
+  // exactly like it having been taken away.
+  body.append(callsSection(dep, context));
 
   return body;
 }

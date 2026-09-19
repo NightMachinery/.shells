@@ -1111,10 +1111,19 @@ button that plans that one row again and rewrites the fragment.
 A row names a line and a terminus, and at a junction neither answers the
 question a rider actually has, which is whether it stops at the place they are
 going to. The sheet therefore carries the run's remaining calls with the time it
-reaches each of them, the first several of them and then a control that unfolds
-the rest. Times as well as names, because "does it stop there" is almost always
-followed by "and when would I be there", and the pair also says how long the
-ride is, which nothing else on the page does.
+reaches each of them, the first few and then a control that unfolds the rest.
+Times as well as names, because "does it stop there" is almost always followed
+by "and when would I be there", and the pair also says how long the ride is,
+which nothing else on the page does.
+
+It is the last thing in the sheet, under the journey, and it is short. The
+reader opened the sheet to choose a train and the journey is that choice; where
+the train calls afterwards is what confirms it. Put above the journey, as it
+first was, and long enough to be useful, the list pushed the journey past the
+bottom of a sheet that is capped at a fraction of the screen. The journey was
+still there and still drawn, one scroll down inside the sheet, which reads
+exactly like it having been taken away. The count it collapses to is named in
+=src/page/board.ts=.
 
 Asked only when something asks. That is one request per vehicle and a board is
 two hundred rows, so nothing is fetched until a sheet opens on a particular
@@ -1481,6 +1490,14 @@ reaching for a deployed copy, so it is offline and repeatable.
 Run it before every deploy. The layout pass that preceded it measured pixels and
 never tapped anything, and everything it missed was a bug that only exists under
 a finger.
+
+It builds the bundles itself, as the first thing it does. The directory it
+publishes contains a build artefact that is not in version control, so a fresh
+checkout has none of it and a working tree has whatever the last build left
+behind. Both are silent: the run goes green against the previous bundle, which
+is a harness reporting on code that is no longer in the tree. That happened
+here, and it cost a round of assertions that proved nothing about the change
+they were written for.
 
 It measures the layout twice, the second time in a font deliberately wider than
 this machine's. A phone renders =system-ui= as Roboto, which is wider than what
