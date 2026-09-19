@@ -110,11 +110,37 @@ export interface Place {
   name: string;
   /** What the picker calls it; the key when nothing else is given. */
   label: string | null;
+  /** A single glyph drawn in front of it in the picker. Optional. */
+  emoji: string | null;
   /** Set on a coordinate place. */
   lat: number | null;
   lon: number | null;
   /** Set on a stop place: the stop that is the destination. */
   stop: string | null;
+}
+
+/**
+ * The optional glyph a profile or a place may carry.
+ *
+ * Length-capped rather than validated as an emoji, because "is this an emoji"
+ * is a question about a Unicode version and the answer changes underneath you;
+ * what actually matters is that it stays one glyph wide in a tab, and a couple
+ * of code units is what a flag or a zero-width-joiner sequence costs.
+ */
+export const EMOJI_MAX_UNITS = 12;
+
+function parseEmoji(raw: unknown, where: string, issues: string[]): string | null {
+  if (raw === undefined) return null;
+  if (typeof raw !== 'string' || raw.trim().length === 0) {
+    issues.push(`${where}.emoji: must be a non-empty string`);
+    return null;
+  }
+  const emoji = raw.trim();
+  if (emoji.length > EMOJI_MAX_UNITS) {
+    issues.push(`${where}.emoji: must be a single glyph`);
+    return null;
+  }
+  return emoji;
 }
 
 /** Whether this place is a stop the reader travels to rather than a doorstep. */
@@ -316,6 +342,7 @@ function parsePlaces(raw: unknown, issues: string[]): Record<string, Place> {
       continue;
     }
     const label = typeof entry.label === 'string' && entry.label.trim().length > 0 ? entry.label.trim() : null;
+    const emoji = parseEmoji(entry.emoji, `places.${name}`, issues);
     const stop = entry.stop;
     if (stop !== undefined) {
       if (typeof stop !== 'string' || stop.trim().length === 0) {
@@ -326,7 +353,7 @@ function parsePlaces(raw: unknown, issues: string[]): Record<string, Place> {
         issues.push(`places.${name}: declare either stop, or lat and lon, not both`);
         continue;
       }
-      places[name] = { name, label, lat: null, lon: null, stop: stop.trim() };
+      places[name] = { name, label, emoji, lat: null, lon: null, stop: stop.trim() };
       continue;
     }
     const lat = entry.lat;
@@ -340,7 +367,7 @@ function parsePlaces(raw: unknown, issues: string[]): Record<string, Place> {
       issues.push(`places.${name}.lon: must be a number`);
       ok = false;
     }
-    if (ok) places[name] = { name, label, lat: lat as number, lon: lon as number, stop: null };
+    if (ok) places[name] = { name, label, emoji, lat: lat as number, lon: lon as number, stop: null };
   }
   return places;
 }
@@ -597,6 +624,15 @@ function parseProfiles(raw: unknown, issues: string[]): Profile[] {
       if (board !== null) boards.push(board);
     }
     const profile: Profile = { key, title: typeof title === 'string' ? title.trim() : key, boards };
+    const emoji = parseEmoji(entry.emoji, `profiles.${key}`, issues);
+    if (emoji !== null) profile.emoji = emoji;
+    if (entry.short !== undefined) {
+      if (typeof entry.short !== 'string' || entry.short.trim().length === 0) {
+        issues.push(`profiles.${key}.short: must be a non-empty string`);
+      } else {
+        profile.short = entry.short.trim();
+      }
+    }
     if (entry.destinations !== undefined) {
       const list = stringList(entry.destinations);
       if (list === null) issues.push(`profiles.${key}.destinations: must be a list of place keys`);

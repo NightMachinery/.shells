@@ -144,6 +144,8 @@ export function configExportDocument(config: Config, options: ConfigExportOption
     profiles: config.profiles.map((profile) => ({
       key: profile.key,
       title: profile.title,
+      emoji: profile.emoji ?? null,
+      short: profile.short ?? null,
       destinations: profile.destinations ?? null,
       boards: profile.boards.map((board) => ({
         title: board.title,
@@ -172,6 +174,7 @@ export function configExportDocument(config: Config, options: ConfigExportOption
     document.places = places.map((place) => ({
       name: place.name,
       label: place.label,
+      emoji: place.emoji,
       lat: place.lat,
       lon: place.lon,
       stop: place.stop,

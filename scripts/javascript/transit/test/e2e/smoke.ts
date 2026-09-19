@@ -311,6 +311,63 @@ async function main(): Promise<void> {
         : 'no .destination found in the first board',
     );
 
+    // ---------------------------------------------------------- assertion 8
+
+    // Every profile has to be reachable. This is the one check that runs
+    // against the real configuration rather than a fixture, so it is the only
+    // place a fourth profile, or a title too long for the bar, shows up at all:
+    // the touch harness has two invented profiles and would still be green.
+    const tabs = await io.evalJs<{
+      right: { backend: number; refresh: number; age: number; ageText: string; barRight: number };
+      drawn: string[];
+      labels: string[];
+      tops: number[];
+      navScroll: number;
+      navClient: number;
+      lastRight: number;
+      navRight: number;
+      slack: number;
+    }>(`(() => {
+      const nav = document.querySelector('.tabs');
+      const nodes = nav === null ? [] : [...nav.querySelectorAll('.tab')];
+      const last = nodes.length === 0 ? null : nodes[nodes.length - 1];
+      const widthOf = (selector) => {
+        const node = document.querySelector(selector);
+        return node === null ? 0 : Math.round(node.getBoundingClientRect().width * 100) / 100;
+      };
+      return {
+        right: {
+          backend: widthOf('.bar-backend'),
+          refresh: widthOf('.refresh'),
+          age: widthOf('.refresh-age'),
+          ageText: (document.querySelector('.refresh-age') || {}).textContent || '',
+          barRight: widthOf('.bar-right'),
+        },
+        drawn: nodes.map((node) => node.textContent ?? ''),
+        labels: nodes.map((node) => node.getAttribute('aria-label') ?? ''),
+        tops: nodes.map((node) => Math.round(node.getBoundingClientRect().top)),
+        navScroll: nav === null ? 0 : nav.scrollWidth,
+        navClient: nav === null ? 0 : nav.clientWidth,
+        lastRight: last === null ? 0 : Math.round(last.getBoundingClientRect().right * 100) / 100,
+        navRight: nav === null ? 0 : Math.round(nav.getBoundingClientRect().right * 100) / 100,
+        // How much room is left between the last tab and the controls on the
+        // right. This is what a fifth profile, or a longer short label, would
+        // be spending; when it reaches zero the tabs start being clipped.
+        slack:
+          last === null || document.querySelector('.bar-right') === null
+            ? 0
+            : Math.round((document.querySelector('.bar-right').getBoundingClientRect().left - last.getBoundingClientRect().right) * 100) / 100,
+      };
+    })()`);
+    record(
+      'every profile tab is drawn, on one line, with the last one fully on screen',
+      tabs.drawn.length > 1 &&
+        new Set(tabs.tops).size === 1 &&
+        tabs.navScroll <= tabs.navClient + 1 &&
+        tabs.lastRight <= tabs.navRight + 1,
+      `${tabs.drawn.length} tabs ${JSON.stringify(tabs.drawn)} (called ${JSON.stringify(tabs.labels)}); nav needs ${tabs.navScroll}px of ${tabs.navClient}px; last tab right=${tabs.lastRight} nav right=${tabs.navRight}; ${tabs.slack}px of room left before the controls; the right of the bar takes ${tabs.right.barRight}px (backend ${tabs.right.backend}, refresh ${tabs.right.refresh}, age ${tabs.right.age} saying "${tabs.right.ageText}")`,
+    );
+
     // --------------------------------------------------------------- summary
 
     const passed = results.filter((r) => r.pass).length;

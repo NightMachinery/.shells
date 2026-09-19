@@ -40,6 +40,8 @@ export interface ExportedBoard {
 export interface ExportedPlace {
   name: string;
   label: string | null;
+  /** A single glyph drawn in front of it in the picker. */
+  emoji?: string | null;
   lat: number | null;
   lon: number | null;
   stop: string | null;
@@ -48,6 +50,10 @@ export interface ExportedPlace {
 export interface ExportedProfile {
   key: string;
   title: string;
+  /** A single glyph drawn in front of the tab's label. */
+  emoji?: string | null;
+  /** What the tab says where the full title does not fit. */
+  short?: string | null;
   /** Place keys this profile offers, in order; null for the default order. */
   destinations?: string[] | null;
   boards: ExportedBoard[];

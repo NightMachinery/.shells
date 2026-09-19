@@ -62,9 +62,12 @@ home = "first"
 [places.somewhere]
 lat = 0.0
 lon = 0.0
+emoji = "⭐"
 
 [profiles.first]
 title = "First"
+emoji = "⭐"
+short = "1st"
 
 [[profiles.first.boards]]
 title = "Rapid transit, one way"
@@ -84,6 +87,14 @@ walk_minutes_by_stop = { "de:00000:1" = 2, "de:00000:2" = 9 }
 
 Profile keys are arbitrary short words. Nothing in the package assumes any
 particular key exists.
+
+=emoji= and =short= are both optional and both are about the sticky bar on a
+phone: the glyph in front of the tab and the label it draws when the full title
+does not fit. A place may carry a glyph too, for the destination picker, and a
+place named after a profile inherits that profile's. The glyph is validated by
+length rather than by asking whether it is an emoji, because which code points
+count changes with the Unicode version and what actually matters is that it
+stays one glyph wide in a tab.
 
 ** The home alias
 
@@ -999,6 +1010,42 @@ the end it has reached: a last control that stays dimmed reads as disabled rathe
 than as reachable. The harness enforces the pair. Every other element on the page
 has to fit the viewport; this one may scroll, and must show the fade when it
 does.
+
+*** A glyph and a short name per tab
+
+A profile may declare a glyph and a short label, and on a phone the tab draws
+both instead of the title. The glyph is a landmark rather than a label: it is
+there so a thumb can find the right tab without reading, and the word stays
+beside it so a reader who does not recognise the picture is not guessing. The
+full title remains the tab's accessible name and its tooltip, and a screen wide
+enough for it draws it in full, still with the glyph in front. With no short
+label declared the key stands in, uppercased, which is right for a key that is
+already an abbreviation and wrong for a word, so a word declares its own.
+
+The places do not repeat themselves: a place named after a profile borrows that
+profile's glyph in the destination picker, and only the stations a reader
+travels to declare their own.
+
+None of this is decoration, and the test for it is not whether it looks nice.
+The bar is sticky, so every pixel it grows is a pixel of departures gone from
+every board, and a second row of tabs would be worse than no glyph at all. So
+the assertions are that the bar is exactly as tall with the glyphs as without
+them, that the tabs sit on one line, and that the last of them is fully on
+screen.
+
+That last one failed the moment it was written, with four profiles on a real
+phone: the fourth tab was drawn off the edge of the strip. What the smoke check
+made obvious is that the right of the bar takes its width first and the tabs get
+what is left, so everything reserved on the right is a tab that might not be
+reachable. Three things came off it. The tabs and their padding are tighter at
+phone width, where a thumb is no less accurate for a few pixels either side. The
+freshness reads as a number rather than as a word while a refresh is running,
+because the ring beside it is already spinning and "updating" was three times
+the width of the age it replaced. And the feed's name leaves the bar entirely on
+a phone: it is provenance rather than a control, every board's filter now names
+the feed that answered it, and a board that disagrees with the others still says
+so on its own header. The check prints how much room is left, so the next
+profile added can be budgeted rather than discovered.
 
 The start time is either *now*, which moves with the clock, or a moment the
 reader picked. With a picked moment every row is labelled *planned*, because

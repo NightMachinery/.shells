@@ -1,10 +1,10 @@
 import { buildLabel } from './build.ts';
 import type { Board, Departure } from '../model.ts';
-import { visibleRows } from './board.ts';
+import { narrowViewport, visibleRows } from './board.ts';
 import { button, compact, el, minutesUntil, timeLabel, timeNode } from './dom.ts';
 import { lineBadge } from './journey.ts';
 import { attachTip } from './tip.ts';
-import type { ExportedConfig, PageState } from './types.ts';
+import type { ExportedConfig, ExportedProfile, PageState } from './types.ts';
 
 // The sticky bar: which profile, how far ahead, from when, how fresh, and a way
 // to jump to any board without scrolling for it.
@@ -203,7 +203,7 @@ export function resetBar(): void {
  * stop for a bus they had already decided not to take.
  */
 function chipsKeyOf(boards: Board[]): string {
-  return boards.map((board) => board.title).join('');
+  return boards.map((board) => board.title).join('\u0001');
 }
 
 function buildChip(bar: BarView, index: number): ChipEntry {
@@ -324,19 +324,27 @@ function destinationOffered(context: BarContext): Array<{ name: string; label: s
     }
     return Number(a.stop !== null) - Number(b.stop !== null);
   });
-  return offered.map((place) => ({
-    name: place.name,
+  return offered.map((place) => {
     // A stop place says what it is called; a doorstep borrows the tab's title,
-    // which is the name a reader recognises, and falls back to the raw key.
-    label: place.label ?? context.config.profiles.find((entry) => entry.key === place.name)?.title ?? place.name,
-  }));
+    // which is the name a reader recognises, and falls back to the raw key. The
+    // glyph comes from the place, or from the profile the place is named after,
+    // so a doorstep and its tab are marked the same way without saying so twice
+    // in the configuration.
+    const profile = context.config.profiles.find((entry) => entry.key === place.name);
+    const label = place.label ?? profile?.title ?? place.name;
+    const emoji = place.emoji ?? profile?.emoji ?? null;
+    return {
+      name: place.name,
+      label: emoji === null || emoji.length === 0 ? label : `${emoji} ${label}`,
+    };
+  });
 }
 
 function updateDestination(bar: BarView, context: BarContext): void {
   const offered = destinationOffered(context);
   setPresent(bar.controls, bar.destination.wrap, offered !== null, bar.start.wrap);
   if (offered === null) return;
-  const key = offered.map((place) => `${place.name}:${place.label}`).join('');
+  const key = offered.map((place) => `${place.name}:${place.label}`).join('\u0001');
   if (key !== bar.destination.offered) {
     bar.destination.offered = key;
     const options: HTMLOptionElement[] = [];
@@ -463,11 +471,11 @@ function createBar(context: BarContext): BarView {
     writeAge: () => undefined,
     chips,
     chipEntries: [],
-    chipsKey: ' never',
+    chipsKey: '\u0000never',
     controls,
     segments,
     horizonEnd,
-    destination: { wrap: destinationWrap, select, sort, offered: ' never' },
+    destination: { wrap: destinationWrap, select, sort, offered: '\u0000never' },
     start: { wrap: startWrap, now: startNow, input, note, noteTime },
     error,
   };
@@ -500,15 +508,21 @@ function createBar(context: BarContext): BarView {
 
   bar.writeAge = (): void => {
     const state = bar.context.state;
-    if (state.inFlight > 0) {
-      setText(age, 'updating');
-      return;
-    }
-    // Planning counts as work in flight. It is the slower half of a refresh,
-    // and a ring that stopped while the journeys were still being worked out
-    // said the page was idle when it was not.
-    if (state.planInFlight > 0) {
-      setText(age, 'planning');
+    const busy = state.inFlight > 0 || state.planInFlight > 0;
+    // On a phone the word is dropped and the age is left standing.
+    //
+    // Not for tidiness: "updating" is three times the width of "4s", the right
+    // of the bar takes whatever width it asks for, and the tabs are what
+    // yields, so the widest word here decided whether the last profile tab was
+    // on the screen. It went off the edge every time a refresh started. The
+    // ring beside it is already spinning, which is the same news in no width at
+    // all, and which of the two halves of a refresh is running is a question
+    // the timing lines in the filter answer properly.
+    if (busy && !narrowViewport()) {
+      // Planning counts as work in flight. It is the slower half of a refresh,
+      // and a ring that stopped while the journeys were still being worked out
+      // said the page was idle when it was not.
+      setText(age, state.inFlight > 0 ? 'updating' : 'planning');
       return;
     }
     setText(age, bar.context.ageSeconds === null ? 'no data' : `${bar.context.ageSeconds}s`);
@@ -523,22 +537,52 @@ function startOf(bar: BarView): number {
   return bar.context.state.startMode === 'picked' ? bar.context.state.startMs : bar.context.now;
 }
 
+/**
+ * What a tab says.
+ *
+ * The glyph is a landmark rather than a label: it is there so a thumb can find
+ * the right tab without reading, and the word stays beside it so a reader who
+ * does not recognise the picture is not guessing. On a narrow screen the word
+ * shrinks to the profile's short form, because four full titles either wrap the
+ * bar onto a second line or push the last tab off the edge, and both of those
+ * cost more than the letters do. The full title is still the tab's accessible
+ * name and its tooltip, so the abbreviation is never the only thing on offer.
+ */
+export function tabLabel(profile: ExportedProfile, narrow: boolean): string {
+  const name = narrow ? (profile.short ?? profile.key.toUpperCase()) : profile.title;
+  const emoji = profile.emoji ?? null;
+  return emoji === null || emoji.length === 0 ? name : `${emoji} ${name}`;
+}
+
 function updateTabs(bar: BarView, context: BarContext): void {
-  const key = context.config.profiles.map((profile) => `${profile.key}:${profile.title}`).join('');
+  const key = context.config.profiles
+    .map((profile) => `${profile.key}:${profile.title}:${profile.emoji ?? ''}:${profile.short ?? ''}`)
+    .join('\u0001');
   if (key !== bar.tabsKey) {
     bar.tabsKey = key;
     bar.tabButtons = new Map();
     const nodes = context.config.profiles.map((profile, index) => {
-      const tab = button('tab', profile.title);
-      if (index < 9) tab.title = `press ${index + 1}`;
+      const tab = button('tab');
+      // The name a screen reader reads is the full one whatever is drawn, and
+      // the tooltip carries it too, because the short form is an abbreviation
+      // this page invented and nobody else uses.
+      tab.setAttribute('aria-label', profile.title);
+      tab.title = index < 9 ? `${profile.title} (press ${index + 1})` : profile.title;
       tab.addEventListener('click', () => bar.context.onProfile(profile.key));
       bar.tabButtons.set(profile.key, tab);
       return tab;
     });
     bar.tabs.replaceChildren(...nodes);
   }
-  for (const [profileKey, tab] of bar.tabButtons) {
-    setClass(tab, 'active', profileKey === context.state.profileKey);
+  // Which label fits depends on how wide the screen is, and a phone changes
+  // width when it is turned over, so this is patched on every update rather
+  // than set once when the tab is built.
+  const narrow = narrowViewport();
+  for (const profile of context.config.profiles) {
+    const tab = bar.tabButtons.get(profile.key);
+    if (tab === undefined) continue;
+    setText(tab, tabLabel(profile, narrow));
+    setClass(tab, 'active', profile.key === context.state.profileKey);
   }
 }
 

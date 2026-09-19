@@ -216,6 +216,16 @@ export interface Profile {
   title: string;
   boards: BoardConfig[];
   /**
+   * A single glyph standing for this profile, drawn in front of its tab.
+   *
+   * Optional, and never the whole label: it is a landmark for the thumb on a
+   * narrow screen, where the words shrink to the short form below, and a
+   * reader who does not recognise the picture still has the word beside it.
+   */
+  emoji?: string;
+  /** The tab's label where the full title does not fit. The key, uppercased, when absent. */
+  short?: string;
+  /**
    * Place keys this profile offers as journey destinations, in the order they
    * should appear. Absent means the default order: the other profiles' own
    * places first, then the stops the reader travels to.

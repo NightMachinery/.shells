@@ -234,13 +234,13 @@ describe('places', () => {
 
   test('a stop place needs no coordinates and exports with a final walk of nothing', () => {
     const config = parseConfig({ profiles, places: { station: { stop: 'de:00000:7', label: 'Marienplatz' } } }, PATH);
-    expect(config.places.station).toEqual({ name: 'station', label: 'Marienplatz', lat: null, lon: null, stop: 'de:00000:7' });
+    expect(config.places.station).toEqual({ name: 'station', label: 'Marienplatz', emoji: null, lat: null, lon: null, stop: 'de:00000:7' });
     const document = configExportDocument(config, { mvgBaseUrl: 'a', transitousBaseUrl: 'b' }) as {
       places?: Array<{ name: string; stop: string | null; lat: number | null }>;
     };
     // Exported even without `--with-places`: a stop id is not geography, and
     // this document is already a list of stop ids.
-    expect(document.places).toEqual([{ name: 'station', label: 'Marienplatz', lat: null, lon: null, stop: 'de:00000:7' }]);
+    expect(document.places).toEqual([{ name: 'station', label: 'Marienplatz', emoji: null, lat: null, lon: null, stop: 'de:00000:7' }]);
     expect(planTargets(config.places.station as never, [])[0]?.walkMinutes).toBe(0);
   });
 
@@ -366,5 +366,78 @@ describe('a board that fixes its own destination', () => {
         PATH,
       ),
     ).toThrow(/must be the key of a place/);
+  });
+});
+
+describe('the glyph a profile and a place may carry', () => {
+  const boards = [{ title: 'b', stops: ['de:00000:1'], walk_minutes: 4 }];
+
+  test('a profile carries a glyph and a short label through the export', () => {
+    const config = parseConfig(
+      { profiles: { home: { title: 'The long name nobody reads twice', emoji: '🏠', short: 'H51', boards } } },
+      PATH,
+    );
+    const profile = config.profiles[0];
+    expect(profile?.emoji).toBe('🏠');
+    expect(profile?.short).toBe('H51');
+    const document = configExportDocument(config, { mvgBaseUrl: 'a', transitousBaseUrl: 'b' }) as {
+      profiles: Array<{ emoji: string | null; short: string | null }>;
+    };
+    expect(document.profiles[0]?.emoji).toBe('🏠');
+    expect(document.profiles[0]?.short).toBe('H51');
+  });
+
+  test('both are optional and export as null', () => {
+    const config = parseConfig({ profiles: { home: { title: 'Home', boards } } }, PATH);
+    expect(config.profiles[0]?.emoji).toBeUndefined();
+    const document = configExportDocument(config, { mvgBaseUrl: 'a', transitousBaseUrl: 'b' }) as {
+      profiles: Array<{ emoji: string | null; short: string | null }>;
+    };
+    expect(document.profiles[0]?.emoji).toBeNull();
+    expect(document.profiles[0]?.short).toBeNull();
+  });
+
+  test('a place carries one too, and it reaches the picker through the export', () => {
+    const config = parseConfig(
+      { profiles: { home: { title: 'Home', boards } }, places: { station: { stop: 'de:00000:7', emoji: '🚉' } } },
+      PATH,
+    );
+    expect(config.places.station?.emoji).toBe('🚉');
+    const document = configExportDocument(config, { mvgBaseUrl: 'a', transitousBaseUrl: 'b' }) as {
+      places?: Array<{ emoji: string | null }>;
+    };
+    expect(document.places?.[0]?.emoji).toBe('🚉');
+  });
+
+  test('a sentence where a glyph belongs is refused, on the profile and on the place', () => {
+    // Length rather than "is this an emoji": what matters is that it stays one
+    // glyph wide in a tab, and which code points count as emoji is a question
+    // whose answer changes with the Unicode version.
+    expect(issuesOf({ profiles: { home: { title: 'Home', emoji: 'the one at home', boards } } })).toContain(
+      'profiles.home.emoji: must be a single glyph',
+    );
+    expect(issuesOf({ profiles: { home: { title: 'Home', emoji: '  ', boards } } })).toContain(
+      'profiles.home.emoji: must be a non-empty string',
+    );
+    expect(issuesOf({ profiles: { home: { title: 'Home', short: 42, boards } } })).toContain(
+      'profiles.home.short: must be a non-empty string',
+    );
+    expect(
+      issuesOf({
+        profiles: { home: { title: 'Home', boards } },
+        places: { station: { stop: 'de:00000:7', emoji: 'a whole station name' } },
+      }),
+    ).toContain('places.station.emoji: must be a single glyph');
+  });
+
+  test('a flag and a joined sequence both fit the cap', () => {
+    // Two code points for a flag, and five plus joiners for a family: the cap
+    // is in UTF-16 units, so it has to be wide enough for the sequences that
+    // are genuinely one glyph.
+    const config = parseConfig(
+      { profiles: { a: { title: 'A', emoji: '🇩🇪', boards }, b: { title: 'B', emoji: '👩‍👩‍👧', boards } } },
+      PATH,
+    );
+    expect(config.profiles.map((profile) => profile.emoji)).toEqual(['🇩🇪', '👩‍👩‍👧']);
   });
 });

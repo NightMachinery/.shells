@@ -838,10 +838,15 @@
         opacity: 0.8;
       }
 
+      .filter-source,
       .filter-build {
         margin: 8px 0 0;
         font-size: 11px;
         color: var(--ink-soft);
+      }
+
+      .filter-source + .filter-build {
+        margin-top: 2px;
       }
 
       .row-skeleton {
@@ -1345,6 +1350,54 @@
       }
 
       @media (max-width: 480px) {
+        /*
+         * Tighter tabs on a phone.
+         *
+         * Four profiles have to fit across the bar beside the refresh control,
+         * and the glyph in front of each label costs about a character. The
+         * padding is what pays for it: at this width the tab is a target for a
+         * thumb, and a thumb is not more accurate for the three pixels either
+         * side that come off here.
+         */
+        .tab {
+          padding: 5px 7px;
+        }
+
+        .tabs {
+          gap: 2px;
+        }
+
+        /*
+         * The right of the bar, kept to what it actually needs.
+         *
+         * It takes its width first and the tabs get the rest, so every pixel
+         * reserved here is a pixel the last tab may not have. The age is a
+         * number on a phone rather than a word, so the reservation that stopped
+         * the button resizing between "3s" and "updating" can come down to what
+         * a number needs.
+         */
+        .refresh-age {
+          min-width: 2.6em;
+        }
+
+        .bar-right {
+          gap: 6px;
+        }
+
+        /*
+         * The feed's name comes off the phone's bar.
+         *
+         * It is provenance rather than a control, and on this screen it was
+         * competing with the last profile tab for the same pixels, which is not
+         * a competition it should win: a reader who cannot reach a tab cannot
+         * see a board at all. Every board's filter says which feed answered it,
+         * so nothing is lost here, and a board that disagrees with the rest
+         * still says so on its own header.
+         */
+        .bar-backend {
+          display: none;
+        }
+
         :root {
           /* Lower than the desktop floor on purpose: on a phone the journey
              slot is the one that must not collapse, so the destination is

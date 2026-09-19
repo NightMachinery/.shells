@@ -128,6 +128,8 @@ export function buildConfig(): ExportedConfig {
       {
         key: 'primary',
         title: 'Zuhause',
+        emoji: '\u{1f3e0}',
+        short: 'ZH',
         boards: [
           {
             title: 'Nordweg',
@@ -183,6 +185,8 @@ export function buildConfig(): ExportedConfig {
       {
         key: 'secondary',
         title: 'Büro',
+        emoji: '\u{1f3e2}',
+        short: 'BÜ',
         boards: [
           {
             title: 'Rückweg',
@@ -203,8 +207,8 @@ export function buildConfig(): ExportedConfig {
       },
     ],
     places: [
-      { name: 'work', label: 'Maxmonument', lat: 0.001, lon: 0.001, stop: null },
-      { name: 'home', label: 'Zuhause', lat: 0.002, lon: 0.002, stop: null },
+      { name: 'work', label: 'Maxmonument', emoji: '\u{1f3e2}', lat: 0.001, lon: 0.001, stop: null },
+      { name: 'home', label: 'Zuhause', emoji: '\u{1f3e0}', lat: 0.002, lon: 0.002, stop: null },
     ],
   };
 }
@@ -1354,6 +1358,82 @@ async function main(): Promise<void> {
     // journey and the assertions below would be looking for one.
     await io.evalJs("document.querySelector('.refresh').click(); void 0");
     await io.waitFor("document.querySelector('li.row:has(a.route)') !== null", 15_000);
+
+    // ------------------------------------------------ assertions: the tab glyphs
+
+    // A glyph in front of a tab is only worth having if it costs nothing: the
+    // bar is sticky, so every pixel it grows is a pixel of departures gone on
+    // every board, and a second line of tabs would be worse than no glyph at
+    // all. So the measurement is not "does it look right", it is "is the bar
+    // the same height as it would be without them, and are the tabs still on
+    // one line".
+
+    const tabs = await io.evalJs<{
+      texts: string[];
+      labels: string[];
+      tops: number[];
+      barHeight: number;
+      barHeightWithoutGlyphs: number;
+      rowScroll: number;
+      rowClient: number;
+      picker: string[];
+    }>(`(() => {
+      const bar = document.querySelector('.bar');
+      const row = document.querySelector('.bar-top');
+      const nodes = [...document.querySelectorAll('.tab')];
+      const texts = nodes.map((node) => node.textContent);
+      const labels = nodes.map((node) => node.getAttribute('aria-label') || '');
+      const tops = nodes.map((node) => Math.round(node.getBoundingClientRect().top));
+      const barHeight = bar.getBoundingClientRect().height;
+      // The same bar with the glyphs taken out of the labels, measured before
+      // anything else can re-render: if this is shorter, the glyphs cost height.
+      const stripped = texts.map((text) => text.replace(/^\\S+\\s/u, ''));
+      nodes.forEach((node, index) => { node.textContent = stripped[index]; });
+      void bar.offsetHeight;
+      const barHeightWithoutGlyphs = bar.getBoundingClientRect().height;
+      nodes.forEach((node, index) => { node.textContent = texts[index]; });
+      const select = document.querySelector('.destination-select');
+      return {
+        texts, labels, tops, barHeight, barHeightWithoutGlyphs,
+        rowScroll: row.scrollWidth, rowClient: row.clientWidth,
+        picker: select === null ? [] : [...select.options].map((option) => option.textContent),
+      };
+    })()`);
+
+    record(
+      'a narrow tab says the glyph and the short label, and is still called by its full name',
+      tabs.texts.length >= 2 && tabs.texts[0] === '\u{1f3e0} ZH' && tabs.texts[1] === '\u{1f3e2} B\u00dc' && tabs.labels[0] === 'Zuhause' && tabs.labels[1] === 'B\u00fcro',
+      `drawn ${JSON.stringify(tabs.texts)}, called ${JSON.stringify(tabs.labels)}`,
+    );
+    record(
+      'the tabs sit on one line at 390px',
+      tabs.tops.length > 0 && new Set(tabs.tops).size === 1 && tabs.rowScroll <= tabs.rowClient + 1,
+      `tops ${JSON.stringify(tabs.tops)}; bar row scrollWidth=${tabs.rowScroll} clientWidth=${tabs.rowClient}`,
+    );
+    record(
+      'the glyphs cost the sticky bar no height',
+      Math.abs(tabs.barHeight - tabs.barHeightWithoutGlyphs) < 0.5,
+      `bar ${tabs.barHeight.toFixed(2)}px with glyphs, ${tabs.barHeightWithoutGlyphs.toFixed(2)}px without`,
+    );
+    record(
+      'the destination picker carries the same glyphs',
+      tabs.picker.some((label) => label.startsWith('\u{1f3e2} ')) && tabs.picker.some((label) => label.startsWith('\u{1f3e0} ')),
+      `options ${JSON.stringify(tabs.picker)}`,
+    );
+
+    // A wide screen has room for the name, so it gets the name. The metrics go
+    // back immediately: every other assertion in this run is about a phone.
+    await cdp.send('Emulation.setDeviceMetricsOverride', { width: 900, height: 844, deviceScaleFactor: 2, mobile: false });
+    await sleep(250);
+    const wideTabs = await io.evalJs<string[]>("[...document.querySelectorAll('.tab')].map((node) => node.textContent)");
+    await cdp.send('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 3, mobile: true });
+    await sleep(250);
+    const narrowAgain = await io.evalJs<string[]>("[...document.querySelectorAll('.tab')].map((node) => node.textContent)");
+    record(
+      'a wide screen spells the profile out, and a narrow one goes back to the short form',
+      wideTabs[0] === '\u{1f3e0} Zuhause' && narrowAgain[0] === '\u{1f3e0} ZH',
+      `at 900px ${JSON.stringify(wideTabs)}, back at 390px ${JSON.stringify(narrowAgain)}`,
+    );
 
     // ------------------------------------------------------------ assertion 6
 

@@ -1028,6 +1028,7 @@ function filterShape(board: Board, context: BoardContext): string {
     for (const line of [...lines].sort()) parts.push(`${stop}/${line}`);
   }
   parts.push(context.routes === undefined ? 'plain' : 'planned');
+  parts.push(board.backend);
   return parts.join(';');
 }
 
@@ -1082,6 +1083,10 @@ function buildFilter(board: Board, context: BoardContext): FilterView {
   // Which build this is, somewhere a reader can find it without a console. An
   // installed app can be several deploys behind while the server is current, so
   // "which version am I looking at" has to be answerable from the screen.
+  // Which feed answered this board. It is in the bar as well on a wide screen,
+  // but not on a phone, where the bar has no room for anything that is not a
+  // control, so this is the one place the provenance is always available.
+  popover.append(el('p', 'filter-source', `answered by ${board.backend}`));
   const buildLine = el('p', 'filter-build', buildLabel());
   popover.append(buildLine);
 
