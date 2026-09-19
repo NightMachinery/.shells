@@ -1706,6 +1706,85 @@ Run it before every deploy. The layout pass that preceded it measured pixels and
 never tapped anything, and everything it missed was a bug that only exists under
 a finger.
 
+** The same work, done once, near the page
+
+A phone opening this page asks the two public APIs about every stop on every
+board, and then asks the journey planner about every commute board, and pays
+for a fresh connection each time because the phone is the slowest link in the
+chain. Every one of those questions has the same answer for everybody who asks
+it in the same minute. So the page can also be answered by a small server
+running beside it, doing exactly that work once and keeping the answers warm,
+and then one request replaces all of them.
+
+The page does not choose between the two at build time, because the same bytes
+are served from a host that has such a server and from one that does not, and
+an installed copy on a phone may be either. So there are two implementations of
+one interface, in =src/page/source.ts=. The DIRECT source is this package doing
+the work in the browser, which is what the page has always done and what it
+still does everywhere else. The SERVER source turns the same three questions
+into requests to an API mounted beside the page.
+
+At startup the page probes the server's health endpoint with a short deadline,
+alongside the fetch of its own configuration rather than before it, so the
+probe costs nothing on a host where there is no server to find: the two are one
+round trip to the same place and the slower of them is the configuration. A
+request that then fails, for any reason, moves the page back to doing the work
+itself, at once, and it tries the probe again some minutes later. Falling back
+is not an error state and the reader is never shown one: a page that has fallen
+back is the page as it has always been, and the only thing that changes is the
+provenance line in the timing note, which says either "via server, N s old" or
+"worked out here".
+
+Two details are less obvious than they look.
+
+A =Map= does not survive =JSON.stringify=. It becomes ={}=, with no error
+anywhere, and the journeys are held in maps two levels deep. So there is a wire
+format, in =src/page/wire.ts=, which is the same data with its maps written as
+pairs, and both ends import it from there rather than each parsing what the
+other writes. A server and a page that agree about a format by coincidence stop
+agreeing the first time a field is added.
+
+Carrying a journey forward happens on the phone, not on the server. The server
+has no idea what is on this reader's screen, so what it sends is what it found
+this time, plus a list of which boards it set out to plan. That list is what
+lets the page apply the same rule to a server's answer that it applies to its
+own searches: a board the run could not answer for keeps what it had. Both
+paths go through one function for that, because two implementations of a rule
+like this would drift apart within a week.
+
+The server itself is not in this package, and deliberately: it needs the
+configuration with the places in it, which is private, and it is deployed as
+part of a page rather than as part of a library. What is here is the client
+half, the wire format, and the pieces it composes, which are the very functions
+the page calls. The server calls =fetchProfile= and =planProfile= exactly as
+the page does, so the answer it hands back is the answer the phone would have
+computed.
+
+*** Measuring what it is worth
+
+=test/e2e/server.ts= starts both halves itself, a planning server on one
+loopback port and a static server on another that proxies the mount to it the
+way the deployment does, then loads the page under a throttled phone profile
+and measures the time to a journey on screen with the server and without it. It
+needs the directory the page and its server live in, from the environment,
+because this package is public and the address of somebody's page is not.
+
+Two things it found, both of which looked exactly like the page refusing to use
+the server:
+
+The intercept pattern =*/api/*= matches the upstream transit APIs as well.
+Both of them have =/api/= in their own paths, so a check that meant to pause
+the page's requests to its own server paused all hundred and thirty requests to
+theirs, and turned a two second page load into a twenty second one. Every
+number in that run was wrong and none of them looked wrong.
+
+bun's =fetch= decodes a compressed answer by default and leaves the
+=content-encoding= header on it. A proxy written the obvious way therefore
+hands the browser decoded bytes labelled as gzip, and every request through it
+dies with =ERR_CONTENT_DECODING_FAILED=, which the page sees as a network
+failure and responds to by falling back. The fix is one option; the lesson is
+that the check's own scaffolding is code too, and it had no tests.
+
 ** bun runs code it has not checked
 
 Every harness entry point type-checks before it runs, and so must anything

@@ -151,6 +151,15 @@ export interface PlanProfileOptions {
   boards: Board[];
   destinationKey: string | null;
   startMs: number;
+  /**
+   * How far ahead the boards were asked about.
+   *
+   * Nothing here reads it: a search covers the rows it was handed, and the
+   * board carries how far past them it has to reach. It is part of the
+   * question when the planning server is the one answering, because there one
+   * request answers for the boards and the journeys together.
+   */
+  horizonMinutes?: number;
   earlyBufferMinutes?: number;
   walkWeight?: number;
   /** The plans already on screen, so an unchanged question is not asked again. */
@@ -169,7 +178,7 @@ export interface PlanProfileOptions {
  * delays are deliberately absent because a journey is looked up by its
  * timetabled minute and a delay does not move it.
  */
-function planKey(options: PlanProfileOptions): string {
+export function planKey(options: PlanProfileOptions): string {
   const counts = options.boards.map((board) => board.departures.length).join(',');
   const fixed = options.profile.boards.map((board) => board.destination ?? '').join(',');
   return [
@@ -237,27 +246,80 @@ export function mergeBoardRoutes(previous: BoardRoutes | undefined, fresh: Board
   return { rows, origin: fresh.origin, plannedAt, ...(fresh.destinationKey === undefined ? {} : { destinationKey: fresh.destinationKey }) };
 }
 
+/** One board's share of a planning run: what came back, or that nothing did. */
+export interface BoardResult {
+  index: number;
+  routes: BoardRoutes | null;
+}
+
+/**
+ * The boards of a whole run, merged onto the run before it.
+ *
+ * Whatever was on screen is the floor, not the thing being replaced. A board
+ * this run could not answer for keeps what it had; a board it did answer for
+ * keeps the rows the answer left out. What is not carried is a board that is
+ * now heading somewhere else: those journeys answer another question, and
+ * showing them under a new destination would be a lie rather than a stale
+ * truth. `wanted` is every board the run set out to plan, with where it was
+ * planning to, which is what makes that judgement possible for a board the run
+ * never got an answer for.
+ *
+ * Exported because a run does not always happen here. When the page is being
+ * answered by the planning server, the searching happens there and the
+ * carrying still has to happen on the phone, against the phone's own previous
+ * answer, and two implementations of this rule would drift apart within a week.
+ */
+export function carryBoards(
+  previous: ProfileRoutes | undefined,
+  wanted: ReadonlyMap<number, string>,
+  results: Iterable<BoardResult>,
+  at: number,
+): Map<number, BoardRoutes> {
+  const boards = new Map<number, BoardRoutes>();
+  if (previous !== undefined) {
+    for (const [index, board] of previous.boards) {
+      if (wanted.get(index) !== (board.destinationKey ?? '')) continue;
+      boards.set(index, board);
+    }
+  }
+  for (const result of results) {
+    if (result.routes === null) continue;
+    boards.set(result.index, mergeBoardRoutes(previous?.boards.get(result.index), result.routes, at));
+  }
+  return boards;
+}
+
 /** When a previous board's rows were planned, for entries that predate the dating. */
 function firstPlannedAt(previous: BoardRoutes, fallback: number): number {
   for (const value of previous.plannedAt?.values() ?? []) return value;
   return fallback;
 }
 
-/**
- * Plan every board of a profile that opted in, all at once.
- *
- * In parallel rather than one after another: the boards are independent
- * questions to the same service, and planning them in sequence made the journey
- * slots of the last board on a profile arrive a second and a half after the
- * first board's. The opt-in still exists, because a plan is a much heavier
- * question than a departure board and most boards are "is there a bus soon".
- */
-export async function planProfile(options: PlanProfileOptions): Promise<ProfileRoutes | null> {
-  const previous = options.previous;
-  const key = planKey(options);
-  // Asked and answered within this same minute: hand back what is on screen.
-  if (previous !== undefined && !previous.stale && previous.key === key) return previous;
+/** One board this run will search for, and the question it will ask about it. */
+export interface PlanJob {
+  index: number;
+  board: Board;
+  /** The identifier the planner is given, which is not always the departures' one. */
+  stop: string;
+  destinationKey: string;
+  targets: readonly PlanTarget[];
+}
 
+/**
+ * Which boards of a profile get a journey search, and towards what.
+ *
+ * A board may name its own destination, and then the picker does not apply to
+ * it: a departure hall is laid out by where a platform goes, so "which way am I
+ * heading" is a fact about the board rather than a question for the reader.
+ *
+ * Exported because the planning server has to answer the same question without
+ * running the search: what it sends back has to say which boards it set out to
+ * plan, so that the page can carry its own previous answers forward for the
+ * ones that came back empty.
+ */
+export function planJobs(
+  options: Pick<PlanProfileOptions, 'config' | 'profile' | 'boards' | 'destinationKey'>,
+): PlanJob[] {
   /**
    * The places to ask about for one destination key, worked out once per key.
    *
@@ -282,23 +344,38 @@ export async function planProfile(options: PlanProfileOptions): Promise<ProfileR
     return targets;
   };
 
-  // A board may name its own destination, and then the picker does not apply to
-  // it: a departure hall is laid out by where a platform goes, so "which way am
-  // I heading" is a fact about the board rather than a question for the reader.
-  const jobs: Array<{ index: number; board: Board; stop: string; destinationKey: string }> = [];
+  const jobs: PlanJob[] = [];
   for (let index = 0; index < options.boards.length; index += 1) {
     const board = options.boards[index];
     const exported = options.profile.boards[index];
     if (board === undefined || exported === undefined || !exported.commute) continue;
     const destinationKey = exported.destination ?? options.destinationKey;
     if (destinationKey === null) continue;
-    if (targetsFor(destinationKey).length === 0) continue;
-    // The identifier the planner is given, which is not always the one the
-    // departures came from; see `planStop` on the board configuration.
+    const targets = targetsFor(destinationKey);
+    if (targets.length === 0) continue;
     const stop = exported.plan_stop ?? board.stops[0];
     if (stop === undefined) continue;
-    jobs.push({ index, board, stop, destinationKey });
+    jobs.push({ index, board, stop, destinationKey, targets });
   }
+  return jobs;
+}
+
+/**
+ * Plan every board of a profile that opted in, all at once.
+ *
+ * In parallel rather than one after another: the boards are independent
+ * questions to the same service, and planning them in sequence made the journey
+ * slots of the last board on a profile arrive a second and a half after the
+ * first board's. The opt-in still exists, because a plan is a much heavier
+ * question than a departure board and most boards are "is there a bus soon".
+ */
+export async function planProfile(options: PlanProfileOptions): Promise<ProfileRoutes | null> {
+  const previous = options.previous;
+  const key = planKey(options);
+  // Asked and answered within this same minute: hand back what is on screen.
+  if (previous !== undefined && !previous.stale && previous.key === key) return previous;
+
+  const jobs = planJobs(options);
   if (jobs.length === 0) return null;
 
   let done = 0;
@@ -318,13 +395,13 @@ export async function planProfile(options: PlanProfileOptions): Promise<ProfileR
           return fetch(url, { ...init, signal: merged });
         };
   const results = await Promise.all(
-    jobs.map(async ({ index, board, stop, destinationKey }) => {
+    jobs.map(async ({ index, board, stop, destinationKey, targets }) => {
       try {
         let origin: OriginLevel | null = null;
         const coverThroughMs = coverThroughOf(board);
         const planned = await planBoard({
           stop,
-          targets: targetsFor(destinationKey),
+          targets,
           rows: board.departures,
           startMs: options.startMs,
           baseUrl: options.config.backends.transitous_base_url,
@@ -355,24 +432,8 @@ export async function planProfile(options: PlanProfileOptions): Promise<ProfileR
   );
 
   const at = Date.now();
-  const boards = new Map<number, BoardRoutes>();
-  // Whatever was on screen is the floor, not the thing being replaced. A board
-  // this run could not answer for keeps what it had; a board it did answer for
-  // keeps the rows the answer left out. What is not carried is a board that is
-  // now heading somewhere else: those journeys are answers to another question,
-  // and showing them under a new destination would be a lie rather than a
-  // stale truth.
   const wanted = new Map(jobs.map((job) => [job.index, job.destinationKey]));
-  if (previous !== undefined) {
-    for (const [index, board] of previous.boards) {
-      if (wanted.get(index) !== (board.destinationKey ?? '')) continue;
-      boards.set(index, board);
-    }
-  }
-  for (const result of results) {
-    if (result.routes === null) continue;
-    boards.set(result.index, mergeBoardRoutes(previous?.boards.get(result.index), result.routes, at));
-  }
+  const boards = carryBoards(previous, wanted, results, at);
   if (boards.size === 0) return null;
 
   const routes: ProfileRoutes = {

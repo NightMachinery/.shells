@@ -27,8 +27,8 @@ import type { Board, Message } from './model.ts';
 import { renderBar, HORIZONS } from './page/bar.ts';
 import { boardChrome, closeFilters, renderBoard, viewOf, type BoardContext } from './page/board.ts';
 import { callsVersion } from './page/calls.ts';
-import { cachedRoutes, destinationNameOf, planProfile } from './page/commute.ts';
-import { fetchMessages, fetchProfile } from './page/data.ts';
+import { cachedRoutes, destinationNameOf } from './page/commute.ts';
+import { createSwitchingSource, type SwitchingSource } from './page/source.ts';
 import { el, selectionInsideBoards, syncChildren } from './page/dom.ts';
 import { idbGet, idbSet, STORE_BOARDS } from './page/idb.ts';
 import { autoTranslate, primeMessageState, renderMessages, resetMessageFilters } from './page/messages.ts';
@@ -39,6 +39,7 @@ import {
   markRender,
   markRoutes,
   markRows,
+  noteSource,
   notePlanAborted,
   notePlanEnd,
   notePlanQueued,
@@ -325,7 +326,7 @@ async function runPlan(
   notePlanStart(profileKey);
   const planStarted = Date.now();
   try {
-    const routes = await planProfile({
+    const routes = await source.planProfile({
       config,
       signal,
       profileKey,
@@ -333,6 +334,7 @@ async function runPlan(
       boards,
       destinationKey: state.destinationKey,
       startMs,
+      horizonMinutes: state.horizonMinutes,
       earlyBufferMinutes: state.earlyBufferMinutes,
       walkWeight: state.walkWeight,
       previous: state.routes.get(profileKey),
@@ -372,6 +374,15 @@ function replanVisible(): void {
   void replanProfile(profileKey, profile, data.boards, data.startMs, true);
 }
 
+/**
+ * Where the data comes from, which is not decided here and not decided once.
+ *
+ * The page probes for a planning server at startup and uses it when there is
+ * one; the same bytes are served from a host that has no server, and there the
+ * page does the work itself exactly as it always has. See `page/source.ts`.
+ */
+const source: SwitchingSource = createSwitchingSource({ onNote: (note) => noteSource(note.kind, note.ageMs) });
+
 async function refreshProfile(profileKey: string, force = false): Promise<void> {
   const config = state.config;
   if (config === null) return;
@@ -397,11 +408,18 @@ async function refreshProfile(profileKey: string, force = false): Promise<void> 
   if (profileKey === state.profileKey) beginRun(profileKey);
   render();
   try {
-    const result = await fetchProfile({
+    const result = await source.fetchProfile({
       config,
       profile,
       startMs,
       horizonMinutes: state.horizonMinutes,
+      // Sent with the boards because a server answers both halves at once; the
+      // page's own path ignores it and is asked the second half separately.
+      plan: {
+        destinationKey: state.destinationKey,
+        walkWeight: state.walkWeight,
+        earlyBufferMinutes: state.earlyBufferMinutes,
+      },
       onStatus: (index, status) => {
         setStatus(profileKey, index, status);
         if (profileKey === state.profileKey) render();
@@ -453,7 +471,7 @@ async function refreshMessages(): Promise<void> {
   const config = state.config;
   if (config === null) return;
   try {
-    const messages: Message[] = await fetchMessages(config);
+    const messages: Message[] = await source.fetchMessages(config);
     state.messages = messages;
     await primeMessageState(messages);
     render();
@@ -856,8 +874,17 @@ async function boot(): Promise<void> {
   });
   render();
 
+  // Alongside the configuration rather than before it, because both are one
+  // round trip to the same host and waiting for them in turn would cost the
+  // first paint the slower of the two twice. The probe carries its own short
+  // deadline, so the worst case here is the configuration fetch plus nothing.
+  const probing = source.probe();
+
   try {
-    const response = await fetch('data/config.json', { headers: { Accept: 'application/json' } });
+    const [response] = await Promise.all([
+      fetch('data/config.json', { headers: { Accept: 'application/json' } }),
+      probing,
+    ]);
     if (!response.ok) throw new Error(`config.json: HTTP ${response.status}`);
     const config = (await response.json()) as ExportedConfig;
     state.config = config;

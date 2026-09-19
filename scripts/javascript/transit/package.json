@@ -11,7 +11,8 @@
     "build": "bun build src/page.ts --target browser --outfile page/app.js && bun build src/route.ts --target browser --outfile page/route.js",
     "e2e": "tsc --noEmit && bun run test/e2e/phone.ts",
     "smoke": "tsc --noEmit && bun run test/e2e/smoke.ts",
-    "shots": "tsc --noEmit && bun run test/e2e/shots.ts"
+    "shots": "tsc --noEmit && bun run test/e2e/shots.ts",
+    "server-e2e": "tsc --noEmit && bun run test/e2e/server.ts"
   },
   "devDependencies": {
     "typescript": "^5.9.2"

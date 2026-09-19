@@ -10,6 +10,8 @@ declare namespace Bun {
   interface ServeHandlerOptions {
     hostname?: string;
     port?: number;
+    /** Seconds a connection may sit without data before bun closes it. */
+    idleTimeout?: number;
     fetch(request: Request): Response | Promise<Response>;
   }
 
@@ -23,6 +25,9 @@ declare namespace Bun {
 
   interface SpawnOptions {
     cmd: string[];
+    /** The directory the child starts in, which is where it looks for its own files. */
+    cwd?: string;
+    env?: Record<string, string | undefined>;
     stdout?: 'pipe' | 'inherit' | 'ignore';
     stderr?: 'pipe' | 'inherit' | 'ignore';
     stdin?: 'pipe' | 'inherit' | 'ignore';

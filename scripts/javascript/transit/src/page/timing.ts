@@ -124,9 +124,32 @@ export function publishTiming(): void {
   if (typeof window !== 'undefined') window.__transitTiming = lastRun;
 }
 
+/**
+ * Where the last answer came from, and how old it was when it arrived.
+ *
+ * Worth a line in the timing note because it changes what every other number
+ * in it means: two hundred milliseconds to rows is a fast connection when the
+ * page did the work, and a warm cache when it did not.
+ */
+let sourceKind: 'direct' | 'server' = 'direct';
+let sourceAgeMs: number | null = null;
+
+export function noteSource(kind: 'direct' | 'server', ageMs: number | null): void {
+  sourceKind = kind;
+  sourceAgeMs = ageMs;
+}
+
+/** What the page would say about where its data came from. */
+export function describeSource(): string {
+  if (sourceKind === 'direct') return 'worked out here';
+  const age = sourceAgeMs === null ? null : Math.round(sourceAgeMs / 1000);
+  return age === null ? 'via server' : `via server, ${age} s old`;
+}
+
 /** One line per board plus a total, short enough for a popover. */
 export function describe(run: RunTiming): string {
   const parts: string[] = [];
+  parts.push(describeSource());
   parts.push(`rows ${run.toRowsMs ?? '-'} ms`);
   if (run.toRoutesMs !== null) parts.push(`routes ${run.toRoutesMs} ms`);
   if (run.planMs !== null) parts.push(`plan ${run.planMs} ms for ${run.planBoards} board${run.planBoards === 1 ? '' : 's'}`);
