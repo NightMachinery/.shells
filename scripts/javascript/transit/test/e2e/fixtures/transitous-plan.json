@@ -1,0 +1,68 @@
+{
+  "_comment": "Two synthetic itineraries that both match the U6 row (line U6, offset 6 minutes) fixed in mvg-departures.json / de:00000:1, so the commute planner produces two real alternatives for that row: enough to exercise the tip sheet's alternative-open control as well as the final open-in-new-tab control. Every id and place name is made up.",
+  "itineraries": [
+    {
+      "startTimeOffsetMin": 6,
+      "endTimeOffsetMin": 29,
+      "legs": [
+        {
+          "mode": "SUBWAY",
+          "tripId": "trip-u6-e2e",
+          "routeShortName": "U6",
+          "agencyName": "MVG",
+          "from": { "name": "Nordweg", "stopId": "de-DELFI_de:00000:1:3:3", "track": "3" },
+          "to": { "name": "Umstiegspunkt", "stopId": "de-DELFI_de:00000:9:1:1" },
+          "startTimeOffsetMin": 6,
+          "endTimeOffsetMin": 16,
+          "scheduledStartTimeOffsetMin": 6,
+          "intermediateStops": []
+        },
+        { "mode": "WALK", "distance": 120 },
+        {
+          "mode": "TRAM",
+          "tripId": "trip-t9-e2e",
+          "routeShortName": "T9",
+          "agencyName": "City",
+          "from": { "name": "Umstiegspunkt", "stopId": "de-DELFI_de:00000:9:2:2" },
+          "to": { "name": "Maxmonument", "stopId": "de-DELFI_de:00000:7:1:1" },
+          "startTimeOffsetMin": 18,
+          "endTimeOffsetMin": 28,
+          "scheduledStartTimeOffsetMin": 18,
+          "intermediateStops": []
+        }
+      ]
+    },
+    {
+      "startTimeOffsetMin": 6,
+      "endTimeOffsetMin": 31,
+      "legs": [
+        {
+          "mode": "SUBWAY",
+          "tripId": "trip-u6-e2e",
+          "routeShortName": "U6",
+          "agencyName": "MVG",
+          "from": { "name": "Nordweg", "stopId": "de-DELFI_de:00000:1:3:3", "track": "3" },
+          "to": { "name": "Umstiegspunkt", "stopId": "de-DELFI_de:00000:9:1:1" },
+          "startTimeOffsetMin": 6,
+          "endTimeOffsetMin": 16,
+          "scheduledStartTimeOffsetMin": 6,
+          "intermediateStops": []
+        },
+        { "mode": "WALK", "distance": 150 },
+        {
+          "mode": "TRAM",
+          "tripId": "trip-t5-e2e",
+          "routeShortName": "T5",
+          "agencyName": "City",
+          "from": { "name": "Umstiegspunkt", "stopId": "de-DELFI_de:00000:9:2:2" },
+          "to": { "name": "Maxmonument Süd", "stopId": "de-DELFI_de:00000:8:1:1" },
+          "startTimeOffsetMin": 19,
+          "endTimeOffsetMin": 30,
+          "scheduledStartTimeOffsetMin": 19,
+          "intermediateStops": []
+        }
+      ]
+    }
+  ],
+  "nextPageCursor": ""
+}

@@ -1,0 +1,6 @@
+{
+  "_comment": "A minimal, always-successful answer to the aggregator's stoptimes probe (used by origin resolution) and to any departures fan-out. Every id is synthetic; nothing here is a real stop.",
+  "stopTimes": [],
+  "nextPageCursor": "",
+  "previousPageCursor": ""
+}

@@ -576,8 +576,9 @@
          destination badge in the strip. */
       .platform {
         justify-self: center;
-        min-width: 100%;
+        width: 100%;
         box-sizing: border-box;
+        overflow: hidden;
         padding: 0 3px;
         font-size: 10px;
         font-weight: 700;
@@ -1117,18 +1118,26 @@
           /* Lower than the desktop floor on purpose: on a phone the journey
              slot is the one that must not collapse, so the destination is
              what yields. It is abbreviated already and repeated down the
-             group, so a few characters cost the reader nothing. */
-          --col-destination-min: 2.9rem;
+             group, so a few characters cost the reader nothing.
+
+             These numbers have to add up to less than a row is wide, and a row
+             is narrower than the viewport by more than it looks: the page's own
+             gutter, the card's border and the card's padding all come off first.
+             Getting that wrong does not wrap or ellipsise anything, it runs the
+             last column off the side of the card where nothing shows it. */
+          --col-destination-min: 2rem;
           --col-minutes: 2.1rem;
           --col-badge: 2.5rem;
           --col-connection: 4rem;
           --col-platform: 1.4rem;
-          --col-state: 3.2rem;
+          --col-state: 2.6rem;
           --col-alarm: 0.9rem;
           --col-stop: 2rem;
-          /* Wider on a phone than on a desktop, because the interchange column
-             is dropped here and the journey is what takes its place. */
-          --col-route: 8.6rem;
+          /* Pinned to its own floor here rather than given a range. A track
+             with room to grow takes the leftover before the destination does,
+             and the journey slot is already wide enough on a phone: every pixel
+             above the floor would come straight out of the destination. */
+          --col-route: 8rem;
           --col-route-min: 8rem;
         }
 
@@ -1141,6 +1150,13 @@
            slot that names its station and one that ellipsises it away. */
         .row {
           column-gap: 5px;
+        }
+
+        /* Less padding than the desktop card. The gutter outside the card
+           already separates it from the screen edge, so a wide inset here is
+           paid for twice, and on a phone it is paid out of the row. */
+        .board {
+          padding: 10px 8px 12px;
         }
 
         .bar {
@@ -1166,6 +1182,7 @@
            the emulator: the letter spacing and a pixel of padding either side
            were the difference between fitting and lying across the bell. */
         .state {
+          font-size: 9px;
           letter-spacing: 0;
           padding: 0 2px;
         }

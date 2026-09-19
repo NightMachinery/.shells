@@ -961,6 +961,28 @@ holds too many lines for one property each to be worth building and parsing on
 every load, and nothing reads them anyway: both renderers ask =src/colors.ts=
 directly.
 
+* The touch harness
+
+=bun run e2e= drives the built page in a headless browser at a phone's size,
+with device metrics and touch emulation on, and every network answer served from
+fixtures committed beside it. It uses real touch events rather than calling
+=click()=, because the bug it exists to catch was precisely that the page
+listened for the wrong kind of event: a synthetic click proves nothing about
+what a finger does. It skips itself with a message where no browser is
+installed, and it serves the built directory over a local server rather than
+reaching for a deployed copy, so it is offline and repeatable.
+
+Run it before every deploy. The layout pass that preceded it measured pixels and
+never tapped anything, and everything it missed was a bug that only exists under
+a finger.
+
+Two things it is worth knowing about writing assertions here. Service workers
+must be bypassed or the run measures the previous deploy rather than the build
+in front of it. And a tap that opens a second tab must close that tab again
+before the run continues: a browser that has moved its foreground elsewhere can
+leave the next evaluation waiting for a reply that never comes, which looks
+exactly like a slow test rather than a hang.
+
 * Knobs
 
 Every tunable value lives in exactly one place in the code, which is the only

@@ -225,9 +225,15 @@ function gridTemplate(columns: Columns): string {
   // naming a station at all, which is the whole reason the column exists.
   if (columns.route) parts.push('minmax(var(--col-route-min), var(--col-route))');
   if (columns.connection) parts.push('minmax(0, var(--col-connection))');
-  if (columns.platform) parts.push('var(--col-platform)');
+  // Allowed to reach zero, unlike the state and alarm columns beside them. A
+  // grid whose fixed tracks add up to more than the row is wide does not wrap or
+  // ellipsise: it runs the last column off the side of the card, where the
+  // reader sees nothing at all and the page reports no overflow because the card
+  // clips it. The platform number and the stop tag are the two that can vanish
+  // without the row losing its meaning, and both are repeated in the sheet.
+  if (columns.platform) parts.push('minmax(0, var(--col-platform))');
   parts.push('var(--col-state)', 'var(--col-alarm)');
-  if (columns.stop) parts.push('var(--col-stop)');
+  if (columns.stop) parts.push('minmax(0, var(--col-stop))');
   return parts.join(' ');
 }
 
