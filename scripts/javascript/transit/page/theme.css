@@ -46,14 +46,10 @@
      is a floor rather than a fixed width, so it still grows into space
      the other slots do not need. */
   --col-destination-min: 7rem;
-  --col-minutes: 2.6rem;
+  /* The countdown's widest form is an hour count, a colon and two minutes. */
+  --col-minutes: 3.4rem;
   --col-badge: 2.9rem;
   --col-connection: 4.6rem;
-  --col-platform: 1.6rem;
-  /* Wide enough for the word "planned", which is what most rows say: the
-     column used to fit "plan" and the longer word spilled over the bell
-     beside it. */
-  --col-state: 3.5rem;
   --col-alarm: 1rem;
   --col-stop: 2.6rem;
   --col-route: 9rem;

@@ -469,8 +469,13 @@
         display: grid;
         align-items: baseline;
         column-gap: 7px;
-        padding: 6px 0;
+        padding: 5px 0;
         border-top: 1px solid var(--line);
+        /* So the live/planned disc can be placed in the row's corner. It is the
+           only thing on the page positioned out of its own flow, and it is
+           there because a mark that takes a grid track takes it from the
+           destination in every font on every device. */
+        position: relative;
       }
 
       .row:first-child {
@@ -569,24 +574,62 @@
         text-overflow: ellipsis;
       }
 
-      /* The platform is a number, and a number on its own in a row of numbers
-         is ambiguous: readers were reading it as part of the time beside it. It
-         is a badge now, in a blue that belongs to no line in the colour table,
-         so it cannot be mistaken for the line pill on its left or for a
-         destination badge in the strip. */
+      /* The platform and the live state, as one mark in the row's corner.
+         Both used to be grid tracks. The platform's two characters cost the
+         destination a quarter of its width, and the live mark overflowed on the
+         reader's phone in every form it took, because a track is a promise about
+         width and the font that has to keep it is not the font here.
+
+         Out of the flow, so it costs the row nothing. Flush into the corner, so
+         it reads as part of the row's edge rather than as something floating on
+         top of it: no margin, and the two corners that lie along the row's own
+         edges stay square so the badge fuses with them. Only the corner that
+         faces into the row is rounded.
+
+         Centred by line-height rather than by flex alignment, because a flex
+         box on a row whose items are baseline-aligned inherits a baseline it
+         should not have, and the digit then sits a pixel low in some fonts and
+         not in others. A line-height equal to the height cannot drift. */
       .platform {
-        justify-self: center;
-        width: 100%;
+        position: absolute;
+        top: 0;
+        right: 0;
+        min-width: 18px;
+        height: 15px;
+        line-height: 15px;
         box-sizing: border-box;
-        overflow: hidden;
         padding: 0 3px;
+        overflow: hidden;
         font-size: 10px;
         font-weight: 700;
         font-variant-numeric: tabular-nums;
         text-align: center;
-        border-radius: 4px;
-        background: var(--platform-bg);
+        border-radius: 0 0 0 6px;
         color: #fff;
+      }
+
+      /* A row with no platform still gets the badge, so the colour still says
+         whether the time is live and the corner still looks like one thing. It
+         is a square rather than a slot with nothing in it. */
+      .platform-empty {
+        min-width: 15px;
+        padding: 0;
+      }
+
+      .state-live {
+        background: var(--early);
+      }
+
+      .state-plan {
+        background: var(--ink-soft);
+      }
+
+      /* Cancelled outranks both. A departure that is not running is not usefully
+         described as live, and the struck text says so a second way for a reader
+         who does not separate red from green. */
+      .state-cancelled {
+        background: var(--late);
+        text-decoration: line-through;
       }
 
       /* Clipped, every one of them. A grid track is a promise about width, and
@@ -595,32 +638,15 @@
          browser will report. What is too wide depends on the reader's font,
          which is not this machine's font, so the only safe rule is that none of
          these may draw outside the box they were given. */
-      .state,
       .badge,
       .minutes {
         overflow: hidden;
       }
 
-      .state {
-        font-size: 10px;
-        text-align: center;
-        letter-spacing: 0.03em;
-        border-radius: 4px;
-        padding: 0 3px;
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-      }
-
-      .state-live {
-        color: var(--early);
-        border: 1px solid currentColor;
-        font-weight: 700;
-      }
-
-      .state-plan {
-        color: var(--ink-soft);
-        border: 1px dashed currentColor;
+      /* A cancelled row is already struck through and dimmed; the badge follows
+         it down rather than staying bright on a departure that is not running. */
+      .row-cancelled .platform {
+        opacity: 0.55;
       }
 
       .stop-tag {
@@ -653,16 +679,6 @@
       .leg-walk-badge .icon {
         width: 1.15em;
         height: 1.15em;
-      }
-
-      .state-dot {
-        width: 0.62em;
-        height: 0.62em;
-        vertical-align: 0;
-      }
-
-      .state-word {
-        margin-left: 3px;
       }
 
       .update-toast {
@@ -1207,12 +1223,16 @@
              Getting that wrong does not wrap or ellipsise anything, it runs the
              last column off the side of the card where nothing shows it. */
           --col-destination-min: 3.4rem;
-          --col-minutes: 2.1rem;
+          /* Wide enough for the widest the countdown can be, which is an hour
+             count, a colon and two minutes at the far end of the longest
+             horizon. Sized for a font wider than this one, because the one that
+             renders it is not this one, and confirmed by the harness rather than
+             estimated here. */
+          --col-minutes: 2.85rem;
           --col-badge: 2.5rem;
           --col-connection: 4rem;
-          --col-state: 1.15rem;
           --col-alarm: 0.9rem;
-          --col-stop: 2rem;
+          --col-stop: 1.8rem;
           /* Pinned to its own floor here rather than given a range. A track
              with room to grow takes the leftover before the destination does,
              and the journey slot is already wide enough on a phone: every pixel
@@ -1225,11 +1245,14 @@
           padding: 0 12px 32px;
         }
 
-        /* A denser row on a phone. Two pixels a column is not something a
-           reader sees, and seven of them are the difference between a journey
-           slot that names its station and one that ellipsises it away. */
+        /* A denser row on a phone. A pixel a column is not something a reader
+           sees, and six of them are the difference between a destination that
+           names a station and one that ellipsises it away. The vertical padding
+           comes down for the same reason in the other direction: what is bought
+           there is one more departure on the screen. */
         .row {
-          column-gap: 5px;
+          column-gap: 4px;
+          padding: 3px 0;
         }
 
         /* Less padding than the desktop card. The gutter outside the card
@@ -1245,45 +1268,21 @@
           padding-right: 12px;
         }
 
-        .row {
-          column-gap: 5px;
+        .minutes {
+          font-size: 16px;
         }
 
-        .minutes {
-          font-size: 18px;
+        /* The two lines of a row sit directly on top of one another here. The
+           gap was there to separate them and the difference in size and colour
+           already does that. */
+        .row-main {
+          gap: 0;
         }
 
         .destination {
           font-size: 13px;
         }
 
-        /* The state badge has the whole word "planned" to fit into a column
-           that a phone can barely spare. Measured on the device rather than in
-           the emulator: the letter spacing and a pixel of padding either side
-           were the difference between fitting and lying across the bell. */
-        /* The word goes and the disc stays. The disc is an SVG sized in em, so
-           this column's width is now a constant rather than a measurement of
-           somebody else's font, and the sheet still spells out "live" or
-           "planned" for anyone who wants the word. */
-        .state-word {
-          display: none;
-        }
-
-        .state {
-          font-size: 9px;
-          letter-spacing: 0;
-          padding: 0 2px;
-        }
-
-        /* No longer a column here: it sits on the row's second line, beside the
-           time, where the line is short and the two characters cost nothing.
-           Sized to its own content rather than stretched to a track. */
-        .row-times .platform {
-          width: auto;
-          justify-self: auto;
-          font-size: 9px;
-          padding: 0 4px;
-        }
       }
     </style>
   </head>

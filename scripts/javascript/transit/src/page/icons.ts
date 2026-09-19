@@ -24,7 +24,7 @@ const SVG_NS = 'http://www.w3.org/2000/svg';
 /** The id prefix, so nothing here can collide with an id the page makes. */
 const PREFIX = 'transit-icon-';
 
-export type IconName = 'walk' | 'bell' | 'gear' | 'close' | 'dot-filled' | 'dot-hollow';
+export type IconName = 'walk' | 'bell' | 'gear' | 'close';
 
 /**
  * Each icon as the inside of a 24x24 symbol.
@@ -42,10 +42,6 @@ const PATHS: Record<IconName, string> = {
   // A gear: a ring and six teeth, which is as much as survives at this size.
   gear: '<circle cx="12" cy="12" r="3.1" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M12 2.6v3M12 18.4v3M21.4 12h-3M5.6 12h-3M18.6 5.4l-2.1 2.1M7.5 16.5l-2.1 2.1M18.6 18.6l-2.1-2.1M7.5 7.5 5.4 5.4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>',
   close: '<path d="M6 6l12 12M18 6 6 18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>',
-  // The two states a time can be in. A disc that is filled or not carries the
-  // difference at any size and in any font, which a word does not.
-  'dot-filled': '<circle cx="12" cy="12" r="6" fill="currentColor"/>',
-  'dot-hollow': '<circle cx="12" cy="12" r="5.2" fill="none" stroke="currentColor" stroke-width="2.2"/>',
 };
 
 /**

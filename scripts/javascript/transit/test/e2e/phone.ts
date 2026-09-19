@@ -645,24 +645,177 @@ async function main(): Promise<void> {
       `scrollWidth=${overflow.scrollWidth} clientWidth=${overflow.clientWidth} worstRight=${overflow.worstRight}px (${overflow.worstSelector})`,
     );
 
-    // -------------------------------------------- state-badge clip check
+    // ------------------------------------ the corner badge: platform and state
 
-    const stateClip = await io.evalJs<{ found: boolean; scrollWidth: number; clientWidth: number; text: string }>(`(() => {
-      const nodes = document.querySelectorAll('li.row .state');
-      for (const node of nodes) {
-        if (node.textContent && node.textContent.trim() === 'planned') {
-          return { found: true, scrollWidth: node.scrollWidth, clientWidth: node.clientWidth, text: node.textContent.trim() };
-        }
+    // The platform number and the live mark were two grid tracks and are now
+    // one badge in the row's corner. Both of them overflowed as tracks, for the
+    // same reason: a track is a promise about width and the font that has to
+    // keep it is not the font this machine has. Out of the flow it costs the row
+    // nothing, so what is left to prove is that it is really out of the flow,
+    // really in the corner, and that its digit is really centred in it.
+    const badge = await io.evalJs<{
+      rows: number;
+      badges: number;
+      positioned: number;
+      flush: number;
+      inside: number;
+      centred: number;
+      worstEdge: number;
+      worstCentre: number;
+      clipped: number;
+      gridMismatch: string;
+    }>(`(() => {
+      const rows = document.querySelectorAll('li.row');
+      let badges = 0, positioned = 0, flush = 0, inside = 0, centred = 0, clipped = 0;
+      let worstEdge = 0, worstCentre = 0, gridMismatch = '';
+      for (const row of rows) {
+        const mark = row.querySelector(':scope > .platform');
+        if (mark === null) continue;
+        badges += 1;
+        const style = window.getComputedStyle(mark);
+        if (style.position === 'absolute') positioned += 1;
+        const rr = row.getBoundingClientRect();
+        const br = mark.getBoundingClientRect();
+        // Flush into the corner: its top edge on the row's top edge and its
+        // right edge on the row's right edge, with nothing between.
+        const edge = Math.max(Math.abs(br.top - rr.top), Math.abs(br.right - rr.right));
+        if (edge <= 1) flush += 1;
+        if (edge > worstEdge) worstEdge = edge;
+        const out = Math.max(rr.left - br.left, rr.top - br.top, br.right - rr.right, br.bottom - rr.bottom);
+        if (out <= 0.5) inside += 1;
+        if (mark.scrollWidth > mark.clientWidth + 0.5 || mark.scrollHeight > mark.clientHeight + 0.5) clipped += 1;
+        // The text's own box rather than the element's, which is the only way
+        // to see a baseline that has drifted: a glyph can sit low inside a box
+        // that is itself perfectly placed.
+        const text = mark.firstChild;
+        if (text === null || text.nodeType !== 3) { centred += 1; continue; }
+        const range = document.createRange();
+        range.selectNodeContents(mark);
+        const tr = range.getBoundingClientRect();
+        const dx = Math.abs((tr.left + tr.right) / 2 - (br.left + br.right) / 2);
+        const dy = Math.abs((tr.top + tr.bottom) / 2 - (br.top + br.bottom) / 2);
+        const off = Math.max(dx, dy);
+        if (off <= 1) centred += 1;
+        if (off > worstCentre) worstCentre = off;
+        // A grid places only the children that are in the flow, so the number
+        // of tracks and the number of such children must agree. If the badge
+        // still had a track of its own, this is where it would show.
+        const tracks = window.getComputedStyle(row).gridTemplateColumns.trim().split(/\\s+/).length;
+        let placed = 0;
+        for (const child of row.children) if (window.getComputedStyle(child).position !== 'absolute') placed += 1;
+        if (tracks !== placed && gridMismatch === '') gridMismatch = tracks + ' tracks for ' + placed + ' placed children';
       }
-      return { found: false, scrollWidth: 0, clientWidth: 0, text: '' };
+      return {
+        rows: rows.length, badges, positioned, flush, inside, centred, clipped,
+        worstEdge: Math.round(worstEdge * 100) / 100,
+        worstCentre: Math.round(worstCentre * 100) / 100,
+        gridMismatch,
+      };
     })()`);
     record(
-      '.state badge ("planned") is not clipped (scrollWidth <= clientWidth)',
-      stateClip.found && stateClip.scrollWidth <= stateClip.clientWidth,
-      stateClip.found
-        ? `scrollWidth=${stateClip.scrollWidth} clientWidth=${stateClip.clientWidth}`
-        : 'no li.row .state with text "planned" found',
+      'every row carries the corner badge, flush to the row\'s top and right',
+      badge.badges === badge.rows && badge.positioned === badge.badges && badge.flush === badge.badges && badge.inside === badge.badges,
+      `${badge.badges} badges on ${badge.rows} rows, ${badge.positioned} out of flow, ${badge.flush} flush (worst edge gap ${badge.worstEdge}px), ${badge.inside} inside their row`,
     );
+    record(
+      'the badge text is centred in it and nothing is clipped',
+      badge.badges > 0 && badge.centred === badge.badges && badge.clipped === 0,
+      `${badge.centred} of ${badge.badges} centred (worst offset ${badge.worstCentre}px), ${badge.clipped} clipped`,
+    );
+    record(
+      'the row grid has no track for the platform or the state',
+      badge.badges > 0 && badge.gridMismatch === '',
+      badge.gridMismatch === '' ? 'every row has exactly one track per placed child' : badge.gridMismatch,
+    );
+
+    // ------------------------------------------- the countdown column's width
+
+    // The headline runs to an hour count, a colon and two minutes at the far end
+    // of the longest horizon, and the column is a constant. A column budgeted
+    // for a narrower form does not ellipsise the number, it cuts the leading
+    // digit off a right-aligned cell, which reads as a completely different
+    // time.
+    const WIDEST_COUNTDOWN = '23:59';
+    const measureMinutes = async (): Promise<{ found: boolean; clientWidth: number; sampleWidth: number }> =>
+      io.evalJs(`(() => {
+      const cell = document.querySelector('li.row .minutes');
+      if (cell === null) return { found: false, clientWidth: 0, sampleWidth: 0 };
+      const probe = document.createElement('span');
+      const style = window.getComputedStyle(cell);
+      probe.style.position = 'absolute';
+      probe.style.visibility = 'hidden';
+      probe.style.whiteSpace = 'pre';
+      probe.style.font = style.font;
+      probe.style.fontVariantNumeric = style.fontVariantNumeric;
+      probe.style.letterSpacing = style.letterSpacing;
+      probe.textContent = ${JSON.stringify(WIDEST_COUNTDOWN)};
+      document.body.append(probe);
+      const sampleWidth = probe.getBoundingClientRect().width;
+      probe.remove();
+      return { found: true, clientWidth: cell.clientWidth, sampleWidth };
+    })()`);
+    const minutesFit = await measureMinutes();
+    record(
+      `the countdown column holds "${WIDEST_COUNTDOWN}"`,
+      minutesFit.found && minutesFit.clientWidth >= minutesFit.sampleWidth,
+      `clientWidth=${minutesFit.clientWidth.toFixed(2)} needs=${minutesFit.sampleWidth.toFixed(2)}`,
+    );
+
+    // ------------------------------------- destination width on a planned row
+
+    // The destination is the row's subject and it is the column that yields
+    // first, so it is the one worth measuring rather than trusting. Measured
+    // against a sample rendered in the cell's own font rather than against a
+    // character count, because "twelve characters" is a different number of
+    // pixels in every font the page might be served in, and the font the phone
+    // uses is not the one here. Twelve characters of a long station name is the
+    // point at which the name still says which station it is.
+    const SAMPLE = 'Flughafen Mü';
+    const measureDestination = async (): Promise<{
+      found: boolean;
+      clientWidth: number;
+      scrollWidth: number;
+      sampleWidth: number;
+      text: string;
+    }> =>
+      io.evalJs(`(() => {
+      const row = document.querySelector('li.row:has(a.route)');
+      const cell = row === null ? null : row.querySelector('.destination');
+      if (cell === null) return { found: false, clientWidth: 0, scrollWidth: 0, sampleWidth: 0, text: '' };
+      const probe = document.createElement('span');
+      const style = window.getComputedStyle(cell);
+      probe.style.position = 'absolute';
+      probe.style.visibility = 'hidden';
+      probe.style.whiteSpace = 'pre';
+      probe.style.font = style.font;
+      probe.style.letterSpacing = style.letterSpacing;
+      probe.textContent = ${JSON.stringify(SAMPLE)};
+      document.body.append(probe);
+      const sampleWidth = probe.getBoundingClientRect().width;
+      probe.remove();
+      return {
+        found: true,
+        clientWidth: cell.clientWidth,
+        scrollWidth: cell.scrollWidth,
+        sampleWidth,
+        text: cell.textContent ?? '',
+      };
+    })()`);
+
+    const recordDestination = (
+      label: string,
+      measured: { found: boolean; clientWidth: number; scrollWidth: number; sampleWidth: number; text: string },
+    ): void => {
+      record(
+        label,
+        measured.found && measured.clientWidth >= measured.sampleWidth,
+        measured.found
+          ? `clientWidth=${measured.clientWidth.toFixed(2)} needs=${measured.sampleWidth.toFixed(2)} for "${SAMPLE}", own text "${measured.text}" wants ${measured.scrollWidth}`
+          : 'no li.row with an a.route and a .destination found',
+      );
+    };
+
+    recordDestination(`destination on a row with a journey fits "${SAMPLE}"`, await measureDestination());
 
     // ------------------------------------------- the same layout, wider font
 
@@ -691,54 +844,19 @@ async function main(): Promise<void> {
       wideOverflow.scrollWidth === 390 && wideOverflow.clientWidth === 390 && wideOverflow.worstRight <= 391,
       `Verdana: scrollWidth=${wideOverflow.scrollWidth} clientWidth=${wideOverflow.clientWidth} worstRight=${wideOverflow.worstRight}px (${wideOverflow.worstSelector})`,
     );
+    recordDestination(
+      `destination still fits "${SAMPLE}" in a wider font than this machine has`,
+      await measureDestination(),
+    );
+    const wideMinutes = await measureMinutes();
+    record(
+      `the countdown column still holds "${WIDEST_COUNTDOWN}" in a wider font`,
+      wideMinutes.found && wideMinutes.clientWidth >= wideMinutes.sampleWidth,
+      `Verdana: clientWidth=${wideMinutes.clientWidth.toFixed(2)} needs=${wideMinutes.sampleWidth.toFixed(2)}`,
+    );
 
     await io.evalJs(`(() => { document.getElementById('e2e-wide-font')?.remove(); return true; })()`);
     await sleep(250);
-
-    // ------------------------------------- destination width on a planned row
-
-    // The destination is the row's subject and it is the column that yields
-    // first, so it is the one worth measuring rather than trusting. Measured
-    // against a sample word rendered in the cell's own font rather than against
-    // a character count, because "at least eight characters" is a different
-    // number of pixels in every font the page might be served in.
-    const SAMPLE = 'Talbogen';
-    const destWidth = await io.evalJs<{
-      found: boolean;
-      clientWidth: number;
-      scrollWidth: number;
-      sampleWidth: number;
-      text: string;
-    }>(`(() => {
-      const row = document.querySelector('li.row:has(a.route)');
-      const cell = row === null ? null : row.querySelector('.destination');
-      if (cell === null) return { found: false, clientWidth: 0, scrollWidth: 0, sampleWidth: 0, text: '' };
-      const probe = document.createElement('span');
-      const style = window.getComputedStyle(cell);
-      probe.style.position = 'absolute';
-      probe.style.visibility = 'hidden';
-      probe.style.whiteSpace = 'pre';
-      probe.style.font = style.font;
-      probe.style.letterSpacing = style.letterSpacing;
-      probe.textContent = ${JSON.stringify(SAMPLE)};
-      document.body.append(probe);
-      const sampleWidth = probe.getBoundingClientRect().width;
-      probe.remove();
-      return {
-        found: true,
-        clientWidth: cell.clientWidth,
-        scrollWidth: cell.scrollWidth,
-        sampleWidth,
-        text: cell.textContent ?? '',
-      };
-    })()`);
-    record(
-      `destination on a row with a journey fits "${SAMPLE}" or its own full text`,
-      destWidth.found && (destWidth.clientWidth >= destWidth.sampleWidth || destWidth.scrollWidth <= destWidth.clientWidth),
-      destWidth.found
-        ? `clientWidth=${destWidth.clientWidth.toFixed(2)} needs=${destWidth.sampleWidth.toFixed(2)} for "${SAMPLE}", own text "${destWidth.text}" wants ${destWidth.scrollWidth}`
-        : 'no li.row with an a.route and a .destination found',
-    );
 
     // ------------------------------------------------- assertions 1, 3, 7
 
@@ -768,7 +886,10 @@ async function main(): Promise<void> {
     const childTargets: Array<{ label: string; expr: string }> = [
       { label: 'badge', expr: "document.querySelectorAll('li.row')[0].querySelector('.badge')" },
       { label: 'destination', expr: "document.querySelectorAll('li.row')[0].querySelector('.destination')" },
-      { label: 'times', expr: "document.querySelectorAll('li.row')[0].querySelector('.times')" },
+      // Not the first row's: on a phone a row only draws its second line when
+      // there is something on it that the countdown does not already say, so the
+      // first on-time row has no times cell at all. Whichever row does.
+      { label: 'times', expr: "document.querySelector('li.row .times')" },
     ];
     for (const target of childTargets) {
       await io.closeSheetIfOpen();

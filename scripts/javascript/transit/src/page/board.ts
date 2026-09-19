@@ -5,7 +5,7 @@ import { catchableOnBoard, describeWalk, normaliseLine, walkMinutesFor } from '.
 import type { Board, Departure } from '../model.ts';
 import { handoffFor, routeUrl } from '../route-link.ts';
 import type { RouteOption } from '../plan.ts';
-import { button, clockTime, compact, el, minutesUntil, slot, timeLabel, timeNode } from './dom.ts';
+import { button, clockTime, compact, countdownLabel, el, minutesUntil, slot, timeLabel, timeNode } from './dom.ts';
 import { destinationBadges, type DestinationBadge } from './badges.ts';
 import { alternativeLine, journeySummary, lineBadge, renderJourney, slotHead } from './journey.ts';
 import { attachTip } from './tip.ts';
@@ -166,16 +166,16 @@ function departureTip(dep: Departure, timezone: string, referenceMs: number): HT
 interface Columns {
   connection: boolean;
   route: boolean;
-  platform: boolean;
   /**
-   * Whether the platform rides on the row's second line instead of a column.
+   * Whether the row's second line has to earn its place.
    *
-   * A phone row cannot afford a column for it. The number is two characters and
-   * the destination it was squeezing is the row's actual subject, so on a narrow
-   * screen the badge moves down beside the time, where the line it shares is
-   * short and has room to spare.
+   * On a phone it does: a line of vertical space per row is the difference
+   * between five departures on a screen and eight, and a clock time that merely
+   * restates the countdown is the cheapest thing on the row to drop. On a wider
+   * screen it does not, because the space is there and an always-drawn line
+   * keeps every row the same height.
    */
-  platformInline: boolean;
+  terseTimes: boolean;
   stop: boolean;
 }
 
@@ -192,7 +192,7 @@ export function narrowViewport(): boolean {
     : false;
 }
 
-function columnsOf(board: Board, rows: Departure[], routes: BoardRoutes | undefined): Columns {
+function columnsOf(board: Board, routes: BoardRoutes | undefined): Columns {
   const route = routes !== undefined && routes.rows.size > 0;
   return {
     // On a phone a board with both an interchange and a journey has more fixed
@@ -204,31 +204,11 @@ function columnsOf(board: Board, rows: Departure[], routes: BoardRoutes | undefi
     // question somebody asked for by name.
     connection: board.connection !== undefined && !(route && narrowViewport()),
     route,
-    // The upstream feed reports a platform for rail and never for trams or
-    // buses, so a fixed platform column would be dead space on most boards.
-    // Presence is decided per board, which keeps the slots aligned within a
-    // board without spending a column that can never be filled.
-    platform: rows.some((row) => row.platform !== null) && !narrowViewport(),
-    platformInline: rows.some((row) => row.platform !== null) && narrowViewport(),
+    terseTimes: narrowViewport(),
     stop: board.stops.length > 1,
   };
 }
 
-/**
- * The row's columns, as a grid template.
- *
- * On a phone a board with both an interchange and a journey wants more width
- * than the screen has, so the template says in what order the slots give way.
- * The destination is flexible between a floor and the leftover space; the two
- * wide optional slots carry a ceiling they may fall below; and the journey
- * carries a floor of its own, which is the part that had to be learned twice.
- * With no floor the journey was the slot that collapsed, and a collapsed
- * journey says "Le…", which is not a station. With too high a floor on the
- * destination it was the destination that collapsed to one letter. Both of
- * them have a minimum below which they stop meaning anything, and the
- * destination's is the lower of the two, because the same word is on every row
- * of its group and the tooltip repeats it either way.
- */
 function gridTemplate(columns: Columns): string {
   const parts = ['var(--col-minutes)', 'var(--col-badge)', 'minmax(var(--col-destination-min), 1fr)'];
   // The journey keeps a floor the destination does not. When the row runs out of
@@ -238,17 +218,19 @@ function gridTemplate(columns: Columns): string {
   // naming a station at all, which is the whole reason the column exists.
   if (columns.route) parts.push('minmax(var(--col-route-min), var(--col-route))');
   if (columns.connection) parts.push('minmax(0, var(--col-connection))');
-  // Allowed to reach zero, unlike the state and alarm columns beside them. A
-  // grid whose fixed tracks add up to more than the row is wide does not wrap or
-  // ellipsise: it runs the last column off the side of the card, where the
-  // reader sees nothing at all and the page reports no overflow because the card
-  // clips it. The platform number and the stop tag are the two that can vanish
-  // without the row losing its meaning, and both are repeated in the sheet.
-  if (columns.platform) parts.push('minmax(0, var(--col-platform))');
+  // Allowed to reach zero, unlike the alarm column beside it. A grid whose fixed
+  // tracks add up to more than the row is wide does not wrap or ellipsise: it
+  // runs the last column off the side of the card, where the reader sees nothing
+  // at all and the page reports no overflow because the card clips it. The stop
+  // tag is the one that can vanish without the row losing its meaning, and it is
+  // repeated in the sheet.
   // The alarm keeps a floor and may grow for its bell: a track sized only to
   // its content collapses on the rows that have no reminder, and then the
   // columns stop lining up down the board.
-  parts.push('var(--col-state)', 'minmax(var(--col-alarm), max-content)');
+  // No track for the platform and none for the state. They are one badge in the
+  // row's corner rather than two cells, so they cost the grid nothing at all;
+  // see `stateBadge`.
+  parts.push('minmax(var(--col-alarm), max-content)');
   if (columns.stop) parts.push('minmax(0, var(--col-stop))');
   return parts.join(' ');
 }
@@ -497,10 +479,39 @@ function rowSheet(dep: Departure, board: Board, context: BoardContext, usual: Ma
   return body;
 }
 
-/** The platform number, as a badge that cannot be mistaken for a line. */
-function platformBadge(platform: string): HTMLElement {
-  const node = el('span', 'platform', platform);
-  node.title = `platform ${platform}`;
+/**
+ * The platform, and whether the time is live, as one mark in the row's corner.
+ *
+ * Two facts that were two slots and are now one badge, because they were
+ * competing for the same scarce thing. The platform was a column two characters
+ * wide that cost the destination a quarter of its width; the live mark was a
+ * column too, and it overflowed on the reader's phone in every form it took,
+ * because a grid track is a promise about width that cannot be kept in a font
+ * this machine does not have.
+ *
+ * So neither is a track. The badge is positioned in the corner, out of the flow,
+ * where it costs the row nothing at all, and the colour it is painted carries
+ * the state the word used to: green when the operator is reporting this trip,
+ * grey when the time comes off the timetable, red and struck when the departure
+ * is cancelled. A row with no platform gets the same badge with nothing in it,
+ * so the colour still reads and the corner still looks like one thing rather
+ * than like something missing. The words for all of it are in the sheet.
+ */
+function stateBadge(dep: Departure, context: BoardContext): HTMLElement {
+  const known = dep.realtimeKnown && !context.planned;
+  const state = dep.cancelled ? 'state-cancelled' : known ? 'state-live' : 'state-plan';
+  const node = el('span', `platform ${state}${dep.platform === null ? ' platform-empty' : ''}`);
+  if (dep.platform !== null) node.textContent = dep.platform;
+  const where = dep.platform === null ? '' : `platform ${dep.platform}, `;
+  node.title = dep.cancelled
+    ? `${where}cancelled`
+    : known
+      ? `${where}a live time reported by the operator`
+      : context.planned
+        ? `${where}a timetable for the moment you picked, not a live time`
+        : dep.realtime - context.now <= REPORTING_HORIZON_MS
+          ? `${where}the operator has not started reporting this trip yet`
+          : `${where}timetable: too far ahead for the operator to be reporting it yet`;
   return node;
 }
 
@@ -509,11 +520,11 @@ function renderRow(dep: Departure, board: Board, columns: Columns, context: Boar
   const row = el('li', `row${reachable ? '' : ' unreachable'}${dep.cancelled ? ' row-cancelled' : ''}`);
   row.style.gridTemplateColumns = gridTemplate(columns);
 
-  const minutes = el('span', 'minutes', String(minutesUntil(dep.realtime, context.now)));
+  const minutes = el('span', 'minutes', countdownLabel(dep.realtime, context.now));
   // Registered rather than re-rendered: the tick patches this one text node, so
   // a selection elsewhere in the board survives and nothing else reflows.
   context.ticks.push(() => {
-    minutes.textContent = String(minutesUntil(dep.realtime, Date.now()));
+    minutes.textContent = countdownLabel(dep.realtime, Date.now());
   });
   row.append(minutes);
   row.append(lineBadge(dep));
@@ -523,11 +534,19 @@ function renderRow(dep: Departure, board: Board, columns: Columns, context: Boar
   destination.title = dep.destination;
   main.append(destination);
   const meta = el('span', 'row-times');
-  meta.append(timeGroup(dep, context.timezone, context.now));
-  if (columns.platformInline && dep.platform !== null) meta.append(platformBadge(dep.platform));
+  // A clock time that is exactly the countdown plus now says nothing the
+  // countdown has not already said, and on a phone it costs a whole second line
+  // to say it. So the second line is earned rather than assumed: a delay earns
+  // it, because "17:04 (16:58)" is a promise and a fact and the countdown is
+  // only the fact; a platform earns it; a replacement service or a cancellation
+  // earns it. An on-time departure with none of those is one line, and its
+  // clock time is on the sheet with everything else. On a wider screen the line
+  // is free, so it is always drawn there and the rows stay aligned.
+  const notable = dep.delayMin !== 0 || dep.cancelled || dep.sev;
+  if (!columns.terseTimes || notable) meta.append(timeGroup(dep, context.timezone, context.now));
   if (dep.sev) meta.append(el('span', 'flag sev', 'SEV'));
   if (dep.cancelled) meta.append(el('span', 'flag cancelled-flag', 'cancelled'));
-  main.append(meta);
+  if (meta.childNodes.length > 0) main.append(meta);
   row.append(main);
 
   if (columns.route) row.append(renderRoute(dep, board, context, usual));
@@ -546,10 +565,6 @@ function renderRow(dep: Departure, board: Board, columns: Columns, context: Boar
     }
   }
 
-  if (columns.platform) row.append(dep.platform === null ? slot('platform') : platformBadge(dep.platform));
-
-  row.append(stateMark(dep, context));
-
   row.append(alarmMarker(dep) ?? slot('alarm'));
 
   if (columns.stop) {
@@ -558,6 +573,11 @@ function renderRow(dep: Departure, board: Board, columns: Columns, context: Boar
     node.title = `from ${tag}`;
     row.append(node);
   }
+
+  // Last, and out of the flow: it is placed by the stylesheet in the row's
+  // corner rather than by the grid, so where it sits among the children is only
+  // a question of what a screen reader says last.
+  row.append(stateBadge(dep, context));
 
   attachLongPress(row, () => openAlarmPopup(dep, board, row));
   // The whole row is the tap target, and only on touch: on a desktop a tip that
@@ -573,36 +593,6 @@ function renderRow(dep: Departure, board: Board, columns: Columns, context: Boar
 
 /** How far ahead a departure still counts as one the operator ought to be reporting. */
 const REPORTING_HORIZON_MS = 60 * 60_000;
-
-/**
- * Whether this row's time is live or off the timetable, and why.
- *
- * "planned" rather than "plan", because the word describes the time rather than
- * naming a kind of object, and the pair reads as live/planned. The explanation
- * splits on an hour because the two cases are genuinely different questions: a
- * train leaving in twenty minutes with no live time is one the operator has not
- * started reporting yet, and a train leaving tomorrow morning was never going to
- * have one. Saying "no live data" for both invites the reader to worry about the
- * second, which is simply how a timetable works.
- */
-function stateMark(dep: Departure, context: BoardContext): HTMLElement {
-  const known = dep.realtimeKnown && !context.planned;
-  // A disc and a word, so the phone can drop the word. A word's width is a
-  // property of the font, and the font on the reader's phone is not the font
-  // here: "planned" at nine pixels fits the column on this machine and paints
-  // across the bell on an Android one. A disc is a disc in every font.
-  const node = el('span', `state ${known ? 'state-live' : 'state-plan'}`);
-  node.append(icon(known ? 'dot-filled' : 'dot-hollow', 'state-dot'));
-  node.append(el('span', 'state-word', known ? 'live' : 'planned'));
-  node.title = known
-    ? 'a live time reported by the operator'
-    : context.planned
-      ? 'a timetable for the moment you picked, not a live time'
-      : dep.realtime - context.now <= REPORTING_HORIZON_MS
-        ? 'the operator has not started reporting this trip yet'
-        : 'timetable: too far ahead for the operator to be reporting it yet';
-  return node;
-}
 
 interface Strip {
   head: Departure;
@@ -1006,7 +996,7 @@ export function renderBoard(board: Board, context: BoardContext): HTMLElement {
     return section;
   }
 
-  const columns = columnsOf(board, rows, context.routes);
+  const columns = columnsOf(board, context.routes);
   const usual = context.routes === undefined ? new Map<string, string>() : usualExits(context.routes.rows);
   const ordered =
     context.sortByArrival && columns.route

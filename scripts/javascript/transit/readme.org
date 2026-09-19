@@ -681,13 +681,54 @@ integrated view covers the whole horizon.
 ** The row grid
 
 A row is a grid of fixed slots: minutes, line badge, destination with its times,
-the onward connection, the journey to the destination, the platform, whether the
-time is live or planned, a reminder marker, and the stop label.
+the onward connection, the journey to the destination, a reminder marker, and
+the stop label. The platform and whether the time is live are on the row too,
+and are deliberately not slots.
 
-The platform is a badge rather than bare text, in a blue that belongs to no line
-in the operator's table. A number on its own in a row of numbers is ambiguous,
-and readers were reading it as part of the time beside it; a badge in a colour
-that names nothing else says "this is a platform" without a word.
+Both were, and both overflowed on the reader's phone. A grid track is a promise
+about width, and a cell whose text is wider than its track does not overflow
+anything a browser will report: it paints across its neighbours. The word
+"planned" fitted its track exactly in the font of the machine this was written on
+and lay across the bell in the font a phone renders =system-ui= as. Replacing the
+word with a disc fixed the word and not the mechanism, because the disc still
+needed a track and the track still had to be budgeted against a font nobody here
+can see. The platform's own track was cheaper but no better spent: two characters
+were costing the destination a quarter of its width.
+
+So they are one badge in the row's top right corner, positioned out of the flow,
+where they cost the row no width at all. The badge holds the platform number and
+is painted by the state: green when the operator is reporting this trip, grey
+when the time comes off the timetable, red and struck through when the departure
+is cancelled. A row with no platform gets the same badge with nothing in it, so
+the colour still reads and the corner still looks like one thing rather than like
+something missing. It is flush into the corner rather than floating near it: no
+margin, and the two corners that lie along the row's own edges stay square so the
+badge fuses with them, leaving only the corner that faces into the row rounded.
+Its digit is centred by a line height equal to its height rather than by flex
+alignment, because a flex box inside a baseline-aligned row inherits a baseline
+it should not have and the digit then sits a pixel low in some fonts and not in
+others. The words for all of this are in the sheet, on the line that says where
+the time came from.
+
+The countdown is minutes up to an hour and hours and minutes past it, so a row
+twenty hours out reads "20:14" rather than "1214". At that range the question is
+how long, and four digits of minutes is a number the reader has to divide. The
+digits stay the same size and the column stays right-aligned, so a "9", a "45"
+and a "1:23" line up under each other down the board. Five characters is the
+widest the headline can be, at the far end of the longest horizon on offer, and
+that is what the column is budgeted for. It is a fact about the formatter rather
+than a guess about a font, and the harness checks the column against it in two
+fonts anyway.
+
+On a phone the row's second line has to earn its place. A clock time that is
+exactly the countdown added to now says nothing the countdown has not already
+said, and saying it costs a whole line on every row. So the second line is drawn
+when there is something on it that the countdown does not carry: a delay, where
+the expected time and the promised one are two different facts, a replacement
+service, or a cancellation. An on-time departure with none of those is one line
+tall, and its clock time is in the sheet with everything else. On a wider screen
+the line is free and is always drawn, so the rows there stay the same height as
+each other.
 
 In the slots too narrow to hold a full place name (the strip's legend, the board
 chips) names are abbreviated by one shared map before they are cut, so what
@@ -716,12 +757,6 @@ decision the render makes rather than the stylesheet, so the page re-renders
 when the breakpoint is crossed. A slot is empty when the value is absent and
 nothing shifts, so the eye can run down one column.
 
-On a phone the platform gives up its column and rides on the row's second line
-instead, beside the time. Two characters were costing the destination a quarter
-of its width, and the destination is what the row is about; the second line is
-short and has the room to spare. That is the second layout decision the render
-makes rather than the stylesheet, and it crosses the same breakpoint.
-
 The numbers this has to add up to are not the ones the screen reports. A row is
 narrower than the page by the page's gutter, the card's border and the card's
 own padding, and a grid whose fixed tracks exceed the row it is in neither wraps
@@ -731,13 +766,17 @@ there is none. The touch harness asserts every row child stays inside its row
 for exactly this reason. It found the case above, where the columns had been
 budgeted against the page's width rather than a row's.
 
+What the destination ends up with is the whole point of the arithmetic, so the
+harness measures that rather than trusting it: on a board with a journey slot at
+a phone's width, the destination must hold twelve characters of a long station
+name, measured against a sample rendered in the cell's own font and measured
+again with a deliberately wider font forced on the page. Twelve characters is
+about where a shortened name still says which station it is.
+
 Which *optional* slots exist is decided per board rather than globally: the
-platform column appears only when that board's rows actually carry platforms, the
-connection column only when the board declares an interchange, the journey
-column only when that board is being planned, and the stop column only when the
-board merges stops. The upstream feed reports a platform for
-rail and never for surface transport, so a globally fixed platform column would be
-dead space on most boards.
+connection column only when the board declares an interchange, the journey column
+only when that board is being planned, and the stop column only when the board
+merges stops.
 
 The expected time is the headline and the planned time follows it in parentheses
 when the two differ, because a departure eleven minutes late is a different thing
@@ -1067,7 +1106,10 @@ perfect on the machine it was written on. No test that runs here could have
 caught it, because the font is not here.
 
 A glyph is a request that some font, somewhere, happens to have a picture. An
-SVG is the picture. Text punctuation is deliberately not in the sprite: an arrow
+SVG is the picture. The live and planned discs were in the sprite for one round and are gone: the
+state is a colour on the corner badge now, and a colour needs no picture.
+
+Text punctuation is deliberately not in the sprite: an arrow
 between two stop names, a middle dot between two facts, an ellipsis on a
 shortened name. Those are words, not icons, and they live in blocks every system
 font covers.
@@ -1154,12 +1196,25 @@ than Roboto, so a layout that survives it survives the phone, and forcing it is
 better than guessing a margin.
 
 The consequence for the page is that no column's width may be a measurement of
-text. The fixed tracks are all in rem, which is a constant; where a cell would
-otherwise be as wide as its word, the word is replaced by something whose width
-is not a font's business, which is why the live and planned states are a disc on
-a phone. Every fixed text cell is also clipped, so that a cell whose text is
-wider than its track cannot paint across its neighbours, which is a kind of
-overflow no browser reports.
+text. The fixed tracks are all in rem, which is a constant; a slot whose width
+could only ever be a measurement of somebody else's font was taken out of the
+grid instead, which is what happened to the live mark and to the platform. Every
+fixed text cell is also clipped, so that a cell whose text is wider than its
+track cannot paint across its neighbours, which is a kind of overflow no browser
+reports.
+
+Where a cell does have to hold text, the harness measures it against a sample
+rendered in that cell's own font rather than against a character count, in both
+passes: the destination must hold twelve characters of a long station name, and
+the countdown column must hold the widest form the countdown can take. A
+character count would be a different number of pixels in every font, which is the
+mistake this whole section exists to stop making.
+
+It also asserts what is deliberately not in the grid: the corner badge must be
+out of the flow, flush to the row's top and right edges, with its text centred in
+it, and every row's track count must equal the number of children the grid
+actually places. That last one is how a slot that quietly came back would be
+found.
 
 It also measures a refresh with the processor slowed to a quarter and the
 network held to a slow mobile connection, and prints what it found. Two limits
@@ -1171,8 +1226,11 @@ page waits for its requests one after another or all at once.
 
 Two things it is worth knowing about writing assertions here. Service workers
 must be bypassed or the run measures the previous deploy rather than the build
-in front of it. And a tap that opens a second tab must close that tab again
-before the run continues: a browser that has moved its foreground elsewhere can
+in front of it. A regular expression inside an evaluated template literal needs
+its backslash doubled, because a template literal eats the first one and =\s=
+silently becomes the letter =s=, which is a passing test that measures nothing.
+And a tap that opens a second tab must close that tab again before the run
+continues: a browser that has moved its foreground elsewhere can
 leave the next evaluation waiting for a reply that never comes, which looks
 exactly like a slow test rather than a hang.
 

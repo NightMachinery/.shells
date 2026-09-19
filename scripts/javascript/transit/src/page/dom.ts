@@ -109,6 +109,32 @@ export function minutesUntil(epochMs: number, now: number): number {
 }
 
 /**
+ * The countdown as the row's headline draws it.
+ *
+ * Minutes up to an hour, and hours and minutes past that. The longer horizons
+ * run to a whole day, and "1438" is four digits that nobody reads as a length of
+ * time: the question a reader is asking at that range is "how long", and the
+ * answer to that is an hour count with the minutes still attached rather than a
+ * number they have to divide. The digits stay the same size and the column stays
+ * right-aligned, so a "9", a "45" and a "1:23" line up under each other down the
+ * board.
+ *
+ * The widest this can be is five characters, at the far end of the longest
+ * horizon on offer. That is what the column has to be budgeted for, and it is a
+ * fact about this function rather than a guess about a font.
+ */
+export function countdownLabel(epochMs: number, now: number): string {
+  return formatCountdown(minutesUntil(epochMs, now));
+}
+
+/** The same, from a plain minute count, which is the part worth testing. */
+export function formatCountdown(minutes: number): string {
+  if (minutes <= 60) return String(minutes);
+  const hours = Math.floor(minutes / 60);
+  return `${hours}:${String(minutes - hours * 60).padStart(2, '0')}`;
+}
+
+/**
  * Whether the reader is in the middle of selecting text inside a board.
  *
  * The page repaints once a second to keep the minute counts honest, and a
