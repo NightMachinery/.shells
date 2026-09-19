@@ -6,7 +6,7 @@ import type { Board, Departure } from '../model.ts';
 import { handoffFor, routeUrl, type RouteHandoff } from '../route-link.ts';
 import { openRouteOverlay, standalone } from './route-overlay.ts';
 import type { RouteOption } from '../plan.ts';
-import { button, clockTime, compact, countdownLabel, el, minutesUntil, slot, timeLabel, timeNode } from './dom.ts';
+import { button, clockTime, compact, countdownLabel, el, fitCountdown, minutesUntil, slot, timeLabel, timeNode } from './dom.ts';
 import { destinationBadges, type DestinationBadge } from './badges.ts';
 import { alternativeLine, journeySummary, lineBadge, renderJourney, slotHead } from './journey.ts';
 import { attachTip } from './tip.ts';
@@ -718,11 +718,15 @@ function renderRow(dep: Departure, board: Board, columns: Columns, context: Boar
   const row = el('li', `row${reachable ? '' : ' unreachable'}${dep.cancelled ? ' row-cancelled' : ''}`);
   row.style.gridTemplateColumns = gridTemplate(columns);
 
-  const minutes = el('span', 'minutes', countdownLabel(dep.realtime, context.now));
+  const minutes = el('span', 'minutes');
+  fitCountdown(minutes, countdownLabel(dep.realtime, context.now));
   // Registered rather than re-rendered: the tick patches this one text node, so
-  // a selection elsewhere in the board survives and nothing else reflows.
+  // a selection elsewhere in the board survives and nothing else reflows. It
+  // goes through `fitCountdown` for the same reason the first draw does: a
+  // countdown that crosses the hour changes length as well as value, and a
+  // class set once at render would be the wrong class a minute later.
   context.ticks.push(() => {
-    minutes.textContent = countdownLabel(dep.realtime, Date.now());
+    fitCountdown(minutes, countdownLabel(dep.realtime, Date.now()));
   });
   row.append(minutes);
   row.append(lineBadge(dep));

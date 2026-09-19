@@ -848,12 +848,53 @@ the time came from.
 The countdown is minutes up to an hour and hours and minutes past it, so a row
 twenty hours out reads "20:14" rather than "1214". At that range the question is
 how long, and four digits of minutes is a number the reader has to divide. The
-digits stay the same size and the column stays right-aligned, so a "9", a "45"
-and a "1:23" line up under each other down the board. Five characters is the
-widest the headline can be, at the far end of the longest horizon on offer, and
-that is what the column is budgeted for. It is a fact about the formatter rather
-than a guess about a font, and the harness checks the column against it in two
-fonts anyway.
+column is right-aligned, so a "9", a "45" and a "1:23" end under each other down
+the board.
+
+*** A column budgeted for the common case, not the widest one
+
+Five characters is the widest the headline can be, at the far end of the longest
+horizon on offer, and the column was budgeted for exactly that. It is the wrong
+budget. Almost every row is one or two digits, so two thirds of the column was
+blank on almost every row, and because the column is the first one and its text
+is right-aligned, all of that blank pooled on the left: a gutter down the side of
+every board, on every screen, for the sake of a form that appears a few times a
+day. Measured in the stress font, thirty six pixels a row.
+
+So the column is two digits wide now, and the forms that do not fit are drawn
+smaller until they do: one step for four characters, another for five, each ratio
+being the widest string of that length divided by two digits in a font wider than
+this machine's. Those sizes are genuinely small. That is the trade, and it is the
+right way round: a row ten hours out is read for "not for ages" and not for the
+minute, while the gutter was charged to every row on every board. The thirty six
+pixels went to the destination, which is the column that yields first and the one
+the reader is actually reading.
+
+Which step a countdown needs is a question about the length of the string and not
+about its punctuation. A colon is what makes the long forms long today, and a
+rule written about the colon would quietly stop covering the next long form that
+appears. The rule is in =src/page/dom.ts= beside the formatter, so the two can be
+checked against each other, and the test walks every minute the longest horizon
+can reach and insists that everything the formatter emits which is wider than the
+column names a step.
+
+The tick has to set the class as well as the text: a countdown crossing the hour
+changes length as well as value, and a class set once at render is the wrong
+class a minute later. It still patches the text node rather than replacing it.
+
+The rest of the left edge was measured and left alone, because it turned out not
+to be waste. On a phone at 390 pixels the card starts at zero, its padding is
+eight pixels, the row adds none of its own, and the countdown's cell begins
+exactly there. The mark on the first catchable row is an inset shadow rather than
+a track or a border, so it costs no width at all; it was moved out of the grid
+for that reason and the comment beside it says so. Eight pixels is the page's
+text gutter, not a gutter to reclaim, and taking it would put the largest number
+on the page against the edge of the screen.
+
+What is left inside the column is the space a one-digit countdown leaves to the
+left of itself, which is what right-alignment is for: the units line up down the
+board, so the eye compares lengths of time rather than hunting for where each
+number starts.
 
 On a phone the row's second line has to earn its place. A clock time that is
 exactly the countdown added to now says nothing the countdown has not already
@@ -1517,10 +1558,18 @@ reports.
 
 Where a cell does have to hold text, the harness measures it against a sample
 rendered in that cell's own font rather than against a character count, in both
-passes: the destination must hold twelve characters of a long station name, and
-the countdown column must hold the widest form the countdown can take. A
-character count would be a different number of pixels in every font, which is the
-mistake this whole section exists to stop making.
+passes: the destination must hold twelve characters of a long station name, the
+countdown column must be as wide as two digits and no wider, and each of the
+countdown's long forms must fit that column at the size its own class gives it.
+A character count would be a different number of pixels in every font, which is
+the mistake this whole section exists to stop making.
+
+The countdown's probe clones the real cell and adds the class, rather than
+building a span and copying font properties onto it. The sizes under test are
+the stylesheet's own, so the probe has to inherit the same cascade the cell has;
+a probe assembled from =getComputedStyle= measures what the harness believes
+instead of what the page draws, which is exactly how the previous version of
+this assertion passed while the column was seventeen pixels too narrow.
 
 It also asserts what is deliberately not in the grid: the corner badge must be
 out of the flow, flush to the row's top and right edges, with its text centred in

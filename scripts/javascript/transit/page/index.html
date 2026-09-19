@@ -571,10 +571,39 @@
       }
 
       .minutes {
-        font-size: 19px;
+        font-size: var(--minutes-size);
         font-weight: 600;
         font-variant-numeric: tabular-nums;
         text-align: right;
+      }
+
+      /*
+       * The countdown's rare long forms, drawn small enough to fit the column
+       * its common form sized.
+       *
+       * The countdown is one or two digits up to an hour and an hour count with
+       * minutes past that, so a column wide enough for the second form is
+       * two thirds empty on almost every row, and that emptiness is a gutter
+       * down the whole left of the page. The column is sized for two digits
+       * instead and these two steps buy the long forms back: enough for four
+       * characters, and enough for five, both measured against the widest the
+       * form can be in a font wider than this machine's.
+       *
+       * They really are small, and that is the trade. A row ten hours out is
+       * being read for "not for ages", not for the minute, and the alternative
+       * was charging every row on every board for it.
+       *
+       * The two ratios are the widest form of each length divided by two
+       * digits, in the wider font, with a pixel or so spare. Set to exactly
+       * the quotient they fit at a hair under half a pixel, which is inside
+       * what a browser will round away.
+       */
+      .minutes.minutes-long {
+        font-size: calc(var(--minutes-size) * 0.53);
+      }
+
+      .minutes.minutes-longest {
+        font-size: calc(var(--minutes-size) * 0.41);
       }
 
       .row-main {
@@ -1341,12 +1370,17 @@
              take, so every pixel the fixed slots do not need belongs to the
              destination. */
           --col-destination-max: 1fr;
-          /* Wide enough for the widest the countdown can be, which is an hour
-             count, a colon and two minutes at the far end of the longest
-             horizon. Sized for a font wider than this one, because the one that
-             renders it is not this one, and confirmed by the harness rather than
-             estimated here. */
-          --col-minutes: 3.85rem;
+          /* The largest thing on the row, because it is the only number the
+             reader came for: everything else on a row answers "which
+             departure", and this answers "do I leave now". A point smaller than
+             on a wide screen, where the room is. */
+          --minutes-size: 18px;
+          /* Two digits at that size in a font wider than this one, which is the
+             common form and now the whole column; see the root rule and
+             `.minutes-long`. It was 3.85rem, sized for the widest form the
+             countdown has, and the two and a bit rem of that which almost every
+             row did not use were a blank gutter down the left of the page. */
+          --col-minutes: 1.6rem;
           --col-badge: 2.5rem;
           --col-connection: 4rem;
           --col-alarm: 0.9rem;
@@ -1392,16 +1426,6 @@
           margin: 0 0 8px;
           padding-left: 12px;
           padding-right: 12px;
-        }
-
-        /* The largest thing on the row, because it is the only number the
-           reader came for: everything else on a row answers "which departure",
-           and this answers "do I leave now". The extra two points cost the
-           countdown's column a little more width, which comes out of the
-           destination, which has enough of it since the cards went full
-           bleed. */
-        .minutes {
-          font-size: 18px;
         }
 
         /* The two lines of a row sit directly on top of one another here. The

@@ -964,50 +964,85 @@ async function main(): Promise<void> {
 
     // ------------------------------------------- the countdown column's width
 
-    // The headline runs to an hour count, a colon and two minutes at the far end
-    // of the longest horizon, and the column is a constant. A column budgeted
-    // for a narrower form does not ellipsise the number, it cuts the leading
-    // digit off a right-aligned cell, which reads as a completely different
-    // time.
-    const WIDEST_COUNTDOWN = '23:59';
-    const measureMinutes = async (): Promise<{ found: boolean; clientWidth: number; sampleWidth: number }> =>
+    // The column used to be budgeted for the widest form the headline has, an
+    // hour count and two minutes at the far end of the longest horizon. That
+    // form is rare and the common one is one or two digits, so two thirds of
+    // the column sat blank on almost every row, as a gutter down the left of
+    // every board. It is budgeted for two digits now and the long forms are
+    // drawn small enough to fit it.
+    //
+    // Which makes this two assertions rather than one, and the second matters
+    // more. A column too narrow for the form being drawn does not ellipsise a
+    // number, it cuts the leading digit off a right-aligned cell, and "1:23"
+    // without its "1" reads as a completely different time.
+    const COMMON_COUNTDOWN = '88';
+    const LONG_COUNTDOWN = '1:23';
+    const LONGEST_COUNTDOWN = '23:59';
+    /** How much wider than two digits the column may be before it is a gutter again. */
+    const COLUMN_SLACK_PX = 4;
+    interface MinutesMeasurement {
+      found: boolean;
+      clientWidth: number;
+      common: number;
+      long: number;
+      longest: number;
+      sizes: string;
+    }
+    const measureMinutes = async (): Promise<MinutesMeasurement> =>
       io.evalJs(`(() => {
       const cell = document.querySelector('li.row .minutes');
-      if (cell === null) return { found: false, clientWidth: 0, sampleWidth: 0 };
-      const probe = document.createElement('span');
-      const style = window.getComputedStyle(cell);
-      probe.style.position = 'absolute';
-      probe.style.visibility = 'hidden';
-      probe.style.whiteSpace = 'pre';
-      // One property at a time, never the \`font\` shorthand.
-      //
-      // \`getComputedStyle().font\` serialises to the empty string whenever any
-      // longhand it does not cover is at a non-initial value, and this cell sets
-      // \`font-variant-numeric: tabular-nums\`, which is exactly such a longhand.
-      // Assigning that empty string does nothing, so the probe stayed at the
-      // page's own 15px and this assertion measured a countdown two sizes
-      // smaller than the one on the screen: it passed with 41px of need against
-      // a column that really needed 58px, which is a leading digit cut off a
-      // right-aligned time on the reader's phone and a green line here.
-      probe.style.fontFamily = style.fontFamily;
-      probe.style.fontSize = style.fontSize;
-      probe.style.fontWeight = style.fontWeight;
-      probe.style.fontStyle = style.fontStyle;
-      probe.style.fontStretch = style.fontStretch;
-      probe.style.fontVariantNumeric = style.fontVariantNumeric;
-      probe.style.letterSpacing = style.letterSpacing;
-      probe.textContent = ${JSON.stringify(WIDEST_COUNTDOWN)};
-      document.body.append(probe);
-      const sampleWidth = probe.getBoundingClientRect().width;
-      probe.remove();
-      return { found: true, clientWidth: cell.clientWidth, sampleWidth };
+      if (cell === null) return { found: false, clientWidth: 0, common: 0, long: 0, longest: 0, sizes: '' };
+      // Cloned and re-classed rather than styled from scratch. The sizes under
+      // test are the stylesheet's own, so the probe has to inherit the same
+      // cascade the real cell has, step-down classes and all; a probe built
+      // from getComputedStyle would measure what this file believes instead of
+      // what the page draws, and that is exactly how the previous version of
+      // this assertion passed while the column was seventeen pixels too narrow.
+      const probe = (extra, text) => {
+        const node = cell.cloneNode(false);
+        if (extra !== '') node.classList.add(extra);
+        node.textContent = text;
+        node.style.position = 'absolute';
+        node.style.visibility = 'hidden';
+        node.style.whiteSpace = 'pre';
+        node.style.width = 'auto';
+        cell.parentElement.append(node);
+        const width = node.getBoundingClientRect().width;
+        const size = window.getComputedStyle(node).fontSize;
+        node.remove();
+        return { width, size };
+      };
+      const common = probe('', ${JSON.stringify(COMMON_COUNTDOWN)});
+      const long = probe('minutes-long', ${JSON.stringify(LONG_COUNTDOWN)});
+      const longest = probe('minutes-longest', ${JSON.stringify(LONGEST_COUNTDOWN)});
+      return {
+        found: true,
+        clientWidth: cell.clientWidth,
+        common: common.width,
+        long: long.width,
+        longest: longest.width,
+        sizes: common.size + '/' + long.size + '/' + longest.size,
+      };
     })()`);
-    const minutesFit = await measureMinutes();
-    record(
-      `the countdown column holds "${WIDEST_COUNTDOWN}"`,
-      minutesFit.found && minutesFit.clientWidth >= minutesFit.sampleWidth,
-      `clientWidth=${minutesFit.clientWidth.toFixed(2)} needs=${minutesFit.sampleWidth.toFixed(2)}`,
-    );
+
+    const recordMinutes = (label: string, m: MinutesMeasurement): void => {
+      record(
+        `the countdown column is two digits wide${label}`,
+        m.found && m.clientWidth + 0.5 >= m.common && m.clientWidth <= m.common + COLUMN_SLACK_PX,
+        m.found
+          ? `column=${m.clientWidth.toFixed(2)} "${COMMON_COUNTDOWN}"=${m.common.toFixed(2)} spare=${(m.clientWidth - m.common).toFixed(2)}px`
+          : 'no li.row .minutes found',
+      );
+      record(
+        `the long countdown forms fit that column${label}`,
+        m.found && m.long <= m.clientWidth + 0.5 && m.longest <= m.clientWidth + 0.5,
+        m.found
+          ? `column=${m.clientWidth.toFixed(2)} "${LONG_COUNTDOWN}"=${m.long.toFixed(2)} "${LONGEST_COUNTDOWN}"=${m.longest.toFixed(2)} at ${m.sizes}`
+          : 'no li.row .minutes found',
+      );
+    };
+
+    recordMinutes('', await measureMinutes());
 
     // ------------------------------------- destination width on a planned row
 
@@ -1105,12 +1140,7 @@ async function main(): Promise<void> {
       `destination still fits "${SAMPLE}" in a wider font than this machine has`,
       await measureDestination(),
     );
-    const wideMinutes = await measureMinutes();
-    record(
-      `the countdown column still holds "${WIDEST_COUNTDOWN}" in a wider font`,
-      wideMinutes.found && wideMinutes.clientWidth >= wideMinutes.sampleWidth,
-      `Verdana: clientWidth=${wideMinutes.clientWidth.toFixed(2)} needs=${wideMinutes.sampleWidth.toFixed(2)}`,
-    );
+    recordMinutes(' in a wider font than this machine has', await measureMinutes());
 
     await io.evalJs(`(() => { document.getElementById('e2e-wide-font')?.remove(); return true; })()`);
     await sleep(250);

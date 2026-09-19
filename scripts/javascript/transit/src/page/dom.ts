@@ -115,13 +115,13 @@ export function minutesUntil(epochMs: number, now: number): number {
  * run to a whole day, and "1438" is four digits that nobody reads as a length of
  * time: the question a reader is asking at that range is "how long", and the
  * answer to that is an hour count with the minutes still attached rather than a
- * number they have to divide. The digits stay the same size and the column stays
- * right-aligned, so a "9", a "45" and a "1:23" line up under each other down the
- * board.
+ * number they have to divide. The column is right-aligned, so a "9", a "45" and
+ * a "1:23" end under each other down the board.
  *
  * The widest this can be is five characters, at the far end of the longest
- * horizon on offer. That is what the column has to be budgeted for, and it is a
- * fact about this function rather than a guess about a font.
+ * horizon on offer, and the narrowest is one. The column is budgeted for the
+ * narrow end, because that is what almost every row is; the long forms are
+ * drawn smaller to fit it. See `fitCountdown`, which is what puts them there.
  */
 export function countdownLabel(epochMs: number, now: number): string {
   return formatCountdown(minutesUntil(epochMs, now));
@@ -132,6 +132,44 @@ export function formatCountdown(minutes: number): string {
   if (minutes <= 60) return String(minutes);
   const hours = Math.floor(minutes / 60);
   return `${hours}:${String(minutes - hours * 60).padStart(2, '0')}`;
+}
+
+/**
+ * Put a countdown into its node, at a size that fits the column.
+ *
+ * The column is budgeted for the common form, which is one or two digits, so
+ * the forms that do not fit carry a class that steps the size down until they
+ * do. Which class is a question about the string's length and not about its
+ * punctuation: a colon is what makes the long forms long today, but the reason
+ * to shrink is that the string is wide, and a rule written about the colon
+ * would quietly stop covering any other long form that ever appears.
+ *
+ * The text node is patched rather than replaced when there is one to patch.
+ * This runs once a second for every row on the page, and replacing the node
+ * throws away anything the browser had attached to it.
+ */
+export function fitCountdown(node: HTMLElement, text: string): void {
+  const only = node.childNodes.length === 1 ? node.firstChild : null;
+  if (only !== null && only.nodeType === Node.TEXT_NODE) only.nodeValue = text;
+  else node.textContent = text;
+  const wanted = countdownWidthClass(text);
+  node.classList.toggle('minutes-long', wanted === 'minutes-long');
+  node.classList.toggle('minutes-longest', wanted === 'minutes-longest');
+}
+
+/**
+ * Which step down a countdown of this length needs, or null for none.
+ *
+ * Separated from the node so it can be checked against every form the
+ * formatter can actually produce, which is the pairing that matters: the
+ * column is budgeted for two characters, so anything the formatter can emit
+ * that is longer has to name a class, and a form that names none is a form
+ * that paints over the badge beside it.
+ */
+export function countdownWidthClass(text: string): 'minutes-long' | 'minutes-longest' | null {
+  if (text.length >= 5) return 'minutes-longest';
+  if (text.length >= 3) return 'minutes-long';
+  return null;
 }
 
 /**

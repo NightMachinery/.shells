@@ -50,12 +50,19 @@
      A station name is not longer for having a wider screen behind it, so past
      this the extra pixels only push the journey away from the departure. */
   --col-destination-max: 13rem;
-  /* The countdown's widest form is an hour count, a colon and two minutes, and
-     this has to hold that string at the size the countdown is drawn at, in a
-     font wider than this machine's. It held it at the body size for a long
-     time instead, and the harness agreed, because its probe was measuring at
-     the body size too; see the countdown probe in the e2e harness. */
-  --col-minutes: 4.1rem;
+  /* The size the countdown is drawn at, which is a variable because two other
+     things are derived from it: the width of its column, and how far the rare
+     long forms have to step down to fit that width. */
+  --minutes-size: 19px;
+  /* Held the countdown's widest form for a long time, which was an hour count,
+     a colon and two minutes, measured in a font wider than this machine's. The
+     widest form is not the common one: almost every row is one or two digits,
+     and a column sized for "23:59" left about two thirds of itself blank on
+     every row of every board, as a gutter down the left of the page. So it is
+     sized for two digits now, and the forms that do not fit are drawn smaller;
+     see `.minutes-long` in the page shell. Measured, not estimated: two digits
+     at this size in the wider font, confirmed by the harness. */
+  --col-minutes: 1.7rem;
   --col-badge: 2.9rem;
   --col-connection: 4.6rem;
   --col-alarm: 1rem;
