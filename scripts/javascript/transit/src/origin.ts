@@ -1,3 +1,4 @@
+import { resetInflight, share } from './inflight.ts';
 import { toAggregatorId, toRawId, TRANSITOUS_DEFAULT_BASE_URL } from './aggregator.ts';
 import { envOverride, fetchJson, HttpError, type FetchLike } from './http.ts';
 import { MVG_DEFAULT_BASE_URL } from './backends/mvg.ts';
@@ -70,6 +71,9 @@ const unresolvable = new Set<string>();
 export function clearOriginCache(): void {
   memo.clear();
   unresolvable.clear();
+  // Requests in flight are cleared too, or a case that started a probe could
+  // hand its answer to the next case, which is precisely what clearing is for.
+  resetInflight();
 }
 
 export class UnresolvableOriginError extends Error {
@@ -194,6 +198,14 @@ export async function resolveOrigin(options: ResolveOriginOptions): Promise<Reso
   const held = memo.get(rawId);
   if (held !== undefined) return held;
   if (unresolvable.has(rawId)) throw new UnresolvableOriginError(rawId);
+  // Shared, because every board of a profile starts planning at the same
+  // moment and the memo above is only written once a probe has finished. Two
+  // boards at the same stop used to probe the aggregator twice, in parallel,
+  // for an answer that cannot differ.
+  return share(`origin|${rawId}`, () => resolveOriginUncached(options, rawId));
+}
+
+async function resolveOriginUncached(options: ResolveOriginOptions, rawId: string): Promise<ResolvedOrigin> {
 
   const cacheKey = `origin:${rawId}`;
   if (options.cache) {

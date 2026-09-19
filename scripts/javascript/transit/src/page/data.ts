@@ -1,4 +1,6 @@
 import { chain } from '../backends/chain.ts';
+import { share, withLimit } from '../inflight.ts';
+import { recordBoard } from './timing.ts';
 import { createMvgBackend, MVG_DEFAULT_BASE_URL } from '../backends/mvg.ts';
 import { createTransitousBackend, TRANSITOUS_DEFAULT_BASE_URL } from '../backends/transitous.ts';
 import type { Backend } from '../backends/types.ts';
@@ -35,6 +37,41 @@ interface CacheEntry {
 }
 
 const timetableCache = new Map<string, CacheEntry>();
+
+/**
+ * How many upstream requests of each kind may be in the air at once.
+ *
+ * Boards are fetched together rather than one after another, which is the whole
+ * speed-up, and without a cap "together" means every stop of every board of
+ * every prefetched profile at the same instant. That is how a public
+ * aggregator's rate limit gets tripped, and a rate-limited board looks to a
+ * reader exactly like a broken one.
+ */
+const LIVE_CONCURRENCY = 4;
+const TIMETABLE_CONCURRENCY = 4;
+
+/** How many stop requests this run answered from one already in flight. */
+let sharedHits = 0;
+
+/** Read and reset the shared-request count, for the timing line. */
+export function takeSharedHits(): number {
+  const count = sharedHits;
+  sharedHits = 0;
+  return count;
+}
+
+/**
+ * A private copy of a shared answer.
+ *
+ * Two boards that share a stop share one request, and then each one filters,
+ * tags and annotates the rows it got. Those are writes: a stop tag, an onward
+ * connection. Handing both boards the same objects would make the second board's
+ * tags appear on the first, which is the kind of bug that only shows up on the
+ * one profile that happens to list a stop twice.
+ */
+function copies(rows: Departure[]): Departure[] {
+  return rows.map((row) => ({ ...row }));
+}
 
 export interface Backends {
   /** Realtime first, timetable as a fallback, for the near window. */
@@ -113,7 +150,11 @@ async function timetableRows(
   const hit = timetableCache.get(key);
   const now = Date.now();
   if (hit !== undefined && now - hit.at < TIMETABLE_CACHE_MS) return hit.rows;
-  const rows = await backend.departures(stop, window, modes === undefined ? undefined : { transportTypes: modes });
+  const rows = await share(`timetable|${key}`, () =>
+    withLimit('timetable', TIMETABLE_CONCURRENCY, () =>
+      backend.departures(stop, window, modes === undefined ? undefined : { transportTypes: modes }),
+    ),
+  );
   timetableCache.set(key, { at: now, rows });
   return rows;
 }
@@ -133,12 +174,24 @@ async function stopDepartures(
   const modes = board.modes;
   const call = modes === undefined ? undefined : { transportTypes: modes };
   const liveEnd = Math.min(window.toMs, window.fromMs + REALTIME_HORIZON_MINUTES * 60_000);
-  const live = await backends.live.departures(stop, { fromMs: window.fromMs, toMs: liveEnd }, call);
+  // Keyed by what is being asked, not by who is asking. Two boards at the same
+  // stop over the same window want the same rows; the filters that make them
+  // different boards are applied afterwards, here on the page.
+  const liveKey = ['live', stop, Math.floor(window.fromMs / 60_000), Math.floor(liveEnd / 60_000), (modes ?? []).join(',')].join('|');
+  const live = copies(
+    await share(
+      liveKey,
+      () => withLimit('live', LIVE_CONCURRENCY, () => backends.live.departures(stop, { fromMs: window.fromMs, toMs: liveEnd }, call)),
+      () => {
+        sharedHits += 1;
+      },
+    ),
+  );
   if (window.toMs <= liveEnd) return live;
 
   let later: Departure[] = [];
   try {
-    later = await timetableRows(backends.timetable, stop, { fromMs: liveEnd, toMs: window.toMs }, modes);
+    later = copies(await timetableRows(backends.timetable, stop, { fromMs: liveEnd, toMs: window.toMs }, modes));
   } catch {
     // A long horizon that cannot be filled is still a usable board: the near
     // window is the part anyone acts on.
@@ -170,19 +223,33 @@ export async function fetchProfile(options: FetchProfileOptions): Promise<FetchP
   const { config, profile, startMs, horizonMinutes, onStatus } = options;
   const window = { fromMs: startMs, toMs: startMs + horizonMinutes * 60_000 };
 
-  let currentBoard = 0;
-  const backends = makeBackends(config, (backend, _stop, page) => {
-    onStatus(currentBoard, { kind: 'loading', backend, page });
+  // Which board a stop belongs to, so progress can be reported while every board
+  // is being fetched at once. A stop that two boards share reports to the first
+  // of them, which is a cosmetic choice: the page number it draws is the same
+  // number either way, because it is the same request.
+  const boardOfStop = new Map<string, number>();
+  for (let index = 0; index < profile.boards.length; index += 1) {
+    for (const stop of profile.boards[index]?.stops ?? []) if (!boardOfStop.has(stop)) boardOfStop.set(stop, index);
+  }
+  const pages = new Map<number, number>();
+  const backends = makeBackends(config, (backend, stop, page) => {
+    const index = boardOfStop.get(stop) ?? 0;
+    pages.set(index, Math.max(pages.get(index) ?? 0, page));
+    onStatus(index, { kind: 'loading', backend, page });
   });
 
-  const built: Board[] = [];
   const used = new Set<string>();
 
-  for (let index = 0; index < profile.boards.length; index += 1) {
-    currentBoard = index;
-    const exported = profile.boards[index];
-    if (exported === undefined) continue;
+  // Every board at once. They are independent questions and the reader is
+  // waiting for the slowest one either way, so asking them in turn only added
+  // the others' time to it. The concurrency cap lives one level down, around
+  // the requests themselves, where it can count what is actually in the air.
+  const built = await Promise.all(
+    profile.boards.map(async (exported, index): Promise<Board | null> => {
+    if (exported === undefined) return null;
     const boardConfig = toBoardConfig(exported);
+    const boardStarted = Date.now();
+    const sharedBefore = takeSharedHits();
     onStatus(index, { kind: 'loading', backend: null, page: 0 });
     try {
       const multiStop = boardConfig.stops.length > 1;
@@ -229,21 +296,34 @@ export async function fetchProfile(options: FetchProfileOptions): Promise<FetchP
       if (boardConfig.walkMinutesByStop !== undefined) board.walkMinutesByStop = boardConfig.walkMinutesByStop;
       if (boardConfig.stopLabels !== undefined) board.stopLabels = boardConfig.stopLabels;
       if (boardConfig.connection !== undefined) board.connection = boardConfig.connection;
-      built.push(board);
       onStatus(index, { kind: 'ready' });
+      recordBoard({
+        title: boardConfig.title,
+        departuresMs: Date.now() - boardStarted,
+        pages: pages.get(index) ?? 0,
+        shared: sharedBefore + takeSharedHits(),
+      });
+      return board;
     } catch (error) {
-      built.push({
+      onStatus(index, { kind: 'error', detail: error instanceof Error ? error.message : String(error) });
+      recordBoard({
+        title: boardConfig.title,
+        departuresMs: Date.now() - boardStarted,
+        pages: pages.get(index) ?? 0,
+        shared: sharedBefore + takeSharedHits(),
+      });
+      return {
         title: boardConfig.title,
         stops: boardConfig.stops,
         backend: config.defaults.backend,
         departures: [],
         walkMinutes: boardConfig.walkMinutes,
-      });
-      onStatus(index, { kind: 'error', detail: error instanceof Error ? error.message : String(error) });
+      };
     }
-  }
+    }),
+  );
 
-  return { boards: built, backends: [...used].sort() };
+  return { boards: built.filter((board): board is Board => board !== null), backends: [...used].sort() };
 }
 
 export async function fetchMessages(config: ExportedConfig): Promise<Message[]> {

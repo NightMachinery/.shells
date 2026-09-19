@@ -128,6 +128,24 @@ function buildConfig(): ExportedConfig {
             connection: null,
           },
           {
+            // Deliberately the same stop as the board above, filtered to one
+            // line. A profile really does list a stop twice when two lines from
+            // it are worth separate boards, and before requests were shared
+            // that cost two identical round trips.
+            title: 'Nordweg U6',
+            stops: ['de:00000:1'],
+            modes: null,
+            lines: ['U6'],
+            direction: null,
+            destinations: null,
+            walk_minutes: 3,
+            walk_minutes_by_stop: null,
+            stop_labels: null,
+            commute: false,
+            destination: null,
+            connection: null,
+          },
+          {
             title: 'Talbogen',
             stops: ['de:00000:2'],
             modes: null,
@@ -910,6 +928,83 @@ async function main(): Promise<void> {
       `stillOpen=${stillOpen} markerSurvived=${survivedMarker === marker} textChanged=${beforeText !== afterText}`,
     );
 
+    // ------------------------------------------------ timing, under a phone's
+    //
+    // Measured here rather than quoted from the machine this runs on, with the
+    // processor slowed to a quarter and the network held to a slow mobile
+    // connection, because the numbers that matter are the ones on a phone.
+    //
+    // Two limits worth stating rather than burying. The fixtures are fulfilled
+    // through the debugging protocol, so the emulated bandwidth does not apply
+    // to them the way it would to a real response; what the delay below models
+    // is the round trip, which is the part that decides whether asking in
+    // parallel was worth doing. And the processor throttle is a multiplier on
+    // this machine's processor, not a model of any particular phone.
+
+    await cdp.send('Emulation.setCPUThrottlingRate', { rate: 4 });
+    await cdp.send('Network.emulateNetworkConditions', {
+      offline: false,
+      latency: 150,
+      downloadThroughput: Math.round((1.6 * 1024 * 1024) / 8),
+      uploadThroughput: Math.round((750 * 1024) / 8),
+      connectionType: 'cellular4g',
+    });
+    upstreamDelayMs = 300;
+
+    await cdp.send('Page.reload', { ignoreCache: true });
+    const rowsAt = Date.now();
+    const gotRows = await io.waitFor("document.querySelectorAll('li.row').length > 0", 40_000, 50);
+    const toRows = Date.now() - rowsAt;
+    // Waited on the page's own record rather than on a route anchor appearing.
+    // Anchors show up before the planner answers, because the plans from the
+    // last visit are restored from storage and drawn as stale, which is the
+    // right thing for a reader and a trap for a stopwatch.
+    const gotRoutes = await io.waitFor(
+      'typeof window.__transitTiming === "function" && window.__transitTiming() !== null',
+      40_000,
+      50,
+    );
+    const toRoutes = Date.now() - rowsAt;
+
+    // The page's own record, which is what a reader sees in the filter popover
+    // and what makes the comparison below possible from a single run.
+    const run = await io.evalJs<{
+      toRowsMs: number | null;
+      toRoutesMs: number | null;
+      planMs: number | null;
+      renderMs: number | null;
+      boards: Array<{ title: string; departuresMs: number; pages: number; shared: number }>;
+    } | null>(`(() => {
+      const w = window;
+      return w.__transitTiming ? w.__transitTiming() : null;
+    })()`);
+
+    const boardMs = (run?.boards ?? []).map((board) => board.departuresMs);
+    const slowest = boardMs.length === 0 ? 0 : Math.max(...boardMs);
+    const sequential = boardMs.reduce((sum, ms) => sum + ms, 0);
+    const shared = (run?.boards ?? []).reduce((sum, board) => sum + board.shared, 0);
+    record(
+      'a board that repeats a stop costs no second request',
+      shared >= 1,
+      `${shared} of the run's stop requests were answered by one already in flight`,
+    );
+    record(
+      'timing under 4x CPU and a slow mobile connection',
+      gotRows && gotRoutes,
+      `to rows ${toRows} ms, to routes ${toRoutes} ms; boards [${boardMs.join(', ')}] ms, ` +
+        `slowest ${slowest} ms, same work in sequence would be ${sequential} ms, ${shared} request(s) shared, ` +
+        `plan ${run?.planMs ?? '-'} ms, render ${run?.renderMs ?? '-'} ms`,
+    );
+
+    upstreamDelayMs = 0;
+    await cdp.send('Emulation.setCPUThrottlingRate', { rate: 1 });
+    await cdp.send('Network.emulateNetworkConditions', {
+      offline: false,
+      latency: 0,
+      downloadThroughput: -1,
+      uploadThroughput: -1,
+    });
+
     // --------------------------------------------- assertion: the update flow
     //
     // The test this section exists for, written after two deploys in a row
@@ -1266,7 +1361,18 @@ const CORS_HEADERS = [
   { name: 'access-control-allow-headers', value: '*' },
 ];
 
+/**
+ * A delay added to every upstream answer, in milliseconds.
+ *
+ * Zero for the correctness assertions, where a fixture that answers instantly is
+ * exactly what makes them repeatable. Set for the timing section, where an
+ * instant upstream would hide the only thing worth measuring: whether the page
+ * waits for its requests one after another or all at once.
+ */
+let upstreamDelayMs = 0;
+
 async function fulfillJson(cdp: Cdp, requestId: string, body: unknown): Promise<void> {
+  if (upstreamDelayMs > 0) await sleep(upstreamDelayMs);
   const text = JSON.stringify(body);
   await cdp.send('Fetch.fulfillRequest', {
     requestId,

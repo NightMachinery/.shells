@@ -1038,6 +1038,42 @@ between two stop names, a middle dot between two facts, an ellipsis on a
 shortened name. Those are words, not icons, and they live in blocks every system
 font covers.
 
+* Timing
+
+A refresh records where its time went, and the record is shown in the filter
+popover and logged to the console: time until there were rows, time until the
+journey slots filled, the planner's share, the last render, and per board how
+long its departures took and how many upstream pages they cost.
+
+It is on the page rather than in a profiler because the device the question is
+about is a phone, and a phone has no profiler. Numbers measured on a laptop on a
+wired connection answer a different question from the one a reader is asking
+when they say it feels slow.
+
+** Asking once, and asking together
+
+A profile's boards are fetched all at once rather than one after another. They
+are independent questions and the reader is waiting for the slowest one either
+way, so asking them in turn only added the others' time to it.
+
+Requests are shared by promise rather than by result. A cache stops a second
+request only if the first has already finished, and on this page the common case
+is not "asked again later" but "asked twice in the same instant": two boards at
+the same stop, two boards planning to the same place, a prefetch overlapping the
+profile on screen. The first caller starts the work and everyone who arrives
+before it finishes waits on the same promise. Each one gets its own copy of the
+rows, because boards annotate what they receive and two boards sharing objects
+would show each other's annotations.
+
+The same applies one layer down, to the journey searches and to the probe that
+works out which identifier the planner will accept for a stop.
+
+Everything is capped: so many departure requests in flight, so many timetable
+requests, so many journey searches. Uncapped, a long horizon across several
+profiles turns one refresh into dozens of simultaneous requests against free
+public services, and a rate-limited board looks to a reader exactly like a
+broken one.
+
 * The touch harness
 
 =bun run e2e= drives the built page in a headless browser at a phone's size,

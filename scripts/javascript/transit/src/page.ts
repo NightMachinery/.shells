@@ -25,6 +25,7 @@ import { el, selectionInsideBoards } from './page/dom.ts';
 import { idbGet, idbSet, STORE_BOARDS } from './page/idb.ts';
 import { autoTranslate, primeMessageState, renderMessages, resetMessageFilters } from './page/messages.ts';
 import { rearm, setOnAlarmsChanged } from './page/notify.ts';
+import { beginRun, endRun, markRender, markRoutes, markRows, publishTiming } from './page/timing.ts';
 import {
   boardId,
   readDestination,
@@ -238,6 +239,7 @@ async function replanProfile(
   const config = state.config;
   if (config === null) return;
   state.planInFlight += 1;
+  const planStarted = Date.now();
   try {
     const routes = await planProfile({
       config,
@@ -256,6 +258,10 @@ async function replanProfile(
     });
     if (routes === null) state.routes.delete(profileKey);
     else state.routes.set(profileKey, routes);
+    if (profileKey === state.profileKey) {
+      markRoutes(Date.now() - planStarted, routes?.boards.size ?? 0, targetCount(profile, state.destinationKey));
+      endRun();
+    }
   } finally {
     state.planInFlight -= 1;
     state.planning.delete(profileKey);
@@ -293,6 +299,10 @@ async function refreshProfile(profileKey: string, force = false): Promise<void> 
   }
 
   state.inFlight += 1;
+  // Only the profile on screen is timed. A prefetch in the background competes
+  // for the same connection but nobody is waiting for it, so folding it into
+  // the same numbers would describe a wait that nobody had.
+  if (profileKey === state.profileKey) beginRun(profileKey);
   render();
   try {
     const result = await fetchProfile({
@@ -313,6 +323,7 @@ async function refreshProfile(profileKey: string, force = false): Promise<void> 
     };
     state.data.set(profileKey, data);
     if (profileKey === state.profileKey) {
+      markRows();
       backendsUsed = result.backends;
       state.lastError = null;
       rearm(result.boards, Date.now());
@@ -421,7 +432,19 @@ function selectProfile(key: string): void {
   void loadCached(key).then(() => refreshProfile(key));
 }
 
+/** How many distinct places this profile's boards plan towards, for the timing line. */
+function targetCount(profile: ExportedProfile, picked: string | null): number {
+  const keys = new Set<string>();
+  for (const board of profile.boards) {
+    if (!board.commute) continue;
+    const key = board.destination ?? picked;
+    if (key !== null) keys.add(key);
+  }
+  return keys.size;
+}
+
 function render(): void {
+  const renderStarted = performance.now();
   const app = document.getElementById('app');
   if (app === null) return;
   const config = state.config;
@@ -543,6 +566,7 @@ function render(): void {
   }
 
   app.replaceChildren(...nodes);
+  markRender(performance.now() - renderStarted);
 }
 
 /**
@@ -697,6 +721,7 @@ function offerReload(): void {
 async function boot(): Promise<void> {
   injectColors();
   installIcons();
+  publishTiming();
   installServiceWorker();
   setOnAlarmsChanged(() => {
     // A reminder is drawn on the row it belongs to, and nothing else in the

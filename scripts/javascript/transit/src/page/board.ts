@@ -1,5 +1,6 @@
 import { icon } from './icons.ts';
 import { buildLabel } from './build.ts';
+import { describe, describeBoards, lastRun } from './timing.ts';
 import { catchableOnBoard, describeWalk, normaliseLine, walkMinutesFor } from '../filter.ts';
 import type { Board, Departure } from '../model.ts';
 import { handoffFor, routeUrl } from '../route-link.ts';
@@ -762,6 +763,7 @@ function renderFilter(board: Board, context: BoardContext, rows: Departure[]): H
     popover.append(el('p', 'filter-empty', 'only one line here, nothing to filter'));
     appendEarlyBuffer(popover, context);
     popover.append(el('p', 'filter-build', buildLabel()));
+    appendTiming(popover);
     return popover;
   }
 
@@ -798,7 +800,23 @@ function renderFilter(board: Board, context: BoardContext, rows: Departure[]): H
   // installed app can be several deploys behind while the server is current, so
   // "which version am I looking at" has to be answerable from the screen.
   popover.append(el('p', 'filter-build', buildLabel()));
+  appendTiming(popover);
   return popover;
+}
+
+/**
+ * How long the last refresh took, on this device.
+ *
+ * Here rather than in a console because the device the question is about is a
+ * phone, and a phone has no console. The numbers measured on a laptop answer a
+ * different question than the one a reader is asking when they say it feels
+ * slow.
+ */
+function appendTiming(popover: HTMLElement): void {
+  const run = lastRun();
+  if (run === null) return;
+  popover.append(el('p', 'filter-timing', describe(run)));
+  for (const line of describeBoards(run)) popover.append(el('p', 'filter-timing filter-timing-board', line));
 }
 
 /**

@@ -1,3 +1,4 @@
+import { resetInflight, share, withLimit } from './inflight.ts';
 import {
   isCityBusAgency,
   MODE_MAP,
@@ -498,6 +499,15 @@ interface CacheEntry {
 // arithmetic on data already in hand.
 const planCache = new Map<string, CacheEntry>();
 
+/**
+ * How many journey searches may be in the air at once.
+ *
+ * A planned board asks one search per destination target per row window, and a
+ * profile can have several planned boards. Unbounded, a long horizon turns one
+ * refresh into dozens of simultaneous searches against a free public service.
+ */
+const PLAN_CONCURRENCY = 4;
+
 function cacheGet(key: string, now: number): ParsedItinerary[] | null {
   const entry = planCache.get(key);
   if (entry === undefined) return null;
@@ -536,6 +546,7 @@ const unknownOrigins = new Map<string, HttpError>();
 export function clearPlanCache(): void {
   planCache.clear();
   unknownOrigins.clear();
+  resetInflight();
 }
 
 /**
@@ -1019,17 +1030,25 @@ export async function planBoard(options: PlanBoardOptions): Promise<PlannedRow[]
       if (cached !== null) return cached;
       let fetched: ParsedItinerary[];
       try {
-        fetched = await fetchItineraries(
-          fromPlace,
-          toPlace,
-          resolvedTarget.target,
-          options.startMs,
-          coverThrough,
-          options.stop,
-          baseUrl,
-          planModes,
-          options.fetchImpl,
-          options.onDebug,
+        // Shared by promise as well as cached by result. Boards are planned
+        // together, so two boards heading to the same place from the same stop
+        // ask this identical question in the same instant and the cache, which
+        // is only written when an answer comes back, cannot help either of them.
+        fetched = await share(`plan|${cacheKey}`, () =>
+          withLimit('plan', PLAN_CONCURRENCY, () =>
+            fetchItineraries(
+              fromPlace,
+              toPlace,
+              resolvedTarget.target,
+              options.startMs,
+              coverThrough,
+              options.stop,
+              baseUrl,
+              planModes,
+              options.fetchImpl,
+              options.onDebug,
+            ),
+          ),
         );
       } catch (error) {
         // Not recorded against the origin here: a 404 names one of the two ends
