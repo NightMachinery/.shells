@@ -1,3 +1,4 @@
+import { icon } from './icons.ts';
 import { contrastText, resolveColor, resolveTextColor } from '../colors.ts';
 import type { Departure } from '../model.ts';
 import { transitLegs, WALK_MODE, type RouteLeg, type RouteOption } from '../plan.ts';
@@ -39,7 +40,9 @@ export function renderLegs(option: RouteOption, timezone: string, now: number): 
   for (const leg of option.legs) {
     const item = el('li', `leg leg-${leg.kind}`);
     if (leg.kind === 'walk') {
-      item.append(el('span', 'leg-badge leg-walk-badge', '⭧'));
+      const walk = el('span', 'leg-badge leg-walk-badge');
+      walk.append(icon('walk'));
+      item.append(walk);
       item.append(el('span', 'leg-text', `walk ${walkMinutesOf(leg)} min to ${compact(leg.to)}`));
     } else {
       item.append(lineBadge({ line: leg.line, mode: leg.mode as Departure['mode'], color: null }));

@@ -1,3 +1,4 @@
+import { icon } from './icons.ts';
 import { button, el } from './dom.ts';
 
 // The one tooltip on this page.
@@ -174,7 +175,8 @@ export function showTip(target: HTMLElement, build: () => HTMLElement, options: 
   if (sheet) {
     // Top right, and drawn over the content rather than above it, so the first
     // line of the explanation is still the first thing under the reader's eye.
-    const shut = button('tip-close', '×', 'close');
+    const shut = button('tip-close', undefined, 'close');
+    shut.append(icon('close'));
     shut.setAttribute('aria-label', 'close');
     shut.addEventListener('click', () => closeTip());
     node.append(shut);

@@ -1,3 +1,4 @@
+import { icon } from './icons.ts';
 import { normaliseLine } from '../filter.ts';
 import type { Message } from '../model.ts';
 import { button, el } from './dom.ts';
@@ -463,7 +464,8 @@ export function renderMessages(
     actions.append(run);
   }
 
-  const settings = button('disruptions-settings', '⚙', 'translation settings');
+  const settings = button('disruptions-settings', undefined, 'translation settings');
+  settings.append(icon('gear'));
   settings.setAttribute('aria-label', 'translation settings');
   settings.addEventListener('click', () => openKeyBox(onChange));
   actions.append(settings);

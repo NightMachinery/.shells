@@ -499,7 +499,14 @@ async function main(): Promise<void> {
 
     // ---------------------------------------------------------- assertion 8
 
-    const containment = await io.evalJs<{ worstOverflowPx: number; worstClass: string; rows: number }>(`(() => {
+    // Both layout measurements are taken twice: once in this machine's fonts and
+    // once in a deliberately wider one. A phone renders `system-ui` as Roboto,
+    // which is wider than what runs here, and a budget derived from a
+    // measurement taken on this machine is therefore a budget for the wrong
+    // font. Verdana is wider than Roboto, so a layout that survives it survives
+    // the phone; that is the whole point of forcing it rather than guessing.
+    const measureContainment = async (): Promise<{ worstOverflowPx: number; worstClass: string; rows: number }> =>
+      io.evalJs(`(() => {
       let worst = 0; let worstClass = '';
       const rows = document.querySelectorAll('li.row');
       for (const row of rows) {
@@ -513,6 +520,8 @@ async function main(): Promise<void> {
       }
       return { worstOverflowPx: Math.round(worst * 100) / 100, worstClass, rows: rows.length };
     })()`);
+
+    const containment = await measureContainment();
     record(
       'containment: every row child inside its row (<=1px)',
       containment.worstOverflowPx <= 1,
@@ -594,7 +603,8 @@ async function main(): Promise<void> {
 
     // ---------------------------------------------------------- assertion 9
 
-    const overflow = await io.evalJs<{ scrollWidth: number; clientWidth: number; worstRight: number; worstSelector: string }>(`(() => {
+    const measureOverflow = async (): Promise<{ scrollWidth: number; clientWidth: number; worstRight: number; worstSelector: string }> =>
+      io.evalJs(`(() => {
       const de = document.documentElement;
       let worstRight = 0; let worstSelector = '';
       const all = document.querySelectorAll('body *');
@@ -608,6 +618,8 @@ async function main(): Promise<void> {
       }
       return { scrollWidth: de.scrollWidth, clientWidth: de.clientWidth, worstRight: Math.round(worstRight * 100) / 100, worstSelector };
     })()`);
+
+    const overflow = await measureOverflow();
     const overflowPass = overflow.scrollWidth === 390 && overflow.clientWidth === 390 && overflow.worstRight <= 391;
     record(
       'no horizontal overflow (scrollWidth=clientWidth=390, worst right <=391px)',
@@ -633,6 +645,37 @@ async function main(): Promise<void> {
         ? `scrollWidth=${stateClip.scrollWidth} clientWidth=${stateClip.clientWidth}`
         : 'no li.row .state with text "planned" found',
     );
+
+    // ------------------------------------------- the same layout, wider font
+
+    // Injected rather than set through CDP: there is no protocol call that
+    // changes the page's font, and the emulated-media call does not do it. A
+    // stylesheet with `!important` on everything is crude and exact, which is
+    // what is wanted.
+    await io.evalJs(`(() => {
+      const style = document.createElement('style');
+      style.id = 'e2e-wide-font';
+      style.textContent = '* { font-family: Verdana, sans-serif !important; }';
+      document.head.append(style);
+      return true;
+    })()`);
+    await sleep(250);
+
+    const wideContainment = await measureContainment();
+    record(
+      'containment holds in a wider font than this machine has',
+      wideContainment.worstOverflowPx <= 1,
+      `Verdana: worst overflow ${wideContainment.worstOverflowPx}px in .${wideContainment.worstClass} across ${wideContainment.rows} rows`,
+    );
+    const wideOverflow = await measureOverflow();
+    record(
+      'no horizontal overflow in a wider font than this machine has',
+      wideOverflow.scrollWidth === 390 && wideOverflow.clientWidth === 390 && wideOverflow.worstRight <= 391,
+      `Verdana: scrollWidth=${wideOverflow.scrollWidth} clientWidth=${wideOverflow.clientWidth} worstRight=${wideOverflow.worstRight}px (${wideOverflow.worstSelector})`,
+    );
+
+    await io.evalJs(`(() => { document.getElementById('e2e-wide-font')?.remove(); return true; })()`);
+    await sleep(250);
 
     // ------------------------------------- destination width on a planned row
 

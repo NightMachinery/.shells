@@ -9,6 +9,7 @@
 // presses the button. That is the honest answer to a snapshot: it says when it
 // was taken, and it offers to take another.
 
+import { installIcons } from './page/icons.ts';
 import { cssCustomProperties } from './colors.ts';
 import { DEFAULT_WALK_WEIGHT } from './config.ts';
 import type { Departure } from './model.ts';
@@ -156,6 +157,7 @@ async function replan(): Promise<void> {
 
 function boot(): void {
   injectColors();
+  installIcons();
   handoff = decodeRoute(location.hash);
   render();
   window.addEventListener('hashchange', () => {

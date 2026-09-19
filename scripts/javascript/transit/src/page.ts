@@ -13,6 +13,7 @@
 // the page unscrollable, so the second-by-second countdowns are patched through
 // registered callbacks instead. See `tick()`.
 
+import { installIcons } from './page/icons.ts';
 import { cssCustomProperties } from './colors.ts';
 import { normaliseLine } from './filter.ts';
 import type { Board, Message } from './model.ts';
@@ -695,6 +696,7 @@ function offerReload(): void {
 
 async function boot(): Promise<void> {
   injectColors();
+  installIcons();
   installServiceWorker();
   setOnAlarmsChanged(() => {
     // A reminder is drawn on the row it belongs to, and nothing else in the

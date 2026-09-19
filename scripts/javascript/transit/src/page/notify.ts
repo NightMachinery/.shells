@@ -1,3 +1,4 @@
+import { icon } from './icons.ts';
 import { normaliseLine, walkMinutesFor } from '../filter.ts';
 import type { Board, Departure } from '../model.ts';
 import { button, el } from './dom.ts';
@@ -407,7 +408,8 @@ export function alarmMarker(dep: Departure): HTMLElement | null {
   const key = tripKey(dep);
   const alarm = store().get(key);
   if (alarm === undefined) return null;
-  const node = button('alarm-marker', '\u{1F514}', describe(alarm));
+  const node = button('alarm-marker', undefined, describe(alarm));
+  node.append(icon('bell'));
   node.setAttribute('aria-label', describe(alarm));
   node.addEventListener('click', (event) => {
     // The bell is the short route back to the popup, which is where cancelling

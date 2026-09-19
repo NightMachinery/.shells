@@ -589,12 +589,27 @@
         color: #fff;
       }
 
+      /* Clipped, every one of them. A grid track is a promise about width, and
+         a cell whose text is wider than its track breaks that promise by
+         painting over its neighbours rather than by overflowing anything the
+         browser will report. What is too wide depends on the reader's font,
+         which is not this machine's font, so the only safe rule is that none of
+         these may draw outside the box they were given. */
+      .state,
+      .badge,
+      .minutes {
+        overflow: hidden;
+      }
+
       .state {
         font-size: 10px;
         text-align: center;
         letter-spacing: 0.03em;
         border-radius: 4px;
         padding: 0 3px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
       }
 
       .state-live {
@@ -622,6 +637,34 @@
 
       /* The one thing on this page that interrupts. Fixed to the bottom so it
          never covers a departure time, wide enough to tap without aiming. */
+      /* Every icon on the page. Sized in em so it matches whatever text it sits
+         beside, and painted with the inherited colour so it needs none of its
+         own. These replaced characters, which depend on the reader's system
+         font having the picture, which Android's does not for the walk symbol. */
+      .icon {
+        width: 1em;
+        height: 1em;
+        display: inline-block;
+        vertical-align: -0.125em;
+        flex: none;
+        color: currentColor;
+      }
+
+      .leg-walk-badge .icon {
+        width: 1.15em;
+        height: 1.15em;
+      }
+
+      .state-dot {
+        width: 0.62em;
+        height: 0.62em;
+        vertical-align: 0;
+      }
+
+      .state-word {
+        margin-left: 3px;
+      }
+
       .update-toast {
         position: fixed;
         left: 50%;
@@ -1155,7 +1198,7 @@
           --col-minutes: 2.1rem;
           --col-badge: 2.5rem;
           --col-connection: 4rem;
-          --col-state: 2.6rem;
+          --col-state: 1.15rem;
           --col-alarm: 0.9rem;
           --col-stop: 2rem;
           /* Pinned to its own floor here rather than given a range. A track
@@ -1206,6 +1249,14 @@
            that a phone can barely spare. Measured on the device rather than in
            the emulator: the letter spacing and a pixel of padding either side
            were the difference between fitting and lying across the bell. */
+        /* The word goes and the disc stays. The disc is an SVG sized in em, so
+           this column's width is now a constant rather than a measurement of
+           somebody else's font, and the sheet still spells out "live" or
+           "planned" for anyone who wants the word. */
+        .state-word {
+          display: none;
+        }
+
         .state {
           font-size: 9px;
           letter-spacing: 0;

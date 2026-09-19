@@ -1020,6 +1020,24 @@ holds too many lines for one property each to be worth building and parsing on
 every load, and nothing reads them anyway: both renderers ask =src/colors.ts=
 directly.
 
+* Icons
+
+Every icon on the page is an inline SVG symbol, defined once in a sprite and
+referenced with =use=, sized in em and painted with =currentColor=.
+
+They used to be characters, and that failed in the worst way a thing can fail:
+silently, and only on somebody else's device. The walking figure that says "and
+then you walk" is in a Unicode block Android's system font does not carry, so on
+the phone this page exists for it rendered as an empty box, while looking
+perfect on the machine it was written on. No test that runs here could have
+caught it, because the font is not here.
+
+A glyph is a request that some font, somewhere, happens to have a picture. An
+SVG is the picture. Text punctuation is deliberately not in the sprite: an arrow
+between two stop names, a middle dot between two facts, an ellipsis on a
+shortened name. Those are words, not icons, and they live in blocks every system
+font covers.
+
 * The touch harness
 
 =bun run e2e= drives the built page in a headless browser at a phone's size,
@@ -1034,6 +1052,30 @@ reaching for a deployed copy, so it is offline and repeatable.
 Run it before every deploy. The layout pass that preceded it measured pixels and
 never tapped anything, and everything it missed was a bug that only exists under
 a finger.
+
+It measures the layout twice, the second time in a font deliberately wider than
+this machine's. A phone renders =system-ui= as Roboto, which is wider than what
+runs here, so any width budget derived from a measurement taken here is a budget
+for the wrong font. That is not a hypothetical either: a row measured as fitting
+exactly, to the pixel, on this machine overflowed on the phone. Verdana is wider
+than Roboto, so a layout that survives it survives the phone, and forcing it is
+better than guessing a margin.
+
+The consequence for the page is that no column's width may be a measurement of
+text. The fixed tracks are all in rem, which is a constant; where a cell would
+otherwise be as wide as its word, the word is replaced by something whose width
+is not a font's business, which is why the live and planned states are a disc on
+a phone. Every fixed text cell is also clipped, so that a cell whose text is
+wider than its track cannot paint across its neighbours, which is a kind of
+overflow no browser reports.
+
+It also measures a refresh with the processor slowed to a quarter and the
+network held to a slow mobile connection, and prints what it found. Two limits
+are worth stating: the fixtures are fulfilled through the debugging protocol, so
+the emulated bandwidth does not apply to them the way it would to a real
+response, and the processor throttle is a multiplier on this machine rather than
+a model of any particular phone. What it does measure honestly is whether the
+page waits for its requests one after another or all at once.
 
 Two things it is worth knowing about writing assertions here. Service workers
 must be bypassed or the run measures the previous deploy rather than the build

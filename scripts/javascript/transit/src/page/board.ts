@@ -1,3 +1,4 @@
+import { icon } from './icons.ts';
 import { buildLabel } from './build.ts';
 import { catchableOnBoard, describeWalk, normaliseLine, walkMinutesFor } from '../filter.ts';
 import type { Board, Departure } from '../model.ts';
@@ -243,7 +244,10 @@ function gridTemplate(columns: Columns): string {
   // clips it. The platform number and the stop tag are the two that can vanish
   // without the row losing its meaning, and both are repeated in the sheet.
   if (columns.platform) parts.push('minmax(0, var(--col-platform))');
-  parts.push('var(--col-state)', 'var(--col-alarm)');
+  // The alarm keeps a floor and may grow for its bell: a track sized only to
+  // its content collapses on the rows that have no reminder, and then the
+  // columns stop lining up down the board.
+  parts.push('var(--col-state)', 'minmax(var(--col-alarm), max-content)');
   if (columns.stop) parts.push('minmax(0, var(--col-stop))');
   return parts.join(' ');
 }
@@ -582,7 +586,13 @@ const REPORTING_HORIZON_MS = 60 * 60_000;
  */
 function stateMark(dep: Departure, context: BoardContext): HTMLElement {
   const known = dep.realtimeKnown && !context.planned;
-  const node = el('span', `state ${known ? 'state-live' : 'state-plan'}`, known ? 'live' : 'planned');
+  // A disc and a word, so the phone can drop the word. A word's width is a
+  // property of the font, and the font on the reader's phone is not the font
+  // here: "planned" at nine pixels fits the column on this machine and paints
+  // across the bell on an Android one. A disc is a disc in every font.
+  const node = el('span', `state ${known ? 'state-live' : 'state-plan'}`);
+  node.append(icon(known ? 'dot-filled' : 'dot-hollow', 'state-dot'));
+  node.append(el('span', 'state-word', known ? 'live' : 'planned'));
   node.title = known
     ? 'a live time reported by the operator'
     : context.planned
@@ -682,7 +692,11 @@ function renderStrip(rows: Departure[], board: Board, context: BoardContext, usu
       // A platform only appears per time when the group's platforms disagree.
       // When they agree it is on the row, once, which is where a reader looks.
       if (uniform === undefined && dep.platform !== null) cell.append(el('span', 'time-note', `pl ${dep.platform}`));
-      if (dep.cancelled) cell.append(el('span', 'time-note', '✕'));
+      if (dep.cancelled) {
+        const struck = el('span', 'time-note');
+        struck.append(icon('close'));
+        cell.append(struck);
+      }
       // The same sheet a row opens, from the same departure. In the strip a time
       // is the only thing there is to tap, so it is the tap target; the group
       // header is a heading and opens nothing.
@@ -881,7 +895,8 @@ export function renderBoard(board: Board, context: BoardContext): HTMLElement {
   }
   const hidden = readHidden(id);
   if (hidden.size > 0) marks.append(el('span', 'filter-mark', `${hidden.size} hidden`));
-  const filterButton = button('filter-button', '⚙', 'filter the lines on this board');
+  const filterButton = button('filter-button', undefined, 'filter the lines on this board');
+  filterButton.append(icon('gear'));
   filterButton.setAttribute('aria-label', 'filter the lines on this board');
   filterButton.addEventListener('click', (event) => {
     event.stopPropagation();
