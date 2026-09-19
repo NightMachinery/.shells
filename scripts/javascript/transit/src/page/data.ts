@@ -297,7 +297,7 @@ export async function fetchProfile(options: FetchProfileOptions): Promise<FetchP
       if (boardConfig.stopLabels !== undefined) board.stopLabels = boardConfig.stopLabels;
       if (boardConfig.connection !== undefined) board.connection = boardConfig.connection;
       onStatus(index, { kind: 'ready' });
-      recordBoard({
+      recordBoard(profile.key, {
         title: boardConfig.title,
         departuresMs: Date.now() - boardStarted,
         pages: pages.get(index) ?? 0,
@@ -306,7 +306,7 @@ export async function fetchProfile(options: FetchProfileOptions): Promise<FetchP
       return board;
     } catch (error) {
       onStatus(index, { kind: 'error', detail: error instanceof Error ? error.message : String(error) });
-      recordBoard({
+      recordBoard(profile.key, {
         title: boardConfig.title,
         departuresMs: Date.now() - boardStarted,
         pages: pages.get(index) ?? 0,

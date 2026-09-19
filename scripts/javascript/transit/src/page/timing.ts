@@ -59,9 +59,17 @@ export function beginRun(profileKey: string): void {
   };
 }
 
-/** Add one board's numbers to the run in progress. */
-export function recordBoard(entry: BoardTiming): void {
-  current?.boards.push(entry);
+/**
+ * Add one board's numbers to the run in progress.
+ *
+ * The profile is named because a prefetch of a different profile finishes
+ * inside the open run of the one on screen, and charging its boards to that run
+ * makes the visible refresh look slower than it was. It is dropped instead: the
+ * reader is not waiting for it.
+ */
+export function recordBoard(profileKey: string, entry: BoardTiming): void {
+  if (current === null || current.profileKey !== profileKey) return;
+  current.boards.push(entry);
 }
 
 /** Note that rows could be drawn, which is the moment the page stops being empty. */
