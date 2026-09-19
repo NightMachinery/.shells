@@ -61,6 +61,37 @@
         display: none;
       }
 
+      /* With the scrollbar gone nothing says a control is hiding past the edge,
+         so the overflowing side fades out. The classes are set from the strip's
+         own scroll position, and the fade comes off at the end it has reached:
+         a last control that stays dimmed reads as disabled, not as reachable. */
+      .bar-controls.fade-end {
+        -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 24px), transparent);
+        mask-image: linear-gradient(to right, #000 calc(100% - 24px), transparent);
+      }
+
+      .bar-controls.fade-start {
+        -webkit-mask-image: linear-gradient(to right, transparent, #000 24px);
+        mask-image: linear-gradient(to right, transparent, #000 24px);
+      }
+
+      .bar-controls.fade-start.fade-end {
+        -webkit-mask-image: linear-gradient(
+          to right,
+          transparent,
+          #000 24px,
+          #000 calc(100% - 24px),
+          transparent
+        );
+        mask-image: linear-gradient(
+          to right,
+          transparent,
+          #000 24px,
+          #000 calc(100% - 24px),
+          transparent
+        );
+      }
+
       .bar-controls > * {
         flex: none;
       }

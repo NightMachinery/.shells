@@ -324,6 +324,31 @@ function renderDestination(context: BarContext): HTMLElement | null {
   return wrap;
 }
 
+/**
+ * Mark which side of a horizontally scrolling strip still has content past it.
+ *
+ * The strip hides its scrollbar so it reads as a bar rather than as a pane,
+ * which leaves nothing at all to say that there is another control just off the
+ * edge. The stylesheet fades whichever side is overflowing; this is what decides
+ * which side that is. The fade comes off once the reader has reached that end,
+ * because a permanently dimmed last control looks disabled rather than reachable.
+ */
+export function markScrollEdges(strip: HTMLElement): void {
+  const update = (): void => {
+    const slack = strip.scrollWidth - strip.clientWidth;
+    // Fractional layout widths leave a sub-pixel remainder that is not content.
+    const scrolls = slack > 1;
+    strip.classList.toggle('fade-start', scrolls && strip.scrollLeft > 1);
+    strip.classList.toggle('fade-end', scrolls && strip.scrollLeft < slack - 1);
+  };
+  strip.addEventListener('scroll', update, { passive: true });
+  // Rotation and a font change both resize the strip without re-rendering it.
+  // The observer dies with the element, which a window listener would not.
+  if (typeof ResizeObserver === 'function') new ResizeObserver(update).observe(strip);
+  // Nothing has a width until the bar is in the document.
+  requestAnimationFrame(update);
+}
+
 export function renderBar(context: BarContext): HTMLElement {
   const bar = el('header', 'bar');
 
@@ -357,6 +382,7 @@ export function renderBar(context: BarContext): HTMLElement {
   const destination = renderDestination(context);
   if (destination !== null) controls.append(destination);
   controls.append(renderStart(context));
+  markScrollEdges(controls);
   bar.append(controls);
 
   if (context.state.lastError !== null) {

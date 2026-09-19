@@ -661,6 +661,73 @@ async function main(): Promise<void> {
       `scrollWidth=${overflow.scrollWidth} clientWidth=${overflow.clientWidth} worstRight=${overflow.worstRight}px (${overflow.worstSelector})`,
     );
 
+    // ------------------------ the sticky bar's strip: may scroll, must say so
+
+    // The controls strip is the one element allowed to overflow, because the
+    // horizon, the destination and the start time do not fit side by side on a
+    // phone and a control that cannot be reached is worse than one that has to
+    // be scrolled to. That licence is only defensible if the strip admits it,
+    // so the rule here is "may scroll, must show the fade when it does": the
+    // overflowing side carries a mask, and the side already reached does not.
+    const stripState = async (): Promise<{
+      scrolls: boolean;
+      slack: number;
+      scrollLeft: number;
+      fadeStart: boolean;
+      fadeEnd: boolean;
+      masked: boolean;
+    }> =>
+      io.evalJs(`(() => {
+      const strip = document.querySelector('.bar-controls');
+      if (strip === null) return { scrolls: false, slack: -1, scrollLeft: -1, fadeStart: false, fadeEnd: false, masked: false };
+      const style = window.getComputedStyle(strip);
+      const mask = style.maskImage || style.webkitMaskImage || 'none';
+      const slack = strip.scrollWidth - strip.clientWidth;
+      return {
+        scrolls: slack > 1,
+        slack: Math.round(slack * 100) / 100,
+        scrollLeft: Math.round(strip.scrollLeft * 100) / 100,
+        fadeStart: strip.classList.contains('fade-start'),
+        fadeEnd: strip.classList.contains('fade-end'),
+        masked: mask !== 'none' && mask !== '',
+      };
+    })()`);
+
+    const stripAtStart = await stripState();
+    let stripPass: boolean;
+    let stripNote: string;
+    if (!stripAtStart.scrolls) {
+      // Nothing hidden, so nothing to advertise: a fade here would dim a
+      // control for no reason.
+      stripPass = !stripAtStart.fadeStart && !stripAtStart.fadeEnd && !stripAtStart.masked;
+      stripNote = `strip fits (slack=${stripAtStart.slack}px), no fade: masked=${stripAtStart.masked}`;
+    } else {
+      await io.evalJs(`(() => {
+        const strip = document.querySelector('.bar-controls');
+        strip.scrollLeft = strip.scrollWidth - strip.clientWidth;
+        return true;
+      })()`);
+      await sleep(120);
+      const stripAtEnd = await stripState();
+      await io.evalJs(`(() => { document.querySelector('.bar-controls').scrollLeft = 0; return true; })()`);
+      await sleep(120);
+      const stripBack = await stripState();
+      stripPass =
+        stripAtStart.fadeEnd &&
+        !stripAtStart.fadeStart &&
+        stripAtStart.masked &&
+        stripAtEnd.fadeStart &&
+        !stripAtEnd.fadeEnd &&
+        stripAtEnd.masked &&
+        stripBack.fadeEnd &&
+        !stripBack.fadeStart;
+      stripNote =
+        `slack=${stripAtStart.slack}px; at left: fade-end=${stripAtStart.fadeEnd} fade-start=${stripAtStart.fadeStart} masked=${stripAtStart.masked}; ` +
+        `at right: fade-end=${stripAtEnd.fadeEnd} fade-start=${stripAtEnd.fadeStart} masked=${stripAtEnd.masked}; ` +
+        `back at left: fade-end=${stripBack.fadeEnd} fade-start=${stripBack.fadeStart}`;
+    }
+    record('the controls strip may scroll, and shows the fade when it does', stripPass, stripNote);
+
     // ------------------------------------ the corner badge: platform and state
 
     // The platform number and the live mark were two grid tracks and are now

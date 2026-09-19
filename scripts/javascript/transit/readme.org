@@ -808,6 +808,14 @@ because on a phone they do not fit and a control that cannot be reached at all i
 worse than one that has to be scrolled to. The chips count only the rows a board is actually
 showing, so a chip never promises a departure the board's own filter is hiding.
 
+Their scrollbars are hidden, so they read as bars rather than as panes, and that
+leaves nothing to say there is another control just past the edge. The control
+row fades out on whichever side is still holding something, and drops the fade at
+the end it has reached: a last control that stays dimmed reads as disabled rather
+than as reachable. The harness enforces the pair. Every other element on the page
+has to fit the viewport; this one may scroll, and must show the fade when it
+does.
+
 The start time is either *now*, which moves with the clock, or a moment the
 reader picked. With a picked moment every row is labelled *planned*, because
 there is no live data for a train that has not been dispatched yet.
