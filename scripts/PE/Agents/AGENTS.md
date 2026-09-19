@@ -75,6 +75,18 @@ it is finding itself.
   resource is actually free (GPU memory, port, lock file), not just that a
   pattern failed to match.
 
+**Never pass a variable to `pgrep -f`, `pkill -f` or `killall`.** A harness
+helper once received an object instead of a path and ran
+`pgrep -f '[object Object]'`, a bracket expression that matches nearly every
+command line; the loop then SIGKILLed ssh-agent, Hammerspoon, kitty, Redis and
+other sessions. Match a literal, validate it is non-empty and specific (an
+absolute scratch path, a unique token), and filter a `ps` listing on it in
+code rather than handing it to a regex. Print the PIDs before killing them.
+
+**bun runs TypeScript without type-checking.** The bug above was a wrong
+argument count that `tsc --noEmit` would have refused. Type-check before
+running any ad-hoc `.ts` script under bun, especially one that kills processes.
+
 **Killing a parent does not kill its children.** After terminating a process
 tree, re-check for orphans and kill them by PID. A `doom sync --rebuild` that
 outlived the parent I had killed went on rewriting the package tree while I
