@@ -24,7 +24,22 @@ export interface BoardRoutes {
   origin: OriginLevel | null;
   /** The place these journeys end at, which a board may fix for itself. */
   destinationKey?: string;
+  /**
+   * When each row's journey was worked out, by row key.
+   *
+   * Per row rather than per board because a run does not answer for every row
+   * every time. A journey search is a search: the aggregator returns what it
+   * found in the window it looked at, and a row at the edge of that window
+   * drops out of one answer and comes back in the next. Measured on the real
+   * page, one row in fifty lost its journey for forty-one seconds that way.
+   * Carrying the previous answer forward is what stops that being a blank slot,
+   * and dating it per row is what lets the view say which ones are getting old.
+   */
+  plannedAt?: Map<string, number>;
 }
+
+/** How old a carried-over journey may be before it is shown as ageing. */
+export const ROUTE_AGEING_MS = 3 * 60_000;
 
 /** Plans for one profile: per board, plus how old and how trustworthy they are. */
 export interface ProfileRoutes {
@@ -129,6 +144,8 @@ export function arrivalOf(dep: Departure, planned: Map<string, PlannedRow> | und
 
 export interface PlanProfileOptions {
   config: ExportedConfig;
+  /** Cancels a run whose question has been replaced; see `replanProfile`. */
+  signal?: AbortSignal;
   profileKey: string;
   profile: ExportedProfile;
   boards: Board[];
@@ -182,6 +199,48 @@ export async function cachedRoutes(profileKey: string, destinationKey: string | 
   // because that question is in the configuration rather than on screen.
   if (stored.destinationKey !== (destinationKey ?? '')) return null;
   return { ...stored, stale: true };
+}
+
+/**
+ * The new answer for one board, with the previous one carried underneath it.
+ *
+ * Everything the new run found wins. Everything it did not answer for keeps
+ * what it had, with the date it had, so a row whose journey dropped out of one
+ * search keeps showing the last journey anybody actually found for it rather
+ * than an empty slot. Nothing is carried across a change of destination: those
+ * are answers to a different question.
+ */
+export function mergeBoardRoutes(previous: BoardRoutes | undefined, fresh: BoardRoutes, at: number): BoardRoutes {
+  const plannedAt = new Map<string, number>();
+  const rows = new Map<string, PlannedRow>();
+  if (previous !== undefined && (previous.destinationKey ?? '') === (fresh.destinationKey ?? '')) {
+    for (const [key, row] of previous.rows) {
+      rows.set(key, row);
+      plannedAt.set(key, previous.plannedAt?.get(key) ?? firstPlannedAt(previous, at));
+    }
+  }
+  for (const [key, row] of fresh.rows) {
+    const carried = rows.get(key);
+    // A search that offers nothing for a row it answered for a minute ago is a
+    // search that looked and missed, not news that the journey has gone: the
+    // aggregator answers for what it found in the window it looked at. So the
+    // older answer stays, wearing its age, and only a fresh answer that
+    // actually found something replaces it. Everything else about the row, the
+    // departure itself included, comes from the fresh run.
+    if (carried !== undefined && row.best === null && carried.best !== null) {
+      rows.set(key, { ...carried, departure: row.departure });
+      continue;
+    }
+    rows.set(key, row);
+    plannedAt.set(key, at);
+  }
+  return { rows, origin: fresh.origin, plannedAt, ...(fresh.destinationKey === undefined ? {} : { destinationKey: fresh.destinationKey }) };
+}
+
+/** When a previous board's rows were planned, for entries that predate the dating. */
+function firstPlannedAt(previous: BoardRoutes, fallback: number): number {
+  for (const value of previous.plannedAt?.values() ?? []) return value;
+  return fallback;
 }
 
 /**
@@ -245,6 +304,19 @@ export async function planProfile(options: PlanProfileOptions): Promise<ProfileR
   let done = 0;
   options.onProgress?.(0, jobs.length);
   const planModes = options.config.defaults.plan_modes;
+  // The run's own cancellation, folded into whatever timeout the request layer
+  // already set. Replacing the signal outright would throw that timeout away,
+  // which is the kind of quiet loss that only shows up as a page that hangs.
+  const signal = options.signal;
+  const fetchImpl =
+    signal === undefined
+      ? undefined
+      : (url: string, init?: RequestInit): Promise<Response> => {
+          const own = init?.signal ?? null;
+          const merged =
+            own === null ? signal : typeof AbortSignal.any === 'function' ? AbortSignal.any([own, signal]) : signal;
+          return fetch(url, { ...init, signal: merged });
+        };
   const results = await Promise.all(
     jobs.map(async ({ index, board, stop, destinationKey }) => {
       try {
@@ -264,13 +336,16 @@ export async function planProfile(options: PlanProfileOptions): Promise<ProfileR
             origin = resolved.level;
           },
           ...(options.earlyBufferMinutes === undefined ? {} : { earlyBufferMinutes: options.earlyBufferMinutes }),
+          ...(fetchImpl === undefined ? {} : { fetchImpl }),
         });
         const byKey = new Map<string, PlannedRow>();
         for (const row of planned) byKey.set(rowKey(row.departure), row);
         return { index, routes: { rows: byKey, origin, destinationKey } as BoardRoutes };
       } catch {
         // A board with no plan is a board without the commute slot, not a broken
-        // board. The departures are still correct and still the main thing.
+        // board. The departures are still correct and still the main thing, and
+        // whatever journeys it had are kept: a search that failed says nothing
+        // about whether the journeys it found a minute ago still exist.
         return { index, routes: null };
       } finally {
         done += 1;
@@ -279,13 +354,30 @@ export async function planProfile(options: PlanProfileOptions): Promise<ProfileR
     }),
   );
 
+  const at = Date.now();
   const boards = new Map<number, BoardRoutes>();
-  for (const result of results) if (result.routes !== null) boards.set(result.index, result.routes);
+  // Whatever was on screen is the floor, not the thing being replaced. A board
+  // this run could not answer for keeps what it had; a board it did answer for
+  // keeps the rows the answer left out. What is not carried is a board that is
+  // now heading somewhere else: those journeys are answers to another question,
+  // and showing them under a new destination would be a lie rather than a
+  // stale truth.
+  const wanted = new Map(jobs.map((job) => [job.index, job.destinationKey]));
+  if (previous !== undefined) {
+    for (const [index, board] of previous.boards) {
+      if (wanted.get(index) !== (board.destinationKey ?? '')) continue;
+      boards.set(index, board);
+    }
+  }
+  for (const result of results) {
+    if (result.routes === null) continue;
+    boards.set(result.index, mergeBoardRoutes(previous?.boards.get(result.index), result.routes, at));
+  }
   if (boards.size === 0) return null;
 
   const routes: ProfileRoutes = {
     boards,
-    at: Date.now(),
+    at,
     destinationKey: options.destinationKey ?? '',
     stale: false,
     key,

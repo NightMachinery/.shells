@@ -26,7 +26,7 @@ import { attachTip } from './tip.ts';
 import { alarmMarker, attachLongPress, openAlarmPopup } from './notify.ts';
 import { stopTagOf } from './data.ts';
 import { callsExpanded, expandCalls, onwardCalls, peekCalls } from './calls.ts';
-import { arrivalOf, rowKey, usualExits, type BoardRoutes } from './commute.ts';
+import { arrivalOf, ROUTE_AGEING_MS, rowKey, usualExits, type BoardRoutes } from './commute.ts';
 import { boardId, filterKey, readHidden, readView, writeHidden, writeView } from './store.ts';
 import type { BoardStatus, BoardView } from './types.ts';
 
@@ -358,6 +358,12 @@ function routeAnchor(handoff: RouteHandoff, className: string, text?: string): H
  * and when you arrive. A tight option is one that only works if the first leg
  * runs early, so it is never the recommendation and says so when asked.
  */
+/** How long ago this row's journey was worked out, or zero when it is this run's. */
+function carriedAge(dep: Departure, context: BoardContext): number {
+  const plannedAt = context.routes?.plannedAt?.get(rowKey(dep));
+  return plannedAt === undefined ? 0 : Math.max(0, context.now - plannedAt);
+}
+
 function renderRoute(dep: Departure, board: Board, context: BoardContext, usual: Map<string, string>): HTMLElement {
   // A cancelled departure gets no route, however good the planner thinks it is.
   // The planner works from the timetable and does not always know the vehicle
@@ -379,7 +385,13 @@ function renderRoute(dep: Departure, board: Board, context: BoardContext, usual:
   const options = planned?.options ?? [option];
 
   const better = usual.get(normaliseLine(dep.line)) !== undefined && usual.get(normaliseLine(dep.line)) !== option.exitStop;
-  const stale = context.routesStale ? ' route-stale' : '';
+  // Dimmed either because the whole plan came off the disk from a previous
+  // visit, or because this row's own journey was carried over from an earlier
+  // search and is getting old. The second is not an error: a search answers for
+  // the rows it found and a row can drop out of one and come back in the next,
+  // so the last journey anybody found is still the best answer available. Past
+  // a few minutes it stops being one worth acting on without a second look.
+  const stale = context.routesStale || carriedAge(dep, context) > ROUTE_AGEING_MS ? ' route-stale' : '';
   // A link, not a span: the expanded view is a page with its own address, so it
   // opens in a new tab, it can be shared, and the browser's own affordances for
   // "this goes somewhere" all work without being reimplemented.
@@ -480,6 +492,15 @@ function routeTip(
   if (context.routesStale && context.routesAt !== null) {
     const age = Math.max(0, Math.round((Date.now() - context.routesAt) / 1000));
     body.append(el('p', 'tip-note', `from the last visit, ${age} s old; planning again now`));
+  } else {
+    // Said only when it is true of this row: the board as a whole may have been
+    // planned a moment ago and this row's journey carried over from earlier.
+    const carried = carriedAge(dep, context);
+    if (carried > ROUTE_AGEING_MS) {
+      body.append(
+        el('p', 'tip-note', `this journey was found ${Math.round(carried / 60_000)} min ago; the last search did not offer one`),
+      );
+    }
   }
 
   // The label says where it goes, and where it goes depends on whether there is
@@ -748,6 +769,15 @@ function stateBadge(dep: Departure, context: BoardContext): HTMLElement {
 function renderRow(dep: Departure, board: Board, columns: Columns, context: BoardContext, usual: Map<string, string>): HTMLElement {
   const reachable = catchableOnBoard(dep, board, context.now);
   const row = el('li', `row${reachable ? '' : ' unreachable'}${dep.cancelled ? ' row-cancelled' : ''}`);
+  // The identity the plan cache uses for this row, on the row itself.
+  //
+  // A board is redrawn from scratch whenever its departures change, so the
+  // element is not the row: two elements a minute apart showing the same
+  // departure are different objects with the same meaning. Anything asking
+  // "did this row keep its journey across a refresh" has to be able to say
+  // which row it means, and every other candidate moves: the countdown ticks,
+  // the delay changes, the position shifts as earlier rows leave.
+  row.dataset.key = rowKey(dep);
   row.style.gridTemplateColumns = gridTemplate(columns);
 
   const minutes = el('span', 'minutes');

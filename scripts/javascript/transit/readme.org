@@ -1324,6 +1324,67 @@ a refresh, and insists that all four are where they were. It insists on the
 refresh as well: the rows must actually have changed, or the assertions would
 pass against a page that had done nothing.
 
+*** A journey slot that had an answer never goes blank
+
+The report was that journey slots empty out when a refresh starts and stay empty
+until the new plan lands, and the obvious reading of that is a race: the page
+refreshes every half minute, a search takes seconds, so a second search overlaps
+the first and the two fight over the same slots. Watching the real page for two
+and a half minutes said something else. Row identities were stable across
+refreshes, plans came back in well under a second from the planner's own cache,
+and one row in fifty lost its journey for forty-one seconds while everything
+around it kept one. Forty-one seconds is the remainder of a minute plus the next
+search, which is the signature of the planner's cache expiring and the next
+search answering differently, not of two searches at once.
+
+So there are two problems, and they need separate fixes.
+
+The first is that a journey search is a search rather than a lookup. The
+aggregator answers for the itineraries it found in the window it looked at, and
+a row at the edge of that window drops out of one answer and returns in the
+next. A run used to build its map of journeys from scratch, so a row the newest
+search did not answer for had its journey removed, and the slot went blank as if
+there were no way to get there from that train. Now every run is merged onto the
+one before it, per row: a row the new search answered for takes the new answer,
+a row it left out keeps the one it had, and, the case the harness caught, a row
+the search did answer for by saying it found nothing also keeps the one it had.
+That last case is the same blank slot arriving by a different route, because the
+row was in the answer, just empty. What the fresh run always contributes is the
+departure itself, so a carried journey is drawn against a train whose delay is
+current.
+
+A carried answer is dated with when it was found rather than when it was last
+asked about, which is what lets it age: past =ROUTE_AGEING_MS= the row is dimmed,
+and its sheet says the journey was found some minutes ago and that the last
+search did not offer one. Nothing is carried across a change of destination,
+because those journeys answer a different question, and a stale truth may be
+shown where an answer about somewhere else may not.
+
+The second is the race, which was not the cause but is real. There is now one
+search per profile at a time. A refresh that lands mid-search is remembered
+rather than started, however many land, and one follow-up runs when the search
+finishes. A search whose question has been replaced, by the reader choosing a
+different destination for instance, is cancelled outright with an =AbortSignal=
+that reaches the fetches inside it, and what it had already put on screen stays
+there until the new run replaces it row by row.
+
+Testing this needed one thing that is easy to get wrong. Three refreshes in a
+row against a fixture prove nothing, because the planner keys its own cache on
+the minute a search starts and the minute its horizon ends, so three refreshes
+inside one minute are one question asked three times and answered twice from
+memory, at memory speed and with the answers it gave the first time. No search
+runs long enough to be overlapped and no answer ever differs. The harness moves
+the reader's start time on by a minute per round instead, which is a question
+the planner has not been asked, while leaving the departures alone so the rows
+keep their identity. Against a planner made slow and made to answer nothing, it
+samples every row ten times a second and insists that no row that had a journey
+is ever seen without one, and it reads the page's own search accounting to
+insist that no two searches for one profile ever overlapped and that the
+refreshes which landed mid-search were folded rather than run. The accounting is
+read from the page rather than counted at the network for the same reason the
+start time has to move: a search answered from memory makes no request, so
+counting requests cannot see a search at all.
+
 *** Destination badges in the strip
 
 A strip is one line per line and direction and one cell per departure, which is

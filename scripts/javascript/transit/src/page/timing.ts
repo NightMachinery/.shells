@@ -142,3 +142,75 @@ export function describe(run: RunTiming): string {
 export function describeBoards(run: RunTiming): string[] {
   return run.boards.map((board) => `${board.title}: ${board.departuresMs} ms, ${board.pages} page${board.pages === 1 ? '' : 's'}`);
 }
+
+/**
+ * Journey searches, counted.
+ *
+ * A search takes seconds and the page refreshes every half minute, so "how
+ * many were running at once" is a correctness question rather than a
+ * curiosity: two runs writing the same slots is how a journey that is already
+ * on screen gets replaced by a blank. The page runs one search per profile and
+ * remembers a refresh that lands mid-flight instead of starting a second one,
+ * and these counters are how that rule is observed from outside the page.
+ */
+export interface PlanRunStats {
+  /** Searches begun since the page loaded. */
+  started: number;
+  /** Running right now, across every profile. */
+  inFlight: number;
+  /** The worst overlap seen across every profile at once. */
+  peak: number;
+  /** The worst overlap seen within one profile, which is the rule that matters. */
+  peakByProfile: Record<string, number>;
+  /** Refreshes that landed mid-search and were folded into one follow-up. */
+  queued: number;
+  /** Searches cancelled because the reader had asked a different question. */
+  aborted: number;
+}
+
+const planRuns = { started: 0, inFlight: 0, peak: 0, queued: 0, aborted: 0 };
+const planInFlightByProfile = new Map<string, number>();
+const planPeakByProfile = new Map<string, number>();
+
+/** A search is starting for this profile. */
+export function notePlanStart(profileKey: string): void {
+  planRuns.started += 1;
+  planRuns.inFlight += 1;
+  if (planRuns.inFlight > planRuns.peak) planRuns.peak = planRuns.inFlight;
+  const mine = (planInFlightByProfile.get(profileKey) ?? 0) + 1;
+  planInFlightByProfile.set(profileKey, mine);
+  if (mine > (planPeakByProfile.get(profileKey) ?? 0)) planPeakByProfile.set(profileKey, mine);
+}
+
+/** That search has finished, whether it answered or threw. */
+export function notePlanEnd(profileKey: string): void {
+  planRuns.inFlight = Math.max(0, planRuns.inFlight - 1);
+  planInFlightByProfile.set(profileKey, Math.max(0, (planInFlightByProfile.get(profileKey) ?? 1) - 1));
+}
+
+/** A refresh arrived while a search was running and will be answered once, at the end. */
+export function notePlanQueued(): void {
+  planRuns.queued += 1;
+}
+
+/** A search was cancelled because its question is no longer the one being asked. */
+export function notePlanAborted(): void {
+  planRuns.aborted += 1;
+}
+
+/** The counters as they stand. */
+export function planRunStats(): PlanRunStats {
+  return { ...planRuns, peakByProfile: Object.fromEntries(planPeakByProfile) };
+}
+
+declare global {
+  interface Window {
+    /** Search accounting, for a test driving this page from outside it. */
+    __transitPlanRuns?: () => PlanRunStats;
+  }
+}
+
+/** Expose the search accounting the same way the timing record is exposed. */
+export function publishPlanRunStats(): void {
+  if (typeof window !== 'undefined') window.__transitPlanRuns = planRunStats;
+}

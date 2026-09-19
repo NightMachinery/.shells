@@ -33,7 +33,19 @@ import { el, selectionInsideBoards, syncChildren } from './page/dom.ts';
 import { idbGet, idbSet, STORE_BOARDS } from './page/idb.ts';
 import { autoTranslate, primeMessageState, renderMessages, resetMessageFilters } from './page/messages.ts';
 import { rearm, setOnAlarmsChanged } from './page/notify.ts';
-import { beginRun, endRun, markRender, markRoutes, markRows, publishTiming } from './page/timing.ts';
+import {
+  beginRun,
+  endRun,
+  markRender,
+  markRoutes,
+  markRows,
+  notePlanAborted,
+  notePlanEnd,
+  notePlanQueued,
+  notePlanStart,
+  publishPlanRunStats,
+  publishTiming,
+} from './page/timing.ts';
 import {
   boardId,
   readDestination,
@@ -239,19 +251,83 @@ async function loadCachedRoutes(profileKey: string): Promise<void> {
  * makes an immediate re-plan nearly free: the itineraries are already there
  * and only the filtering of them differs.
  */
-async function replanProfile(
+/**
+ * One planning run per profile, with the next one queued rather than piled on.
+ *
+ * A journey search takes seconds and the page refreshes every half minute, so
+ * without this a slow search is overlapped by the next one, and two runs race
+ * to write the same slots. The rule is: one in flight, a refresh that lands
+ * during it is remembered as "do it again when this finishes" however many
+ * times it lands, and a run whose question has been replaced is cancelled
+ * outright rather than left to finish and answer the old question.
+ */
+interface PlanRun {
+  controller: AbortController;
+  promise: Promise<void>;
+  /** The most recent refresh that arrived mid-flight, answered once at the end. */
+  queued: { profile: ExportedProfile; boards: Board[]; startMs: number } | null;
+}
+const planRuns = new Map<string, PlanRun>();
+
+function replanProfile(
   profileKey: string,
   profile: ExportedProfile,
   boards: Board[],
   startMs: number,
+  supersede = false,
+): Promise<void> {
+  const running = planRuns.get(profileKey);
+  if (running !== undefined) {
+    if (!supersede) {
+      // Same question, newer departures. Note it and let the run finish: the
+      // answers already on screen are better than the blank a restart would
+      // leave, and the planner's own cache makes the follow-up nearly free.
+      running.queued = { profile, boards, startMs };
+      notePlanQueued();
+      return running.promise;
+    }
+    // A different question. Whatever this run comes back with would be an
+    // answer about somewhere the reader is no longer going, so it is cancelled;
+    // what it had already put on screen stays there until the new run replaces
+    // it row by row.
+    running.controller.abort();
+    notePlanAborted();
+    running.queued = null;
+    planRuns.delete(profileKey);
+  }
+  const controller = new AbortController();
+  const run: PlanRun = { controller, promise: Promise.resolve(), queued: null };
+  planRuns.set(profileKey, run);
+  run.promise = (async () => {
+    try {
+      await runPlan(profileKey, profile, boards, startMs, controller.signal);
+    } finally {
+      if (planRuns.get(profileKey) === run) planRuns.delete(profileKey);
+    }
+    const queued = run.queued;
+    if (queued !== null && !controller.signal.aborted) {
+      await replanProfile(profileKey, queued.profile, queued.boards, queued.startMs);
+    }
+  })();
+  return run.promise;
+}
+
+async function runPlan(
+  profileKey: string,
+  profile: ExportedProfile,
+  boards: Board[],
+  startMs: number,
+  signal: AbortSignal,
 ): Promise<void> {
   const config = state.config;
   if (config === null) return;
   state.planInFlight += 1;
+  notePlanStart(profileKey);
   const planStarted = Date.now();
   try {
     const routes = await planProfile({
       config,
+      signal,
       profileKey,
       profile,
       boards,
@@ -265,14 +341,19 @@ async function replanProfile(
         if (profileKey === state.profileKey) render();
       },
     });
-    if (routes === null) state.routes.delete(profileKey);
-    else state.routes.set(profileKey, routes);
+    // A cancelled run says nothing. Its successor is already on the way, and
+    // what is on screen is the answer to the question the reader last asked.
+    if (signal.aborted) return;
+    // Null means nothing has ever been planned here, not that what was planned
+    // is gone: `planProfile` carries the previous answers forward itself.
+    if (routes !== null) state.routes.set(profileKey, routes);
     if (profileKey === state.profileKey) {
       markRoutes(Date.now() - planStarted, routes?.boards.size ?? 0, targetCount(profile, state.destinationKey));
       endRun();
     }
   } finally {
     state.planInFlight -= 1;
+    notePlanEnd(profileKey);
     state.planning.delete(profileKey);
   }
   render();
@@ -286,7 +367,9 @@ function replanVisible(): void {
   const profile = config.profiles.find((entry) => entry.key === profileKey);
   const data = state.data.get(profileKey);
   if (profile === undefined || data === undefined) return;
-  void replanProfile(profileKey, profile, data.boards, data.startMs);
+  // Superseding: the question itself changed, so an answer in flight is about
+  // the wrong place or the wrong window.
+  void replanProfile(profileKey, profile, data.boards, data.startMs, true);
 }
 
 async function refreshProfile(profileKey: string, force = false): Promise<void> {
@@ -763,6 +846,7 @@ async function boot(): Promise<void> {
   injectColors();
   installIcons();
   publishTiming();
+  publishPlanRunStats();
   installServiceWorker();
   setOnAlarmsChanged(() => {
     // A reminder is drawn on the row it belongs to, and nothing else in the

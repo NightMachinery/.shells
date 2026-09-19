@@ -1359,6 +1359,132 @@ async function main(): Promise<void> {
     await io.evalJs("document.querySelector('.refresh').click(); void 0");
     await io.waitFor("document.querySelector('li.row:has(a.route)') !== null", 15_000);
 
+    // --------------------------------------- assertions: a slot never goes blank
+
+    // The report was that journey slots go empty when a refresh starts and stay
+    // empty until the new plan lands. Two things about a real search are
+    // invisible at fixture speed, and both are turned on here: it takes
+    // seconds, so the page's own refresh arrives in the middle of one, and it
+    // is a search rather than a lookup, so the set of rows it answers for is
+    // not the same every time.
+    //
+    // What is asserted is not "the slots are full at the end". It is that no
+    // row that had a journey was ever seen without one, sampled ten times a
+    // second through the whole thing, because the complaint is about a gap
+    // rather than about a final state.
+
+    await io.waitFor("document.querySelectorAll('li.row a.route').length > 0", 15_000);
+    const sampler = `(() => {
+      window.__slots = { samples: [], start: Date.now() };
+      const take = () => {
+        const state = {};
+        for (const row of document.querySelectorAll('li.row')) {
+          const key = row.dataset.key;
+          if (key === undefined) continue;
+          state[key] = row.querySelector('a.route') !== null;
+        }
+        window.__slots.samples.push({ at: Date.now() - window.__slots.start, state });
+      };
+      // At once, not in a tenth of a second: the rows as they stand before
+      // anything is asked of the page are the baseline the rest is compared
+      // against, and the first refresh can land inside that tenth.
+      take();
+      window.__slotTimer = setInterval(take, 100);
+      return null;
+    })()`;
+    await io.evalJs(sampler);
+    resetPlanStats();
+    // Slow, and forgetful from here on: every further answer offers nothing,
+    // which is the worst case of a search that did not find what it found last
+    // time.
+    setPlanDelay(3000);
+    setPlanAnswersEmpty(true);
+
+    // Each refresh has to be a new question, or nothing above is exercised:
+    // the planner keys its own cache on the minute a search starts and on the
+    // minute its horizon ends, so three plain refreshes inside one minute are
+    // one question asked three times and answered twice from memory, at
+    // memory speed and with the answers it gave the first time. Moving the
+    // reader's start time on by a minute is the smallest change that makes
+    // each round a question the planner has not been asked, and it leaves the
+    // departures themselves alone, so the rows keep their identity and the
+    // carrying-forward above is what is being watched.
+    const bumpStart = async (): Promise<string> =>
+      io.evalJs<string>(`(() => {
+        const input = document.querySelector('.start-input');
+        const at = new Date(Date.parse(input.value) + 60000);
+        const pad = (value) => String(value).padStart(2, '0');
+        input.value = at.getFullYear() + '-' + pad(at.getMonth() + 1) + '-' + pad(at.getDate()) +
+          'T' + pad(at.getHours()) + ':' + pad(at.getMinutes());
+        input.dispatchEvent(new Event('change', { bubbles: true }));
+        return input.value;
+      })()`);
+    for (let round = 0; round < 3; round += 1) {
+      await bumpStart();
+      // Mid-flight by construction: the answer takes three seconds.
+      await sleep(1200);
+    }
+    await sleep(14_000);
+
+    const slots = await io.evalJs<{ samples: number; everHad: number; gaps: Array<{ row: string; at: number }> }>(`(() => {
+      clearInterval(window.__slotTimer);
+      const samples = window.__slots.samples;
+      const everHad = new Set();
+      const gaps = [];
+      for (const sample of samples) {
+        for (const [row, has] of Object.entries(sample.state)) if (has) everHad.add(row);
+        for (const row of everHad) {
+          const has = sample.state[row];
+          // A row that has left the board is not a row with an empty slot.
+          if (has === undefined || has) continue;
+          if (!gaps.some((gap) => gap.row === row)) gaps.push({ row, at: sample.at });
+        }
+      }
+      return { samples: samples.length, everHad: everHad.size, gaps };
+    })()`);
+    const stats = planStats();
+    // The page's own accounting, because the network cannot answer this one:
+    // the planner remembers its answers, so a second run asking a question it
+    // has already asked makes no request at all and would look like no run.
+    const runs = await io.evalJs<{
+      started: number;
+      inFlight: number;
+      peak: number;
+      peakByProfile: Record<string, number>;
+      queued: number;
+      aborted: number;
+    }>('window.__transitPlanRuns()');
+    setPlanDelay(0);
+    setPlanAnswersEmpty(false);
+
+    record(
+      'no row that had a journey is ever seen without one',
+      slots.everHad > 0 && slots.gaps.length === 0,
+      `${slots.everHad} rows with a journey, ${slots.samples} samples over ${Math.round(slots.samples / 10)}s, ${slots.gaps.length} went blank` +
+        (slots.gaps.length === 0 ? '' : `: ${slots.gaps.slice(0, 3).map((gap) => `${gap.row} at ${gap.at}ms`).join(', ')}`),
+    );
+    record(
+      'one journey search per profile at a time, however many refreshes land',
+      runs.started > 1 &&
+        runs.queued > 0 &&
+        runs.inFlight === 0 &&
+        Object.values(runs.peakByProfile).every((peak) => peak <= 1),
+      `${runs.started} searches run, ${runs.queued} refreshes folded into the one in flight, ` +
+        `${runs.aborted} cancelled, worst overlap ${runs.peak} across all profiles and ` +
+        `${JSON.stringify(runs.peakByProfile)} within one, ${runs.inFlight} still running; ` +
+        `${stats.requests} reached the network, worst ${JSON.stringify(stats.peakByOrigin)} per origin, ` +
+        'across three refreshes 1.2s apart against a 3s answer',
+    );
+
+    // Back to a planner that answers, a start time of "now", and a page that
+    // has caught up with both, so the assertions below are not reading a
+    // board mid-recovery or one planned for a quarter of an hour from now.
+    await io.evalJs("document.querySelector('.start-now').click(); void 0");
+    await sleep(300);
+    await io.evalJs("document.querySelector('.refresh').click(); void 0");
+    await io.waitFor("document.querySelectorAll('li.row a.route').length > 0", 15_000);
+    await sleep(500);
+
     // ------------------------------------------------ assertions: the tab glyphs
 
     // A glyph in front of a tab is only worth having if it costs nothing: the
@@ -2593,6 +2719,49 @@ export function tripRequestsFulfilled(): number {
   return tripRequestCount;
 }
 
+/**
+ * The journey planner, made slow and made forgetful, on purpose.
+ *
+ * Two things about a real search cannot be seen at fixture speed. It takes
+ * seconds, so the page's own refresh lands in the middle of one, and it is a
+ * search rather than a lookup, so the set of rows it answers for is not the
+ * same every time: measured on the live page, one row in fifty lost its
+ * journey for forty-one seconds because one search did not offer it and the
+ * slot went blank. `planDelayMs` reproduces the first and `planAnswersEmpty`
+ * reproduces the second.
+ */
+let planDelayMs = 0;
+let planAnswersEmpty = false;
+/** How many `/plan` requests are in the air right now, and the worst it got. */
+let planInFlight = 0;
+let planInFlightPeak = 0;
+let planRequestCount = 0;
+/** The same, per origin, which is what "one plan per board" actually means. */
+const planInFlightByOrigin = new Map<string, number>();
+const planPeakByOrigin = new Map<string, number>();
+
+export function setPlanDelay(ms: number): void {
+  planDelayMs = ms;
+}
+
+export function setPlanAnswersEmpty(empty: boolean): void {
+  planAnswersEmpty = empty;
+}
+
+export function planStats(): { requests: number; peak: number; peakByOrigin: Record<string, number> } {
+  return {
+    requests: planRequestCount,
+    peak: planInFlightPeak,
+    peakByOrigin: Object.fromEntries(planPeakByOrigin),
+  };
+}
+
+export function resetPlanStats(): void {
+  planRequestCount = 0;
+  planInFlightPeak = 0;
+  planPeakByOrigin.clear();
+}
+
 async function fulfillJson(cdp: Cdp, requestId: string, body: unknown): Promise<void> {
   if (upstreamDelayMs > 0) await sleep(upstreamDelayMs);
   const text = JSON.stringify(body);
@@ -2644,7 +2813,21 @@ export async function handleRequestPaused(
     }
     if (parsed.hostname === 'api.transitous.org') {
       if (parsed.pathname.endsWith('/plan')) {
-        await fulfillJson(cdp, requestId, planBody);
+        // Keyed by where the journey starts, which is the board asking.
+        const origin = parsed.searchParams.get('fromPlace') ?? '?';
+        planRequestCount += 1;
+        planInFlight += 1;
+        planInFlightPeak = Math.max(planInFlightPeak, planInFlight);
+        const perOrigin = (planInFlightByOrigin.get(origin) ?? 0) + 1;
+        planInFlightByOrigin.set(origin, perOrigin);
+        planPeakByOrigin.set(origin, Math.max(planPeakByOrigin.get(origin) ?? 0, perOrigin));
+        try {
+          if (planDelayMs > 0) await sleep(planDelayMs);
+          await fulfillJson(cdp, requestId, planAnswersEmpty ? { itineraries: [] } : planBody);
+        } finally {
+          planInFlight -= 1;
+          planInFlightByOrigin.set(origin, (planInFlightByOrigin.get(origin) ?? 1) - 1);
+        }
         return;
       }
       if (parsed.pathname.endsWith('/stoptimes')) {
