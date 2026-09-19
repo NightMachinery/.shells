@@ -1374,6 +1374,34 @@ continues: a browser that has moved its foreground elsewhere can
 leave the next evaluation waiting for a reply that never comes, which looks
 exactly like a slow test rather than a hang.
 
+** The smoke check, which is the only thing that looks at the live page
+
+=test/e2e/smoke.ts= loads the page that was actually deployed, at a phone's
+width, with real upstream data and no fixtures, and it is the last step of a
+deploy rather than a thing anybody remembers to run. The URL comes from the
+environment, because this package is public and the address of somebody's page
+is not.
+
+It exists because the harness and the server checks between them still missed a
+page the reader could not use. The harness asks whether the code behaves, against
+fixtures it ships with; the server checks ask whether the bytes arrived. Neither
+can see a browser holding two builds at once, an upstream that changed shape, or
+a proxy in front of the site. So this one asks the only question left: does the
+thing at the end of the URL still look like a departure board.
+
+It checks that the shell reports a build id, that nothing overflows a 390 pixel
+viewport, that every row keeps its children inside itself, that the state badge
+is in each row's corner, that no row draws a state word outside the cancellation
+flag, that no progress line is still on screen once the boards have loaded, and
+that a destination can show twelve characters of a real station name. It saves a
+full-length screenshot named after the build, which is what a report should
+carry instead of an assurance.
+
+The progress-line check waits rather than reading once, and it matches the class
+those lines carry rather than their words. The wording changes with the backend
+and the page number, and a check written against one phrasing quietly stops
+covering the other one.
+
 * Knobs
 
 Every tunable value lives in exactly one place in the code, which is the only
