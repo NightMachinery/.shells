@@ -500,6 +500,24 @@ board's journey and is dropped. A leading walking leg is normal, though, and is
 skipped over to find that first leg: the planner will walk you onto a platform
 inside the station you named.
 
+** What counts as an alternative
+
+A row's alternatives are deduplicated by where the rider gets off and which
+lines carry them on from there. Within a group only one ride survives, so a later
+run of the very same route never appears as a choice: that is the next row on the
+board, and offering it here says nothing the board does not already say. The
+reported symptom was a row whose three alternatives were the same line from the
+same interchange twenty minutes apart.
+
+Which ride represents the group is not simply the earliest arrival, though it
+nearly was. A tight option is never recommended, by design, because it is offered
+so a rider can choose to gamble and not so the tool can gamble for them. A group
+whose earliest ride was tight would therefore have elected a representative that
+could never be recommended, and the row would have come back with no journey at
+all while a perfectly good ride of the same route two minutes later sat unshown.
+So a comfortable ride represents its route however much earlier the tight one
+lands, and the earliest arrival decides between equals.
+
 ** Which vehicles a journey may use
 
 The journey planner routes over the whole national timetable, so left alone it

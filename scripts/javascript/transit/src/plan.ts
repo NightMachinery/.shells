@@ -894,6 +894,45 @@ function optionKey(option: RouteOption): string {
 }
 
 /**
+ * The route an option represents, as opposed to the particular ride: where it
+ * puts the rider down off the first vehicle, and which lines carry them on
+ * from there.
+ *
+ * "Sequence of onward lines" means the transit legs after the first one, in
+ * order, transit legs only. The first transit leg is always this row's own
+ * departure, so it is fixed across every option of a row and carries no
+ * information here; a walk leg is not a line and is skipped, since two
+ * options that differ only in which platform they use for the identical
+ * change are still the identical change. `destinationName` is folded in
+ * too: two options that agree on exit and onward lines but end at different
+ * configured targets are not one route, they are two.
+ */
+/**
+ * Which of two rides of the same route represents that route.
+ *
+ * Earliest arrival, except that a comfortable ride beats a tight one however
+ * much earlier the tight one lands. Arrival alone was the obvious rule and it
+ * quietly cost rows their recommendation: a tight option is never recommended,
+ * by design, because it is offered so a rider can choose to gamble and not so
+ * the tool can gamble for them. So a group whose earliest ride was tight
+ * elected a representative that could never be recommended, and the row came
+ * back with no journey at all while a perfectly good ride of the same route two
+ * minutes later sat unshown. One representative per route is the rule; which
+ * one it is has to follow the same courtesy as everything else here.
+ */
+function beatsWithinRoute(option: RouteOption, incumbent: RouteOption): boolean {
+  if (option.tight !== incumbent.tight) return !option.tight;
+  return option.arrival < incumbent.arrival;
+}
+
+function routeKey(option: RouteOption): string {
+  const onward = transitLegs(option)
+    .slice(1)
+    .map((leg) => normaliseLine(leg.line));
+  return `${option.destinationName}|${option.exitStop}|${onward.join('>')}`;
+}
+
+/**
  * The journeys that begin with `first`.
  *
  * The recombination is the point of this function. The planner returns only
@@ -1240,7 +1279,18 @@ export async function planBoard(options: PlanBoardOptions): Promise<PlannedRow[]
       }
       if (option.walkMinutes < existing.walkMinutes) unique.set(key, option);
     }
-    const list = [...unique.values()].sort(orderBy(walkWeight)).slice(0, MAX_OPTIONS_PER_ROW);
+    // A later ride of the same route is not an alternative, it is the next row
+    // on the board: same exit, same onward lines, just a later departure. This
+    // groups the survivors above by route and keeps only the one that arrives
+    // earliest in each group, so the cap below counts distinct routes rather
+    // than repeats of one.
+    const distinctRoutes = new Map<string, RouteOption>();
+    for (const option of unique.values()) {
+      const key = routeKey(option);
+      const existing = distinctRoutes.get(key);
+      if (existing === undefined || beatsWithinRoute(option, existing)) distinctRoutes.set(key, option);
+    }
+    const list = [...distinctRoutes.values()].sort(orderBy(walkWeight)).slice(0, MAX_OPTIONS_PER_ROW);
     // A tight option is never recommended: it is offered so a rider can choose
     // to gamble on it, not so the tool can gamble on their behalf.
     //

@@ -52,7 +52,6 @@ function row(line: string, minutes: number): Departure {
  */
 const X9_TIGHT_ARRIVAL = at(38);
 const X9_BEST_ARRIVAL = at(40);
-const X9_SLOW_ARRIVAL = at(45);
 
 /**
  * A fetch that answers the origin probe and then serves plan pages in order.
@@ -178,17 +177,24 @@ describe('exit connections', () => {
     expect(Math.round(140 / WALK_METRES_PER_MINUTE)).toBe(2);
     const { planned } = await planFixtureBoard([row('U1', 10)]);
     const arrivals = (planned[0]?.options ?? []).map((option) => option.arrival);
-    expect(arrivals).toEqual([X9_TIGHT_ARRIVAL, X9_BEST_ARRIVAL, X9_SLOW_ARRIVAL]);
+    // One option, because all three of the fixture's rides are the same route:
+    // same exit, same onward line, three departures. Which one survives is the
+    // assertion that matters here. Believing the planner's eight minute walk
+    // would put the earliest feasible change at 08:28 and elect the slow ride;
+    // measuring the walk from the distance elects the 08:23 one.
+    expect(arrivals).toEqual([X9_BEST_ARRIVAL]);
   });
 
-  test('an option inside the early buffer is tight and is never the best one', async () => {
+  test('a gamble never represents a route a comfortable ride also covers', async () => {
     const { planned } = await planFixtureBoard([row('U1', 10)]);
     const options = planned[0]?.options ?? [];
-    const tight = options.find((option) => option.arrival === X9_TIGHT_ARRIVAL) as RouteOption;
     // 08:21 is one minute before the feasible 08:22, so it only comes off if the
-    // train runs early or the change is quicker than the pace assumes.
-    expect(tight.tight).toBe(true);
-    expect(options.filter((option) => option.tight)).toHaveLength(1);
+    // train runs early or the change is quicker than the pace assumes. It is the
+    // earliest arrival of its route and it is still not the one shown: one ride
+    // stands for a route, and a row whose only representative could never be
+    // recommended is a row with no journey on it.
+    expect(options.some((option) => option.tight)).toBe(false);
+    expect(options.some((option) => option.arrival === X9_TIGHT_ARRIVAL)).toBe(false);
     expect(planned[0]?.best?.arrival).toBe(X9_BEST_ARRIVAL);
     expect(planned[0]?.best?.tight).toBe(false);
   });
@@ -196,7 +202,7 @@ describe('exit connections', () => {
   test('a zero buffer drops the tight option outright', async () => {
     const { planned } = await planFixtureBoard([row('U1', 10)], 0);
     const options = planned[0]?.options ?? [];
-    expect(options.map((option) => option.arrival)).toEqual([X9_BEST_ARRIVAL, X9_SLOW_ARRIVAL]);
+    expect(options.map((option) => option.arrival)).toEqual([X9_BEST_ARRIVAL]);
     expect(options.some((option) => option.tight)).toBe(false);
   });
 
