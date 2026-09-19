@@ -513,7 +513,15 @@ function rowSheet(dep: Departure, board: Board, context: BoardContext, usual: Ma
     wait.append(el('span', undefined, `planning the journey to ${context.destinationName}\u2026`));
     body.append(wait);
   } else if (!dep.cancelled && context.routes !== undefined) {
-    body.append(el('p', 'tip-note', `No journey to ${context.destinationName} from this departure.`));
+    const note = el('p', 'tip-note', `No journey to ${context.destinationName} from this departure.`);
+    // Why, not just that. The two reasons a slot is empty are "this train is not
+    // the way to go", which is ordinary, and "the planner offered one and it was
+    // refused", which is a bug. They look the same on the board, and the only
+    // place a reader can be told them apart is here, because the phone they are
+    // holding at the stop has no console.
+    const miss = planned?.miss;
+    if (miss !== undefined) note.append(el('span', 'tip-miss', ` No journey: ${miss}.`));
+    body.append(note);
   }
 
   return body;

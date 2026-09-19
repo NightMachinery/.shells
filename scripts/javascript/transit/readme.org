@@ -463,15 +463,37 @@ of failure that looks like a coverage gap rather than a bug. The expected minute
 now only backs the timetabled one up, for a row whose backend publishes no
 scheduled time.
 
-The platform is there because line and minute are not unique, and the exception
-is the case that matters most. A stop whose two directions hang off one parent
-identifier can run the same line at the same minute each way, and one S-Bahn line
-was observed doing exactly that, leaving for the city and leaving for the country
-in the same minute. Without the platform check the outbound row was handed the
-inbound journey, which is the worst answer this package can give: plausible, and
-pointing at a train going the other way. A row or a leg that names no platform is
-not held against it, since a stop with no platforms has one direction per
-identifier and cannot collide.
+Something has to separate two trains that share a line and a minute, because
+that happens and it is the case that matters most. A stop whose two directions
+hang off one parent identifier can run the same line at the same minute each way,
+and one S-Bahn line was observed doing exactly that, leaving for the city and
+leaving for the country in the same minute. Handed the wrong one of those, a row
+gets the worst answer this package can give: plausible, and pointing at a train
+going the other way.
+
+The platform was that separator and it is not good enough on its own. At a large
+station the two feeds do not spell a platform the same way. The departure board
+says platform 6 and the planner says track 86 for the same piece of concrete, and
+then says 6 for it on the next train through. That is not a disagreement about
+facts, it is two identifier schemes for one edge, and holding rows to it cost the
+busiest board on the page most of its journeys: measured on one afternoon, every
+regional departure towards the city and half the rapid-transit ones had an
+itinerary waiting and were refused it.
+
+So the platform is believed when it agrees, and where it does not the question
+falls back to where the vehicle says it is going. A headsign is exactly what
+separates the two directions of a line at one minute, which is the collision the
+platform was brought in to settle, and both feeds publish one. They spell a
+terminus differently often enough that the comparison folds punctuation, case and
+the bracketed district a long-distance feed likes to add.
+
+A row that ends up with no journey now carries the reason, and the sheet shows
+it. The two reasons are genuinely different and used to look identical on the
+board: nobody offered a journey starting with that departure, which on a board
+with several lines is usually the honest answer that this train is not the way to
+go, and a journey was offered and refused here, which is this package's fault
+every time. The command line prints the same sentence, so the question can be
+asked without a browser.
 
 An itinerary whose first timetabled leg starts at some other stop is not this
 board's journey and is dropped. A leading walking leg is normal, though, and is

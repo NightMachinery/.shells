@@ -331,6 +331,12 @@ button {
   color: var(--ink-soft);
 }
 
+/* The diagnosis, quieter than the statement it follows. A reader who only wants
+   to know that there is no journey has been told in the sentence before it. */
+.tip-miss {
+  opacity: 0.75;
+}
+
 .tip-warning {
   margin: 6px 0 0;
   color: var(--late);

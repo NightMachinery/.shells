@@ -195,6 +195,14 @@ export interface PlannedRow {
   departure: Departure;
   best: RouteOption | null;
   options: RouteOption[];
+  /**
+   * Why this row has no journey, when it has none.
+   *
+   * Absent on a row that got one. It is a phrase rather than a code because its
+   * only reader is a person holding a phone at a stop, and the question it
+   * answers is "is this board broken or is this train simply not the way".
+   */
+  miss?: string;
 }
 
 /** Where a plan ends: a stop the aggregator knows, or a bare coordinate. */
@@ -278,6 +286,7 @@ interface RawPlanLeg {
   distance?: number;
   tripId?: string;
   routeShortName?: string;
+  headsign?: string;
   agencyName?: string;
   /** Stops this leg calls at between its own ends; null on a street leg. */
   intermediateStops?: RawPlanPlace[] | null;
@@ -328,6 +337,13 @@ interface ParsedLeg extends RouteLeg {
   scheduledDeparture: number;
   /** Platform this leg is boarded from, when the planner names one. */
   fromTrack: string | null;
+  /**
+   * Where this vehicle is going, as the planner's feed spells it.
+   *
+   * Kept because the platform cannot be trusted to identify a trip; see
+   * `sameVehicle`.
+   */
+  headsign: string | null;
   walkMetresAfter: number;
 }
 
@@ -443,6 +459,7 @@ function parseItinerary(raw: RawItinerary, target: PlanTarget): ParsedItinerary 
     const fromName = String(leg.from?.name ?? '').trim();
     const track = String(leg.from?.track ?? leg.from?.scheduledTrack ?? '').trim();
     const toName = String(leg.to?.name ?? '').trim();
+    const headsign = String(leg.headsign ?? '').trim();
 
     const previous = legs[legs.length - 1];
     // A street leg preceding this one is the walk away from the previous
@@ -465,6 +482,7 @@ function parseItinerary(raw: RawItinerary, target: PlanTarget): ParsedItinerary 
       toName,
       scheduledDeparture: Number.isFinite(scheduled) ? scheduled : departure,
       fromTrack: track.length > 0 ? track : null,
+      headsign: headsign.length > 0 ? headsign : null,
       intermediate: parseIntermediate(leg),
       walkMetresAfter: 0,
     });
@@ -797,7 +815,7 @@ function publicLeg(leg: ParsedLeg): RouteLeg {
 }
 
 /**
- * Whether a board row and an itinerary leg agree about the platform.
+ * Whether a board row and an itinerary leg are the same vehicle.
  *
  * Line and minute alone are not unique, and the exception is exactly the case
  * that matters. A stop whose two directions share one parent identifier can run
@@ -808,14 +826,52 @@ function publicLeg(leg: ParsedLeg): RouteLeg {
  * plausible and wrong, and it tells someone to board a train going the other
  * way.
  *
- * The platform separates them, and both sides publish one for exactly the kind
- * of stop where this happens. A row or a leg that names none is not held against
- * it: a missing platform is common on street stops, where a single direction per
- * identifier makes the collision impossible anyway.
+ * The platform used to be the whole of the answer and it is not good enough.
+ * At a large station the two feeds do not spell a platform the same way: the
+ * departure board says platform 6 and the planner says track 86 for the same
+ * physical edge, and the planner says 6 for it on the next train. That is not a
+ * disagreement about facts, it is two identifier schemes for one piece of
+ * concrete, and holding a row to it cost the busiest board on the page most of
+ * its journeys. Measured on one afternoon: every regional departure towards the
+ * city and half the rapid-transit ones had an itinerary waiting for them and
+ * were refused it.
+ *
+ * So the platform is believed when it agrees, and where it does not the
+ * question falls back to where the vehicle says it is going. A headsign is what
+ * separates the two directions of a line at one minute, which is the collision
+ * the platform was brought in to settle in the first place, and both feeds
+ * publish it.
  */
-function samePlatform(rowPlatform: string | null, legTrack: string | null): boolean {
-  if (rowPlatform === null || legTrack === null) return true;
+function sameVehicle(row: Departure, leg: ParsedLeg): boolean {
+  if (row.platform !== null && leg.fromTrack !== null && samePlatformLabel(row.platform, leg.fromTrack)) return true;
+  if (row.platform === null || leg.fromTrack === null) return true;
+  return sameDestinationLabel(row.destination, leg.headsign);
+}
+
+function samePlatformLabel(rowPlatform: string, legTrack: string): boolean {
   return rowPlatform.trim().toLowerCase() === legTrack.trim().toLowerCase();
+}
+
+/**
+ * Whether two feeds are naming the same place as a destination.
+ *
+ * Folded rather than compared, because the two spell a terminus differently
+ * often enough that equality would answer no to trains that are plainly the
+ * same: punctuation, the bracketed district a long-distance feed likes to add,
+ * and the spacing around it.
+ */
+function sameDestinationLabel(rowDestination: string, headsign: string | null): boolean {
+  if (headsign === null) return false;
+  const fold = (value: string): string =>
+    value
+      .toLowerCase()
+      .replace(/\(.*?\)/g, ' ')
+      .replace(/[^a-z0-9äöüß]+/g, ' ')
+      .trim();
+  const a = fold(rowDestination);
+  const b = fold(headsign);
+  if (a.length === 0 || b.length === 0) return false;
+  return a === b || a.startsWith(b) || b.startsWith(a);
 }
 
 /** A line label and a departure minute, folded into one comparable string. */
@@ -987,6 +1043,23 @@ function exitArrival(option: RouteOption): number {
  * tried first and the expected minute only backs it up for a row whose backend
  * publishes no scheduled time of its own.
  */
+/**
+ * The phrase a row with no journey carries.
+ *
+ * The cases are genuinely different. Nobody offered a journey starting with this
+ * departure, which on a board with several lines is usually the honest answer:
+ * that train is not the way to go. Somebody did offer one and it was refused
+ * here, which is this file's fault and used to be invisible. A journey was
+ * matched and produced nothing worth showing. The departure is cancelled, which
+ * is a refusal on purpose.
+ */
+function missFor(row: Departure, matched: Set<Departure>, refused: Set<Departure>): string {
+  if (row.cancelled) return 'this departure is cancelled, so it is not recommended';
+  if (matched.has(row)) return 'the journey that starts here had no onward connection worth offering';
+  if (refused.has(row)) return 'a journey for this line and minute was offered and did not match this row';
+  return 'no itinerary the planner returned starts with this departure';
+}
+
 export async function planBoard(options: PlanBoardOptions): Promise<PlannedRow[]> {
   const rows = options.rows;
   if (rows.length === 0) return [];
@@ -1117,6 +1190,16 @@ export async function planBoard(options: PlanBoardOptions): Promise<PlannedRow[]
     addRow(byExpected, matchKey(row.line, row.realtime), row);
   }
 
+  // Why a row ended up with nothing, for the rows that do. An empty journey slot
+  // is the page's most common complaint and the least diagnosable one, because
+  // "no journey" covers two entirely different facts: the planner never offered
+  // a journey starting with this departure, which is ordinary on a board whose
+  // lines are not all worth taking, and the planner did offer one and it was
+  // refused here, which is a bug every time. On a phone, at a stop, with no
+  // console, they look identical.
+  const refused = new Set<Departure>();
+  const matched = new Set<Departure>();
+
   for (const itinerary of itineraries) {
     const first = itinerary.legs[0];
     if (first === undefined) continue;
@@ -1127,10 +1210,16 @@ export async function planBoard(options: PlanBoardOptions): Promise<PlannedRow[]
       byScheduled.get(matchKey(first.line, first.scheduledDeparture)) ??
       byExpected.get(matchKey(first.line, first.departure));
     if (sameMinute === undefined) continue;
-    const matches = sameMinute.filter((row) => samePlatform(row.platform, first.fromTrack));
-    if (matches.length === 0) continue;
+    const matches = sameMinute.filter((row) => sameVehicle(row, first));
+    if (matches.length === 0) {
+      for (const row of sameMinute) refused.add(row);
+      continue;
+    }
     const candidates = optionsFor(first, itinerary, index, earlyBufferMs, walkWeight);
-    for (const row of matches) (planned.get(row) as RouteOption[]).push(...candidates);
+    for (const row of matches) {
+      matched.add(row);
+      (planned.get(row) as RouteOption[]).push(...candidates);
+    }
   }
 
   return rows.map((row) => {
@@ -1162,7 +1251,8 @@ export async function planBoard(options: PlanBoardOptions): Promise<PlannedRow[]
     // still carried, because what the timetable said is worth having; what is
     // withdrawn is the endorsement.
     const best = row.cancelled ? null : (list.find((option) => !option.tight) ?? null);
-    return { departure: row, best, options: list };
+    if (list.length > 0) return { departure: row, best, options: list };
+    return { departure: row, best, options: list, miss: missFor(row, matched, refused) };
   });
 }
 
@@ -1201,6 +1291,10 @@ export function plannedRowJson(row: PlannedRow, board: WalkSource, now: number, 
     departure: departureJson(row.departure, board, now, multiStop),
     best: row.best === null ? null : routeOptionJson(row.best),
     options: row.options.map(routeOptionJson),
+    // Only on a row that has none, and the same sentence the sheet shows. A
+    // board whose journeys are missing is the complaint this package gets most
+    // often, and answering it from the command line should not need a debugger.
+    ...(row.miss === undefined ? {} : { miss: row.miss }),
   };
 }
 
