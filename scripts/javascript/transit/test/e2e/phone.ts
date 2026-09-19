@@ -976,8 +976,12 @@ async function main(): Promise<void> {
     // number, it cuts the leading digit off a right-aligned cell, and "1:23"
     // without its "1" reads as a completely different time.
     const COMMON_COUNTDOWN = '88';
-    const LONG_COUNTDOWN = '1:23';
-    const LONGEST_COUNTDOWN = '23:59';
+    // The widest the headline can be, and the other shape it takes at that
+    // range. Past ten hours it rounds to whole hours, so nothing five
+    // characters long reaches the column any more, and both of these are drawn
+    // by the one step-down class.
+    const LONG_COUNTDOWN = '9:59';
+    const LONGEST_COUNTDOWN = '23h';
     /** How much wider than two digits the column may be before it is a gutter again. */
     const COLUMN_SLACK_PX = 4;
     interface MinutesMeasurement {
@@ -1014,7 +1018,7 @@ async function main(): Promise<void> {
       };
       const common = probe('', ${JSON.stringify(COMMON_COUNTDOWN)});
       const long = probe('minutes-long', ${JSON.stringify(LONG_COUNTDOWN)});
-      const longest = probe('minutes-longest', ${JSON.stringify(LONGEST_COUNTDOWN)});
+      const longest = probe('minutes-long', ${JSON.stringify(LONGEST_COUNTDOWN)});
       return {
         found: true,
         clientWidth: cell.clientWidth,

@@ -578,32 +578,23 @@
       }
 
       /*
-       * The countdown's rare long forms, drawn small enough to fit the column
-       * its common form sized.
+       * The countdown's long forms, drawn small enough to fit the column its
+       * common form sized.
        *
-       * The countdown is one or two digits up to an hour and an hour count with
-       * minutes past that, so a column wide enough for the second form is
-       * two thirds empty on almost every row, and that emptiness is a gutter
-       * down the whole left of the page. The column is sized for two digits
-       * instead and these two steps buy the long forms back: enough for four
-       * characters, and enough for five, both measured against the widest the
-       * form can be in a font wider than this machine's.
+       * The countdown is one or two digits up to an hour, so a column wide
+       * enough for anything longer is two thirds empty on almost every row,
+       * and that emptiness is a gutter down the whole left of the page. The
+       * column is sized for two digits instead and this step buys the longer
+       * forms back. The ratio is the widest of them, four characters, over two
+       * digits in a font wider than this machine's, with a pixel spare.
        *
-       * They really are small, and that is the trade. A row ten hours out is
-       * being read for "not for ages", not for the minute, and the alternative
-       * was charging every row on every board for it.
-       *
-       * The two ratios are the widest form of each length divided by two
-       * digits, in the wider font, with a pixel or so spare. Set to exactly
-       * the quotient they fit at a hair under half a pixel, which is inside
-       * what a browser will round away.
+       * One step and not a ladder. There was a second, deeper one for the five
+       * character form, and at that depth the number had stopped being
+       * readable; the headline rounds past ten hours now instead, which keeps
+       * every form it can draw inside this one step.
        */
       .minutes.minutes-long {
         font-size: calc(var(--minutes-size) * 0.53);
-      }
-
-      .minutes.minutes-longest {
-        font-size: calc(var(--minutes-size) * 0.41);
       }
 
       .row-main {

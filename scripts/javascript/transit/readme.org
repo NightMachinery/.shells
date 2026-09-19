@@ -845,38 +845,46 @@ it should not have and the digit then sits a pixel low in some fonts and not in
 others. The words for all of this are in the sheet, on the line that says where
 the time came from.
 
-The countdown is minutes up to an hour and hours and minutes past it, so a row
-twenty hours out reads "20:14" rather than "1214". At that range the question is
-how long, and four digits of minutes is a number the reader has to divide. The
-column is right-aligned, so a "9", a "45" and a "1:23" end under each other down
-the board.
+The countdown is minutes up to an hour, hours and minutes past it, and whole
+hours past ten of them: a row two hours out reads "2:14" and one twenty hours out
+reads "20h". At that range the question is how long, and four digits of minutes
+is a number the reader has to divide. The column is right-aligned, so a "9", a
+"45" and a "1:23" end under each other down the board.
 
 *** A column budgeted for the common case, not the widest one
 
-Five characters is the widest the headline can be, at the far end of the longest
-horizon on offer, and the column was budgeted for exactly that. It is the wrong
-budget. Almost every row is one or two digits, so two thirds of the column was
+Five characters was the widest the headline could be, at the far end of the
+longest horizon on offer, and the column was budgeted for exactly that. It was
+the wrong budget. Almost every row is one or two digits, so two thirds of the column was
 blank on almost every row, and because the column is the first one and its text
 is right-aligned, all of that blank pooled on the left: a gutter down the side of
 every board, on every screen, for the sake of a form that appears a few times a
 day. Measured in the stress font, thirty six pixels a row.
 
-So the column is two digits wide now, and the forms that do not fit are drawn
-smaller until they do: one step for four characters, another for five, each ratio
-being the widest string of that length divided by two digits in a font wider than
-this machine's. Those sizes are genuinely small. That is the trade, and it is the
-right way round: a row ten hours out is read for "not for ages" and not for the
-minute, while the gutter was charged to every row on every board. The thirty six
-pixels went to the destination, which is the column that yields first and the one
-the reader is actually reading.
+So the column is two digits wide now, and anything longer is drawn smaller to fit
+it. There is one step, and its ratio is the widest form the headline can emit,
+four characters, over two digits in a font wider than this machine's. The thirty
+six pixels went to the destination, which is the column that yields first and the
+one the reader is actually reading.
 
-Which step a countdown needs is a question about the length of the string and not
-about its punctuation. A colon is what makes the long forms long today, and a
-rule written about the colon would quietly stop covering the next long form that
-appears. The rule is in =src/page/dom.ts= beside the formatter, so the two can be
-checked against each other, and the test walks every minute the longest horizon
-can reach and insists that everything the formatter emits which is wider than the
-column names a step.
+There were two steps at first, the second one for a five character form, and that
+is the part worth writing down because it was the wrong answer. Two digits of
+width make "23:59" fit only at about seven pixels, and seven pixels is not a
+small number, it is a smudge. The fix was not a deeper step but a shorter string:
+past ten hours the headline drops the minutes and reads "23h". Nothing is lost by
+that. A departure half a day out is not one anybody times to the minute, the row
+already carries the clock time it means, and the sheet and the tooltip spell the
+countdown out in full whenever the headline has rounded it, so the exact figure
+is one tap from the row that rounded it.
+
+Whether a countdown needs the step is a question about the length of the string
+and not about its punctuation. A colon is what makes the long forms long today,
+and a rule written about the colon would quietly stop covering the next long form
+that appears, which is exactly what "23h" would have been. The rule is in
+=src/page/dom.ts= beside the formatter, so the two can be checked against each
+other: one test walks every minute the longest horizon can reach and insists that
+everything the formatter emits which is wider than the column takes the step, and
+another insists that nothing it emits is wider than the step can hold.
 
 The tick has to set the class as well as the text: a countdown crossing the hour
 changes length as well as value, and a class set once at render is the wrong
@@ -1559,8 +1567,9 @@ reports.
 Where a cell does have to hold text, the harness measures it against a sample
 rendered in that cell's own font rather than against a character count, in both
 passes: the destination must hold twelve characters of a long station name, the
-countdown column must be as wide as two digits and no wider, and each of the
-countdown's long forms must fit that column at the size its own class gives it.
+countdown column must be as wide as two digits and no wider, and both of the
+countdown's long shapes, the widest hours-and-minutes form and the hours-only
+one, must fit that column at the size the step-down class gives them.
 A character count would be a different number of pixels in every font, which is
 the mistake this whole section exists to stop making.
 

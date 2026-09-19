@@ -118,10 +118,16 @@ export function minutesUntil(epochMs: number, now: number): number {
  * number they have to divide. The column is right-aligned, so a "9", a "45" and
  * a "1:23" end under each other down the board.
  *
- * The widest this can be is five characters, at the far end of the longest
- * horizon on offer, and the narrowest is one. The column is budgeted for the
- * narrow end, because that is what almost every row is; the long forms are
- * drawn smaller to fit it. See `fitCountdown`, which is what puts them there.
+ * Past ten hours it drops the minutes and says "12h". The column is budgeted
+ * for the common form, which is one or two digits, so everything longer is
+ * drawn smaller to fit it, and five characters had to be drawn so small that
+ * it was no longer a number anybody could read. Nothing is lost by rounding
+ * there: half past midnight tomorrow is not a thing anyone times to the
+ * minute, the row already carries the clock time it means, and the exact
+ * figure is in the sheet for the one reader who wants it.
+ *
+ * The widest this can now be is four characters, and the narrowest is one.
+ * See `fitCountdown`, which is what puts the long ones in their class.
  */
 export function countdownLabel(epochMs: number, now: number): string {
   return formatCountdown(minutesUntil(epochMs, now));
@@ -129,6 +135,28 @@ export function countdownLabel(epochMs: number, now: number): string {
 
 /** The same, from a plain minute count, which is the part worth testing. */
 export function formatCountdown(minutes: number): string {
+  if (minutes >= HOURS_ONLY_FROM_MINUTES) return `${Math.floor(minutes / 60)}h`;
+  return exactCountdown(minutes);
+}
+
+/**
+ * How far ahead the headline stops naming the minutes.
+ *
+ * Ten hours, which is past every horizon a reader picks to answer "when is the
+ * next one" and inside the two that exist for "is there anything at all later
+ * on". The minutes at that range are noise being paid for in legibility.
+ */
+export const HOURS_ONLY_FROM_MINUTES = 600;
+
+/**
+ * The same countdown with its minutes kept, whatever the range.
+ *
+ * What the headline rounds away, for the places that have room to say it: the
+ * sheet and the tooltip behind a row. A reader who wonders what "12h" stands
+ * for has somewhere to look, and it is the same place everything else about
+ * the departure already is.
+ */
+export function exactCountdown(minutes: number): string {
   if (minutes <= 60) return String(minutes);
   const hours = Math.floor(minutes / 60);
   return `${hours}:${String(minutes - hours * 60).padStart(2, '0')}`;
@@ -152,24 +180,25 @@ export function fitCountdown(node: HTMLElement, text: string): void {
   const only = node.childNodes.length === 1 ? node.firstChild : null;
   if (only !== null && only.nodeType === Node.TEXT_NODE) only.nodeValue = text;
   else node.textContent = text;
-  const wanted = countdownWidthClass(text);
-  node.classList.toggle('minutes-long', wanted === 'minutes-long');
-  node.classList.toggle('minutes-longest', wanted === 'minutes-longest');
+  node.classList.toggle('minutes-long', countdownNeedsStep(text));
 }
 
 /**
- * Which step down a countdown of this length needs, or null for none.
+ * Whether a countdown of this length has to be drawn smaller to fit its column.
  *
  * Separated from the node so it can be checked against every form the
  * formatter can actually produce, which is the pairing that matters: the
  * column is budgeted for two characters, so anything the formatter can emit
- * that is longer has to name a class, and a form that names none is a form
- * that paints over the badge beside it.
+ * that is longer has to be stepped down, and a form that is not is a form that
+ * paints over the badge beside it.
+ *
+ * One step rather than a ladder of them, because the formatter no longer emits
+ * anything a single step cannot hold. It used to run to five characters, which
+ * needed a step so deep the number stopped being readable; rounding those to
+ * whole hours was the better answer, and it left this with one case.
  */
-export function countdownWidthClass(text: string): 'minutes-long' | 'minutes-longest' | null {
-  if (text.length >= 5) return 'minutes-longest';
-  if (text.length >= 3) return 'minutes-long';
-  return null;
+export function countdownNeedsStep(text: string): boolean {
+  return text.length >= 3;
 }
 
 /**

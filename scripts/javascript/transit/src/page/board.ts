@@ -6,7 +6,20 @@ import type { Board, Departure } from '../model.ts';
 import { handoffFor, routeUrl, type RouteHandoff } from '../route-link.ts';
 import { openRouteOverlay, standalone } from './route-overlay.ts';
 import type { RouteOption } from '../plan.ts';
-import { button, clockTime, compact, countdownLabel, el, fitCountdown, minutesUntil, slot, timeLabel, timeNode } from './dom.ts';
+import {
+  button,
+  clockTime,
+  compact,
+  countdownLabel,
+  el,
+  exactCountdown,
+  fitCountdown,
+  formatCountdown,
+  minutesUntil,
+  slot,
+  timeLabel,
+  timeNode,
+} from './dom.ts';
 import { destinationBadges, type DestinationBadge } from './badges.ts';
 import { alternativeLine, journeySummary, lineBadge, renderJourney, slotHead } from './journey.ts';
 import { attachTip } from './tip.ts';
@@ -125,6 +138,21 @@ export function visibleRows(profileKey: string, board: Board): Departure[] {
 }
 
 /**
+ * The countdown spelled out, for the two places that have room for it.
+ *
+ * Null whenever the headline on the row already says the same thing, which is
+ * every departure inside ten hours. Past that the headline rounds to whole
+ * hours to stay legible in a column two digits wide, and this is where the
+ * minutes it dropped go: a reader who wonders what "12h" stands for finds the
+ * answer in the same place everything else about the departure is.
+ */
+function roundedAway(dep: Departure, now: number): string | null {
+  const minutes = minutesUntil(dep.realtime, now);
+  const exact = exactCountdown(minutes);
+  return exact === formatCountdown(minutes) ? null : exact;
+}
+
+/**
  * A time, with its planned time behind it when the two differ.
  *
  * The expected time is the headline because it is the one a rider acts on, and
@@ -183,6 +211,8 @@ function departureTip(dep: Departure, context: BoardContext): HTMLElement {
   row('expected', timeNode(dep.realtime, referenceMs, timezone));
   row('delay', dep.delayMin === 0 ? 'on time' : `${dep.delayMin > 0 ? '+' : ''}${dep.delayMin} min`);
   if (dep.platform !== null) row('platform', dep.platform);
+  const exact = roundedAway(dep, referenceMs);
+  if (exact !== null) row('in', exact);
   body.append(rows);
   const hint = viaHint(dep, context, SHEET_CALLS);
   if (hint !== null) body.append(el('p', 'tip-next', hint));
@@ -620,6 +650,8 @@ function rowSheet(dep: Departure, board: Board, context: BoardContext, usual: Ma
   if (dep.platform !== null) row('platform', dep.platform);
   row('stop', dep.stopTag ?? stopTagOf(dep.stop, board.stopLabels));
   row('times from', dep.realtimeKnown && !context.planned ? `${dep.backend}, live` : `${dep.backend}, timetable`);
+  const exact = roundedAway(dep, context.now);
+  if (exact !== null) row('in', exact);
   body.append(rows);
 
   if (dep.viaUnverified === true) {
