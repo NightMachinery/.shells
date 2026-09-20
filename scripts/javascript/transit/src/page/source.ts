@@ -22,7 +22,17 @@ import { fetchMessages as fetchDirectMessages, fetchProfile as fetchDirect } fro
 import type { FetchProfileOptions, FetchProfileResult } from './data.ts';
 import { carryBoards, planKey, planProfile as planDirect } from './commute.ts';
 import type { PlanProfileOptions, ProfileRoutes } from './commute.ts';
-import { decodeRoutes, profileSearch, WIRE_VERSION, type ProfileQuery, type WireMessages, type WireProfileAnswer } from './wire.ts';
+import {
+  decodeRoutes,
+  profileSearch,
+  WIRE_VERSION,
+  type ProfileQuery,
+  type WireMessages,
+  type WireProfileAnswer,
+  type WireTranslationPut,
+  type WireTranslations,
+  type WireTranslationsAnswer,
+} from './wire.ts';
 import type { Message } from '../model.ts';
 import type { ExportedConfig } from './types.ts';
 
@@ -44,13 +54,36 @@ export interface SourceFetchOptions extends FetchProfileOptions {
   plan?: PlanView | undefined;
 }
 
-export interface DataSource {
+/**
+ * The shared translation store, which is the one thing here that is a WRITE.
+ *
+ * Every browser reading this page translates the same dozen notices, and the
+ * ones using the paid provider pay for it each time. The planning server keeps
+ * what any of them produced and hands it to the next, so the work happens once.
+ * It does not translate: it holds no key and never will, and the key it would
+ * need lives in the reader's browser by design.
+ *
+ * Both calls are best effort by construction. With no server there is nothing
+ * to ask and nowhere to offer, which is what the tailnet copy of this page does
+ * all day, and the panel behaves exactly as it did before any of this existed.
+ */
+export interface TranslationShare {
+  /** What the store already has, in this language, for these hashes. */
+  fetchTranslations(lang: string, hashes: string[]): Promise<WireTranslations>;
+  /** Offer one translation for the next reader. Resolves whatever happens. */
+  shareTranslation(entry: WireTranslationPut): Promise<void>;
+}
+
+export interface DataSource extends TranslationShare {
   /** Which of the two this is, for the provenance line. */
   readonly kind: 'direct' | 'server';
   fetchProfile(options: SourceFetchOptions): Promise<FetchProfileResult>;
   planProfile(options: PlanProfileOptions): Promise<ProfileRoutes | null>;
   fetchMessages(config: ExportedConfig): Promise<Message[]>;
 }
+
+/** How many hashes may be asked about in one lookup, so the URL stays a URL. */
+const MAX_LOOKUP_HASHES = 200;
 
 /** What the last answer cost and where it came from, for the timing line. */
 export interface SourceNote {
@@ -59,12 +92,20 @@ export interface SourceNote {
   ageMs: number | null;
 }
 
-/** The page doing its own work: the behaviour this page shipped with. */
+/**
+ * The page doing its own work: the behaviour this page shipped with.
+ *
+ * It shares nothing and finds nothing, because there is nobody to share with:
+ * this is the source a page opened off the tailnet, or off a memory stick, is
+ * using, and it has no server at all.
+ */
 export const directSource: DataSource = {
   kind: 'direct',
   fetchProfile: (options) => fetchDirect(options),
   planProfile: (options) => planDirect(options),
   fetchMessages: (config) => fetchDirectMessages(config),
+  fetchTranslations: async () => ({}),
+  shareTranslation: async () => undefined,
 };
 
 /** Thrown when the server answered, but not with an answer. */
@@ -175,6 +216,31 @@ export function createServerSource(options: ServerSourceOptions = {}): DataSourc
       if (answer.v !== WIRE_VERSION) throw new ServerError(`the planning server speaks version ${answer.v}`, 500);
       return answer.messages;
     },
+    async fetchTranslations(lang, wanted) {
+      // Asked in one request rather than one per notice, because the point of
+      // this is to save a phone round trips and a lookup per message would
+      // spend more of them than translating locally ever cost.
+      const hashes = wanted.slice(0, MAX_LOOKUP_HASHES);
+      if (hashes.length === 0) return {};
+      const query = new URLSearchParams({ lang, hashes: hashes.join(',') });
+      const response = await call(`${base}/translations?${query.toString()}`, {
+        headers: { Accept: 'application/json' },
+      });
+      if (!response.ok) throw new ServerError(`the planning server said ${response.status}`, response.status);
+      const answer = (await response.json()) as WireTranslationsAnswer;
+      // The envelope's other field says why an answer is thin, which is worth
+      // nothing to this page: with or without a budget on the other side, the
+      // hashes that did not come back are the ones to translate here.
+      return answer.translations ?? {};
+    },
+    async shareTranslation(entry) {
+      const response = await call(`${base}/translations`, {
+        method: 'PUT',
+        headers: { 'content-type': 'application/json', Accept: 'application/json' },
+        body: JSON.stringify(entry),
+      });
+      if (!response.ok) throw new ServerError(`the planning server said ${response.status}`, response.status);
+    },
   };
 }
 
@@ -277,6 +343,26 @@ export function createSwitchingSource(options: SwitchingOptions = {}): Switching
     return run(directSource);
   }
 
+  /**
+   * The translation store, asked only when there is a server, and never
+   * through `through`.
+   *
+   * Deliberately not: `through` treats a failure as evidence that the server
+   * has gone, and demotes the whole page to doing its own work for the next
+   * five minutes. A translation lookup that 404s or a share that is rate
+   * limited says nothing about whether the server can still plan a journey,
+   * and letting it cost the page its boards would be a bad trade for a
+   * feature whose entire value is saving somebody else a translation.
+   */
+  async function shared<T>(run: (source: DataSource) => Promise<T>, fallback: T): Promise<T> {
+    if (kind !== 'server') return fallback;
+    try {
+      return await run(server);
+    } catch {
+      return fallback;
+    }
+  }
+
   const source: SwitchingSource = {
     get kind() {
       return kind;
@@ -286,6 +372,8 @@ export function createSwitchingSource(options: SwitchingOptions = {}): Switching
     fetchProfile: (fetchOptions) => through((chosen) => chosen.fetchProfile(fetchOptions)),
     planProfile: (planOptions) => through((chosen) => chosen.planProfile(planOptions)),
     fetchMessages: (config) => through((chosen) => chosen.fetchMessages(config)),
+    fetchTranslations: (lang, hashes) => shared((chosen) => chosen.fetchTranslations(lang, hashes), {}),
+    shareTranslation: (entry) => shared((chosen) => chosen.shareTranslation(entry), undefined),
   };
   if (typeof window !== 'undefined') window.__transitSource = source.state;
   return source;

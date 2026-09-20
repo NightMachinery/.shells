@@ -92,9 +92,8 @@ export async function idbSet(store: string, key: string, value: unknown): Promis
   });
 }
 
-/** Hex SHA-256 of a string, for keying a cache by content rather than by index. */
-export async function sha256Hex(text: string): Promise<string> {
-  const bytes = new TextEncoder().encode(text);
-  const digest = await crypto.subtle.digest('SHA-256', bytes);
-  return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, '0')).join('');
-}
+// Content-addressing a cached translation used to be done with a hash written
+// out here. It moved to `../message-hash.ts` when the planning server started
+// keying the shared translation store by the same thing: two implementations of
+// the same rule, one of them in another process, is a bug waiting for somebody
+// to edit one of them.

@@ -55,6 +55,75 @@ export interface WireMessages {
   messages: Message[];
 }
 
+/**
+ * Who produced a shared translation, best last.
+ *
+ * Not the page's own provider names. A client says what it is on the wire, and
+ * "browser" covers whichever on-device translator a reader's browser shipped,
+ * which is a thing the next reader's browser may well not have at all.
+ * "google" is the planning server's own, from a proper translation API with a
+ * credential the server holds; no client can produce one.
+ */
+export type TranslationSource = 'browser' | 'gemini' | 'google';
+
+/**
+ * What a CLIENT may claim to be.
+ *
+ * Deliberately narrower than `TranslationSource`. "google" outranks everything,
+ * so a page that could claim it could pin its own on-device output above a
+ * translation somebody paid for. The page has no reason to want that and the
+ * store has no way to check it, so the wire simply does not carry it inward.
+ */
+export type ClientTranslationSource = 'browser' | 'gemini';
+
+/** One translation as the shared store holds it. */
+export interface WireTranslation {
+  text: string;
+  /** The language it is INTO, as a BCP-47 tag. */
+  lang: string;
+  source: TranslationSource;
+  /** When the store took it, epoch milliseconds. */
+  at: number;
+}
+
+/**
+ * What the store holds: the hashes it knows in that language, and only those. A
+ * hash it has never seen is simply absent, which is the common case and is not
+ * a failure of anything.
+ */
+export type WireTranslations = Record<string, WireTranslation>;
+
+/**
+ * The answer to a lookup.
+ *
+ * An envelope rather than the bare map, because the answer has one thing to say
+ * about itself: whether the hashes that came back empty came back empty because
+ * nobody has translated them or because the server's own translation budget for
+ * the day is spent. Those mean different things to a page deciding whether to
+ * translate locally, and the difference does not fit in a map keyed by hash.
+ */
+export interface WireTranslationsAnswer {
+  translations: WireTranslations;
+  /** True when the server would have translated the rest and may not. */
+  budget_exhausted?: boolean;
+}
+
+/**
+ * One translation offered to the store.
+ *
+ * `original_length` travels so the store can refuse a body that is wildly
+ * longer than the notice it claims to translate, without holding the notice.
+ * The names are the store's own, not the page's, because the store is the only
+ * thing that reads them.
+ */
+export interface WireTranslationPut {
+  hash: string;
+  lang: string;
+  source: ClientTranslationSource;
+  text: string;
+  original_length: number;
+}
+
 /** Journeys as the page holds them, written out as pairs. */
 export function encodeRoutes(routes: ProfileRoutes | null, wanted: ReadonlyMap<number, string>): WireBoardRoutes[] | null {
   if (routes === null) return null;

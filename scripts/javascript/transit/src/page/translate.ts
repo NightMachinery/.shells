@@ -1,5 +1,7 @@
-import { idbGet, idbSet, sha256Hex, STORE_TRANSLATIONS } from './idb.ts';
+import { idbGet, idbSet, STORE_TRANSLATIONS } from './idb.ts';
+import { messageHash } from '../message-hash.ts';
 import { readGeminiKey } from './store.ts';
+import type { ClientTranslationSource, TranslationSource } from './wire.ts';
 
 // German service messages, turned into English by whichever provider is usable,
 // with every result cached by the hash of the source text.
@@ -11,17 +13,39 @@ import { readGeminiKey } from './store.ts';
 // money and needs the reader's own key, so it is opt-in and is never called
 // without one: no key is not an error, it is a provider that does not exist.
 //
-// Content addressing is the point of the cache, not an implementation detail.
-// The operator edits a notice in place rather than posting a new one, so a
-// translation keyed by a notice id would silently go stale against text that
-// had changed underneath it. Keyed by the text, a changed notice is a cache
-// miss and corrects itself.
+// Content addressing is the point of the cache, not an implementation detail,
+// and the rule for it lives in `message-hash.ts` because three things key off
+// it and they run in different processes. See the note there.
+//
+// A third source of translations, after the two providers, is the planning
+// server. It keeps whatever the browsers reading this page produced, so a notice
+// somebody else paid Gemini to translate arrives here for nothing, and when the
+// server has a translation credential of its own it will have translated the
+// notice before anybody asked. Those are stored in the same cache as our own,
+// marked with where they came from, so the panel can say so and so that we never
+// offer somebody else's work back to the store as ours.
 
 export type TranslationProvider = 'chrome' | 'gemini';
 
 export interface Translation {
   text: string;
   provider: TranslationProvider;
+  /**
+   * Absent when this device produced it. Set to the kind of client that did,
+   * when it arrived from the shared store.
+   */
+  from?: TranslationSource;
+}
+
+/**
+ * What this page calls itself on the wire when it offers a translation.
+ *
+ * A client source, never the server's own: see the note on
+ * `ClientTranslationSource` in `wire.ts` for why the narrower type is the point
+ * rather than an accident.
+ */
+export function sourceOfProvider(provider: TranslationProvider): ClientTranslationSource {
+  return provider === 'gemini' ? 'gemini' : 'browser';
 }
 
 /** How the provider is named to the reader. */
@@ -30,7 +54,12 @@ export function providerLabel(provider: TranslationProvider): string {
 }
 
 const SOURCE_LANGUAGE = 'de';
-const TARGET_LANGUAGE = 'en';
+/**
+ * The language everything here translates into, and the one the shared store is
+ * asked about. Exported because the store is keyed by it: a lookup for the
+ * wrong language is a lookup that finds nothing, silently.
+ */
+export const TARGET_LANGUAGE = 'en';
 
 /**
  * Whether translating is worth doing at all in this browser.
@@ -220,6 +249,8 @@ interface CacheRecord {
   provider: TranslationProvider;
   /** Epoch milliseconds, so a later eviction pass has something to sort by. */
   at: number;
+  /** Which kind of client produced it, when it was not this one. */
+  from?: TranslationSource;
 }
 
 /**
@@ -234,7 +265,9 @@ function asTranslation(value: unknown): Translation | null {
   const record = value as Partial<CacheRecord>;
   if (typeof record.text !== 'string' || record.text.length === 0) return null;
   if (record.provider !== 'chrome' && record.provider !== 'gemini') return null;
-  return { text: record.text, provider: record.provider };
+  const from =
+    record.from === 'browser' || record.from === 'gemini' || record.from === 'google' ? record.from : undefined;
+  return from === undefined ? { text: record.text, provider: record.provider } : { text: record.text, provider: record.provider, from };
 }
 
 /**
@@ -243,7 +276,7 @@ function asTranslation(value: unknown): Translation | null {
  * side having to know the other's rule.
  */
 export function translationKey(text: string): Promise<string> {
-  return sha256Hex(text);
+  return messageHash(text);
 }
 
 /** A translation already in memory, for a synchronous repaint. */
@@ -251,10 +284,31 @@ export function rememberedTranslation(hash: string): Translation | null {
   return memo.get(hash) ?? null;
 }
 
+/**
+ * Take a translation another client produced into this device's own cache.
+ *
+ * Marked with the client kind it came from, and that mark is what stops it
+ * being offered back to the store later: the store already has it, and a
+ * round trip that re-asserts somebody else's work under our name would break
+ * the rule that a browser translation never displaces a Gemini one.
+ */
+export async function rememberShared(hash: string, text: string, source: TranslationSource): Promise<void> {
+  if (text.trim().length === 0) return;
+  // `provider` is this page's own vocabulary and says which of ITS two
+  // providers made a translation. A shared one was not made by either, so the
+  // field is filled in only because the record shape wants it, and `from` is
+  // what everything actually reads: the panel credits by `from`, and nothing
+  // shared is ever offered back.
+  const translation: Translation = { text, provider: source === 'browser' ? 'chrome' : 'gemini', from: source };
+  memo.set(hash, translation);
+  const record: CacheRecord = { text: translation.text, provider: translation.provider, at: Date.now(), from: source };
+  await idbSet(STORE_TRANSLATIONS, hash, record);
+}
+
 /** The cached translation of a text, from memory or IndexedDB. Never networked. */
 export async function cachedTranslation(text: string): Promise<Translation | null> {
   if (text.trim().length === 0) return null;
-  const hash = await sha256Hex(text);
+  const hash = await messageHash(text);
   const remembered = memo.get(hash);
   if (remembered !== undefined) return remembered;
   const stored = asTranslation(await idbGet<unknown>(STORE_TRANSLATIONS, hash));
@@ -302,7 +356,7 @@ export async function probeTranslationProviders(): Promise<TranslationProvider[]
  */
 export async function translate(text: string): Promise<Translation | null> {
   if (text.trim().length === 0) return null;
-  const hash = await sha256Hex(text);
+  const hash = await messageHash(text);
   const cached = memo.get(hash) ?? (await cachedTranslation(text));
   if (cached !== null) return cached;
 

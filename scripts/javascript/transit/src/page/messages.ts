@@ -2,16 +2,21 @@ import { icon } from './icons.ts';
 import { normaliseLine } from '../filter.ts';
 import type { Message } from '../model.ts';
 import { button, el } from './dom.ts';
-import { sha256Hex } from './idb.ts';
+import { messageHash } from '../message-hash.ts';
 import { readGeminiKey, writeGeminiKey } from './store.ts';
+import type { TranslationShare } from './source.ts';
 import {
   chromeTranslationReady,
   probeTranslationProviders,
   providerLabel,
   rememberedTranslation,
+  rememberShared,
+  sourceOfProvider,
+  TARGET_LANGUAGE,
   translate,
   translationProviders,
   uiLanguageDiffers,
+  type Translation,
 } from './translate.ts';
 
 // The disruptions panel: the operator's service messages, narrowed to the lines
@@ -59,14 +64,36 @@ let autoTranslated = false;
 let translating = false;
 
 /**
- * Hex SHA-256 per message text, resolved ahead of time.
+ * The identity of each message text, resolved ahead of time.
  *
  * Hashing goes through `crypto.subtle` and is therefore asynchronous, while a
  * repaint is synchronous and cannot await anything. So `primeMessageState`
  * resolves every hash the next render will need and parks it here, and the
  * render path only ever reads this map.
+ *
+ * The rule for the hash itself is in `message-hash.ts`, because the planning
+ * server keys the shared translation store by the same thing and the two
+ * cannot be allowed to drift.
  */
 const hashes = new Map<string, string>();
+
+/**
+ * Where translations are shared, parked here for the same reason as everything
+ * else in this file: the repaint path is synchronous and the buttons on it fire
+ * long after the call that knew about the source. It is set by
+ * `primeMessageState`, which is called before anything renders.
+ *
+ * Null until then, and it stays effectively null on a page with no planning
+ * server, where sharing is a pair of calls that find nothing and offer nowhere.
+ */
+let sharing: TranslationShare | null = null;
+
+/**
+ * Hashes this client has already offered, so a repaint or a second run does not
+ * offer the same translation again. The server would take it happily, since the
+ * write is idempotent, but it is a request that buys nothing.
+ */
+const offered = new Set<string>();
 
 /**
  * Acknowledgements live under one key per message hash rather than one list.
@@ -214,6 +241,25 @@ function describeValidity(message: Message): string | null {
   return null;
 }
 
+/**
+ * Who a translation is owed to, in the line under it.
+ *
+ * Worth saying, because the reader's judgement of a translation depends on it.
+ * One produced here came from a provider this reader chose and can turn off;
+ * one that came from the shared store was made by somebody else's browser, and
+ * whether that was an on-device translator or Gemini is the difference between
+ * "probably fine" and "probably right", on text full of line names and platform
+ * numbers where the cheap translators come apart.
+ */
+function creditFor(translation: Translation): string {
+  if (translation.from === undefined) return 'translated on this device';
+  // The planning server's own is not another client and is not somebody else's
+  // phone: it is a proper translation API with a credential the server holds,
+  // and it is the best answer anybody here is going to get.
+  if (translation.from === 'google') return 'translated by server';
+  return `translated by another client · ${translation.from}`;
+}
+
 /** One message as plain text, for the clipboard. */
 function forCopy(message: Message): string {
   const parts = [message.title];
@@ -236,7 +282,7 @@ async function copyAll(messages: Message[], node: HTMLButtonElement): Promise<vo
     node.textContent = 'Copied';
   } catch {
     node.textContent = 'Copy failed';
-    node.title = 'the clipboard was refused: this needs a focused page on a secure origin';
+    node.setAttribute('aria-label', 'Copy failed: the clipboard was refused, this needs a focused page on a secure origin');
   }
   window.setTimeout(() => {
     node.textContent = label;
@@ -251,13 +297,41 @@ async function translateAll(messages: Message[], onChange: () => void): Promise<
     // they land rather than all at the end of a run that may take a while over
     // a phone connection.
     for (const message of messages) {
-      await translate(message.text);
+      const produced = await translate(message.text);
       onChange();
+      void offerTranslation(message, produced);
     }
   } finally {
     translating = false;
     onChange();
   }
+}
+
+/**
+ * Offer one translation this device produced to the next reader.
+ *
+ * Not awaited by the loop above, because nothing on screen is waiting for it:
+ * the translation is already rendered and the offer is a favour to somebody
+ * else's phone. Every reason not to offer is silent, and none of them is an
+ * error the reader is shown.
+ *
+ * Only what this device produced. A translation that arrived FROM the store
+ * carries the client kind that made it, and offering that back would let a
+ * browser translation this page received get re-asserted under this page's own
+ * name, which is exactly what the store's precedence rule exists to prevent.
+ */
+async function offerTranslation(message: Message, translation: Translation | null): Promise<void> {
+  if (translation === null || translation.from !== undefined || sharing === null) return;
+  const hash = hashes.get(message.text);
+  if (hash === undefined || offered.has(hash)) return;
+  offered.add(hash);
+  await sharing.shareTranslation({
+    hash,
+    lang: TARGET_LANGUAGE,
+    source: sourceOfProvider(translation.provider),
+    text: translation.text,
+    original_length: message.text.length,
+  });
 }
 
 // ------------------------------------------------------- the settings popover
@@ -403,10 +477,10 @@ export function renderMessages(
   if (lineList.length > 0) summary.append(el('span', 'disruption-lines', lineList.join(' ')));
   if (hiddenCount > 0) {
     summary.append(el('span', 'disruptions-hidden', `${hiddenCount} acknowledged`));
-    const restore = button(
-      'disruptions-restore',
-      showAcknowledged ? 'hide again' : 'show',
-      'acknowledged messages stay out of the list until their text changes',
+    const restore = button('disruptions-restore', showAcknowledged ? 'hide again' : 'show');
+    restore.setAttribute(
+      'aria-label',
+      `${showAcknowledged ? 'hide again' : 'show'}: acknowledged messages stay out of the list until their text changes`,
     );
     restore.addEventListener('click', (event) => {
       // Both, because a click anywhere inside a summary otherwise folds the
@@ -441,7 +515,8 @@ export function renderMessages(
   }
 
   const actions = el('div', 'disruptions-actions');
-  const copy = button('disruptions-copy', 'Copy all', 'copy every message shown here, ready to paste into a translator');
+  const copy = button('disruptions-copy', 'Copy all');
+  copy.setAttribute('aria-label', 'Copy all: copy every message shown here, ready to paste into a translator');
   copy.disabled = visible.length === 0;
   copy.addEventListener('click', () => void copyAll(visible, copy));
   actions.append(copy);
@@ -453,18 +528,24 @@ export function renderMessages(
   });
   const primary = providers[0];
   if (primary === undefined) {
-    const setup = button('disruptions-translate', 'Translate…', 'no translator is available here yet');
+    const setup = button('disruptions-translate', 'Translate…');
+    setup.setAttribute('aria-label', 'Translate…: no translator is available here yet');
     setup.addEventListener('click', () => openKeyBox(onChange));
     actions.append(setup);
   } else {
     const run = button('disruptions-translate', translating ? 'Translating…' : `Translate with ${providerLabel(primary)}`);
     run.disabled = translating || untranslated.length === 0;
-    run.title = untranslated.length === 0 ? 'everything shown here is already translated' : `${untranslated.length} still to translate`;
+    run.setAttribute(
+      'aria-label',
+      `${translating ? 'Translating…' : `Translate with ${providerLabel(primary)}`}: ${
+        untranslated.length === 0 ? 'everything shown here is already translated' : `${untranslated.length} still to translate`
+      }`,
+    );
     run.addEventListener('click', () => void translateAll(untranslated, onChange));
     actions.append(run);
   }
 
-  const settings = button('disruptions-settings', undefined, 'translation settings');
+  const settings = button('disruptions-settings');
   settings.append(icon('gear'));
   settings.setAttribute('aria-label', 'translation settings');
   settings.addEventListener('click', () => openKeyBox(onChange));
@@ -495,12 +576,21 @@ export function renderMessages(
       // speaks, which one they want first.
       const original = showOriginal.has(hash);
       const box = el('p', 'disruption-translation', original ? message.text : translation.text);
-      box.append(el('span', 'disruption-provider', original ? 'original' : providerLabel(translation.provider)));
+      const credit = el('span', 'disruption-provider', original ? 'original' : creditFor(translation));
+      // Which provider actually produced it stays available without spending a
+      // line on it: the credit answers "can I trust this", and the provider
+      // name answers "which one got it wrong", which is a rarer question. Only
+      // for one this device made, because that is the only case where the
+      // provider is a thing this page knows rather than guesses.
+      if (!original && translation.from === undefined) {
+        credit.setAttribute('aria-label', `${creditFor(translation)}: ${providerLabel(translation.provider)}`);
+      }
+      box.append(credit);
       item.append(box);
-      const toggle = button(
-        'disruption-original',
-        original ? 'show translation' : 'original',
-        original ? 'show the translated text again' : 'show the operator’s own words',
+      const toggle = button('disruption-original', original ? 'show translation' : 'original');
+      toggle.setAttribute(
+        'aria-label',
+        `${original ? 'show translation' : 'original'}: ${original ? 'show the translated text again' : 'show the operator’s own words'}`,
       );
       toggle.addEventListener('click', () => {
         if (original) showOriginal.delete(hash);
@@ -511,10 +601,12 @@ export function renderMessages(
     }
 
     if (hash !== undefined) {
-      const ack = button(
-        'disruption-ack',
-        acknowledged ? 'bring back' : 'got it',
-        acknowledged ? 'show this message in the list again' : 'hide this message until its text changes',
+      const ack = button('disruption-ack', acknowledged ? 'bring back' : 'got it');
+      ack.setAttribute(
+        'aria-label',
+        `${acknowledged ? 'bring back' : 'got it'}: ${
+          acknowledged ? 'show this message in the list again' : 'hide this message until its text changes'
+        }`,
       );
       ack.addEventListener('click', () => {
         if (acknowledged) unacknowledge(hash);
@@ -536,12 +628,21 @@ export function resetMessageFilters(): void {
 
 /**
  * Resolve everything the next render needs but cannot await: the hash of every
- * message text, which is what an acknowledgement and a cached translation are
- * both keyed by.
+ * message text, which is what an acknowledgement, a cached translation and a
+ * shared one are all keyed by.
+ *
+ * `share` is where translations are pooled between the browsers reading this
+ * page. It is awaited, unlike the provider probe below, because the whole
+ * point is to render a translation somebody else already made INSTEAD of
+ * starting one here, and a lookup that lands after the automatic pass has
+ * already begun has saved nobody anything. It is one request against a server
+ * on the same machine as the page, so the wait is the wait of a local round
+ * trip; with no server it does not happen at all.
  */
-export async function primeMessageState(messages: Message[]): Promise<void> {
+export async function primeMessageState(messages: Message[], share: TranslationShare): Promise<void> {
+  sharing = share;
   const pending = [...new Set(messages.map((message) => message.text))].filter((text) => !hashes.has(text));
-  const resolved = await Promise.all(pending.map(async (text) => [text, await sha256Hex(text)] as const));
+  const resolved = await Promise.all(pending.map(async (text) => [text, await messageHash(text)] as const));
   for (const [text, hash] of resolved) hashes.set(text, hash);
 
   // An empty list is what a failed fetch looks like, and pruning against it
@@ -550,11 +651,51 @@ export async function primeMessageState(messages: Message[]): Promise<void> {
     forgetStaleAcknowledgements(new Set(messages.map((message) => hashes.get(message.text) ?? '')));
   }
 
+  await adoptSharedTranslations(messages);
+
   // Not awaited: the probe only sharpens an answer the panel already has a
   // provisional version of, and the first paint should not wait on the browser
   // deciding whether it can download a language pack. The next repaint, thirty
   // seconds away at most, picks up the verdict.
   void probeTranslationProviders();
+}
+
+/**
+ * Ask the shared store about every notice on screen, and take what it has.
+ *
+ * Only the ones nothing is known about locally: the IndexedDB cache stays the
+ * layer in front of this, so a notice this browser has already translated, or
+ * already picked up from the store on an earlier visit, costs no request at
+ * all. What arrives is written into that same cache, keyed the same way, so the
+ * next visit does not ask again either.
+ *
+ * Never throws. The store is an optimisation on an optimisation, and a page
+ * whose panel failed to render because a cache lookup went wrong would be a bad
+ * trade at any price.
+ */
+async function adoptSharedTranslations(messages: Message[]): Promise<void> {
+  if (sharing === null || messages.length === 0) return;
+  const wanted = new Set<string>();
+  for (const message of messages) {
+    const hash = hashes.get(message.text);
+    if (hash === undefined || rememberedTranslation(hash) !== null) continue;
+    wanted.add(hash);
+  }
+  if (wanted.size === 0) return;
+  try {
+    const found = await sharing.fetchTranslations(TARGET_LANGUAGE, [...wanted]);
+    await Promise.all(
+      Object.entries(found).map(async ([hash, entry]) => {
+        if (!wanted.has(hash)) return;
+        await rememberShared(hash, entry.text, entry.source);
+        // Already there, so there is nothing to offer back. This also keeps a
+        // page that only ever received translations from ever writing.
+        offered.add(hash);
+      }),
+    );
+  } catch {
+    /* no server, or a server that did not answer: the panel translates as it always did */
+  }
 }
 
 /**

@@ -473,7 +473,10 @@ async function refreshMessages(): Promise<void> {
   try {
     const messages: Message[] = await source.fetchMessages(config);
     state.messages = messages;
-    await primeMessageState(messages);
+    // The source goes in because priming is also when the panel asks the
+    // planning server what the other readers have already translated. With no
+    // server there is nothing to ask and the panel behaves as it always did.
+    await primeMessageState(messages, source);
     render();
     // Not awaited: the first translation may have to download a language pack,
     // and the notices are readable in the meantime.
