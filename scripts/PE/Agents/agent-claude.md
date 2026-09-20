@@ -18,3 +18,8 @@
 - If the auto-classifier denies you permission to run some commands, try making the harness ask me directly for permission. This is easier UX for me than copy-pasting commands and running them manually.
 
 - You should always arm monitors (possibly using your internal tool `CronCreate`) for important times, especially for quota resets.
+
+- A command that insists on a terminal (a `Y/n` prompt, `gcloud components
+  install`, a passphrase-free `ssh-add`) does not need me: run it under a
+  pseudo-TTY with `script -q <log> <command> </dev/null`, read the log
+  afterwards. Only reach for me when it needs a secret I hold or a decision.
