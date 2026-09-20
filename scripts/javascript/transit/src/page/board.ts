@@ -537,7 +537,21 @@ function routeTip(
  * closed.
  */
 function rowTipKey(dep: Departure, context: BoardContext): string {
-  return `row|${context.profileKey}|${rowKey(dep)}|${dep.direction}`;
+  // The board is part of it. Two boards on one stop draw the same departure,
+  // a whole-stop board with journeys and a one-line board without, and a key
+  // that named only the departure let whichever board rendered last claim the
+  // open sheet and rebuild it with its own context: the journey vanished from
+  // a sheet the reader had just opened. It surfaced the moment a sheet could
+  // redraw itself while open, which the onward calls landing now does.
+  return `row|${context.profileKey}|${context.index}|${rowKey(dep)}|${dep.direction}`;
+}
+
+/**
+ * What is known about where a departure goes, shared across the boards that
+ * show it: the run is the same run whichever board it is on.
+ */
+function rowCallsKey(dep: Departure, context: BoardContext): string {
+  return `calls|${context.profileKey}|${rowKey(dep)}|${dep.direction}`;
 }
 
 /**
@@ -569,7 +583,7 @@ function rowTipSignature(
  * same constant every time and so never rebuilds anything.
  */
 function callsSignature(dep: Departure, context: BoardContext): string {
-  const key = rowTipKey(dep, context);
+  const key = rowCallsKey(dep, context);
   const state = peekCalls(key);
   if (state === undefined) return 'none';
   if (state.kind !== 'ready') return state.kind;
@@ -587,7 +601,7 @@ function callsSignature(dep: Departure, context: BoardContext): string {
  * appear would be a request per row for a two-character badge.
  */
 function callFor(dep: Departure, context: BoardContext): TripCall | null {
-  const state = peekCalls(rowTipKey(dep, context));
+  const state = peekCalls(rowCallsKey(dep, context));
   if (state === undefined || state.kind !== 'ready') return null;
   return state.calls.find((call) => sameStopArea(call.stopId, dep.stop)) ?? null;
 }
@@ -602,7 +616,7 @@ function callFor(dep: Departure, context: BoardContext): TripCall | null {
  * centre and the one that turns off before it.
  */
 function viaHint(dep: Departure, context: BoardContext, count: number): string | null {
-  const state = onwardCalls(rowTipKey(dep, context), dep);
+  const state = onwardCalls(rowCallsKey(dep, context), dep);
   if (state.kind !== 'ready') return null;
   const names = state.calls.slice(0, count).map((call) => compact(call.name));
   if (names.length === 0) return null;
@@ -634,7 +648,7 @@ function callsGapNote(gap: CallsGap): string {
  * together also say how long the ride is, which no other part of the page does.
  */
 function callsSection(dep: Departure, context: BoardContext): HTMLElement {
-  const key = rowTipKey(dep, context);
+  const key = rowCallsKey(dep, context);
   const state = onwardCalls(key, dep);
   if (state.kind === 'loading') {
     const wait = el('p', 'tip-planning');

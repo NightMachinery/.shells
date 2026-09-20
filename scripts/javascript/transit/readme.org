@@ -1383,6 +1383,15 @@ landing or the minute changing, which measured as sixteen to twenty five
 seconds on a fast connection. The hook now redraws unconditionally; a redraw
 that changes nothing is cheap, because an unchanged board keeps its DOM.
 
+That redraw uncovered a third fault, older than both. A sheet is claimed across
+renders by a key, and the key named the departure but not the board. Two
+boards on one stop draw the same departure, a whole-stop board with journeys
+and a one-line board without, and whichever rendered last claimed the open
+sheet and rebuilt it with its own context, so the journey vanished from a
+sheet the reader had just opened. The key now names the board as well; what
+is known about a run's onward calls stays shared across the boards that show
+it, because it is the same run.
+
 *** Nothing moves that did not change
 
 Skeleton rows are a promise that something is coming, and they are the right
