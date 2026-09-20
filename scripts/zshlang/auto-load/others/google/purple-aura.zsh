@@ -46,7 +46,6 @@ function purple-aura-spent {
     PA_COSTS="$costs" PA_QUOTA="$quota" PA_PROJECT="${gcp_pa_project}" \
     PA_START="${gcp_pa_trial_start}" PA_DAYS="${gcp_pa_trial_days}" \
     PA_CREDIT="${gcp_pa_trial_credit_eur}" PA_JSON="${json_p}" PA_RICH="${rich_p}" \
-    PA_KITTY="$(isKitty && echo y)" \
     python3 - <<'PY'
 import json, os, datetime as dt
 
