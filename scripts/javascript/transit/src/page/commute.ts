@@ -339,6 +339,7 @@ export function planJobs(
             stops: board.stops,
             walkMinutes: board.walk_minutes,
             walkMinutesByStop: board.walk_minutes_by_stop,
+            destinationPlace: board.destination ?? null,
           })));
     targetCache.set(destinationKey, targets);
     return targets;
@@ -409,6 +410,9 @@ export async function planProfile(options: PlanProfileOptions): Promise<ProfileR
           ...(coverThroughMs === undefined ? {} : { coverThroughMs }),
           ...(planModes === undefined ? {} : { planModes }),
           ...(options.walkWeight === undefined ? {} : { walkWeight: options.walkWeight }),
+          ...(options.config.defaults.target_max_walk_minutes === undefined
+            ? {}
+            : { targetMaxWalkMinutes: options.config.defaults.target_max_walk_minutes }),
           onOrigin: (resolved) => {
             origin = resolved.level;
           },

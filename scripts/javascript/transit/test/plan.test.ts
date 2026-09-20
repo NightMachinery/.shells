@@ -538,6 +538,56 @@ describe('planning to the destination’s own stops', () => {
   });
 });
 
+describe('a target that cannot be where it claims to be', () => {
+  /** The doorstep the walks in these cases are measured from. */
+  const DOOR: PlanTarget = { place: { lat: 0, lon: 0 }, name: 'Home', walkMinutes: null };
+  const ACROSS_TOWN = 'de:00000:31';
+  const DOWN_THE_ROAD = 'de:00000:32';
+  /** One degree of latitude is 111_320 metres, so these are distances. */
+  const north = (metres: number) => ({ latitude: metres / 111_320, longitude: 0 });
+
+  async function planWith(stop: string, metres: number, walkMinutes: number) {
+    const body = await fixture<{ place: unknown; stop: unknown }>('transitous-plan-targets.json');
+    const { fetchImpl, urls } = mockFetch((url) => {
+      if (url.includes('/stations/')) return north(metres);
+      if (url.includes('/stoptimes')) return { stopTimes: [{}] };
+      return url.includes(encodeURIComponent(stop)) ? body.stop : body.place;
+    });
+    const planned = await planBoard({
+      stop: HOME,
+      targets: [DOOR, { place: { id: stop }, name: 'Home', walkMinutes }],
+      rows: [row('T1', 10)],
+      startMs: FIXTURE_NOW,
+      baseUrl: BASE,
+      fetchImpl,
+    });
+    const asked = urls.filter((url) => url.includes('/plan') && url.includes(encodeURIComponent(stop)));
+    return { planned, asked };
+  }
+
+  test('a stop three kilometres from the door is dropped, and said so once', async () => {
+    const warnings: string[] = [];
+    const warn = console.warn;
+    console.warn = (...args: unknown[]) => void warnings.push(args.join(' '));
+    try {
+      // Three minutes on foot, says the configuration; three kilometres, says
+      // the backend. This is the Pasing fault in miniature.
+      const { planned, asked } = await planWith(ACROSS_TOWN, 3000, 3);
+      expect(asked).toHaveLength(0);
+      // The doorstep target is untouched, so the board still has its journeys.
+      expect(planned[0]?.options.length).toBeGreaterThan(0);
+    } finally {
+      console.warn = warn;
+    }
+    expect(warnings.join('\n')).toContain(ACROSS_TOWN);
+  });
+
+  test('a stop four hundred metres from the door is asked about as usual', async () => {
+    const { asked } = await planWith(DOWN_THE_ROAD, 400, 5);
+    expect(asked.length).toBeGreaterThan(0);
+  });
+});
+
 describe('the search window', () => {
   test('one wide window replaces the cursor walk', async () => {
     const body = await fixture<unknown>('transitous-plan.json');

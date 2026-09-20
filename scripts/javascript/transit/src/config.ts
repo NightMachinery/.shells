@@ -29,6 +29,17 @@ export const DEFAULT_CONFIG_RELATIVE_PATH = '.address-config/address.toml';
  */
 export const DEFAULT_PLAN_MODES: readonly string[] = ['SUBURBAN', 'SUBWAY', 'TRAM', 'BUS', 'REGIONAL_RAIL'];
 
+/**
+ * How far a target stop may be from the place it is a target for.
+ *
+ * A guard against a configuration mistake rather than a preference: the walks
+ * in the configuration are declarations, and a wrong one is invisible, because
+ * the planner is told the walk rather than asked for it. Twenty five minutes
+ * is well past any walk anybody would actually make from a doorstep and well
+ * short of the distances a mistake produces, which are kilometres.
+ */
+export const DEFAULT_TARGET_MAX_WALK_MINUTES = 25;
+
 export const DEFAULT_HORIZON_MINUTES = 120;
 
 /**
@@ -90,6 +101,12 @@ export interface Defaults {
   planModes: string[];
   /** What a walked minute costs in ridden minutes, when journeys are ranked. */
   walkWeight: number;
+  /**
+   * How far a stop may be from the place it is offered as a way of reaching,
+   * in minutes on foot. A guard against a mistyped walk, not a preference; see
+   * `DEFAULT_TARGET_MAX_WALK_MINUTES`.
+   */
+  targetMaxWalkMinutes: number;
   timezone: string;
   /** Profile key that the alias resolves to, or `null` when unset. */
   home: string | null;
@@ -241,6 +258,7 @@ function parseDefaults(raw: unknown, issues: string[]): Defaults {
     transportTypes: [...DEFAULT_TRANSPORT_TYPES],
     planModes: [...DEFAULT_PLAN_MODES],
     walkWeight: DEFAULT_WALK_WEIGHT,
+    targetMaxWalkMinutes: DEFAULT_TARGET_MAX_WALK_MINUTES,
     timezone: DEFAULT_TIMEZONE,
     home: null,
   };
@@ -305,6 +323,15 @@ function parseDefaults(raw: unknown, issues: string[]): Defaults {
       issues.push('defaults.walk_weight: must be a number of at least 1');
     } else {
       defaults.walkWeight = value;
+    }
+  }
+
+  if (table.target_max_walk_minutes !== undefined) {
+    const value = table.target_max_walk_minutes;
+    if (typeof value !== 'number' || !Number.isFinite(value) || value <= 0) {
+      issues.push('defaults.target_max_walk_minutes: must be a positive number of minutes');
+    } else {
+      defaults.targetMaxWalkMinutes = value;
     }
   }
 
@@ -701,6 +728,7 @@ export async function loadConfig(explicit?: string): Promise<Config> {
         transportTypes: [...DEFAULT_TRANSPORT_TYPES],
         planModes: [...DEFAULT_PLAN_MODES],
         walkWeight: DEFAULT_WALK_WEIGHT,
+        targetMaxWalkMinutes: DEFAULT_TARGET_MAX_WALK_MINUTES,
         timezone: DEFAULT_TIMEZONE,
         home: null,
       },

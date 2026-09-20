@@ -132,6 +132,7 @@ export function configExportDocument(config: Config, options: ConfigExportOption
       transport_types: config.defaults.transportTypes,
       plan_modes: config.defaults.planModes,
       walk_weight: config.defaults.walkWeight,
+      target_max_walk_minutes: config.defaults.targetMaxWalkMinutes,
       timezone: config.defaults.timezone,
       // The profile key the `home` alias resolves to, so the page can follow
       // the same alias without parsing the TOML itself.

@@ -7,10 +7,15 @@ import {
   toRawId,
   TRANSITOUS_DEFAULT_BASE_URL,
 } from './backends/transitous.ts';
-import { DEFAULT_PLAN_MODES, DEFAULT_WALK_WEIGHT } from './config.ts';
+import { DEFAULT_PLAN_MODES, DEFAULT_TARGET_MAX_WALK_MINUTES, DEFAULT_WALK_WEIGHT } from './config.ts';
 import { normaliseLine, type WalkSource } from './filter.ts';
 import { sameDestinationLabel, samePlatformLabel } from './label.ts';
-import { resolveOrigin, type OriginCache, type OriginLevel, type ResolvedOrigin } from './origin.ts';
+import { resolveOrigin, stopCoordinate, type OriginCache, type OriginLevel, type ResolvedOrigin } from './origin.ts';
+// The import back the other way is types only, so this pair is a cycle on
+// paper and not at run time: neither module reads the other while it is being
+// evaluated. Keeping the rule in `targets.ts` is the point, because that is
+// the module whose whole job is deciding which places a plan is asked about.
+import { metresBetween, withinTargetWalk, type Point } from './targets.ts';
 import { envOverride, fetchJson, HttpError, type FetchLike } from './http.ts';
 import { departureJson, toIso } from './json.ts';
 import { SCHEMA_VERSION, type Board, type Departure } from './model.ts';
@@ -249,6 +254,11 @@ export interface PlanBoardOptions {
    * its own onward change would have to leave from, and never find it.
    */
   coverThroughMs?: number;
+  /**
+   * How far a target stop may be from the place it is a target for, in minutes
+   * on foot. See `DEFAULT_TARGET_MAX_WALK_MINUTES`.
+   */
+  targetMaxWalkMinutes?: number;
   earlyBufferMinutes?: number;
   /** What a walked minute costs in ridden minutes; defaults to `DEFAULT_WALK_WEIGHT`. */
   walkWeight?: number;
@@ -622,8 +632,58 @@ export const PLAN_SEARCH_WINDOW_MAX_SECONDS = 4 * 3600;
  * here has departure rows for the far end of the journey, so the chain is the
  * parent and then the station's coordinate.
  */
-async function resolveTarget(target: PlanTarget, options: PlanBoardOptions): Promise<{ place: string; target: PlanTarget }> {
+/** A target dropped for being nowhere near the place it claims to serve. */
+class TargetTooFarError extends Error {
+  constructor(readonly stop: string, readonly metres: number) {
+    super(`${stop} is ${metres} m from its destination, which is further than a target may be`);
+    this.name = 'TargetTooFarError';
+  }
+}
+
+/** Said once per stop per process, because it is a configuration fault and not news. */
+const warnedTargets = new Set<string>();
+
+/**
+ * Is this stop anywhere near the place it is offered as a way of reaching?
+ *
+ * The walks in the configuration are declarations: the planner is told how far
+ * a stop is from the door rather than asked, so a wrong one is invisible and
+ * produces a journey that is wrong in the most confident possible way. This
+ * catches the impossible ones. A backend that does not carry the stop has no
+ * opinion, and no opinion means keep it: a check that cannot see cannot judge.
+ */
+async function checkTargetDistance(target: PlanTarget, options: PlanBoardOptions, reference: Point): Promise<void> {
+  if (!('id' in target.place)) return;
+  const stop = target.place.id;
+  const point = await stopCoordinate({
+    stop,
+    ...(options.baseUrl === undefined ? {} : { baseUrl: options.baseUrl }),
+    ...(options.fetchImpl === undefined ? {} : { fetchImpl: options.fetchImpl }),
+    ...(options.originCache === undefined ? {} : { cache: options.originCache }),
+  });
+  if (point === null) return;
+  const max = options.targetMaxWalkMinutes ?? DEFAULT_TARGET_MAX_WALK_MINUTES;
+  if (withinTargetWalk(reference, point, max)) return;
+  const metres = Math.round(metresBetween(reference, point));
+  if (!warnedTargets.has(stop)) {
+    warnedTargets.add(stop);
+    // eslint-disable-next-line no-console
+    console.warn(
+      `[transit] ${stop} is ${metres} m from ${target.name}, further than a ${max} minute walk, ` +
+        'so it is not being used as a way of getting there. Check the walk this board declares.',
+    );
+  }
+  options.onDebug?.(`target ${stop} dropped: ${metres} m from ${target.name}`);
+  throw new TargetTooFarError(stop, metres);
+}
+
+async function resolveTarget(
+  target: PlanTarget,
+  options: PlanBoardOptions,
+  reference: Point | null,
+): Promise<{ place: string; target: PlanTarget }> {
   if (!('id' in target.place)) return { place: placeParam(target.place), target };
+  if (reference !== null) await checkTargetDistance(target, options, reference);
   const resolved = await resolveOrigin({
     stop: target.place.id,
     ...(options.baseUrl === undefined ? {} : { baseUrl: options.baseUrl }),
@@ -1121,9 +1181,20 @@ export async function planBoard(options: PlanBoardOptions): Promise<PlannedRow[]
   // all. A profile's stops are ordinary configured identifiers and the
   // aggregator's coverage of parent stops is exactly the thing the origin chain
   // exists to work around, so this happens in practice and not in theory.
+  // The place itself, when the destination is one: a coordinate target is the
+  // doorstep, and every stop target claims to be within a walk of it. A
+  // destination that is a stop rather than a place has no coordinate and no
+  // claim to check.
+  let reference: Point | null = null;
+  for (const target of options.targets) {
+    if ('id' in target.place) continue;
+    reference = { lat: target.place.lat, lon: target.place.lon };
+    break;
+  }
+
   const perTarget = await Promise.allSettled(
     options.targets.map(async (target) => {
-      const resolvedTarget = await resolveTarget(target, options);
+      const resolvedTarget = await resolveTarget(target, options, reference);
       const toPlace = resolvedTarget.place;
       // The modes are part of the key: two searches over different modes are two
       // different searches, and one must not answer the other. The cover-through

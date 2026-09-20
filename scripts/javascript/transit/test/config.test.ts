@@ -277,6 +277,13 @@ describe('places', () => {
     );
     expect(parseConfig({ profiles, defaults: { walk_weight: 3 } }, PATH).defaults.walkWeight).toBe(3);
   });
+
+  test('the bound on how far a target may be is minutes, and positive', () => {
+    expect(issuesOf({ profiles, defaults: { target_max_walk_minutes: 0 } })).toContain(
+      'defaults.target_max_walk_minutes: must be a positive number of minutes',
+    );
+    expect(parseConfig({ profiles, defaults: { target_max_walk_minutes: 8 } }, PATH).defaults.targetMaxWalkMinutes).toBe(8);
+  });
 });
 
 describe('a board that fixes its own destination', () => {

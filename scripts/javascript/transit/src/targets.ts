@@ -1,4 +1,5 @@
-import type { PlanTarget } from './plan.ts';
+import { DEFAULT_TARGET_MAX_WALK_MINUTES } from './config.ts';
+import { WALK_METRES_PER_MINUTE, type PlanTarget } from './plan.ts';
 
 // Which places one journey plan is asked about.
 //
@@ -12,6 +13,51 @@ export interface DestinationBoard {
   stops: readonly string[];
   walkMinutes: number;
   walkMinutesByStop?: Record<string, number> | null | undefined;
+  /**
+   * The place this board always plans towards, when it fixes one.
+   *
+   * Load-bearing here, and not obviously so. A board that fixes a destination
+   * other than the place its own profile sits at is a board for LEAVING: it
+   * exists to show what departs from somewhere on the way, and its stops say
+   * nothing about where the profile is. Counting them as targets is how a
+   * station on the far side of the city came to be three minutes from an
+   * office, because the board that names it carries the walk from the OTHER
+   * end of the journey it describes.
+   */
+  destinationPlace?: string | null | undefined;
+}
+
+/** Somewhere on the map, in the spelling every caller here already has. */
+export interface Point {
+  lat: number;
+  lon: number;
+}
+
+// Re-exported so the rule and its bound are read from one module: the bound
+// itself is a configuration default, so it is declared with the others.
+export { DEFAULT_TARGET_MAX_WALK_MINUTES };
+
+/** Great-circle metres between two points. */
+export function metresBetween(a: Point, b: Point): number {
+  const R = 6_371_000;
+  const toRad = (degrees: number): number => (degrees * Math.PI) / 180;
+  const dLat = toRad(b.lat - a.lat);
+  const dLon = toRad(b.lon - a.lon);
+  const lat1 = toRad(a.lat);
+  const lat2 = toRad(b.lat);
+  const h = Math.sin(dLat / 2) ** 2 + Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLon / 2) ** 2;
+  return 2 * R * Math.asin(Math.min(1, Math.sqrt(h)));
+}
+
+/**
+ * Whether a stop is near enough to a place to be one of its targets.
+ *
+ * Straight-line, at the package's one walking pace, which understates a real
+ * walk and is meant to: this rejects the impossible rather than judging the
+ * plausible.
+ */
+export function withinTargetWalk(place: Point, stop: Point, maxWalkMinutes: number): boolean {
+  return metresBetween(place, stop) <= maxWalkMinutes * WALK_METRES_PER_MINUTE;
 }
 
 /** A declared place, in the neutral spelling both callers can produce. */
@@ -54,6 +100,10 @@ export function planTargets(place: DestinationPlace, boards: readonly Destinatio
   const targets: PlanTarget[] = [{ place: { lat: place.lat, lon: place.lon }, name, walkMinutes: null }];
   const walks = new Map<string, number>();
   for (const board of boards) {
+    // A board that plans somewhere else is a board for leaving, not evidence
+    // of where this profile is. See `destinationPlace`.
+    const fixed = board.destinationPlace ?? null;
+    if (fixed !== null && fixed !== place.name) continue;
     for (const stop of board.stops) {
       const walk = board.walkMinutesByStop?.[stop] ?? board.walkMinutes;
       const known = walks.get(stop);

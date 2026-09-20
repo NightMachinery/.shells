@@ -56,6 +56,7 @@ backend = "mvg"
 fallback = "transitous"
 transport_types = ["SBAHN", "UBAHN", "TRAM", "BUS", "BAHN", "REGIONAL_BUS"]
 plan_modes = ["SUBURBAN", "SUBWAY", "TRAM", "BUS", "REGIONAL_RAIL"]
+target_max_walk_minutes = 20
 timezone = "Europe/Berlin"
 home = "first"
 
@@ -500,6 +501,39 @@ Walks are legs in the result rather than annotations on the vehicles around
 them, because a walk is the thing being chosen between: "off at the far station
 and fourteen minutes on foot" and "off at the near one and six" differ in
 nothing else, and a list of trains hides exactly that.
+
+** Which stops count as evidence of where a place is
+
+A profile's boards are the reason its stops become targets: a board that leaves
+from the doorstep says, by existing, that its stops are within the walk it
+declares. Two rules keep that inference honest, and both live in
+=src/targets.ts= so the terminal and the page cannot disagree about them.
+
+A board that fixes a =destination= other than its own profile's place is a board
+for leaving, not evidence of where the profile is. Such a board is often placed
+in a profile purely so its departures show up on the right screen: an
+interchange across the city, whose platforms are useful to watch from here, with
+a walking time measured at the far end of the journey it describes. Its stops
+are never targets for that profile. Without this rule that station becomes "a
+few minutes from the door" and the commute view starts recommending that the
+reader get off there, which is the fault that produced this rule: a journey home
+that alighted at a station on the other side of town and claimed a three minute
+walk.
+
+Every target that survives is then checked against the place itself, when both
+have coordinates. A stop further from the place than a walk of
+=target_max_walk_minutes=, at the package's one walking pace, is dropped with a
+warning on the console naming the stop and the distance, and the rest of the
+board is planned as usual. The check is a guard against a mistyped walk rather
+than a preference: the walks in the configuration are declarations, the planner
+is told them rather than asked, so a wrong one is invisible and produces a
+journey that is wrong in the most confident way a journey can be. A stop the
+primary backend does not carry has no coordinate, and no coordinate means keep
+it: a check that cannot see cannot judge. Places configured as a stop rather
+than a coordinate skip it for the same reason.
+
+The distance is straight-line, which understates a real walk, and that is
+deliberate. This rejects the impossible; it does not judge the plausible.
 
 ** Which identifier the planner will accept
 
@@ -1952,7 +1986,8 @@ The boundary between the near window and the strip view is in
 pace, the early buffer, the plan cache lifetime, the itineraries asked for per
 request, the bounds on the search window, the page cap and the options kept per
 row are all in =src/plan.ts=, and the transit modes a journey may use and what a
-walked minute costs are in =src/config.ts= with the other defaults. The
+walked minute costs are in =src/config.ts= with the other defaults, as is how
+far a target stop may be from the place it is offered as a way of reaching. The
 abbreviations used in slots too narrow for a full place name are a single
 constant in =src/page/dom.ts=, and the filler words a destination badge drops
 are one in =src/page/badges.ts=. How many of a run's onward calls a sheet names

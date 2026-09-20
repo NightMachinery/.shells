@@ -68,9 +68,13 @@ const memo = new Map<string, ResolvedOrigin>();
 /** Stops every step failed for, so the whole chain is walked once and not again. */
 const unresolvable = new Set<string>();
 
+/** Where each stop is, once anybody has asked. A fact, so it never expires. */
+const points = new Map<string, { lat: number; lon: number } | null>();
+
 export function clearOriginCache(): void {
   memo.clear();
   unresolvable.clear();
+  points.clear();
   // Requests in flight are cleared too, or a case that started a probe could
   // hand its answer to the next case, which is precisely what clearing is for.
   resetInflight();
@@ -153,6 +157,43 @@ async function stationPoint(rawId: string, options: ResolveOriginOptions): Promi
   } catch {
     return null;
   }
+}
+
+/**
+ * Where a stop is, as the primary backend has it.
+ *
+ * Exported for the target sanity check, which needs to know whether a stop
+ * somebody declared to be three minutes from a doorstep is in fact across the
+ * city. Answers null when the backend does not carry the stop, and a null is
+ * "no opinion" rather than "not near": a check that cannot see cannot judge.
+ *
+ * Cached in the process and, when the caller has one, in the same store the
+ * resolved origins live in. A stop's position is a fact rather than a
+ * measurement, so nothing here expires.
+ */
+export async function stopCoordinate(options: ResolveOriginOptions): Promise<{ lat: number; lon: number } | null> {
+  const rawId = toRawId(options.stop);
+  const held = points.get(rawId);
+  if (held !== undefined) return held;
+  const cacheKey = `point:${rawId}`;
+  if (options.cache) {
+    const cached = await options.cache.get(cacheKey);
+    const lat = Number(cached?.[0]);
+    const lon = Number(cached?.[1]);
+    if (cached !== null && cached.length === 2 && Number.isFinite(lat) && Number.isFinite(lon)) {
+      const point = { lat, lon };
+      points.set(rawId, point);
+      return point;
+    }
+  }
+  const raw = await stationPoint(rawId, options);
+  const parts = (raw ?? '').split(',');
+  const lat = Number(parts[0]);
+  const lon = Number(parts[1]);
+  const point = raw !== null && parts.length === 2 && Number.isFinite(lat) && Number.isFinite(lon) ? { lat, lon } : null;
+  points.set(rawId, point);
+  if (point !== null && options.cache) await options.cache.set(cacheKey, [String(point.lat), String(point.lon)]);
+  return point;
 }
 
 interface RawReverseHit {

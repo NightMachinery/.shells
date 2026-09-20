@@ -70,6 +70,11 @@ export interface ExportedConfig {
     plan_modes?: string[];
     /** What a walked minute costs in ridden minutes when journeys are ranked. */
     walk_weight?: number;
+    /**
+     * How far a stop may be from the place it is offered as a way of reaching,
+     * in minutes on foot. A guard against a mistyped walk in the configuration.
+     */
+    target_max_walk_minutes?: number;
     timezone: string;
     home: string | null;
   };

@@ -98,6 +98,7 @@ export function createRouteView(container: HTMLElement, options: RouteViewOption
           stops: board.stops,
           walkMinutes: board.walk_minutes,
           walkMinutesByStop: board.walk_minutes_by_stop,
+          destinationPlace: board.destination ?? null,
         })),
       );
       const row: Departure = data.row;
@@ -113,6 +114,9 @@ export function createRouteView(container: HTMLElement, options: RouteViewOption
           set: (key, value) => idbSet(STORE_ORIGINS, key, value),
         },
         ...(config.defaults.plan_modes === undefined ? {} : { planModes: config.defaults.plan_modes }),
+        ...(config.defaults.target_max_walk_minutes === undefined
+          ? {}
+          : { targetMaxWalkMinutes: config.defaults.target_max_walk_minutes }),
       });
       const fresh = planned[0];
       if (fresh === undefined) throw new Error('nothing came back for this departure');
