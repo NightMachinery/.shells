@@ -4,7 +4,7 @@
 #: service account carries the Speech client role too).
 #:
 #: Language: detection works for English but returned "undetermined" on Farsi
-#: speech when measured, so [agfi:stt-file-fa-gcp] names the language outright.
+#: speech when measured, so [agfi:stt-file-chirp3-fa] names the language outright.
 #: The synchronous call takes at most 60 s or 10 MB of audio, so longer files
 #: are cut into pieces with ffmpeg and transcribed in order.
 
@@ -12,8 +12,8 @@ typeset -g gcp_stt_model="${gcp_stt_model:-chirp_3}"
 typeset -g gcp_stt_region="${gcp_stt_region:-eu}"
 typeset -g gcp_stt_chunk_seconds="${gcp_stt_chunk_seconds:-55}"
 
-function stt-file-gcp {
-    #: Usage: stt-file-gcp [--lang en-US[,fa-IR,...]] <audio-file>
+function stt-file-chirp3 {
+    #: Usage: stt-file-chirp3 [--lang en-US[,fa-IR,...]] <audio-file>
     #: Prints the transcript. Without --lang the language is detected.
     local langs='auto'
     if [[ "$1" == --lang ]] ; then
@@ -58,16 +58,22 @@ function stt-file-gcp {
     }
 }
 
-function stt-file-fa-gcp {
+function stt-file-chirp3-fa {
     #: Farsi speech; the language is named because detection misses it.
-    stt-file-gcp --lang fa-IR "$@"
+    stt-file-chirp3 --lang fa-IR "$@"
 }
 
-function stt-file-2en-gcp {
+function stt-file-chirp3-2en {
     #: Transcribe (any language), then translate the transcript to English.
-    stt-file-gcp "$@" | 2en-gcp
+    stt-file-chirp3 "$@" | 2en-gcp
 }
 
-function stt-file-fa-2en-gcp {
-    stt-file-fa-gcp "$@" | 2en-gcp
+function stt-file-chirp3-fa-2en {
+    stt-file-chirp3-fa "$@" | 2en-gcp
 }
+
+#: The `-gcp` names are whichever Google model is currently best; today Chirp 3.
+aliasfn stt-file-gcp stt-file-chirp3
+aliasfn stt-file-fa-gcp stt-file-chirp3-fa
+aliasfn stt-file-2en-gcp stt-file-chirp3-2en
+aliasfn stt-file-fa-2en-gcp stt-file-chirp3-fa-2en
