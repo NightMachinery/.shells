@@ -571,7 +571,7 @@ describe('a target that cannot be where it claims to be', () => {
     console.warn = (...args: unknown[]) => void warnings.push(args.join(' '));
     try {
       // Three minutes on foot, says the configuration; three kilometres, says
-      // the backend. This is the Pasing fault in miniature.
+      // the backend. This is the misplaced-target fault in miniature.
       const { planned, asked } = await planWith(ACROSS_TOWN, 3000, 3);
       expect(asked).toHaveLength(0);
       // The doorstep target is untouched, so the board still has its journeys.
