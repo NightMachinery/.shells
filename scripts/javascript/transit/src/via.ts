@@ -58,20 +58,48 @@ function minuteOf(epochMs: number): number {
  * with a run it cannot narrow to one; see `applyVia`.
  */
 export function matchTrips(row: Departure, aggregator: readonly Departure[]): string[] {
+  return matchCandidates(row, aggregator, (candidate) => candidate.tripId);
+}
+
+/**
+ * The aggregator's own rows for this run, by the same rule.
+ *
+ * Same tiers, same order, same refusal to guess. What differs is what comes
+ * back: the rows themselves rather than their identifiers, for a caller that
+ * wants a field the primary feed left empty rather than the run's identity.
+ * Rows with no trip identifier count here, because the field being borrowed
+ * does not depend on one.
+ */
+export function matchRows(row: Departure, aggregator: readonly Departure[]): Departure[] {
+  return matchCandidates(row, aggregator, (candidate) => candidate);
+}
+
+/**
+ * The tiers themselves, over whatever the caller wants out of a candidate.
+ *
+ * `pick` answering undefined drops that candidate before the tiers are
+ * compared, which is what keeps `matchTrips` answering exactly as it did when
+ * it owned this code: a candidate with no identifier was never a candidate.
+ */
+function matchCandidates<T>(
+  row: Departure,
+  aggregator: readonly Departure[],
+  pick: (candidate: Departure) => T | undefined,
+): T[] {
   // In descending order of how much a tier proves. A timetabled minute that two
   // feeds agree on is the strongest single fact available, and the expected
   // minute is next: two runs of one line can share an expected minute when one
   // of them is late, so agreement there is worth less than agreement on the
   // timetable. The line is worth more than the headsign because two lines can
   // terminate in the same place, and a run is only ever one line.
-  const byLinePlanned: string[] = [];
-  const byLineExpected: string[] = [];
-  const byHeadsignPlanned: string[] = [];
-  const byHeadsignExpected: string[] = [];
-  const nearby: string[] = [];
+  const byLinePlanned: T[] = [];
+  const byLineExpected: T[] = [];
+  const byHeadsignPlanned: T[] = [];
+  const byHeadsignExpected: T[] = [];
+  const nearby: T[] = [];
 
   for (const candidate of aggregator) {
-    const tripId = candidate.tripId;
+    const tripId = pick(candidate);
     if (tripId === undefined) continue;
     const line = normaliseLine(candidate.line) === normaliseLine(row.line);
     const headsign = sameDestinationLabel(row.destination, candidate.destination);
@@ -92,7 +120,7 @@ export function matchTrips(row: Departure, aggregator: readonly Departure[]): st
     }
   }
 
-  const distinct = (ids: readonly string[]): string[] => [...new Set(ids)];
+  const distinct = (ids: readonly T[]): T[] => [...new Set(ids)];
   for (const tier of [byLinePlanned, byLineExpected, byHeadsignPlanned, byHeadsignExpected]) {
     if (tier.length > 0) return distinct(tier);
   }

@@ -1,4 +1,4 @@
-import { describe, expect, test } from 'bun:test';
+import { beforeEach, describe, expect, test } from 'bun:test';
 import {
   CITY_BUS_AGENCIES,
   createTransitousBackend,
@@ -8,6 +8,7 @@ import {
   normaliseLineName,
   toAggregatorId,
 } from '../src/backends/transitous.ts';
+import { clearOriginCache } from '../src/origin.ts';
 import { FIXTURE_WINDOW, fixture, mockFetch } from './helpers.ts';
 
 const SYNTHETIC_STOP = 'de:00000:1';
@@ -143,5 +144,55 @@ describe('a per-call transport-type narrowing', () => {
 
     expect(rows).toEqual([]);
     expect(urls).toHaveLength(0);
+  });
+});
+
+describe('a parent identifier this feed has never heard of', () => {
+  const PLATFORM = 'de:00000:1:2:2';
+
+  // The resolution is memoised per stop for the life of the process, and these
+  // cases resolve the same stop two different ways on purpose.
+  beforeEach(() => {
+    clearOriginCache();
+  });
+
+  /**
+   * The aggregator answers 404 for the parent and serves the platform.
+   *
+   * This is not a contrived shape. It is what a real station does when the
+   * national feed carries its platforms and not the stop above them, and the
+   * whole point of the origin chain is to find them; the 404 used to throw
+   * before the chain was ever consulted.
+   */
+  function feed(onPlatform: unknown) {
+    return mockFetch((url) => {
+      if (url.includes(encodeURIComponent(PLATFORM))) return onPlatform;
+      // The chain probes a candidate with `stoptimes` before it trusts it, and
+      // that probe is answered by the same rule as the fetch.
+      return new Response(JSON.stringify({ error: 'no such stop' }), {
+        status: 404,
+        headers: { 'content-type': 'application/json' },
+      });
+    });
+  }
+
+  test('is asked about through its platforms rather than thrown', async () => {
+    const [page1] = await pages();
+    const { fetchImpl, urls } = feed(page1);
+    const backend = createTransitousBackend({ fetchImpl, baseUrl: BASE });
+
+    const rows = await backend.departures(SYNTHETIC_STOP, FIXTURE_WINDOW, { platformIds: [PLATFORM] });
+
+    expect(rows.length).toBeGreaterThan(0);
+    expect(urls.some((url) => url.includes(encodeURIComponent(PLATFORM)))).toBe(true);
+  });
+
+  test('a rate limit is still a failure, because an empty board would be a lie', async () => {
+    const { fetchImpl } = mockFetch(
+      () => new Response(JSON.stringify({ error: 'slow down' }), { status: 429, headers: { 'content-type': 'application/json' } }),
+    );
+    const backend = createTransitousBackend({ fetchImpl, baseUrl: BASE });
+
+    await expect(backend.departures(SYNTHETIC_STOP, FIXTURE_WINDOW)).rejects.toThrow(/429/);
   });
 });

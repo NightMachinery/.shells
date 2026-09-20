@@ -8,7 +8,7 @@ import { createTransitousBackend, TRANSITOUS_DEFAULT_BASE_URL } from '../backend
 import type { Backend } from '../backends/types.ts';
 import { attachConnections } from '../connect.ts';
 import { applyFilters, mergeBoards, normaliseLine } from '../filter.ts';
-import { applyVia } from '../via.ts';
+import { applyVia, matchRows } from '../via.ts';
 import type { Board, BoardConfig, ConnectionConfig, Departure, Message } from '../model.ts';
 import type { BoardStatus, ExportedBoard, ExportedConfig, ExportedProfile } from './types.ts';
 
@@ -144,21 +144,105 @@ function seamKey(dep: Departure): string {
   return [normaliseLine(dep.line), Math.floor(dep.planned / 60_000), dep.direction ?? '', dep.stop].join('|');
 }
 
+/**
+ * The platform identifiers the primary backend has named at each stop, most
+ * used first.
+ *
+ * The aggregator does not carry every parent stop. Where it does not, the only
+ * way to reach that station's rows is to ask its platforms by name, and the
+ * only place those names exist is on the rows the primary backend already
+ * returned. So every row that carries one is recorded here as it goes past, and
+ * every later request for that stop hands the list on as a hint. It is a
+ * process-wide memo rather than per fetch because it is a fact about the
+ * station rather than about this minute.
+ */
+const platformsSeen = new Map<string, Map<string, number>>();
+
+function notePlatforms(rows: readonly Departure[]): void {
+  for (const row of rows) {
+    const id = row.stopPoint;
+    if (id === undefined || id.length === 0) continue;
+    const counts = platformsSeen.get(row.stop) ?? new Map<string, number>();
+    counts.set(id, (counts.get(id) ?? 0) + 1);
+    platformsSeen.set(row.stop, counts);
+  }
+}
+
+/** The platforms known at a stop, most used first. */
+export function platformHints(stop: string): string[] {
+  const counts = platformsSeen.get(stop);
+  if (counts === undefined) return [];
+  return [...counts.entries()].sort((a, b) => b[1] - a[1]).map(([id]) => id);
+}
+
+// The ordering rule itself is `platformIdsOf` in origin.ts; this memo only
+// accumulates across fetches, which a single list of rows cannot do.
+
+/** Forget the platform memo, for a test that wants a fresh page. */
+export function clearPlatformHints(): void {
+  platformsSeen.clear();
+}
+
+/**
+ * Fill in a platform the row's own feed did not publish.
+ *
+ * The primary feed leaves `platform` empty for some services at some stations,
+ * rapid transit most often, and the aggregator's row for the very same run at
+ * the very same stop carries the track. One request per stop, cached and shared
+ * with every other use of that stop's aggregator rows, and only made when there
+ * is actually a row missing a platform.
+ *
+ * Written to `platformGuess` rather than to `platform`; see the field.
+ */
+async function borrowPlatforms(
+  rows: Departure[],
+  stop: string,
+  backend: Backend,
+  window: { fromMs: number; toMs: number },
+): Promise<void> {
+  const missing = rows.filter((row) => row.stop === stop && row.platform === null && row.platformGuess === undefined);
+  if (missing.length === 0) return;
+  let aggregator: Departure[];
+  try {
+    aggregator = await timetableRows(backend, stop, window, undefined);
+  } catch {
+    // A board without platform badges is a board; a board that failed to draw
+    // because a second feed was down is not.
+    return;
+  }
+  if (aggregator.length === 0) return;
+  for (const row of missing) {
+    for (const candidate of matchRows(row, aggregator)) {
+      if (candidate.platform === null) continue;
+      row.platformGuess = candidate.platform;
+      break;
+    }
+  }
+}
+
 async function timetableRows(
   backend: Backend,
   stop: string,
   window: { fromMs: number; toMs: number },
   modes: BoardConfig['modes'],
 ): Promise<Departure[]> {
-  const key = [stop, Math.floor(window.fromMs / 60_000), Math.floor(window.toMs / 60_000), (modes ?? []).join(',')].join('|');
+  const hints = platformHints(stop);
+  // The hints are part of the key: a request made before this stop's platforms
+  // were known asked a different question from one made after, and the first
+  // answer must not be handed back for the second.
+  const key = [stop, Math.floor(window.fromMs / 60_000), Math.floor(window.toMs / 60_000), (modes ?? []).join(','), hints.join(',')].join('|');
   const hit = timetableCache.get(key);
   const now = Date.now();
   if (hit !== undefined && now - hit.at < TIMETABLE_CACHE_MS) return hit.rows;
   const rows = await share(`timetable|${key}`, () =>
     withLimit('timetable', TIMETABLE_CONCURRENCY, () =>
-      backend.departures(stop, window, modes === undefined ? undefined : { transportTypes: modes }),
+      backend.departures(stop, window, {
+        ...(modes === undefined ? {} : { transportTypes: modes }),
+        ...(hints.length === 0 ? {} : { platformIds: hints }),
+      }),
     ),
   );
+  notePlatforms(rows);
   timetableCache.set(key, { at: now, rows });
   return rows;
 }
@@ -191,6 +275,7 @@ async function stopDepartures(
       },
     ),
   );
+  notePlatforms(live);
   if (window.toMs <= liveEnd) return live;
 
   let later: Departure[] = [];
@@ -323,6 +408,7 @@ export async function fetchProfile(options: FetchProfileOptions): Promise<FetchP
           });
         }
         if (multiStop) for (const row of rows) row.stopTag = stopTagOf(row.stop, boardConfig.stopLabels);
+        await borrowPlatforms(rows, stop, backends.timetable, window);
         perStop.push(rows);
       }
       const departures = mergeBoards(perStop);

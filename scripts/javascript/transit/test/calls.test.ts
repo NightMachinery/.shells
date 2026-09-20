@@ -1,5 +1,13 @@
 import { beforeEach, describe, expect, test } from 'bun:test';
-import { callsExpanded, clearCalls, configureCalls, expandCalls, onwardCalls, peekCalls } from '../src/page/calls.ts';
+import {
+  CALLS_RETRY_MS,
+  callsExpanded,
+  clearCalls,
+  configureCalls,
+  expandCalls,
+  onwardCalls,
+  peekCalls,
+} from '../src/page/calls.ts';
 import { clearTripCache } from '../src/trip.ts';
 import type { Departure } from '../src/model.ts';
 import { mockFetch } from './helpers.ts';
@@ -139,5 +147,97 @@ describe('asking where a departure goes after it leaves', () => {
     expect(callsExpanded('k')).toBe(false);
     expandCalls('k');
     expect(callsExpanded('k')).toBe(true);
+  });
+});
+
+describe('why a run has no onward calls', () => {
+  /**
+   * One sentence per cause. "Not published" used to cover all of these, and a
+   * reader holding a phone could not tell a station the aggregator does not
+   * carry from a run it does not list from a network that was not there.
+   */
+  test('a stop the aggregator lists nothing for says so, rather than blaming the run', async () => {
+    configureCalls({ baseUrl: BASE, rows: async () => [], onLoaded: () => {} });
+    onwardCalls('k', row());
+    await settle();
+    expect(peekCalls('k')).toEqual({ kind: 'unknown', gap: 'no-stop-times' });
+  });
+
+  test('a stop it does list, with nothing that is this departure, is a different sentence', async () => {
+    configureCalls({
+      baseUrl: BASE,
+      // A real run at this stop, four minutes away and under another name, so
+      // no tier of the matcher will take it.
+      rows: async () => [
+        row({ backend: 'transitous', tripId: 'other', line: 'S9', destination: 'Ostweg', planned: AT + 240_000, realtime: AT + 240_000 }),
+      ],
+      onLoaded: () => {},
+    });
+    onwardCalls('k', row());
+    await settle();
+    expect(peekCalls('k')).toEqual({ kind: 'unknown', gap: 'no-match' });
+  });
+
+  test('a run that is identified and has no published sequence is a third', async () => {
+    const { fetchImpl } = mockFetch(() => ({ legs: [] }));
+    configureCalls({ baseUrl: BASE, fetchImpl, rows: async () => [], onLoaded: () => {} });
+    onwardCalls('k', row({ tripId: 'run' }));
+    await settle();
+    expect(peekCalls('k')).toEqual({ kind: 'unknown', gap: 'no-sequence' });
+  });
+
+  test('a request that never arrives is not a claim about the run at all', async () => {
+    configureCalls({
+      baseUrl: BASE,
+      rows: async () => {
+        throw new Error('synthetic network failure');
+      },
+      onLoaded: () => {},
+    });
+    onwardCalls('k', row());
+    await settle();
+    expect(peekCalls('k')).toEqual({ kind: 'unknown', gap: 'unreachable' });
+  });
+});
+
+describe('asking a second time', () => {
+  test('one failed request is retried before anything is concluded from it', async () => {
+    let attempts = 0;
+    configureCalls({
+      baseUrl: BASE,
+      rows: async () => {
+        attempts += 1;
+        if (attempts === 1) throw new Error('synthetic blip');
+        return [];
+      },
+      onLoaded: () => {},
+    });
+    onwardCalls('k', row());
+    await settle();
+    // The second attempt answered, so the verdict is about the stop rather than
+    // about the network.
+    expect(peekCalls('k')).toEqual({ kind: 'unknown', gap: 'no-stop-times' });
+    expect(attempts).toBe(2);
+  });
+
+  test('a network failure may be asked about again, and not on every render', async () => {
+    let asks = 0;
+    configureCalls({
+      baseUrl: BASE,
+      rows: async () => {
+        asks += 1;
+        throw new Error('synthetic network failure');
+      },
+      onLoaded: () => {},
+    });
+    onwardCalls('k', row());
+    await settle();
+    // The attempt and its one retry, and nothing more while the interval runs.
+    expect(asks).toBe(2);
+    for (let render = 0; render < 5; render += 1) onwardCalls('k', row());
+    await settle();
+    expect(asks).toBe(2);
+    // The interval is a real one, so the answer is not permanent either.
+    expect(CALLS_RETRY_MS).toBeGreaterThan(0);
   });
 });

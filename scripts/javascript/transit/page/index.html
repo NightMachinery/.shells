@@ -878,6 +878,12 @@
         padding: 5px 0;
         border-top: 1px solid var(--line);
         flex-wrap: wrap;
+        /* For the group's platform badge, which sits in the corner the way a
+           row's does. The padding on the right is what reserves its space: an
+           absolutely positioned badge takes none, and the times would otherwise
+           wrap underneath it. */
+        position: relative;
+        padding-right: 24px;
       }
 
       .strip:first-child {
@@ -926,8 +932,18 @@
         vertical-align: super;
       }
 
-      /* The strip's own row, so the legend can sit under it without disturbing
-         the rhythm of the times. */
+      /* The platform the whole group leaves from, in the corner, in the same
+         shape the row badge uses. Neutral rather than state-coloured: a group is
+         a rhythm rather than one departure, and there is no one state for it to
+         report. The times that leave from somewhere else carry a `time-note`
+         each, and only those. */
+      .strip-platform {
+        background: var(--ink-soft);
+        opacity: 0.75;
+      }
+
+      /* The strip's own row: the line badge, the header, the platform and stop
+         tags, and the times all wrap onto it as one unit. */
       .strip-main {
         display: flex;
         align-items: baseline;
@@ -935,21 +951,6 @@
         flex-wrap: wrap;
         flex: 1 1 100%;
         min-width: 0;
-      }
-
-      .strip-legend {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 4px 10px;
-        flex: 1 1 100%;
-        font-size: 10px;
-        color: var(--ink-soft);
-      }
-
-      .strip-legend-entry {
-        display: inline-flex;
-        align-items: center;
-        gap: 3px;
       }
 
       /* A destination badge. Same height as the day marker, so a strip with
@@ -968,9 +969,15 @@
         color: var(--dest-badge-ink);
       }
 
-      .strip-legend .dest-badge {
+      /* Inside the strip header a badge sits on the line's own baseline, one per
+         destination, immediately before the name it belongs to. This replaced a
+         second line underneath the header that repeated the same names once
+         more just to say which badge was which; the badge and the name are now
+         next to each other and nothing below the header has to be read first. */
+      .direction .dest-badge {
         vertical-align: baseline;
         margin-left: 0;
+        margin-right: 3px;
       }
 
       .board-collapsed .board-walk {

@@ -37,6 +37,20 @@ export interface Departure {
   sev: boolean;
   platform: string | null;
   /**
+   * A platform this row's own feed did not publish, borrowed from another that
+   * did, for the same run at the same stop.
+   *
+   * Separate from `platform` rather than filled into it, because the two are
+   * not the same claim: `platform` is what the feed that produced this row
+   * said, and everything that decides whether two rows are the same run
+   * compares those. A borrowed figure is good enough to print on a badge and
+   * not good enough to identify a train with. Measured: the primary feed
+   * publishes no platform at all for rapid transit at some stations, so the
+   * corner badge on those rows was empty while the aggregator's own row for the
+   * same train carried the track all along.
+   */
+  platformGuess?: string;
+  /**
    * The platform-level stop identifier this row departs from, when the backend
    * publishes one. Not for display: it is what lets the journey planner be
    * asked about a stop whose parent identifier the aggregator does not carry.

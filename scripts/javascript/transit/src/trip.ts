@@ -33,11 +33,19 @@ export interface TripCall {
   /** Arrival, epoch milliseconds; the departure where a stop publishes only one. */
   arrivalMs: number;
   departureMs: number;
+  /**
+   * The track this run uses at this call, when the run's own record names one.
+   * The last source a platform badge falls back to, and the only one that is
+   * about this vehicle rather than about the stop.
+   */
+  platform: string | null;
 }
 
 interface RawTripPlace {
   name?: string;
   stopId?: string;
+  track?: string;
+  scheduledTrack?: string;
   arrival?: string;
   departure?: string;
   scheduledArrival?: string;
@@ -83,11 +91,13 @@ function toCall(place: RawTripPlace): TripCall | null {
   const arrival = parseTime(place.arrival, place.scheduledArrival, place.departure, place.scheduledDeparture);
   const departure = parseTime(place.departure, place.scheduledDeparture, place.arrival, place.scheduledArrival);
   if (!Number.isFinite(arrival) && !Number.isFinite(departure)) return null;
+  const track = String(place.track ?? place.scheduledTrack ?? '').trim();
   return {
     stopId: toRawId(stopId),
     name: String(place.name ?? '').trim(),
     arrivalMs: Number.isFinite(arrival) ? arrival : departure,
     departureMs: Number.isFinite(departure) ? departure : arrival,
+    platform: track.length > 0 ? track : null,
   };
 }
 

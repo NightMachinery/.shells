@@ -551,7 +551,10 @@ about the moment.
 
 First the parent identifier itself, confirmed with a one-row stop-time request.
 That is the cheapest question that distinguishes "this stop exists here" from
-"it does not", and it is the right answer most of the time.
+"it does not", and it is the right answer most of the time. A 404 to that
+request IS that answer, not a failure of it, and reading it as a failure is what
+kept the two steps below from ever running for a station that exists here only
+as its platforms.
 
 Then the platform identifiers the primary backend has *already handed us* on the
 board's own departure rows. They cost no request, they are exactly the platforms
@@ -890,6 +893,36 @@ it should not have and the digit then sits a pixel low in some fonts and not in
 others. The words for all of this are in the sheet, on the line that says where
 the time came from.
 
+**** A platform three feeds might know
+
+The primary feed publishes a track for most services and, at some stations, none
+at all for a whole category: rapid transit is the usual one, and those rows'
+corner badges were empty while the aggregator's row for the very same train at
+the very same stop carried the track all along.
+
+So a missing platform is borrowed, in order of how much each source knows about
+this row. The row's own feed first, because it is the feed the row came from.
+Then the aggregator's row for the same run at the same stop, matched by the same
+cascade that identifies a run for its onward calls, and borrowed once per stop
+in the data layer rather than per row on the screen. Last the run's own record,
+which names the track it uses at each call, and which is only available once
+something has asked where the run goes.
+
+A borrowed figure is kept in its own field rather than written into the
+published one, because the two are not the same claim and everything that
+decides whether two rows are the same run compares the published one. Good
+enough to print on a badge is not good enough to identify a train with. A
+platform nothing publishes stays unpublished: the badge shows nothing rather
+than a guess.
+
+In the strip the platform belongs to the group rather than to the time. A group
+is one line in one direction from one stop and almost always leaves from one
+platform, so the group carries the platform most of its times use, once, in the
+same corner badge a row uses, and only the times that differ from it are marked.
+Almost always: a diversion or a single late-evening run can move one departure,
+and that one departure is exactly what a reader standing on the usual platform
+needs to be told about. A group no feed publishes a platform for gets no badge.
+
 The countdown is minutes up to an hour, hours and minutes past it, and whole
 hours past ten of them: a row two hours out reads "2:14" and one twenty hours out
 reads "20h". At that range the question is how long, and four digits of minutes
@@ -1008,6 +1041,20 @@ great deal, and giving it to the destination put a few hundred pixels of nothing
 between a departure and the journey that belongs to it, which makes a row take
 two glances instead of one. There the destination is capped at a width a station
 name fits in and the journey takes the rest.
+
+Past that, on a screen wide enough that the column itself is still most of the
+window with blank margins either side, the column grows again. Boards keep
+their rows exactly as above: no side-by-side grid of boards, and the row's own
+grid template is unchanged, so what actually gets wider is the fraction the
+journey slot already claims and the strip view's own row, which can now lay
+more of a group's times on one line before it wraps. The floor this kicks in
+above and the width it grows to are both in the page's shared stylesheet, next
+to the narrow column's own rule; see =#app= in =page/theme.css=. The
+anchored journey popover (see *The journey tooltip and the expanded page*
+below) grew its own width cap to match, so it reads as an explanation rather
+than a column of fragments; that cap is the =.tip= rule in the same file, next
+to =SHEET_MAX_WIDTH_PX= in =src/page/tip.ts=, which still decides the
+floor below which it is the phone's bottom sheet instead.
 
 What the destination ends up with is the whole point of the arithmetic, so the
 harness measures that rather than trusting it: on a board with a journey slot at
@@ -1280,6 +1327,40 @@ seen twice". The filter there is stricter about an ambiguous match than this is,
 and for a good reason: it is deciding whether to hide a departure, while this is
 deciding what to print on one that is staying either way.
 
+**** Four reasons a sheet has no calls, and one sentence each
+
+"Where this run goes after here is not published for it" used to be the answer
+to every one of these, which made a real fault indistinguishable from an
+ordinary gap in the data, and it hid one for months. So each cause now says what
+it is, because the reader holding the phone is the only person who can tell
+which one they are looking at.
+
+The aggregator lists no stop times at this stop at all. The aggregator lists
+them and none of them is this departure. The run was identified and no stop
+sequence is published for it. Or a request did not arrive, which says nothing
+about the run: that one is retried once before it is believed, kept only for an
+interval named in =src/page/calls.ts= rather than for the life of the page, and
+asked again after it rather than on every render.
+
+The fault the fourth sentence uncovered was none of those. A station whose
+parent identifier the aggregator does not carry answers 404 for it, and the
+departures path threw on that 404 before it reached the fan-out over the
+station's platforms that exists precisely for this case: the fan-out sat behind
+a check for an EMPTY list, and a stop that 404s never produces one. Every row of
+every board at such a station therefore had no onward calls, no aggregator rows
+to filter a via clause against, and no timetable half beyond the live horizon,
+while the journey planner at the same station worked perfectly, because it asks
+the resolution chain directly and hands it the platforms the rows came from.
+Measured on the live configuration: thirty five of fifty two rows on one profile
+had no onward calls, and none do now.
+
+A 404 on the parent is therefore an answer rather than a failure, and the
+platforms the primary feed already named on this stop's rows are passed to the
+chain as hints, so the fan-out covers the platforms the board actually uses
+rather than whichever single one a reverse geocode happens to return. Anything
+that is not a 404 still fails, because a rate limit quietly turned into an empty
+board is a board that lies about the service.
+
 *** Nothing moves that did not change
 
 Skeleton rows are a promise that something is coming, and they are the right
@@ -1428,7 +1509,10 @@ and the rhythm was gone.
 
 Where a group's runs all end in the same place the header says so and nothing is
 repeated. Where they do not, every time carries a two or three letter badge and
-a legend under the group defines each one. The letters are the initials of up to
+the header itself is the legend: it names each destination with that
+destination's badge in front of it, so the group costs one line rather than two
+and the reader never has to look below the times to find out what a letter meant.
+The letters are the initials of up to
 three significant words of the destination, filler words dropped, and collisions
 are resolved by lengthening the first word rather than by adding a digit,
 because the extra letters still name a place. The colour comes from the
@@ -1436,6 +1520,37 @@ destination's alphabetical rank within the board, so it is stable across
 refreshes; how saturated and how light it is belongs to the stylesheet, which is
 the only thing that knows the colour scheme. A badge never borrows the line's own
 colour, because the line badge beside it already carries that.
+
+*** Which platform a strip group leaves from
+
+A platform is a property of the group far more often than it is a property of a
+departure. Ten trains on one line in one direction almost always leave from the
+same piece of concrete, and printing that number against every one of them is
+ten times the ink for one fact, on the row whose whole purpose is to be read at a
+glance.
+
+So the group carries it once, in the same corner badge a row uses, drawn neutral
+rather than by state because a group has no single state. The number is the most
+common platform among the group's times, and only a time that leaves from
+somewhere else is marked, beside its own time. A group whose feed publishes no
+platform at all gets no badge, which is the honest answer and not an empty box:
+the empty box belongs to a row, where the badge also carries the colour, and a
+group's badge carries nothing but the number.
+
+*** A platform the departure feed does not publish
+
+The primary backend leaves the platform blank for whole categories of service at
+some stations, most of them the surface ones, and the corner badge was then empty
+for every one of them. The aggregator had the number all along, on its own stop
+times row for the same run.
+
+So a row with no platform of its own borrows one: the aggregator's row matched to
+the same departure, and failing that the run's own record of this station. The
+borrowed number is kept apart from the feed's own, in its own field, because the
+two are not the same claim and only one of them is what the operator is saying
+right now. The page draws either, since a reader asking which platform does not
+care which service answered, but nothing downstream may mistake a borrowed number
+for a published one.
 
 ** Freshness, caching and installing
 
@@ -1591,6 +1706,49 @@ the reader nothing. The paid provider stays a button, because it spends the
 reader's money and sends the text to a third party, and neither is a thing to do
 on somebody's behalf. Its key lives in local storage on that device and nowhere
 else.
+
+*** One translation, shared between the browsers reading the page
+
+Every reader's browser used to translate the same dozen notices, and the ones
+using the paid provider paid for it each time. They are pooled now, through the
+planning server, which stores what any client produced and hands it to the next.
+The server never translates on the page's behalf from a key of the page's: the
+reader's own key stays in the reader's own browser, which is the rule that has
+never had an exception here. A server may hold a translation credential of its
+own, placed on that machine by hand, and then it translates a notice once for
+everybody; a server without one relays and nothing more. Either way the page
+behaves the same, and a page with no server at all, which is what the tailnet
+copy is, behaves exactly as it did before any of this existed.
+
+The identity of a notice is =src/message-hash.ts=: its text trimmed, every run
+of whitespace collapsed to one space, SHA-256, lowercase hex. Both ends import
+that one module, which is the point of it. Two implementations of the same rule,
+one of them in another process, agree until somebody edits one of them, and the
+symptom would be a cache that silently stops hitting. Normalising first is not
+cosmetic either: the two upstreams wrap a notice at different widths and disagree
+about the non-breaking space, and without it a feed that gained a trailing
+newline overnight would invalidate every translation anybody had paid for.
+
+The flow on the page is in =src/page/messages.ts=. When the notices arrive, every
+hash the panel is about to render is asked of the server in one request, and
+whatever comes back is written into the same IndexedDB cache the page's own
+translations live in and rendered before any local translation is attempted. What
+this client then produces, by the browser's translator or by the Gemini button,
+is offered back once per hash. What it received is never offered back: a received
+translation carries the kind of client that made it, and re-asserting somebody
+else's work under this page's name is exactly what the server's precedence rule
+exists to prevent. The lookup and the offer both go through the data source in
+=src/page/source.ts=, where the direct source implements them as finding nothing
+and offering nowhere, and they are deliberately not routed through the fallback
+that demotes the page off the server: a rate-limited translation offer says
+nothing about whether the server can still plan a journey, and losing the boards
+over one would be a poor trade.
+
+The line under a translation says where it came from: translated on this device,
+translated by another client with the kind of client after it, or translated by
+server. The reader's judgement of a translation depends on which: an on-device
+translator is a small model doing a hard job on a phone, and a notice full of
+line names and platform numbers is where it comes apart.
 
 ** Selections
 
@@ -1818,6 +1976,32 @@ hands the browser decoded bytes labelled as gzip, and every request through it
 dies with =ERR_CONTENT_DECODING_FAILED=, which the page sees as a network
 failure and responds to by falling back. The fix is one option; the lesson is
 that the check's own scaffolding is code too, and it had no tests.
+
+*** Checking that a translation is only paid for once
+
+=test/e2e/share.ts= is the other harness that needs a real planning server. It
+runs the page twice against one, with the browser storage cleared in between so
+the second run is a different reader rather than the same one looking at its own
+cache again, and it replaces the browser's Translator with one that counts its
+calls. The assertion is that the second reader's counter never moved and that
+the text on its screen is the first reader's. Counting rather than timing, on
+purpose: a page that translated the notice quickly and a page that was handed
+the translation look identical on screen, so a timing assertion here would pass
+for the wrong reason forever.
+
+A third pass points the page at a second planning server that has a translation
+credential, and asserts that no reader translates anything at all and that the
+credential was spent once rather than once per reader. Its translation endpoint
+is overridden to a loopback stand-in this harness serves itself. Nothing in this
+package may call a paid API from a test, and the alternative to a stand-in was
+leaving the tier that spends money as the one tier with no end-to-end check.
+
+It builds its own page directory into scratch space from the working tree,
+writes a fixture configuration into it, and serves the notices from a stand-in
+for the departure backend. The notices go through the stand-in rather than being
+injected into the browser because the server can only translate a notice it
+fetched itself: a fixture that exists only inside the page is a fixture the
+server has never seen.
 
 ** bun runs code it has not checked
 

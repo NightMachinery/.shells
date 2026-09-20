@@ -252,8 +252,10 @@ function updateChips(bar: BarView, context: BarContext): void {
     entry.next = rows.find((dep) => dep.realtime >= context.now && !dep.cancelled);
     setText(entry.title, compact(board.title));
     const label = chipLabel(board, entry.next, context);
-    if (entry.root.title !== label) {
-      entry.root.title = label;
+    if (entry.root.getAttribute('aria-label') !== label) {
+      // Not `title`: the chip already carries the page's own tooltip
+      // (`chipTip`, attached below), and a native bubble on top of it would
+      // draw the same answer twice.
       entry.root.setAttribute('aria-label', label);
     }
     entry.write();
@@ -397,7 +399,7 @@ function createBar(context: BarContext): BarView {
   const right = el('div', 'bar-right');
   const backend = el('span', 'bar-backend');
   const refreshWrap = el('div', 'refresh-wrap');
-  const control = button('refresh', undefined, 'refresh now');
+  const control = button('refresh');
   control.setAttribute('aria-label', 'refresh now');
   // The ring is the same element whether or not a fetch is running, so the
   // button does not change size when one starts. Only the spin class moves.
@@ -434,10 +436,12 @@ function createBar(context: BarContext): BarView {
   const select = document.createElement('select');
   select.className = 'destination-select';
   destinationWrap.append(select);
-  const sort = button('sort-arrival', 'by arrival', 'order commute rows by when they get you there, not when they leave');
+  const sort = button('sort-arrival', 'by arrival');
+  sort.setAttribute('aria-label', 'order commute rows by when they get you there, not when they leave');
 
   const startWrap = el('div', 'start');
-  const startNow = button('start-now', 'Now', 'show what is leaving from this moment');
+  const startNow = button('start-now', 'Now');
+  startNow.setAttribute('aria-label', 'show what is leaving from this moment');
   startWrap.append(startNow);
   const input = document.createElement('input');
   input.type = 'datetime-local';
@@ -446,7 +450,7 @@ function createBar(context: BarContext): BarView {
   const noteTime = timeSlot('start-note-time');
   const note = el('span', 'start-note');
   note.append(el('span', undefined, 'showing '), noteTime.node);
-  note.title = 'a timetable for the moment you picked. Nothing here is live.';
+  note.setAttribute('aria-label', 'a timetable for the moment you picked. Nothing here is live.');
 
   // Before the start-time control, which is wider and used far less often. The
   // controls row scrolls sideways on a phone, so what comes first is what a
@@ -563,11 +567,14 @@ function updateTabs(bar: BarView, context: BarContext): void {
     bar.tabButtons = new Map();
     const nodes = context.config.profiles.map((profile, index) => {
       const tab = button('tab');
-      // The name a screen reader reads is the full one whatever is drawn, and
-      // the tooltip carries it too, because the short form is an abbreviation
-      // this page invented and nobody else uses.
+      // The name a screen reader reads is the full one whatever is drawn,
+      // because the short form is an abbreviation this page invented and
+      // nobody else uses. Not `title`: it would draw the browser's own
+      // tooltip beside nothing, since a tab carries no custom one. The press
+      // number is a keyboard shortcut, not part of the tab's name, so it goes
+      // on the ARIA property built for exactly that rather than into the label.
       tab.setAttribute('aria-label', profile.title);
-      tab.title = index < 9 ? `${profile.title} (press ${index + 1})` : profile.title;
+      if (index < 9) tab.setAttribute('aria-keyshortcuts', String(index + 1));
       tab.addEventListener('click', () => bar.context.onProfile(profile.key));
       bar.tabButtons.set(profile.key, tab);
       return tab;
@@ -595,10 +602,12 @@ function updateBar(bar: BarView, context: BarContext): void {
   setPresent(bar.right, bar.backend, context.backends.length > 0, bar.refreshWrap);
   if (context.backends.length > 0) {
     setText(bar.backend, context.backends.join(' + '));
-    bar.backend.title =
+    bar.backend.setAttribute(
+      'aria-label',
       (context.backends.length === 1
         ? `every board here was answered by ${context.backends[0]}`
-        : 'two sources answered: the live one for the near window and the timetable for the rest') + `\n${buildLabel()}`;
+        : 'two sources answered: the live one for the near window and the timetable for the rest') + `. ${buildLabel()}`,
+    );
   }
   setClass(bar.ring, 'spinning', context.state.inFlight > 0 || context.state.planInFlight > 0);
   bar.writeAge();

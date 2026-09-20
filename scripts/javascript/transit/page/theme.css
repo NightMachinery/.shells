@@ -140,6 +140,22 @@ body {
   padding: 0 16px 28px;
 }
 
+/* Past the width where the tab bar already spells the profile name out in
+   full (see the bar's own wide-screen rule), the blank margins either side
+   of the column are wider than the column itself. The column grows to use
+   some of that: a board's rows keep their own fixed-width slots and do not
+   become a grid of boards side by side, but a strip group gets the extra
+   width to lay more of its times on one line before it wraps, and the
+   journey slot on a row (the one column here sized as a fraction) gets more
+   room for the exit name it was truncating. Gated behind a floor rather than
+   scaling continuously with the viewport, so an ordinary laptop window is
+   unaffected and only a genuinely wide one grows the column. */
+@media (min-width: 900px) {
+  #app {
+    max-width: 1100px;
+  }
+}
+
 button {
   font: inherit;
   color: inherit;
@@ -147,6 +163,22 @@ button {
   border: none;
   padding: 0;
   cursor: pointer;
+}
+
+/* Read by a screen reader and drawn nowhere: what used to be the extra
+   sentence in a native `title`, for an element whose visible text is already
+   its own short label. Off the layout entirely rather than `display: none`,
+   which assistive tech skips along with the pixels. */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }
 
 .badge {
@@ -175,7 +207,11 @@ button {
    because it explains something the reader is still looking at. */
 .tip {
   z-index: 40;
-  max-width: min(24rem, calc(100vw - 16px));
+  /* 480px: wide enough for a journey's legs to read as prose rather than as a
+     column of fragments, and still an anchored popover rather than a second
+     board-width panel. See `SHEET_MAX_WIDTH_PX` in src/page/tip.ts for the
+     viewport floor below which this becomes the bottom sheet instead. */
+  max-width: min(30rem, calc(100vw - 16px));
   overflow: auto;
   overscroll-behavior: contain;
   background: var(--card);

@@ -30,6 +30,16 @@ export interface Backend {
  */
 export interface DepartureOptions {
   transportTypes?: readonly Mode[];
+  /**
+   * Platform identifiers the caller has already seen departures from at this
+   * stop, most used first.
+   *
+   * A hint rather than a request: a backend that can answer for the stop itself
+   * ignores it. It exists for the one that cannot, where the rows hang off the
+   * platforms and the only way to know which platforms those are is to have
+   * seen a row from each. See the origin resolution chain.
+   */
+  platformIds?: readonly string[];
 }
 
 /**

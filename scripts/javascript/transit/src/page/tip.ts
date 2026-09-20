@@ -187,7 +187,7 @@ export function showTip(target: HTMLElement, build: () => HTMLElement, options: 
   if (sheet) {
     // Top right, and drawn over the content rather than above it, so the first
     // line of the explanation is still the first thing under the reader's eye.
-    const shut = button('tip-close', undefined, 'close');
+    const shut = button('tip-close');
     shut.append(icon('close'));
     shut.setAttribute('aria-label', 'close');
     shut.addEventListener('click', () => closeTip());
@@ -277,11 +277,10 @@ function rebindTip(target: HTMLElement, build: () => HTMLElement, options: TipOp
 export function attachTip(target: HTMLElement, build: () => HTMLElement, options: TipOptions = {}): void {
   const hovers = options.hoverOpens !== false;
   if (options.label !== undefined) {
+    // Not `title`: the browser's own yellow bubble would draw on top of the
+    // custom tip below, duplicating the same explanation. `aria-label` keeps
+    // the label reaching a screen reader without the page drawing it itself.
     target.setAttribute('aria-label', options.label);
-    // Kept as well as the tip, not instead of it: a reader who has hovered for
-    // the browser's own tooltip delay should not be left with nothing on a
-    // browser where the pointer events below did not fire.
-    target.title = options.label;
   }
 
   rebindTip(target, build, options);

@@ -10,7 +10,7 @@ import {
 import { DEFAULT_PLAN_MODES, DEFAULT_TARGET_MAX_WALK_MINUTES, DEFAULT_WALK_WEIGHT } from './config.ts';
 import { normaliseLine, type WalkSource } from './filter.ts';
 import { sameDestinationLabel, samePlatformLabel } from './label.ts';
-import { resolveOrigin, stopCoordinate, type OriginCache, type OriginLevel, type ResolvedOrigin } from './origin.ts';
+import { platformIdsOf, resolveOrigin, stopCoordinate, type OriginCache, type OriginLevel, type ResolvedOrigin } from './origin.ts';
 // The import back the other way is types only, so this pair is a cycle on
 // paper and not at run time: neither module reads the other while it is being
 // evaluated. Keeping the rule in `targets.ts` is the point, because that is
@@ -587,24 +587,6 @@ export function clearPlanCache(): void {
   resetInflight();
 }
 
-/**
- * The platform identifiers this board's own rows depart from, most used first.
- *
- * Ordering by count matters: a journey plan is asked from one place, and the
- * platform most of the board's departures leave from is the one most of its
- * journeys start at. Rows that carry no platform identifier contribute nothing
- * rather than a guess.
- */
-function platformsOf(rows: Departure[]): string[] {
-  const counts = new Map<string, number>();
-  for (const row of rows) {
-    const id = row.stopPoint;
-    if (id === undefined || id.length === 0) continue;
-    counts.set(id, (counts.get(id) ?? 0) + 1);
-  }
-  return [...counts.entries()].sort((a, b) => b[1] - a[1]).map(([id]) => id);
-}
-
 function placeParam(place: PlanDestination): string {
   return 'id' in place ? toAggregatorId(place.id) : `${place.lat},${place.lon}`;
 }
@@ -1147,7 +1129,7 @@ export async function planBoard(options: PlanBoardOptions): Promise<PlannedRow[]
   // small request the first time a stop is planned and nothing afterwards.
   const resolved = await resolveOrigin({
     stop: options.stop,
-    platformIds: platformsOf(rows),
+    platformIds: platformIdsOf(rows),
     baseUrl: options.baseUrl,
     ...(options.fetchImpl === undefined ? {} : { fetchImpl: options.fetchImpl }),
     ...(options.originCache === undefined ? {} : { cache: options.originCache }),

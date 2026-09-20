@@ -20,13 +20,34 @@ import type { Departure } from '../model.ts';
 import { callsAfter, tripCalls, type TripCall, type TripOptions } from '../trip.ts';
 import { matchTrips } from '../via.ts';
 
+/**
+ * Why a run's onward calls are not on screen.
+ *
+ * One sentence per cause, because "not published" was covering four different
+ * faults and a reader holding a phone could not tell which. Measured on the
+ * live configuration: every row of two boards at one station said "not
+ * published" for months, and the cause was none of the things that sentence
+ * suggests. It was the aggregator answering 404 for the station's parent
+ * identifier, which the fan-out over its platforms already knew how to handle
+ * and never got the chance to, because the 404 threw first.
+ */
+export type CallsGap =
+  /** The aggregator lists no stop times at this stop at all. */
+  | 'no-stop-times'
+  /** It lists stop times, and none of them is this departure. */
+  | 'no-match'
+  /** The run was identified and the aggregator publishes no sequence for it. */
+  | 'no-sequence'
+  /** A request failed. Says nothing about the run; it will be asked again. */
+  | 'unreachable';
+
 /** What is known about one row's onward calls. */
 export type Calls =
   | { kind: 'loading' }
   /** The calls still ahead of this departure, in order, possibly none. */
   | { kind: 'ready'; calls: TripCall[] }
   /** Nothing identified the run, or the aggregator would not say. */
-  | { kind: 'unknown' };
+  | { kind: 'unknown'; gap: CallsGap };
 
 /** Where the onward calls come from, and who to tell when one lands. */
 export interface CallsSource extends TripOptions {
@@ -42,6 +63,21 @@ export interface CallsSource extends TripOptions {
 }
 
 const known = new Map<string, Calls>();
+/**
+ * When a key that failed on the network may be asked again.
+ *
+ * An unidentifiable run is unidentifiable for good and is remembered for the
+ * life of the page, which is the whole reason this module has a memo. A request
+ * that never arrived is a different thing: it says nothing about the run, and
+ * marking it unknowable for ever means a reader who was on a train in a tunnel
+ * when they first opened the sheet is told for the rest of the day that the
+ * timetable does not exist. So a network failure is remembered too, but with an
+ * expiry, and re-asking is capped by the clock rather than by the render loop.
+ */
+const retryAt = new Map<string, number>();
+
+/** How long a failed lookup is left alone before anything asks again. */
+export const CALLS_RETRY_MS = 30_000;
 const expanded = new Set<string>();
 let source: CallsSource | null = null;
 let waking = false;
@@ -78,6 +114,7 @@ export function configureCalls(next: CallsSource): void {
 /** Forget everything, for a test that wants a fresh page. */
 export function clearCalls(): void {
   known.clear();
+  retryAt.clear();
   expanded.clear();
   source = null;
 }
@@ -98,28 +135,56 @@ function wake(): void {
   });
 }
 
+/**
+ * Run a request, and run it a second time if the first failed.
+ *
+ * One retry, not a policy: a single timeout or a single rate-limited response
+ * is the common case and costs one more request to survive, and anything that
+ * fails twice in a row is a condition rather than a blip.
+ */
+async function onceMore<T>(attempt: () => Promise<T>): Promise<T> {
+  try {
+    return await attempt();
+  } catch {
+    return attempt();
+  }
+}
+
 async function load(key: string, dep: Departure, from: CallsSource): Promise<void> {
   const settle = (value: Calls): void => {
     known.set(key, value);
+    if (value.kind === 'unknown' && value.gap === 'unreachable') retryAt.set(key, Date.now() + CALLS_RETRY_MS);
+    else retryAt.delete(key);
     version += 1;
     wake();
   };
-  try {
-    let tripId = dep.tripId;
-    if (tripId === undefined) {
-      // Several candidates means the two feeds published one train under two
-      // route names, which is the case this was written for; their sequences are
-      // the same sequence. `applyVia` is stricter because it is deciding whether
-      // to hide a row, and this is only deciding what to print on one.
-      tripId = matchTrips(dep, await from.rows(dep.stop))[0];
+  let tripId = dep.tripId;
+  if (tripId === undefined) {
+    let rows: Departure[];
+    try {
+      rows = await onceMore(() => from.rows(dep.stop));
+    } catch {
+      return settle({ kind: 'unknown', gap: 'unreachable' });
     }
-    if (tripId === undefined) return settle({ kind: 'unknown' });
-    const calls = await tripCalls(tripId, from);
-    if (calls.length === 0) return settle({ kind: 'unknown' });
-    settle({ kind: 'ready', calls: callsAfter(calls, dep.stop, dep.planned) });
-  } catch {
-    settle({ kind: 'unknown' });
+    // A stop the aggregator does not carry at all is a different fault from a
+    // stop it carries and where this run is not listed, and only the second one
+    // is about this departure.
+    if (rows.length === 0) return settle({ kind: 'unknown', gap: 'no-stop-times' });
+    // Several candidates means the two feeds published one train under two
+    // route names, which is the case this was written for; their sequences are
+    // the same sequence. `applyVia` is stricter because it is deciding whether
+    // to hide a row, and this is only deciding what to print on one.
+    tripId = matchTrips(dep, rows)[0];
+    if (tripId === undefined) return settle({ kind: 'unknown', gap: 'no-match' });
   }
+  let calls: TripCall[];
+  try {
+    calls = await onceMore(() => tripCalls(tripId, from));
+  } catch {
+    return settle({ kind: 'unknown', gap: 'unreachable' });
+  }
+  if (calls.length === 0) return settle({ kind: 'unknown', gap: 'no-sequence' });
+  settle({ kind: 'ready', calls: callsAfter(calls, dep.stop, dep.planned) });
 }
 
 /**
@@ -132,10 +197,12 @@ async function load(key: string, dep: Departure, from: CallsSource): Promise<voi
  */
 export function onwardCalls(key: string, dep: Departure): Calls {
   const hit = known.get(key);
-  if (hit !== undefined) return hit;
+  const due = retryAt.get(key);
+  if (hit !== undefined && (due === undefined || Date.now() < due)) return hit;
   const from = source;
-  if (from === null) return { kind: 'unknown' };
+  if (from === null) return { kind: 'unknown', gap: 'unreachable' };
   known.set(key, { kind: 'loading' });
+  retryAt.delete(key);
   void load(key, dep, from);
   return { kind: 'loading' };
 }

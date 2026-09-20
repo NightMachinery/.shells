@@ -1,5 +1,5 @@
 import { toAggregatorId, TRANSITOUS_DEFAULT_BASE_URL } from '../aggregator.ts';
-import { envOverride, fetchJson, type FetchLike } from '../http.ts';
+import { envOverride, fetchJson, HttpError, type FetchLike } from '../http.ts';
 import { departureIds, resolveOrigin } from '../origin.ts';
 import { ALL_MODES, type Departure, type Direction, type Message, type Mode, type StopHit } from '../model.ts';
 import {
@@ -171,9 +171,17 @@ export function createTransitousBackend(options: TransitousOptions = {}): Backen
    * and the journey planner agree on what a stop is called here; a coordinate
    * is dropped, because stop times cannot be asked for at one.
    */
-  async function resolveChildren(stop: string): Promise<string[]> {
+  async function resolveChildren(stop: string, platformIds: readonly string[]): Promise<string[]> {
     const resolved = await resolveOrigin({
       stop,
+      // The platforms the primary backend already named on this stop's own
+      // rows. Without them the chain falls through to the coordinate step,
+      // whose reverse geocode answers with whatever one identifier sits at that
+      // point, and a fan-out over one platform is a fan-out that misses every
+      // line departing from the others. Measured at a four-platform tram and
+      // bus stop: the coordinate step offered one platform, the rows needed
+      // four, and three quarters of the board's runs stayed unidentifiable.
+      ...(platformIds.length === 0 ? {} : { platformIds: [...platformIds] }),
       baseUrl,
       ...(fetchImpl === undefined ? {} : { fetchImpl }),
       ...(lookupCache === undefined ? {} : { cache: lookupCache }),
@@ -322,7 +330,23 @@ export function createTransitousBackend(options: TransitousOptions = {}): Backen
       };
 
       const aggregatorId = toAggregatorId(stop);
-      let rows = await fetchStopRows(aggregatorId, window, stop, report);
+      // A parent identifier this feed has never heard of answers 404, and a 404
+      // is not a failure here: it is the answer "no such stop", which is
+      // precisely the case the fan-out below exists for. Letting it throw was
+      // the bug: the fan-out sat behind a check for an EMPTY list and a stop
+      // that 404s never produces one, so a whole station's rows, its onward
+      // calls and its via filtering were all lost to an exception that meant
+      // "ask the platforms instead". Anything else still throws, because a rate
+      // limit or a gateway error quietly turned into an empty board is a board
+      // that lies about the service.
+      let rows: Departure[];
+      try {
+        rows = await fetchStopRows(aggregatorId, window, stop, report);
+      } catch (error) {
+        if (!(error instanceof HttpError) || error.status !== 404) throw error;
+        debug?.(`transitous ${aggregatorId} is not a stop here; asking its platforms`);
+        rows = [];
+      }
 
       // Some parent stops carry no departures of their own, and some are not
       // stops here at all; either way the rows hang off the platforms beneath
@@ -330,7 +354,7 @@ export function createTransitousBackend(options: TransitousOptions = {}): Backen
       // are, then this fans out over all of them and merges, because one
       // platform's stop times are not the whole stop's.
       if (rows.length === 0) {
-        const children = await resolveChildren(stop);
+        const children = await resolveChildren(stop, call?.platformIds ?? []);
         const merged: Departure[] = [];
         const seen = new Set<string>();
         for (const child of children) {

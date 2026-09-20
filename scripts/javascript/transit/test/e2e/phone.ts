@@ -166,6 +166,26 @@ export function buildConfig(): ExportedConfig {
             connection: null,
           },
           {
+            // The strip's platform rule needs a group with many times, most of
+            // them from one platform. It shares stop 1 with the boards above so
+            // it costs no extra request, and it plans nowhere, which is what
+            // makes it render as a strip and not as rows: ten more rows in a
+            // full board would move which row the sheet assertions open.
+            title: 'Nordweg U9',
+            stops: ['de:00000:1'],
+            modes: null,
+            lines: ['U9'],
+            direction: null,
+            via: null,
+            destinations: null,
+            walk_minutes: 3,
+            walk_minutes_by_stop: null,
+            stop_labels: null,
+            commute: false,
+            destination: null,
+            connection: null,
+          },
+          {
             title: 'Talbogen',
             stops: ['de:00000:2'],
             modes: null,
@@ -966,6 +986,185 @@ async function main(): Promise<void> {
       badge.gridMismatch === '' ? 'every row has exactly one track per placed child' : badge.gridMismatch,
     );
 
+    // -------------------------------------------- native tooltips, removed
+
+    // The page draws its own tooltip (see tip.ts) and used to leave the
+    // browser's native `title` bubble on every element that also carried one,
+    // so a reader hovering a row or a strip time saw both at once. `title` is
+    // now only kept where nothing else already explains the element: a form
+    // field's own `title`, and the strip's direction header, which the reader
+    // asked to keep because the direction code has no other home.
+    const titleAudit = await io.evalJs<{ checked: number; offenders: string[] }>(`(() => {
+      const roots = [...document.querySelectorAll('.board'), document.querySelector('.bar')].filter((node) => node !== null);
+      const offenders = [];
+      let checked = 0;
+      for (const root of roots) {
+        for (const node of [root, ...root.querySelectorAll('*')]) {
+          checked += 1;
+          if (!node.hasAttribute('title')) continue;
+          const tag = node.tagName.toLowerCase();
+          if (tag === 'input' || tag === 'select' || tag === 'textarea') continue;
+          if (node.matches('.strip .direction')) continue;
+          offenders.push(tag + (node.className ? '.' + String(node.className).replace(/\\s+/g, '.') : ''));
+        }
+      }
+      return { checked, offenders };
+    })()`);
+    record(
+      'no element inside a board or the sticky bar carries a native title, except form fields and the strip header',
+      titleAudit.checked > 0 && titleAudit.offenders.length === 0,
+      `checked ${titleAudit.checked} elements` +
+        (titleAudit.offenders.length === 0 ? '' : `; offenders: ${titleAudit.offenders.slice(0, 5).join(', ')}`),
+    );
+
+    // The removed native tooltip's text still has to reach a screen reader.
+    // The strip's per-time cells are the clearest surviving case: each one is
+    // `attachTip`'s target and the only thing there is to tap (the group
+    // header above it opens nothing), so its `aria-label` is what carries the
+    // departure's own summary now that nothing paints it as a `title`.
+    const tipLabelAudit = await io.evalJs<{ count: number; missing: number }>(`(() => {
+      const cells = [...document.querySelectorAll('.strip .time')];
+      const missing = cells.filter((cell) => (cell.getAttribute('aria-label') ?? '').trim().length === 0).length;
+      return { count: cells.length, missing };
+    })()`);
+    record(
+      "attachTip's row tap targets still carry a non-empty aria-label",
+      tipLabelAudit.count > 0 && tipLabelAudit.missing === 0,
+      `${tipLabelAudit.count - tipLabelAudit.missing} of ${tipLabelAudit.count} strip time cells carry aria-label`,
+    );
+
+    // --------------------------------------- the strip legend becomes the header
+
+    // A branching strip group used to draw its destinations twice: once in the
+    // header ("S6 → Nordweg Ost / Südhang") and once more underneath in a
+    // `.strip-legend` line that said which badge meant which name. The badge now
+    // sits in the header itself, in front of the name it belongs to, so the
+    // second line never renders and a multi-destination group is not taller
+    // than a single-destination one.
+    const TOLERANCE_PX = 6;
+    const stripMerge = await io.evalJs<{
+      legendCount: number;
+      found: boolean;
+      headerBadges: number;
+      timeDistinctBadges: number;
+      multiHeight: number;
+      singleFound: boolean;
+      singleHeight: number;
+      multiText: string;
+      singleText: string;
+    }>(`(() => {
+      const legendCount = document.querySelectorAll('.strip-legend').length;
+      const strips = [...document.querySelectorAll('.strip')];
+      let multi = null;
+      let single = null;
+      for (const strip of strips) {
+        const headerBadges = strip.querySelectorAll(':scope .direction .dest-badge').length;
+        const hasDirection = strip.querySelector(':scope .direction') !== null;
+        if (headerBadges > 1 && multi === null) multi = strip;
+        if (headerBadges === 0 && hasDirection && single === null) single = strip;
+      }
+      if (multi === null) {
+        return {
+          legendCount, found: false, headerBadges: 0, timeDistinctBadges: 0, multiHeight: 0,
+          singleFound: single !== null, singleHeight: single ? single.offsetHeight : 0, multiText: '', singleText: '',
+        };
+      }
+      const headerBadges = multi.querySelectorAll(':scope .direction .dest-badge').length;
+      const timeDistinctBadges = new Set([...multi.querySelectorAll(':scope .times-strip .dest-badge')].map((b) => b.textContent)).size;
+      return {
+        legendCount,
+        found: true,
+        headerBadges,
+        timeDistinctBadges,
+        multiHeight: multi.offsetHeight,
+        singleFound: single !== null,
+        singleHeight: single ? single.offsetHeight : 0,
+        multiText: multi.querySelector(':scope .direction')?.textContent ?? '',
+        singleText: single ? (single.querySelector(':scope .direction')?.textContent ?? '') : '',
+      };
+    })()`);
+    record(
+      'no .strip-legend element renders anywhere on the page',
+      stripMerge.legendCount === 0,
+      `found ${stripMerge.legendCount} .strip-legend elements`,
+    );
+    record(
+      "a multi-destination strip header carries exactly one badge per destination it names",
+      stripMerge.found && stripMerge.headerBadges > 1 && stripMerge.headerBadges === stripMerge.timeDistinctBadges,
+      `header="${stripMerge.multiText}" headerBadges=${stripMerge.headerBadges} distinctDestinationsAmongTimes=${stripMerge.timeDistinctBadges}`,
+    );
+    record(
+      'a multi-destination strip group is no taller than a single-destination one, plus a small tolerance',
+      stripMerge.found &&
+        stripMerge.singleFound &&
+        stripMerge.multiHeight > 0 &&
+        stripMerge.multiHeight <= stripMerge.singleHeight + TOLERANCE_PX,
+      `multi="${stripMerge.multiText}" height=${stripMerge.multiHeight}px; single="${stripMerge.singleText}" height=${stripMerge.singleHeight}px; tolerance=${TOLERANCE_PX}px`,
+    );
+
+    // ------------------------------------ the platform a strip group leaves from
+
+    // A platform belongs to the group, not to each time in it. The fixture's U9
+    // group has ten departures: nine leave from platform 2 and one from 5, and
+    // one of the nine is a departure the primary feed publishes NO platform for
+    // at all, whose track only the aggregator's row for the same run carries. So
+    // the group should say "2" once, in its corner, and exactly one time in it
+    // should be marked, the one that is not going from there.
+    const stripPlatform = await io.evalJs<{
+      found: boolean;
+      times: number;
+      badge: string;
+      badges: number;
+      marked: string[];
+    }>(`(() => {
+      const strips = [...document.querySelectorAll('.strip')];
+      const group = strips.find((strip) => strip.textContent.includes('U9'));
+      if (group === undefined) return { found: false, times: 0, badge: '', badges: 0, marked: [] };
+      const corner = group.querySelectorAll(':scope .strip-platform');
+      const marked = [...group.querySelectorAll(':scope .times-strip .time')]
+        .filter((cell) => cell.querySelector(':scope .time-note') !== null)
+        .map((cell) => cell.textContent.replace(/\s+/g, ' ').trim());
+      return {
+        found: true,
+        times: group.querySelectorAll(':scope .times-strip .time').length,
+        badge: corner.length === 0 ? '' : (corner[0].textContent ?? ''),
+        badges: corner.length,
+        marked,
+      };
+    })()`);
+    record(
+      'a strip group says which platform it leaves from, once, in its corner',
+      stripPlatform.found && stripPlatform.badges === 1 && stripPlatform.badge === '2' && stripPlatform.times === 10,
+      `${stripPlatform.times} times, ${stripPlatform.badges} corner badge(s) reading "${stripPlatform.badge}"`,
+    );
+    record(
+      'only the time that leaves from somewhere else is marked',
+      stripPlatform.marked.length === 1 && stripPlatform.marked[0]?.includes('pl 5') === true,
+      `${stripPlatform.marked.length} marked time(s): ${JSON.stringify(stripPlatform.marked)}`,
+    );
+
+    // The badge the primary feed could not fill. Its row's corner used to be
+    // empty for a whole category of service at some stations; the aggregator's
+    // own row for the same run had the track all along.
+    const borrowed = await io.evalJs<{ found: boolean; text: string; empty: boolean }>(`(() => {
+      const row = [...document.querySelectorAll('li.row')].find((node) => {
+        const badge = node.querySelector(':scope .badge');
+        return badge !== null && badge.textContent.trim() === 'S8';
+      });
+      if (row === undefined) return { found: false, text: '', empty: false };
+      const mark = row.querySelector(':scope .platform');
+      return {
+        found: true,
+        text: mark === null ? '' : (mark.textContent ?? '').trim(),
+        empty: mark !== null && mark.classList.contains('platform-empty'),
+      };
+    })()`);
+    record(
+      'a row whose own feed published no platform borrows one rather than showing an empty corner',
+      borrowed.found && borrowed.text === '2' && !borrowed.empty,
+      `S8 row corner badge reads "${borrowed.text}"${borrowed.empty ? ' (still marked empty)' : ''}`,
+    );
+
     // ------------------------------------------- the countdown column's width
 
     // The column used to be budgeted for the widest form the headline has, an
@@ -1559,6 +1758,72 @@ async function main(): Promise<void> {
       'a wide screen spells the profile out, and a narrow one goes back to the short form',
       wideTabs[0] === '\u{1f3e0} Zuhause' && narrowAgain[0] === '\u{1f3e0} ZH',
       `at 900px ${JSON.stringify(wideTabs)}, back at 390px ${JSON.stringify(narrowAgain)}`,
+    );
+
+    // --------------------------------------------------- desktop 1440px layout
+
+    // The wide-screen decision: past 900px (the same floor the column's own
+    // media query and the check above both use) the column grows toward
+    // 1100px. Boards keep their single-column rows; what actually gets wider
+    // is the strip group, which should lay more of the fixture's U9 times on
+    // one line before it wraps. 1440px is comfortably past that floor. The
+    // metrics go back to the phone viewport immediately, before any of this
+    // run's other assertions.
+    await cdp.send('Emulation.setDeviceMetricsOverride', { width: 1440, height: 900, deviceScaleFactor: 2, mobile: false });
+    await sleep(250);
+    const wide1440 = await io.evalJs<{
+      barTops: number[];
+      barScroll: number;
+      barClient: number;
+      appWidth: number;
+      scrollWidth: number;
+      clientWidth: number;
+      u9Times: number;
+      u9Tops: number[];
+    }>(`(() => {
+      const barTop = document.querySelector('.bar-top');
+      const barTops = barTop ? [...barTop.children].map((node) => Math.round(node.getBoundingClientRect().top)) : [];
+      const app = document.querySelector('#app');
+      const strips = [...document.querySelectorAll('.strip')];
+      const group = strips.find((strip) => strip.textContent.includes('U9'));
+      const u9Cells = group ? [...group.querySelectorAll(':scope .times-strip .time')] : [];
+      return {
+        barTops,
+        barScroll: barTop ? barTop.scrollWidth : 0,
+        barClient: barTop ? barTop.clientWidth : 0,
+        appWidth: app ? app.getBoundingClientRect().width : 0,
+        scrollWidth: document.documentElement.scrollWidth,
+        clientWidth: document.documentElement.clientWidth,
+        u9Times: u9Cells.length,
+        u9Tops: u9Cells.map((cell) => Math.round(cell.getBoundingClientRect().top)),
+      };
+    })()`);
+    await cdp.send('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 3, mobile: true });
+    await sleep(250);
+
+    // `.bar-top` is a flex row with the default nowrap, so its two children
+    // (the tabs and the refresh control) cannot wrap onto a second line no
+    // matter the width; what a wide screen could do instead is force a
+    // horizontal scrollbar, which the scrollWidth/clientWidth comparison
+    // catches. The tops are compared with a small tolerance rather than
+    // exactly, because two different element types (a `nav` and a `div`)
+    // centred by `align-items: center` can land a rounded pixel apart even
+    // sitting on the same visual line.
+    const barTopSpread = wide1440.barTops.length > 0 ? Math.max(...wide1440.barTops) - Math.min(...wide1440.barTops) : Infinity;
+    record(
+      'the sticky bar is on one line at 1440px',
+      wide1440.barTops.length > 0 && barTopSpread <= 2 && wide1440.barScroll <= wide1440.barClient + 1,
+      `bar-top child tops ${JSON.stringify(wide1440.barTops)} (spread ${barTopSpread}px); scrollWidth=${wide1440.barScroll} clientWidth=${wide1440.barClient}`,
+    );
+    record(
+      "the U9 strip group's ten times occupy a single line at 1440px, no wrap",
+      wide1440.u9Times === 10 && new Set(wide1440.u9Tops).size === 1,
+      `${wide1440.u9Times} times at tops ${JSON.stringify(wide1440.u9Tops)}`,
+    );
+    record(
+      'no horizontal overflow at 1440px, and the content column widened past 640px but stayed near the 1100px cap',
+      wide1440.scrollWidth <= wide1440.clientWidth && wide1440.appWidth > 640 && wide1440.appWidth <= 1100,
+      `document scrollWidth=${wide1440.scrollWidth} clientWidth=${wide1440.clientWidth}; #app width=${wide1440.appWidth.toFixed(1)}px`,
     );
 
     // ------------------------------------------------------------ assertion 6

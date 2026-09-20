@@ -76,7 +76,10 @@ export function dayMarker(epochMs: number, referenceMs: number, timezone: string
   const offset = dayOffset(epochMs, referenceMs, timezone);
   if (offset <= 0) return null;
   const node = el('sup', 'day-marker', `+${offset}`);
-  node.title = offset === 1 ? 'the next day' : `${offset} days later`;
+  // Not `title`: this sits inside a row or a strip time, both of which already
+  // carry the page's own custom tooltip, and a native bubble on top of it would
+  // repeat the same answer.
+  node.setAttribute('aria-label', offset === 1 ? 'the next day' : `${offset} days later`);
   return node;
 }
 

@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, test } from 'bun:test';
-import { applyVia, matchTrips } from '../src/via.ts';
+import { applyVia, matchRows, matchTrips } from '../src/via.ts';
 import { callsAfter, callsAtAfter, clearTripCache, departureFrom, parseTrip, stationOf } from '../src/trip.ts';
 import type { Departure } from '../src/model.ts';
 import { mockFetch } from './helpers.ts';
@@ -233,6 +233,25 @@ describe('recognising one run in two feeds', () => {
       aggRow({ line: 'RB68', destination: 'Weitental', platform: '4', planned: AT + 480_000, realtime: AT + 480_000, tripId: 'shifted' }),
     ]);
     expect(found).toEqual(['shifted']);
+  });
+
+  test('the same rule answers with the rows themselves, for a field to borrow', () => {
+    // A row whose own feed published no platform, and the aggregator's row for
+    // the same run, which did. `matchRows` differs from `matchTrips` only in
+    // what it hands back, so a borrowed platform can never come from a run the
+    // stricter question would have refused to identify.
+    const mine = row({ platform: null });
+    const theirs = aggRow({ planned: AT, realtime: AT, platform: '2', tripId: 'right' });
+    expect(matchRows(mine, [theirs, aggRow({ planned: AT + 300_000, realtime: AT + 300_000, platform: '9' })])).toEqual([theirs]);
+    expect(matchTrips(mine, [theirs])).toEqual(['right']);
+  });
+
+  test('a row with no identifier still counts when rows rather than runs are wanted', () => {
+    // `matchTrips` never saw such a candidate, because a run with no identifier
+    // is not a run it can name. A platform does not depend on one.
+    const theirs = aggRow({ planned: AT, realtime: AT, platform: '5' });
+    expect(matchRows(row({ platform: null }), [theirs])).toEqual([theirs]);
+    expect(matchTrips(row({ platform: null }), [theirs])).toEqual([]);
   });
 
   test('two runs of one line at one platform identify nothing', () => {

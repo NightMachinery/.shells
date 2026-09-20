@@ -19,6 +19,46 @@
       "directionId": 1,
       "cancelled": false,
       "tripId": "trip-re72-e2e"
+    },
+    {
+      "_comment": "The same S8 the primary feed publishes with an empty platform. It is here so the page can borrow the track from this row, which is the only feed that names one.",
+      "place": {
+        "name": "Nordweg",
+        "stopId": "de-DELFI_de:00000:1:2:2",
+        "track": "2",
+        "scheduledTrack": "2",
+        "departureOffsetMin": 10,
+        "scheduledDepartureOffsetMin": 9
+      },
+      "mode": "METRO",
+      "realTime": true,
+      "headsign": "Talbogen",
+      "agencyName": "S-Bahn",
+      "routeShortName": "S8",
+      "routeColor": "007a33",
+      "directionId": 0,
+      "cancelled": false,
+      "tripId": "trip-s8-e2e"
+    },
+    {
+      "_comment": "The one U9 the primary feed publishes with an empty platform. Its track is here and nowhere else, which is what the borrowing rule is for.",
+      "place": {
+        "name": "Nordweg",
+        "stopId": "de-DELFI_de:00000:1:2:2",
+        "track": "2",
+        "scheduledTrack": "2",
+        "departureOffsetMin": 67,
+        "scheduledDepartureOffsetMin": 67
+      },
+      "mode": "SUBWAY",
+      "realTime": true,
+      "headsign": "Talbogen",
+      "agencyName": "U-Bahn",
+      "routeShortName": "U9",
+      "routeColor": "996633",
+      "directionId": 0,
+      "cancelled": false,
+      "tripId": "trip-u9-e2e"
     }
   ],
   "nextPageCursor": "",

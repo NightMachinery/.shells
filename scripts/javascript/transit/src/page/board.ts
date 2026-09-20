@@ -25,7 +25,10 @@ import { alternativeLine, journeySummary, lineBadge, renderJourney, slotHead } f
 import { attachTip } from './tip.ts';
 import { alarmMarker, attachLongPress, openAlarmPopup } from './notify.ts';
 import { stopTagOf } from './data.ts';
-import { callsExpanded, expandCalls, onwardCalls, peekCalls } from './calls.ts';
+import { groupPlatform, platformOf } from './platform.ts';
+import { sameStopArea } from '../plan.ts';
+import type { TripCall } from '../trip.ts';
+import { callsExpanded, expandCalls, onwardCalls, peekCalls, type CallsGap } from './calls.ts';
 import { arrivalOf, ROUTE_AGEING_MS, rowKey, usualExits, type BoardRoutes } from './commute.ts';
 import { boardId, filterKey, readHidden, readView, writeHidden, writeView } from './store.ts';
 import type { BoardStatus, BoardView } from './types.ts';
@@ -184,7 +187,8 @@ function timeGroup(dep: Departure, context: BoardContext): HTMLElement {
 function departureLabel(dep: Departure, timezone: string, referenceMs: number): string {
   const parts = [dep.destination, `planned ${timeLabel(dep.planned, referenceMs, timezone)}`];
   parts.push(dep.delayMin === 0 ? 'on time' : `${dep.delayMin > 0 ? '+' : ''}${dep.delayMin} min`);
-  if (dep.platform !== null) parts.push(`platform ${dep.platform}`);
+  const platform = platformOf(dep);
+  if (platform !== null) parts.push(`platform ${platform}`);
   if (dep.cancelled) parts.push('cancelled');
   return parts.join(' · ');
 }
@@ -210,7 +214,8 @@ function departureTip(dep: Departure, context: BoardContext): HTMLElement {
   row('planned', timeNode(dep.planned, referenceMs, timezone));
   row('expected', timeNode(dep.realtime, referenceMs, timezone));
   row('delay', dep.delayMin === 0 ? 'on time' : `${dep.delayMin > 0 ? '+' : ''}${dep.delayMin} min`);
-  if (dep.platform !== null) row('platform', dep.platform);
+  const platform = platformOf(dep);
+  if (platform !== null) row('platform', platform);
   const exact = roundedAway(dep, referenceMs);
   if (exact !== null) row('in', exact);
   body.append(rows);
@@ -549,7 +554,7 @@ function rowTipSignature(
   planning: boolean,
   calls: string,
 ): string {
-  const head = `${dep.realtime}|${dep.delayMin}|${dep.cancelled}|${dep.platform ?? ''}|${dep.realtimeKnown}|${calls}`;
+  const head = `${dep.realtime}|${dep.delayMin}|${dep.cancelled}|${platformOf(dep) ?? ''}|${dep.realtimeKnown}|${calls}`;
   if (planning && planned === undefined) return `${head}|planning`;
   const options = planned?.options ?? [];
   return `${head}|${options.map((option) => `${option.exitStop}:${option.arrival}:${option.transfers}:${option.tight}`).join(',')}`;
@@ -572,6 +577,22 @@ function callsSignature(dep: Departure, context: BoardContext): string {
 }
 
 /**
+ * This run's own record of the call it makes here, when something has already
+ * asked where the run goes.
+ *
+ * Peeked, never asked, for the same reason `callsSignature` peeks: this runs
+ * per row per render, and asking would start a lookup for every row on the
+ * board. So it is the last source a platform falls back to and it contributes
+ * only where a sheet has already been opened; a badge that needed a request to
+ * appear would be a request per row for a two-character badge.
+ */
+function callFor(dep: Departure, context: BoardContext): TripCall | null {
+  const state = peekCalls(rowTipKey(dep, context));
+  if (state === undefined || state.kind !== 'ready') return null;
+  return state.calls.find((call) => sameStopArea(call.stopId, dep.stop)) ?? null;
+}
+
+/**
  * Where this run goes next, in a few words.
  *
  * Only for the rows where it settles something. A rapid-transit line calls
@@ -586,6 +607,23 @@ function viaHint(dep: Departure, context: BoardContext, count: number): string |
   const names = state.calls.slice(0, count).map((call) => compact(call.name));
   if (names.length === 0) return null;
   return `via ${names.join(' \u00b7 ')}`;
+}
+
+/**
+ * Why there are no onward calls, in a sentence a reader can act on.
+ *
+ * One sentence per cause rather than one for all of them. They are not the same
+ * news: a stop the aggregator does not carry is a fault in the plumbing, a run
+ * it does not list is a gap in the data, and a request that did not arrive is
+ * nothing about the run at all and will be asked again. A reader at a stop with
+ * a phone and no console is the only person who can tell which they have, and
+ * one sentence for all three hid a real fault for months.
+ */
+function callsGapNote(gap: CallsGap): string {
+  if (gap === 'no-stop-times') return 'The aggregator lists no stop times at this stop.';
+  if (gap === 'no-match') return 'No run in the aggregator\u2019s list here matches this departure.';
+  if (gap === 'no-sequence') return 'The aggregator publishes no stop sequence for this run.';
+  return 'Could not reach the aggregator. This will be tried again.';
 }
 
 /**
@@ -605,7 +643,7 @@ function callsSection(dep: Departure, context: BoardContext): HTMLElement {
     return wait;
   }
   if (state.kind === 'unknown') {
-    return el('p', 'tip-note', 'Where this run goes after here is not published for it.');
+    return el('p', 'tip-note', callsGapNote(state.gap));
   }
   if (state.calls.length === 0) {
     return el('p', 'tip-note', 'This is the last stop of the run.');
@@ -668,7 +706,8 @@ function rowSheet(dep: Departure, board: Board, context: BoardContext, usual: Ma
   row('planned', timeNode(dep.planned, context.now, context.timezone));
   row('expected', timeNode(dep.realtime, context.now, context.timezone));
   row('delay', dep.delayMin === 0 ? 'on time' : `${dep.delayMin > 0 ? '+' : ''}${dep.delayMin} min`);
-  if (dep.platform !== null) row('platform', dep.platform);
+  const platform = platformOf(dep);
+  if (platform !== null) row('platform', platform);
   row('stop', dep.stopTag ?? stopTagOf(dep.stop, board.stopLabels));
   row('times from', dep.realtimeKnown && !context.planned ? `${dep.backend}, live` : `${dep.backend}, timetable`);
   const exact = roundedAway(dep, context.now);
@@ -751,18 +790,28 @@ function rowSheet(dep: Departure, board: Board, context: BoardContext, usual: Ma
 function stateBadge(dep: Departure, context: BoardContext): HTMLElement {
   const known = dep.realtimeKnown && !context.planned;
   const state = dep.cancelled ? 'state-cancelled' : known ? 'state-live' : 'state-plan';
-  const node = el('span', `platform ${state}${dep.platform === null ? ' platform-empty' : ''}`);
-  if (dep.platform !== null) node.textContent = dep.platform;
-  const where = dep.platform === null ? '' : `platform ${dep.platform}, `;
-  node.title = dep.cancelled
-    ? `${where}cancelled`
-    : known
-      ? `${where}a live time reported by the operator`
-      : context.planned
-        ? `${where}a timetable for the moment you picked, not a live time`
-        : dep.realtime - context.now <= REPORTING_HORIZON_MS
-          ? `${where}the operator has not started reporting this trip yet`
-          : `${where}timetable: too far ahead for the operator to be reporting it yet`;
+  // Whatever feed knows it; see `platformOf`. The corner used to sit empty for
+  // a whole category of service at some stations because the primary feed
+  // publishes no track for it, while another feed had it all along.
+  const platform = platformOf(dep, callFor(dep, context));
+  const node = el('span', `platform ${state}${platform === null ? ' platform-empty' : ''}`);
+  if (platform !== null) node.textContent = platform;
+  const where = platform === null ? '' : `platform ${platform}, `;
+  // Not `title`: the row this badge sits in already carries the page's own
+  // tooltip (the sheet), and a native bubble on top of it would say the same
+  // thing twice.
+  node.setAttribute(
+    'aria-label',
+    dep.cancelled
+      ? `${where}cancelled`
+      : known
+        ? `${where}a live time reported by the operator`
+        : context.planned
+          ? `${where}a timetable for the moment you picked, not a live time`
+          : dep.realtime - context.now <= REPORTING_HORIZON_MS
+            ? `${where}the operator has not started reporting this trip yet`
+            : `${where}timetable: too far ahead for the operator to be reporting it yet`,
+  );
   return node;
 }
 
@@ -795,7 +844,9 @@ function renderRow(dep: Departure, board: Board, columns: Columns, context: Boar
 
   const main = el('span', 'row-main');
   const destination = el('span', 'destination', dep.destination);
-  destination.title = dep.destination;
+  // Not `title`: the whole row already carries the page's own tooltip (the
+  // sheet), which says the same destination again the moment it opens.
+  destination.setAttribute('aria-label', dep.destination);
   main.append(destination);
   const meta = el('span', 'row-times');
   // A clock time that is exactly the countdown plus now says nothing the
@@ -818,7 +869,6 @@ function renderRow(dep: Departure, board: Board, columns: Columns, context: Boar
   // already made. What it means is in the sheet, one tap away.
   if (dep.viaUnverified === true) {
     const flag = el('span', 'flag unverified-flag', '?');
-    flag.title = 'direction not verified';
     flag.setAttribute('aria-label', 'direction not verified');
     meta.append(flag);
   }
@@ -844,10 +894,14 @@ function renderRow(dep: Departure, board: Board, columns: Columns, context: Boar
     } else {
       const onward = el('span', 'connection', `${dep.connection.line} ${clockTime(dep.connection.departure, context.timezone)}`);
       const board2 = board.connection;
-      onward.title =
+      // Not `title`: this sits inside the row's own tap target, which already
+      // opens the page's own tooltip.
+      onward.setAttribute(
+        'aria-label',
         board2 === undefined
           ? 'onward departure'
-          : `change after ${board2.rideMinutes} min on board and a ${board2.transferMinutes} min transfer`;
+          : `change after ${board2.rideMinutes} min on board and a ${board2.transferMinutes} min transfer`,
+      );
       row.append(onward);
     }
   }
@@ -857,7 +911,7 @@ function renderRow(dep: Departure, board: Board, columns: Columns, context: Boar
   if (columns.stop) {
     const tag = dep.stopTag ?? stopTagOf(dep.stop, board.stopLabels);
     const node = el('span', 'stop-tag', tag);
-    node.title = `from ${tag}`;
+    node.setAttribute('aria-label', `from ${tag}`);
     row.append(node);
   }
 
@@ -909,14 +963,13 @@ function stripGroups(rows: Departure[]): Strip[] {
  * tooltip for the day someone needs to check the configuration against the
  * screen.
  */
-function stripLabel(group: Strip): { text: string; title: string } {
+function stripLabel(group: Strip): { title: string; shown: string[]; truncated: boolean } {
   const counts = new Map<string, number>();
   for (const entry of group.entries) counts.set(entry.destination, (counts.get(entry.destination) ?? 0) + 1);
   const ordered = [...counts.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])).map(([name]) => name);
   const shown = ordered.slice(0, STRIP_DESTINATIONS);
-  const text = `→ ${shown.join(' / ')}${ordered.length > shown.length ? ' …' : ''}`;
   const code = group.head.direction === null ? 'no direction code' : `direction ${group.head.direction}`;
-  return { text, title: `${code}. Destinations: ${ordered.join(', ')}` };
+  return { title: `${code}. Destinations: ${ordered.join(', ')}`, shown, truncated: ordered.length > shown.length };
 }
 
 function renderStrip(rows: Departure[], board: Board, context: BoardContext, usual: Map<string, string>): HTMLElement {
@@ -929,34 +982,54 @@ function renderStrip(rows: Departure[], board: Board, context: BoardContext, usu
     const item = el('li', 'strip');
     const main = el('span', 'strip-main');
     main.append(lineBadge(group.head));
+
+    // A run that terminates short of the others is a different journey, and a
+    // strip that hides that sends people onto a train that stops before their
+    // stop. When the whole group agrees, the header already says where it goes
+    // and nothing is repeated; when it does not, the header itself carries a
+    // badge in front of each destination it names, the same badge every one of
+    // its times carries, so a reader matches one to the other without a second
+    // line to read first.
+    const destinations = [...new Set(group.entries.map((entry) => entry.destination))];
+    const branching = destinations.length > 1;
+
     const label = stripLabel(group);
-    const direction = el('span', 'direction', label.text);
+    const direction = el('span', 'direction');
+    // The one native tooltip this page keeps: the direction code it names has
+    // no other home, and nothing else here duplicates it.
     direction.title = label.title;
+    direction.append('→ ');
+    label.shown.forEach((name, index) => {
+      if (index > 0) direction.append(' / ');
+      if (branching) {
+        const badge = badges.get(name);
+        if (badge !== undefined) direction.append(destinationChip(badge, name));
+      }
+      direction.append(name);
+    });
+    if (label.truncated) direction.append(' …');
     main.append(direction);
 
-    // A platform is a property of the group when every run uses the same one,
-    // which is the usual case, and only becomes per-time when it is not.
-    const platforms = new Set(group.entries.map((entry) => entry.platform ?? ''));
-    const uniform = platforms.size === 1 ? [...platforms][0] : undefined;
-    if (uniform !== undefined && uniform !== '') {
-      const node = el('span', 'platform', uniform);
-      node.title = `platform ${uniform}`;
+    // A platform is a property of the group, not of each time in it. A group is
+    // one line in one direction from one stop and almost always leaves from one
+    // platform, so the group says which one, once, in the same corner badge a
+    // row uses, and only the times that differ from it are marked. Almost
+    // always: a diversion or a single late run can move one departure, and that
+    // one departure is exactly what a reader standing on the usual platform
+    // needs told. A group nothing publishes a platform for gets no badge at all.
+    const usualPlatform = groupPlatform(group.entries, (entry) => callFor(entry, context));
+    if (usualPlatform !== null) {
+      const node = el('span', 'platform strip-platform', usualPlatform);
+      node.setAttribute('aria-label', `platform ${usualPlatform} (all times unless marked)`);
       main.append(node);
     }
     if (multiStop) {
       const tag = group.head.stopTag ?? stopTagOf(group.head.stop, board.stopLabels);
       const node = el('span', 'stop-tag', tag);
-      node.title = `from ${tag}`;
+      node.setAttribute('aria-label', `from ${tag}`);
       main.append(node);
     }
 
-    // A run that terminates short of the others is a different journey, and a
-    // strip that hides that sends people onto a train that stops before their
-    // stop. When the whole group agrees, the header already says where it goes
-    // and nothing is repeated; when it does not, every time carries a two or
-    // three letter badge and the legend below says what each one stands for.
-    const destinations = [...new Set(group.entries.map((entry) => entry.destination))];
-    const branching = destinations.length > 1;
     const times = el('span', 'times-strip');
     for (const dep of group.entries) {
       const late = dep.delayMin > 0;
@@ -967,9 +1040,14 @@ function renderStrip(rows: Departure[], board: Board, context: BoardContext, usu
         const badge = badges.get(dep.destination);
         if (badge !== undefined) cell.append(destinationChip(badge, dep.destination));
       }
-      // A platform only appears per time when the group's platforms disagree.
-      // When they agree it is on the row, once, which is where a reader looks.
-      if (uniform === undefined && dep.platform !== null) cell.append(el('span', 'time-note', `pl ${dep.platform}`));
+      // Only the exceptions. A badge on every time repeating what the group's
+      // own badge already says is noise that hides the one time it matters.
+      const platform = platformOf(dep, callFor(dep, context));
+      if (platform !== null && platform !== usualPlatform) {
+        const note = el('span', 'time-note', `pl ${platform}`);
+        note.setAttribute('aria-label', `platform ${platform}, not this group's usual one`);
+        cell.append(note);
+      }
       if (dep.cancelled) {
         const struck = el('span', 'time-note');
         struck.append(icon('close'));
@@ -987,25 +1065,12 @@ function renderStrip(rows: Departure[], board: Board, context: BoardContext, usu
     }
     main.append(times);
     item.append(main);
-
-    if (branching) {
-      const legend = el('span', 'strip-legend');
-      for (const name of destinations) {
-        const badge = badges.get(name);
-        if (badge === undefined) continue;
-        const entry = el('span', 'strip-legend-entry');
-        entry.append(destinationChip(badge, name));
-        entry.append(el('span', 'strip-legend-name', compact(name)));
-        legend.append(entry);
-      }
-      item.append(legend);
-    }
     list.append(item);
   }
   return list;
 }
 
-/** One destination badge: procedural colour, full name on the tooltip. */
+/** One destination badge: procedural colour, full name reachable by a screen reader. */
 function destinationChip(badge: DestinationBadge, name: string): HTMLElement {
   const node = el('span', 'dest-badge', badge.text);
   // Only the hue is set here. Saturation, lightness and the text colour belong
@@ -1014,7 +1079,11 @@ function destinationChip(badge: DestinationBadge, name: string): HTMLElement {
   // already carries that, and two things in one colour saying different things
   // is worse than no colour at all.
   node.style.setProperty('--dest-hue', String(badge.hue));
-  node.title = name;
+  // Not `title`: this sits either in the strip's header, which already carries
+  // its own tooltip with the direction code, or on a time that already opens
+  // the page's own tooltip. A native bubble in either place would duplicate
+  // something already on screen or already offered.
+  node.setAttribute('aria-label', name);
   return node;
 }
 
@@ -1264,7 +1333,8 @@ export function renderBoard(board: Board, context: BoardContext): HTMLElement {
   section.id = `board-${context.index}`;
 
   const header = el('header', 'board-header');
-  const cycle = button('board-title', board.title, `showing ${view}; click for ${nextView(view)}`);
+  const cycle = button('board-title', board.title);
+  cycle.setAttribute('aria-label', `${board.title}: showing ${view}; click for ${nextView(view)}`);
   cycle.setAttribute('aria-expanded', String(view !== 'collapsed'));
   cycle.addEventListener('click', () => {
     writeView(id, nextView(view));
@@ -1275,12 +1345,12 @@ export function renderBoard(board: Board, context: BoardContext): HTMLElement {
   const marks = el('span', 'board-marks');
   if (board.backend !== context.barBackend) {
     const node = el('span', 'backend', board.backend);
-    node.title = `answered by ${board.backend}, which is not the source the rest of the page used`;
+    node.setAttribute('aria-label', `answered by ${board.backend}, which is not the source the rest of the page used`);
     marks.append(node);
   }
   const hidden = readHidden(id);
   if (hidden.size > 0) marks.append(el('span', 'filter-mark', `${hidden.size} hidden`));
-  const filterButton = button('filter-button', undefined, 'filter the lines on this board');
+  const filterButton = button('filter-button');
   filterButton.append(icon('gear'));
   filterButton.setAttribute('aria-label', 'filter the lines on this board');
   filterButton.addEventListener('click', (event) => {
@@ -1379,7 +1449,10 @@ export function renderBoard(board: Board, context: BoardContext): HTMLElement {
   } else if (context.routes !== undefined && context.routesStale && context.routesAt !== null) {
     const age = Math.max(0, Math.round((Date.now() - context.routesAt) / 1000));
     const note = el('p', 'board-progress board-stale', `journeys from the last visit, ${age}s old`);
-    note.title = 'these arrival times were planned before this page was opened, and are being planned again now';
+    note.setAttribute(
+      'aria-label',
+      `journeys from the last visit, ${age}s old: these arrival times were planned before this page was opened, and are being planned again now`,
+    );
     section.append(note);
   }
 

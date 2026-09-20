@@ -116,9 +116,12 @@ export interface JourneyNotes {
  */
 export function renderNotes(option: RouteOption, notes: JourneyNotes): HTMLElement {
   const wrap = el('div', 'journey-notes');
-  const add = (className: string, text: string, title: string): void => {
+  const add = (className: string, text: string, detail: string): void => {
     const chip = el('span', `journey-note ${className}`, text);
-    chip.title = title;
+    // Not `title`: this chip is drawn inside the page's own tooltip, and a
+    // native bubble opening on top of an open tooltip is worse clutter than
+    // the loss looks like. The detail stays reachable for a screen reader.
+    chip.append(el('span', 'sr-only', `: ${detail}`));
     wrap.append(chip);
   };
   add(

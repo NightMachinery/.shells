@@ -296,6 +296,28 @@ async function resolveOriginUncached(options: ResolveOriginOptions, rawId: strin
   throw new UnresolvableOriginError(rawId);
 }
 
+/**
+ * The platform identifiers a set of rows departs from, most used first.
+ *
+ * Ordering by count matters wherever one identifier has to stand for the stop:
+ * the platform most of the departures leave from is the one most of the
+ * journeys start at. Rows that carry no platform identifier contribute nothing
+ * rather than a guess.
+ *
+ * Here rather than in either caller because both the journey planner and the
+ * departures fan-out hand this same list to `resolveOrigin`, and two spellings
+ * of it would sooner or later resolve one stop two different ways.
+ */
+export function platformIdsOf(rows: readonly { stopPoint?: string }[]): string[] {
+  const counts = new Map<string, number>();
+  for (const row of rows) {
+    const id = row.stopPoint;
+    if (id === undefined || id.length === 0) continue;
+    counts.set(id, (counts.get(id) ?? 0) + 1);
+  }
+  return [...counts.entries()].sort((a, b) => b[1] - a[1]).map(([id]) => id);
+}
+
 /** The identifiers a departure fan-out should walk, given a resolved origin. */
 export function departureIds(resolved: ResolvedOrigin): string[] {
   // A coordinate is not something stop times can be asked for, so it is dropped
