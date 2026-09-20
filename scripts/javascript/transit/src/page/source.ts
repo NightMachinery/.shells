@@ -18,7 +18,7 @@
 // Falling back is not an error state: it is the page working the way it always
 // did, and nothing on screen changes except the provenance line.
 
-import { fetchMessages as fetchDirectMessages, fetchProfile as fetchDirect } from './data.ts';
+import { fetchMessages as fetchDirectMessages, fetchProfile as fetchDirect, prepareCalls } from './data.ts';
 import type { FetchProfileOptions, FetchProfileResult } from './data.ts';
 import { carryBoards, planKey, planProfile as planDirect } from './commute.ts';
 import type { PlanProfileOptions, ProfileRoutes } from './commute.ts';
@@ -186,6 +186,10 @@ export function createServerSource(options: ServerSourceOptions = {}): DataSourc
       // its skeletons from is reported as finished rather than as never having
       // happened: a board left `idle` reads as a board that is still loading.
       for (let index = 0; index < answer.boards.length; index += 1) fetchOptions.onStatus(index, { kind: 'ready' });
+      // The server answered the boards; the sheets' onward calls are still the
+      // browser's to look up, and they have to be told which window. See
+      // `prepareCalls`.
+      prepareCalls(fetchOptions);
       return { boards: answer.boards, backends: answer.backends };
     },
     async planProfile(planOptions) {

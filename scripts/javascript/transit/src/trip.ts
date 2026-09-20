@@ -131,6 +131,11 @@ export interface TripOptions {
   baseUrl?: string | undefined;
   fetchImpl?: FetchLike | undefined;
   onDebug?: ((message: string) => void) | undefined;
+  /**
+   * A reader is waiting on this one: it goes to the front of the trip gate
+   * rather than behind the background checks a board runs on its own rows.
+   */
+  urgent?: boolean | undefined;
 }
 
 /**
@@ -170,11 +175,16 @@ export async function tripCalls(tripId: string, options: TripOptions = {}): Prom
   const baseUrl = (options.baseUrl ?? envOverride('TRANSITOUS_BASE_URL') ?? TRANSITOUS_DEFAULT_BASE_URL).replace(/\/+$/, '');
   const url = `${baseUrl}/trip?tripId=${encodeURIComponent(tripId)}`;
   const calls = await share(`trip|${tripId}`, () =>
-    withLimit('trip', TRIP_CONCURRENCY, async () => {
-      options.onDebug?.(`GET ${url}`);
-      const body = await fetchJson<unknown>(url, options.fetchImpl ? { fetchImpl: options.fetchImpl } : {});
-      return parseTrip(body);
-    }),
+    withLimit(
+      'trip',
+      TRIP_CONCURRENCY,
+      async () => {
+        options.onDebug?.(`GET ${url}`);
+        const body = await fetchJson<unknown>(url, options.fetchImpl ? { fetchImpl: options.fetchImpl } : {});
+        return parseTrip(body);
+      },
+      { front: options.urgent === true },
+    ),
   );
   trips.set(tripId, calls);
   return calls;

@@ -1361,6 +1361,28 @@ rather than whichever single one a reverse geocode happens to return. Anything
 that is not a 404 still fails, because a rate limit quietly turned into an empty
 board is a board that lies about the service.
 
+**** Two ways the list was there and not shown
+
+Both found by opening sheets on the deployed page and timing when the list
+appeared, after a reader reported the calls as gone.
+
+The lookups are configured per fetch, and they were configured only by the
+page's own fetch. A page behind the planning server never runs that fetch, so
+on the served copy the sheets had no source at all and reported the aggregator
+as unreachable, while the tailnet copy of the same build answered. Now every
+source configures them (=prepareCalls= in =src/page/data.ts=): the server
+answers the boards, and the browser still asks the aggregator about a run when
+a sheet is opened, which is one or two requests nobody needs a server for.
+
+On the page's own path the answer landed and was not drawn. The hook that
+redraws after an answer was bound to the profile whose fetch configured it, and
+the other profiles are prefetched right after the visible one, so by the time a
+sheet was opened the hook belonged to a hidden profile and did nothing. The
+sheet showed its spinner until something unrelated redrew the board, a journey
+landing or the minute changing, which measured as sixteen to twenty five
+seconds on a fast connection. The hook now redraws unconditionally; a redraw
+that changes nothing is cheap, because an unchanged board keeps its DOM.
+
 *** Nothing moves that did not change
 
 Skeleton rows are a promise that something is coming, and they are the right
@@ -1882,6 +1904,16 @@ requests, so many journey searches. Uncapped, a long horizon across several
 profiles turns one refresh into dozens of simultaneous requests against free
 public services, and a rate-limited board looks to a reader exactly like a
 broken one.
+
+The caps are queues, and a queue has a front. Work the page starts on its own
+waits its turn, because no board's third page matters more than another's. A
+lookup a reader just asked for, by opening a sheet on a departure, does not: it
+goes to the front of the timetable and trip gates (=front= in
+=src/inflight.ts=). Before that, a sheet opened while a via-filtered board was
+still checking its rows joined the back of a queue of dozens of trip requests,
+and said "reading where this goes" for ten seconds and more on a fast
+connection, which reads exactly like the calls having been taken away. The
+cap itself is unchanged; only the order is.
 
 * The touch harness
 

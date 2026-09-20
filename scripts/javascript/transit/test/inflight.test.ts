@@ -85,6 +85,23 @@ describe('withLimit', () => {
     expect(running).toBe(0);
   });
 
+  test('a call marked front runs before everything already waiting', async () => {
+    const order: string[] = [];
+    let release: () => void = () => {};
+    const blocker = withLimit('gate', 1, () => new Promise<void>((resolve) => (release = resolve)));
+    const waiting = ['a', 'b', 'c'].map((name) =>
+      withLimit('gate', 1, async () => {
+        order.push(name);
+      }),
+    );
+    const urgent = withLimit('gate', 1, async () => {
+      order.push('urgent');
+    }, { front: true });
+    release();
+    await Promise.all([blocker, ...waiting, urgent]);
+    expect(order).toEqual(['urgent', 'a', 'b', 'c']);
+  });
+
   test('a task that throws still gives up its slot', async () => {
     const fail = async (): Promise<void> => {
       throw new Error('no');

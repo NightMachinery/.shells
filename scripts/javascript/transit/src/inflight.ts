@@ -22,6 +22,22 @@ interface Gate {
 
 const gates = new Map<string, Gate>();
 
+/** Where a call waits for its turn when the gate is full. */
+export interface LimitOptions {
+  /**
+   * Ahead of everything already waiting, rather than behind it.
+   *
+   * The gates are first come, first served, which is right for the work a page
+   * starts on its own: no board's third page matters more than another's. It is
+   * wrong for a lookup a reader just asked for by opening a sheet. That request
+   * used to join the back of a queue of dozens of background trip checks and
+   * the sheet said "reading where this goes" for ten seconds or more on a fast
+   * connection, which reads as the list having been taken away. The cap still
+   * holds; only the order changes.
+   */
+  front?: boolean | undefined;
+}
+
 /**
  * Cap how many calls of one kind are in flight at once.
  *
@@ -32,13 +48,16 @@ const gates = new Map<string, Gate>();
  * spends its bandwidth on the last board's third page while the first board is
  * still waiting for its first.
  */
-export async function withLimit<T>(name: string, limit: number, run: () => Promise<T>): Promise<T> {
+export async function withLimit<T>(name: string, limit: number, run: () => Promise<T>, options: LimitOptions = {}): Promise<T> {
   const gate = gates.get(name) ?? { limit, running: 0, queue: [] };
   gate.limit = limit;
   gates.set(name, gate);
 
   if (gate.running >= gate.limit) {
-    await new Promise<void>((resolve) => gate.queue.push(resolve));
+    await new Promise<void>((resolve) => {
+      if (options.front === true) gate.queue.unshift(resolve);
+      else gate.queue.push(resolve);
+    });
   }
   gate.running += 1;
   try {

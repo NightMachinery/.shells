@@ -1,5 +1,7 @@
 import { describe, expect, test } from 'bun:test';
 import { createServerSource, createSwitchingSource, type SourceNote } from '../src/page/source.ts';
+import { clearCalls, onwardCalls } from '../src/page/calls.ts';
+import type { Departure } from '../src/model.ts';
 import { planKey, type BoardRoutes, type PlanProfileOptions, type ProfileRoutes } from '../src/page/commute.ts';
 import { WIRE_VERSION, type WireProfileAnswer } from '../src/page/wire.ts';
 import type { Board } from '../src/model.ts';
@@ -132,6 +134,33 @@ async function throughDirect<T>(fetchImpl: typeof fetch, run: () => Promise<T>):
 
 describe('createServerSource', () => {
   const base = 'https://example.invalid/api';
+
+  test('fetchProfile leaves the sheets able to ask where a run goes', async () => {
+    // A page behind the server never runs the direct fetch, which used to be
+    // the only place the onward-calls lookups were configured: every sheet on
+    // the served copy said the aggregator was unreachable.
+    clearCalls();
+    const { fetchImpl } = mockFetch(() => wireAnswer({ boards: [BOARD] }));
+    const source = createServerSource({ base, fetchImpl });
+    await source.fetchProfile({ config: CONFIG, profile: PROFILE, startMs: NOW, horizonMinutes: 60, onStatus: () => {} });
+    const dep: Departure = {
+      line: 'S1',
+      mode: 'SBAHN',
+      destination: 'Nordweg',
+      planned: NOW,
+      realtime: NOW,
+      delayMin: 0,
+      cancelled: false,
+      sev: false,
+      platform: null,
+      direction: 'H',
+      backend: 'mvg',
+      stop: SYNTHETIC_STOP,
+      realtimeKnown: true,
+    };
+    expect(onwardCalls('served', dep).kind).toBe('loading');
+    clearCalls();
+  });
 
   test('fetchProfile asks the server exactly once and reports every board ready', async () => {
     const { fetchImpl, urls } = mockFetch(() => wireAnswer({ boards: [BOARD, BOARD] }));

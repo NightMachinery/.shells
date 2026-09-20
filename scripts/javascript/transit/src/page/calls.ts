@@ -179,7 +179,9 @@ async function load(key: string, dep: Departure, from: CallsSource): Promise<voi
   }
   let calls: TripCall[];
   try {
-    calls = await onceMore(() => tripCalls(tripId, from));
+    // The reader opened a sheet and is looking at a spinner. Ahead of the
+    // board's own background checks, which nobody is waiting on.
+    calls = await onceMore(() => tripCalls(tripId, { ...from, urgent: true }));
   } catch {
     return settle({ kind: 'unknown', gap: 'unreachable' });
   }

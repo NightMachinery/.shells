@@ -424,9 +424,14 @@ async function refreshProfile(profileKey: string, force = false): Promise<void> 
         setStatus(profileKey, index, status);
         if (profileKey === state.profileKey) render();
       },
-      onCallsLoaded: () => {
-        if (profileKey === state.profileKey) render();
-      },
+      // Not gated on this fetch's profile. The lookups are configured by
+      // whichever profile fetched last, and the other profiles are prefetched
+      // right after the visible one, so a hook bound to "my profile is the
+      // visible one" belonged to a hidden profile by the time any sheet was
+      // opened, and an answer that had landed was not drawn until something
+      // else happened to redraw the board. A redraw that changes nothing is
+      // cheap: every unchanged board keeps its DOM.
+      onCallsLoaded: () => render(),
     });
     const data: ProfileData = {
       boards: result.boards,

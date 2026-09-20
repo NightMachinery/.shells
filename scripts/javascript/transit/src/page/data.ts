@@ -225,6 +225,7 @@ async function timetableRows(
   stop: string,
   window: { fromMs: number; toMs: number },
   modes: BoardConfig['modes'],
+  urgent = false,
 ): Promise<Departure[]> {
   const hints = platformHints(stop);
   // The hints are part of the key: a request made before this stop's platforms
@@ -235,11 +236,15 @@ async function timetableRows(
   const now = Date.now();
   if (hit !== undefined && now - hit.at < TIMETABLE_CACHE_MS) return hit.rows;
   const rows = await share(`timetable|${key}`, () =>
-    withLimit('timetable', TIMETABLE_CONCURRENCY, () =>
-      backend.departures(stop, window, {
-        ...(modes === undefined ? {} : { transportTypes: modes }),
-        ...(hints.length === 0 ? {} : { platformIds: hints }),
-      }),
+    withLimit(
+      'timetable',
+      TIMETABLE_CONCURRENCY,
+      () =>
+        backend.departures(stop, window, {
+          ...(modes === undefined ? {} : { transportTypes: modes }),
+          ...(hints.length === 0 ? {} : { platformIds: hints }),
+        }),
+      { front: urgent },
     ),
   );
   notePlatforms(rows);
@@ -334,6 +339,33 @@ export interface FetchProfileResult {
   backends: string[];
 }
 
+/**
+ * Point the sheets' onward-calls lookups at this fetch's window.
+ *
+ * Set up per fetch rather than once, because the horizon is the reader's to
+ * change. Set up for every source, not only the page's own fetch: a page behind
+ * the planning server never runs `fetchProfile` here, and until this existed it
+ * therefore never configured the lookups at all, so every sheet on the served
+ * copy reported the aggregator as unreachable while the tailnet copy of the
+ * same page answered. The lookups go to the aggregator from the browser in both
+ * cases; a reader opening a sheet is one or two requests, which is nothing a
+ * server needs to stand in front of.
+ *
+ * Its own backends, without the progress reporting the board fetch has: a
+ * sheet's lookup is not a board's page and must not move a board's skeleton.
+ */
+export function prepareCalls(options: Pick<FetchProfileOptions, 'config' | 'startMs' | 'horizonMinutes' | 'onCallsLoaded'>): void {
+  const { config, startMs, horizonMinutes } = options;
+  const window = { fromMs: startMs, toMs: startMs + horizonMinutes * 60_000 };
+  const backends = makeBackends(config);
+  configureCalls({
+    ...(config.backends.transitous_base_url ? { baseUrl: config.backends.transitous_base_url } : {}),
+    // Urgent: a sheet is open on a spinner. See `LimitOptions.front`.
+    rows: (stop) => timetableRows(backends.timetable, stop, window, undefined, true),
+    onLoaded: options.onCallsLoaded ?? ((): void => {}),
+  });
+}
+
 export async function fetchProfile(options: FetchProfileOptions): Promise<FetchProfileResult> {
   const { config, profile, startMs, horizonMinutes, onStatus } = options;
   const window = { fromMs: startMs, toMs: startMs + horizonMinutes * 60_000 };
@@ -371,14 +403,7 @@ export async function fetchProfile(options: FetchProfileOptions): Promise<FetchP
     report(index, { kind: 'loading', backend, page });
   });
 
-  // What the sheets ask when a reader wants to know where a train goes. Pointed
-  // at this fetch's backends and window rather than set up once, because both
-  // are built per fetch and the horizon is the reader's to change.
-  configureCalls({
-    ...(config.backends.transitous_base_url ? { baseUrl: config.backends.transitous_base_url } : {}),
-    rows: (stop) => timetableRows(backends.timetable, stop, window, undefined),
-    onLoaded: options.onCallsLoaded ?? ((): void => {}),
-  });
+  prepareCalls(options);
 
   const used = new Set<string>();
 
