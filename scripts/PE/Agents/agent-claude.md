@@ -16,3 +16,5 @@
   `PE/Agents/readme.org`.
   
 - If the auto-classifier denies you permission to run some commands, try making the harness ask me directly for permission. This is easier UX for me than copy-pasting commands and running them manually.
+
+- You should always arm monitors (possibly using your internal tool `CronCreate`) for important times, especially for quota resets.
