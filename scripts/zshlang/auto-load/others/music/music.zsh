@@ -31,7 +31,7 @@ function hearinvisible-fast() {
 
 function hearinvisible-playfast {
     local vol="${hear_volume:-${hear_v:-1}}" loudidle="${hear_loudidle}"
-    if volume-mute-p || headphones-p ; then
+    if volume-mute-p || headphones-p || office-p ; then
       loudidle=n
     fi
 
