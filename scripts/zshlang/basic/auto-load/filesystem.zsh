@@ -69,10 +69,19 @@ function dir-rmprefix() {
     prefixer --case-sensitivity no -r "$dir" "$@" | sd '^/*' ''
 }
 ##
-function cdd() {
-    cd "$(bottomdir "$1")"
+function cdd {
+    local d="${1:-$HOME}"
+
+    cd-file "$(path-unabbrev "$d")"
 }
-function cdz() {
+
+function cd-file {
+    local d="${1:-$HOME}"
+
+    cd "$(bottomdir "$d")"
+}
+
+function cdz {
     local i="$*"
 
     if test -d "$i" ; then

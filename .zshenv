@@ -159,7 +159,11 @@ function nightsh-load-zshenv {
             {
                 test -e "$1" && grealpath -e -- "$1" || {
                     (( ${+commands[$1]} )) && grealpath -e -- "${commands[$1]}"
-                }
+                } || {
+                        local o
+                        o="$(path-unabbrev "$1")" || return $?
+                        test -e "$o" && grealpath -e -- "$o"
+                    }
             } |
                     cat-copy-if-tty
             ##
