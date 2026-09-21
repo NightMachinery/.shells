@@ -254,6 +254,8 @@ hs -q -c 'agentBannerOff()'                            # as soon as you are done
 hs -q -c 'return agentBannerActive()'
 ```
 
+This only applies if your work actively interferes with me using the machine. If you are using, e.g., a headless browser to take screenshots, that won’t disturb me, so you shouldn't put up a banner.
+
 `-q` because without it Hammerspoon relays everything printed to its console
 back to you for the duration of the command, so an unrelated hotkey logging a
 line lands in the middle of your output. It has to come before `-c`. (From zsh
