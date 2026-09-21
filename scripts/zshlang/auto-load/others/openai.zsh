@@ -1,5 +1,7 @@
 ##
 aliasfn with-lab-gemini 'llm_key=gemini-lab' reval
+
+aliasfn with-purple-aura-gemini 'llm_key=gemini-purple-aura' reval
 ##
 typeset -g openai_completion_engine=(openai-chatgpt)
 ##
