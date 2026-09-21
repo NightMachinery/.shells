@@ -780,8 +780,7 @@ function claude-code-usage-all {
         #: parse; non-fatal because a failed arm must not make a working report
         #: look broken.
         for p in "${profiles[@]}" ; do
-            h-claude-code-usage-arm-for-profile "${p}" >&2 || true
-            h-claude-code-usage-arm-weekly-for-profile "${p}" >&2 || true
+            h-claude-code-usage-arm-all-for-profile "${p}" >&2 || true
         done
     fi
 
@@ -890,6 +889,9 @@ function h-claude-code-usage-arm {
     local full_pct="${claude_code_usage_arm_full_pct:-100}"
     local full_exclusive_p="${claude_code_usage_arm_full_exclusive_p:-n}"
     local reset_message="${claude_code_usage_arm_reset_message:-reset, usage available again}"
+    local report_p="${claude_code_usage_arm_report_p:-y}"
+
+    REPLY=''
 
     local session="${1}" profile="${2}"
     assert-args session profile @RET
@@ -904,12 +906,16 @@ function h-claude-code-usage-arm {
     json="$(claude_code_usage_arm_p=n claude_code_usage_json_p=y claude_code_usage_profile="${profile}" claude-code-usage)" @RET
 
     local blocked_labels=() role out pct resets label
+    integer found_count=0
     integer blocked_at=0
     for role in "${roles[@]}" ; do
         if ! out="$(h-claude-code-usage-arm-window "${json}" "${role}")" ; then
-            ecgray "$0: ${profile}: no ${role} window, skipping"
+            if bool "${report_p}" ; then
+                ecgray "$0: ${profile}: no ${role} window, skipping"
+            fi
             continue
         fi
+        (( found_count++ ))
 
         pct="${out%%$'\t'*}"
         resets="${${out#*$'\t'}%%$'\t'*}"
@@ -934,7 +940,14 @@ function h-claude-code-usage-arm {
     local msg=''
     if (( ${#blocked_labels} == 0 )) ; then
         if ! isDeus ; then
-            ecgray "$0: ${profile}: usage already possible, not arming (use \`deus\` to arm anyway)"
+            if (( found_count == 0 )) ; then
+                REPLY=absent
+            else
+                REPLY=available
+            fi
+            if bool "${report_p}" ; then
+                ecgray "$0: ${profile}: usage already possible, not arming (use \`deus\` to arm anyway)"
+            fi
             return 0
         fi
 
@@ -959,7 +972,9 @@ function h-claude-code-usage-arm {
     #: [agfi:h-agent-usage-continue-targets-kitty-fz].
     local agent_usage_continue_profile="${profile}"
 
-    h-agent-usage-arm "${session}" "${reset_at}" "${msg}"
+    agent_usage_arm_report_p="${report_p}" \
+        h-agent-usage-arm "${session}" "${reset_at}" "${msg}" @RET
+    REPLY="armed"$'\t'"${reset_at}"$'\t'"${(j:, :)blocked_labels}"
 }
 
 function h-claude-code-usage-arm-for-profile {
@@ -996,6 +1011,62 @@ function h-claude-code-usage-arm-weekly-for-profile {
         claude_code_usage_arm_full_exclusive_p=y \
         claude_code_usage_arm_reset_message='reset, weekly quota replenished' \
         h-claude-code-usage-arm "${session}" "${profile}" weekly_all
+}
+
+function h-claude-code-usage-arm-result-format {
+    #: One concise cell for the integrated all-profile scheduling report.
+    local kind="${1}" result="${2}"
+    assert-args kind result @RET
+
+    local arm_state="${result%%$'\t'*}"
+    case "${arm_state}" in
+        armed)
+            local reset_at="${${result#*$'\t'}%%$'\t'*}"
+            local grace_s="${agent_usage_arm_grace_s:-30}"
+            if [[ "${agent_usage_arm_action:-notif}" == continue ]] ; then
+                grace_s="${agent_usage_continue_grace_s:-60}"
+            fi
+            zmodload zsh/datetime 2>/dev/null
+            integer deadline=$(( ${reset_at%.*} + grace_s ))
+            ec "${kind} armed for $(date-unix-to-3339 "${deadline}") (in $(seconds-fmt-short $(( deadline - EPOCHSECONDS ))))"
+            ;;
+        available)
+            if [[ "${kind}" == weekly ]] ; then
+                ec "weekly has at least ${claude_code_usage_arm_weekly_remaining_pct}% remaining, not armed"
+            else
+                ec "5h available, not armed"
+            fi
+            ;;
+        absent)
+            ec "${kind} not reported, not armed"
+            ;;
+        *)
+            ecerr "$0: unknown arm result: ${result}"
+            return 1
+            ;;
+    esac
+}
+
+function h-claude-code-usage-arm-all-for-profile {
+    #: Schedule the independent 5-hour and weekly jobs, then report them as one
+    #: profile-level result instead of exposing two unrelated helper calls.
+    local profile="${1}"
+    assert-args profile @RET
+
+    local session ordinary_result weekly_result ordinary weekly
+    session="$(h-claude-code-usage-arm-session "${profile}")" @RET
+
+    claude_code_usage_arm_report_p=n \
+        h-claude-code-usage-arm "${session}" "${profile}" session @RET
+    ordinary_result="${REPLY}"
+
+    claude_code_usage_arm_report_p=n \
+        h-claude-code-usage-arm-weekly-for-profile "${profile}" @RET
+    weekly_result="${REPLY}"
+
+    ordinary="$(h-claude-code-usage-arm-result-format 5h "${ordinary_result}")" @RET
+    weekly="$(h-claude-code-usage-arm-result-format weekly "${weekly_result}")" @RET
+    ecgray "Notifications [${profile}]: ${ordinary}; ${weekly}"
 }
 
 #: Scheduling entry points. These arm the job and print no report,

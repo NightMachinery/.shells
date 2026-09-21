@@ -884,6 +884,12 @@ it does not alter the full-limit threshold used by single-profile notifiers or
 automatic continuation. Model-scoped weekly windows remain opt-in through
 their own notifier, such as `claude-code-usage-fable-notify`.
 
+The all-profile command reports the two decisions together, one line per
+profile, while retaining independent jobs and deadlines underneath. For
+example: `Notifications [default]: 5h available, not armed; weekly armed for
+2026-09-21 16:00:29+02:00 (in 4h)`. Routine internal helper names are hidden;
+actual scheduling errors remain visible.
+
 When nothing is blocking, arming is skipped with a note; running it under
 `deus` arms for the next 5-hour rollover anyway, which is how to exercise the
 whole mechanism without having to be rate-limited first.

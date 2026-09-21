@@ -58,6 +58,7 @@ function h-agent-usage-arm {
     local action="${agent_usage_arm_action:-notif}"
     local idle_min_s="${agent_usage_continue_idle_min_s:-600}"
     local text="${agent_usage_continue_text:-Continue.}"
+    local report_p="${agent_usage_arm_report_p:-y}"
 
     #: Resuming gets the longer grace of the two; see the knobs above.
     local grace_s="${agent_usage_arm_grace_s:-30}"
@@ -100,7 +101,9 @@ function h-agent-usage-arm {
         fi
     fi
 
-    ecgray "$0: arming ${session} for $(date-unix-to-3339 "${deadline}") (in $(seconds-fmt-short $(( deadline - EPOCHSECONDS ))))"
+    if bool "${report_p}" ; then
+        ecgray "$0: arming ${session} for $(date-unix-to-3339 "${deadline}") (in $(seconds-fmt-short $(( deadline - EPOCHSECONDS ))))"
+    fi
 
     #: The job runs in its own interactive shell hours from now, so every knob
     #: it reads travels with it rather than being looked up there: a value
