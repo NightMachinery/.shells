@@ -98,11 +98,27 @@ typeset -g gcp_gpu_budget_config="${gcp_gpu_budget_config:-${HOME}/.config/gcp-g
 #: placeholder, and a single 5-day flex-start H100 costs ~EUR 500, so the old
 #: default refused the very work this tooling exists to run.
 typeset -g gcp_gpu_budget_default="${gcp_gpu_budget_default:-5000}"
+#: The BigQuery dataset the Cloud Billing export writes into, and the billing
+#: account that owns it. `cloud_billing` is the name Google's own
+#: documentation suggests, so it is a safe public default; the account id
+#: identifies one deployment and has no default here at all -- it lives in
+#: `${gcp_conf_file}` and is only ever used to name the account in the
+#: instructions `gcp-gpu-spend --actual` prints when the export is missing.
+typeset -g gcp_gpu_billing_dataset="${gcp_gpu_billing_dataset:-cloud_billing}"
+typeset -g gcp_gpu_billing_account="${gcp_gpu_billing_account:-}"
 #: How far before a spend window to scan the audit log, and how long to cache
 #: the scan. Both exist because `gcloud logging read` is slow enough to matter
-#: in `gcp-gpu-status`. See `h-gcp-gpu-audit-events`.
-typeset -g gcp_gpu_audit_lookback_days="${gcp_gpu_audit_lookback_days:-7}"
+#: in `gcp-gpu-status`. See [agfi:gcp-gpu-spend].
+#:
+#: 14 days, not 7: a run that was already going when the window opened has to
+#: be found, and a flex-start VM can hold capacity for a full 7 days, so 7
+#: would clip exactly the longest and most expensive runs there are.
+typeset -g gcp_gpu_audit_lookback_days="${gcp_gpu_audit_lookback_days:-14}"
 typeset -g gcp_gpu_audit_cache_ttl="${gcp_gpu_audit_cache_ttl:-300}"
+#: What `gcp-gpu-spend --all` means. Admin Activity logs are retained for 400
+#: days and _log entries do not exist before that_, so "all time" is a claim
+#: about the log's horizon, not about the project's.
+typeset -g gcp_gpu_audit_retention_days="${gcp_gpu_audit_retention_days:-400}"
 typeset -g gcp_gpu_retry_sleep="${gcp_gpu_retry_sleep:-60}"
 typeset -g gcp_gpu_retry_max="${gcp_gpu_retry_max:-60}"
 typeset -g gcp_gpu_tmux_session="${gcp_gpu_tmux_session:-work}"
@@ -178,6 +194,16 @@ typeset -gA gcp_gpu_price_ondemand=(
     e2-micro         0.0083
     e2-small         0.0167
     e2-medium        0.0334
+    #: The GPU-less shapes an image build or a CPU-side pass lands on. Added
+    #: <2026-09-18 Fri> because `gcp-gpu-spend --all` found them in our own
+    #: history and priced them at 0, which is the one direction a spend figure
+    #: must never fail in. Same derivation as the rest, from the live catalog:
+    #: E2 is 0.021714176/vCPU-hour + 0.002910156/GiB-hour and N2 is
+    #: 0.031469129 + 0.004217984, times the shape.
+    e2-standard-2    0.0667
+    e2-standard-4    0.1334
+    e2-standard-8    0.2668
+    n2-standard-64   3.0938
     g2-standard-4    0.72
     g2-standard-8    0.87
     g2-standard-12   1.02
@@ -209,6 +235,12 @@ typeset -gA gcp_gpu_price_ondemand=(
     a3-highgpu-8g   90.10
 )
 typeset -gA gcp_gpu_price_spot=(
+    #: E2 spot is 0.011173764/vCPU-hour + 0.001498417/GiB-hour, N2 spot is
+    #: 0.010289818 + 0.001381702.
+    e2-standard-2    0.0343
+    e2-standard-4    0.0687
+    e2-standard-8    0.1373
+    n2-standard-64   1.0123
     g2-standard-4    0.11
     g2-standard-8    0.13
     g2-standard-12   0.16
@@ -477,184 +509,134 @@ function h-gcp-gpu-bucket-exists-p {
         --project="${gcp_gpu_project}" &>/dev/null
 }
 ##
-function h-gcp-gpu-billing-table {
-    #: Resolves the billing-export table in `cloud_billing` and caches the
-    #: answer for the shell session. Returns 1 when the export does not exist,
-    #: which is the current state of this project: the dataset was created
-    #: 2026-01-02 and no export was ever enabled into it. Callers fall back to
-    #: `h-gcp-gpu-spend-audit`.
-    ##
-    if test -n "${gcp_gpu_billing_table_cache}" ; then
-        if [[ "${gcp_gpu_billing_table_cache}" == NONE ]] ; then
+function h-gcp-gpu-spend-run {
+    #: The engine behind [agfi:gcp-gpu-spend]: `python/gcp/gcp_spend.py`, told
+    #: the project, the owner label, the price table and the billing dataset,
+    #: and given no default it could guess wrong.
+    #:
+    #: Python rather than zsh and jq, because the reconstruction stopped being
+    #: a fold over one instance's start/stop events. It pairs audit-log entries
+    #: by `operation.id` so a FAILED create is not counted as a run, merges the
+    #: Admin Activity log with the System Event log (preemption and guest
+    #: shutdown are only in the latter), keys everything on `(zone, name)` so a
+    #: machine that has since been DELETED still counts, and models
+    #: flex-start's create->delete billing separately from spot's running
+    #: intervals. That is a program, not a pipeline.
+    #:
+    #: Set `gcp_gpu_spend_memoi=y` for the cached variant. That is what the
+    #: budget preflight on every `gcp-gpu-up` wants: three gcloud round trips
+    #: is too slow to pay for on every create, and the answer barely moves.
+    ensure-cmd gcp_spend.py @RET
+    h-gcp-gpu-conf-assert gcp_gpu_project @RET
+
+    local -x GCP_SPEND_PRICES GCP_SPEND_BILLING_DATASET GCP_SPEND_BILLING_ACCOUNT
+    GCP_SPEND_PRICES="$(h-gcp-gpu-price-json)"
+    GCP_SPEND_BILLING_DATASET="${gcp_gpu_billing_dataset}"
+    GCP_SPEND_BILLING_ACCOUNT="${gcp_gpu_billing_account}"
+
+    local -a args
+    args=(
+        --project "${gcp_gpu_project}"
+        --owner "${gcp_gpu_owner}"
+        --lookback-days "${gcp_gpu_audit_lookback_days}"
+    )
+    #: Every disk the tooling creates is found by label or by the name of the
+    #: instance it belongs to. The standing data disk is ours and carries
+    #: neither, so it has to be named.
+    test -n "${gcp_gpu_data_disk}" && args+=( --extra-disk "${gcp_gpu_data_disk}" )
+
+    if bool "${gcp_gpu_spend_memoi}" ; then
+        memoi_expire="${gcp_gpu_audit_cache_ttl}" memoi_skiperr=y memoi-eval \
+            command gcp_spend.py "${args[@]}" "$@"
+    else
+        command gcp_spend.py "${args[@]}" "$@"
+    fi
+}
+
+function h-gcp-gpu-last-month-start {
+    local y m
+    y="$(strftime '%Y' $EPOCHSECONDS)"
+    m="$(strftime '%m' $EPOCHSECONDS)"
+
+    #: `10#` so that `08` and `09` are not read as bad octal.
+    integer ny=$(( 10#$y )) nm=$(( 10#$m - 1 ))
+    if (( nm < 1 )) ; then
+        nm=12
+        ny=$(( ny - 1 ))
+    fi
+
+    local out
+    strftime -r -s out '%Y-%m-%d %H:%M:%S' "$(printf '%04d-%02d-01 00:00:00' $ny $nm)" || return $?
+    ec "$out"
+}
+
+function h-gcp-gpu-since-epoch {
+    #: `h-gcp-gpu-since-epoch (DURATION|TIMESTAMP)` -> epoch seconds.
+    #:
+    #: A TIMESTAMP is anything containing a `-`: `2026-09-01`, `2026-09-01
+    #: 14:30`, `2026-09-01T14:30:00`. Everything else is a DURATION before now
+    #: and goes to [agfi:dur2sec], so `24h`, `7d`, `1h30m` and a bare count of
+    #: seconds all work.
+    local v="${1:?}"
+
+    if [[ "$v" == *-* ]] ; then
+        local ts="${v//T/ }" out
+        if [[ "$ts" != *:* ]] ; then
+            ts+=" 00:00:00"
+        elif [[ "$ts" != *:*:* ]] ; then
+            ts+=":00"
+        fi
+        if ! strftime -r -s out '%Y-%m-%d %H:%M:%S' "$ts" ; then
+            ecerr "$0: cannot read '${v}' as a timestamp; want YYYY-MM-DD[ HH:MM[:SS]]"
             return 1
         fi
-        ec "${gcp_gpu_billing_table_cache}"
+        ec "$out"
         return 0
     fi
 
-    local table
-    table="$(command bq --project_id="${gcp_gpu_project}" ls --format=json "${gcp_gpu_project}:cloud_billing" 2>/dev/null \
-        | command jq -r '[.[]?.tableReference.tableId | select(test("^gcp_billing_export"))] | first // empty')"
-
-    if test -z "$table" ; then
-        typeset -g gcp_gpu_billing_table_cache=NONE
-        return 1
-    fi
-
-    typeset -g gcp_gpu_billing_table_cache="${gcp_gpu_project}.cloud_billing.${table}"
-    ec "${gcp_gpu_billing_table_cache}"
-}
-
-function h-gcp-gpu-spend-bq {
-    #: `h-gcp-gpu-spend-bq FROM_EPOCH TO_EPOCH` -> TSV of `service<TAB>eur`.
-    local from="${1:?}" to="${2:?}" table
-    table="$(h-gcp-gpu-billing-table)" || return 1
-
-    local query
-    query="SELECT service.description AS service, ROUND(SUM(cost), 4) AS eur
-FROM \`${table}\`
-WHERE usage_start_time >= TIMESTAMP_SECONDS(${from})
-  AND usage_start_time <  TIMESTAMP_SECONDS(${to})
-  AND EXISTS (SELECT 1 FROM UNNEST(labels) l
-              WHERE l.key = 'owner' AND l.value = '${gcp_gpu_owner}')
-GROUP BY service
-HAVING eur > 0
-ORDER BY eur DESC"
-
-    command bq --project_id="${gcp_gpu_project}" query \
-        --use_legacy_sql=false --format=json --quiet "$query" 2>/dev/null \
-        | command jq -r '.[]? | [.service, .eur] | @tsv'
-}
-
-function h-gcp-gpu-audit-events {
-    #: `h-gcp-gpu-audit-events FROM_EPOCH [INSTANCE]`
-    #:
-    #: Admin Activity audit logs are always on, free, and readable without any
-    #: extra role -- unlike Data Access logs, which are off in this project.
-    #: That is what makes the fallback estimate possible at all.
-    ##
-    local from="${1:?}" name="${2:-${gcp_gpu_instance}}"
-
-    #: The `timestamp` bound is not an optimisation, it is the difference
-    #: between 6 seconds and minutes: unbounded, the backend walks the whole
-    #: 400-day retention window, and `gcp-gpu-status` becomes unusable.
-    #: `--max-run-duration` caps a single run at ${gcp_gpu_max_run}, so looking
-    #: back a few days before the window provably catches a run that was
-    #: already going when the window opened.
-    #:
-    #: `from` is always a month or day boundary, so `since` is stable and the
-    #: memoi key actually hits instead of missing once a second.
-    local since
-    local -x TZ=UTC
-    strftime -s since '%Y-%m-%dT%H:%M:%SZ' \
-        $(( from - gcp_gpu_audit_lookback_days * 86400 )) || return $?
-
-    memoi_expire="${gcp_gpu_audit_cache_ttl}" memoi_skiperr=y memoi-eval \
-        h-gcp-gpu-gcloud logging read \
-        "logName:\"cloudaudit.googleapis.com%2Factivity\" AND resource.type=\"gce_instance\" AND protoPayload.resourceName:\"/instances/${name}\" AND timestamp>=\"${since}\"" \
-        --limit=1000 --format=json 2>/dev/null
-}
-
-function h-gcp-gpu-spend-audit {
-    #: `h-gcp-gpu-spend-audit FROM_EPOCH TO_EPOCH` -> TSV of `service<TAB>eur`.
-    #:
-    #: Reconstructs running intervals from the audit log and multiplies by the
-    #: price table. An estimate, not billed euros: it models the VM and my
-    #: labeled disks, and nothing else (no egress, no IP, no snapshots).
-    ##
-    local from="${1:?}" to="${2:?}"
-
-    local machine="${gcp_gpu_machine}" model=STANDARD json
-    json="$(h-gcp-gpu-instance-json)"
-    if test -n "$json" ; then
-        machine="$(ec "$json" | command jq -r '.machineType | split("/") | last')"
-        model="$(ec "$json" | command jq -r '.scheduling.provisioningModel // "STANDARD"')"
-    fi
-
-    local rate
-    rate="$(h-gcp-gpu-price "$machine" "$model")"
-
-    local seconds
-    seconds="$(h-gcp-gpu-audit-events "$from" \
-        | command jq --argjson from "$from" --argjson to "$to" --argjson now "$EPOCHSECONDS" '
-            [ .[]? | { t: (.timestamp | sub("\\.[0-9]+"; "") | fromdateiso8601),
-                       m: (.protoPayload.methodName | split(".") | last) } ]
-            | sort_by(.t)
-            #: A fold, not a pairwise zip: the log repeats `start` several times
-            #: for a single boot, and a naive pairing double-counts badly.
-            | reduce .[] as $e ({run: null, out: []};
-                if ($e.m == "insert" or $e.m == "start") then
-                    (if .run == null then .run = $e.t else . end)
-                elif ($e.m | test("^(stop|delete|preempted|guestTerminate)$")) then
-                    (if .run != null then .out += [[.run, $e.t]] | .run = null else . end)
-                else . end)
-            | (if .run != null then .out + [[.run, $now]] else .out end)
-            | map((([.[1], $to] | min) - ([.[0], $from] | max)) | if . > 0 then . else 0 end)
-            | add // 0')"
-    : "${seconds:=0}"
-
-    local compute
-    compute="$(printf '%.4f' $(( rate * seconds / 3600.0 )))"
-    if (( compute > 0 )) ; then
-        printf 'Compute Engine (estimated)\t%s\n' "$compute"
-    fi
-
-    #: Disks bill whether or not anything is running, so a month-to-date figure
-    #: that omits them understates the standing floor -- the exact thing the cap
-    #: exists to catch.
-    local disk_month
-    disk_month="$(h-gcp-gpu-gcloud compute disks list --filter="$(h-gcp-gpu-label-filter)" --format=json 2>/dev/null \
-        | command jq -r --argjson p "$(h-gcp-gpu-price-disk-json)" '
-            [ .[]? | ($p[.type | split("/") | last] // 0.11) * (.sizeGb | tonumber) ] | add // 0')"
-    : "${disk_month:=0}"
-
-    local disk
-    disk="$(printf '%.4f' $(( disk_month * (to - from) / (86400.0 * 30) )))"
-    if (( disk > 0 )) ; then
-        printf 'Persistent Disk (estimated)\t%s\n' "$disk"
-    fi
-}
-
-function h-gcp-gpu-price-disk-json {
-    local k out=()
-    for k in "${(@k)gcp_gpu_price_disk}" ; do
-        out+=( "$(command jq -nc --arg k "$k" --argjson v "${gcp_gpu_price_disk[$k]}" '{($k): $v}')" )
-    done
-
-    command jq -nc --argjson a "[${(j:,:)out}]" '$a | add // {}'
+    local sec
+    sec="$(dur2sec "$v")" @RET
+    ec $(( EPOCHSECONDS - sec ))
 }
 
 function h-gcp-gpu-spend-total {
     #: `h-gcp-gpu-spend-total FROM_EPOCH TO_EPOCH` -> a bare EUR number.
     #: Sets `$gcp_gpu_spend_source` to `bigquery` or `audit-estimate`.
-    local from="${1:?}" to="${2:?}" rows
+    #:
+    #: FLEET-WIDE, and that is the whole point of this rewrite. The previous
+    #: implementation summed the running intervals of the single CONFIGURED
+    #: instance name, so it was blind to every other machine the tooling can
+    #: create. Measured 2026-09-18: it reported EUR 9 month-to-date while nine
+    #: flex-start `a3-highgpu-8g` nodes under nine other names were burning
+    #: about EUR 300/hour. A budget guard that cannot see the fleet is not a
+    #: guard, and `gcp-gpu-up` had been asking it for permission all along.
+    local from="${1:?}" to="${2:?}" out
 
-    if rows="$(h-gcp-gpu-spend-bq "$from" "$to")" && test -n "$rows" ; then
+    if out="$(gcp_gpu_spend_memoi=y h-gcp-gpu-spend-run \
+                  --from-epoch "$from" --to-epoch "$to" --actual --bare 2>/dev/null)" \
+            && test -n "$out" ; then
         typeset -g gcp_gpu_spend_source=bigquery
-    else
-        if h-gcp-gpu-billing-table >/dev/null 2>&1 ; then
-            #: The table exists but returned nothing, which for a month-to-date
-            #: window means genuinely zero rather than a missing source.
-            typeset -g gcp_gpu_spend_source=bigquery
-            ec 0
-            return 0
-        fi
-        rows="$(h-gcp-gpu-spend-audit "$from" "$to")"
-        typeset -g gcp_gpu_spend_source=audit-estimate
+        ec "$out"
+        return 0
     fi
 
-    ec "$rows" | command awk -F'\t' '{ s += $2 } END { printf "%.4f\n", s + 0 }'
+    typeset -g gcp_gpu_spend_source=audit-estimate
+    gcp_gpu_spend_memoi=y h-gcp-gpu-spend-run --from-epoch "$from" --to-epoch "$to" --bare
 }
 
 function h-gcp-gpu-spend-source-note {
     if [[ "${gcp_gpu_spend_source}" == bigquery ]] ; then
-        ecgray "source: BigQuery billing export. Lags a few hours -- a zero here may not mean zero."
+        ecgray "source: BigQuery billing export -- billed euros. Lags a few hours, so a"
+        ecgray "        zero for the last few hours means 'not exported yet', not 'free'."
     else
-        ecgray "source: ESTIMATE from Admin Activity logs + the local price table."
-        ecgray "        The billing export into ${gcp_gpu_project}:cloud_billing was never enabled;"
-        ecgray "        no egress, IP or snapshot cost is modelled. See usage.org, Escalation."
+        ecgray "source: ESTIMATE from the Admin Activity and System Event audit logs times"
+        ecgray "        the local price table. Compute and persistent disk only: no egress,"
+        ecgray "        no external IP, no snapshots, and no resource without our owner label."
+        ecgray "        For billed euros run 'gcp-gpu-spend --actual', which prints exactly"
+        ecgray "        what has to be enabled when the export is missing."
     fi
 }
+
 ##
 function h-gcp-gpu-budget-cap {
     #: The cap is a plain number in a file so that it is trivially greppable
@@ -742,44 +724,76 @@ function gcp-gpu-budget {
     h-gcp-gpu-spend-source-note
 }
 
+function h-gcp-gpu-spend-usage {
+    ec 'usage: gcp-gpu-spend [WINDOW] [--actual] [--bare]'
+    ec ''
+    ec 'Per instance -- including instances that no longer exist -- then the disks'
+    ec 'that are still billing, then the total. Every readout says whether it is an'
+    ec 'ESTIMATE or ACTUAL, and what the estimate leaves out.'
+    ec ''
+    ec 'WINDOW is one of:'
+    ec '  --month        this calendar month, from the 1st  (the default)'
+    ec '  --last-month   the whole of the previous calendar month'
+    ec '  --week         the last 7 days'
+    ec '  --today        since midnight'
+    ec '  --all          as far back as the audit log is retained'
+    ec '  --since ARG    a duration before now (24h, 7d, 1h30m, or bare seconds)'
+    ec "                 or a timestamp (2026-09-01, '2026-09-01 14:30')"
+    ec ''
+    ec '  --actual       billed euros from the BigQuery billing export. When the'
+    ec '                 export does not exist, prints exactly how to enable it'
+    ec '                 and exits 2; it will not change billing settings itself.'
+    ec '  --bare         the total alone, for arithmetic.'
+}
+
 function gcp-gpu-spend {
+    : "usage: gcp-gpu-spend [--month|--last-month|--week|--today|--all|--since ARG] [--actual] [--bare]"
+    #: Fleet-wide and history-aware, which the previous version was not: it
+    #: folded the start/stop events of the one CONFIGURED instance name, so a
+    #: fleet under other names was simply invisible to it. See
+    #: [agfi:h-gcp-gpu-spend-total] for what that cost us.
+    #:
+    #: `--actual` will not enable the billing export itself. The billing
+    #: account is shared, and reconfiguring what six other editors depend on is
+    #: a deliberate act by a human who has read the consequences.
     h-gcp-gpu-deps @RET
 
-    local from to label="month"
-    case "${1}" in
-        --today)
-            from="$(h-gcp-gpu-day-start)" ; label=today ;;
-        --month|'')
-            from="$(h-gcp-gpu-month-start)" ; label=month ;;
-        *)
-            ecerr "$0: usage: $0 [--today|--month]"
-            return 1 ;;
-    esac
-    to="$EPOCHSECONDS"
+    local from='' to="$EPOCHSECONDS" label='this month'
+    local -a flags
+    while (( $# )) ; do
+        case "$1" in
+            --month|--this-month)
+                from="$(h-gcp-gpu-month-start)" ; label='this month' ; shift ;;
+            --last-month)
+                from="$(h-gcp-gpu-last-month-start)" @RET
+                to="$(h-gcp-gpu-month-start)" ; label='last month' ; shift ;;
+            --week)
+                from=$(( EPOCHSECONDS - 7 * 86400 )) ; label='the last 7 days' ; shift ;;
+            --today)
+                from="$(h-gcp-gpu-day-start)" ; label='today' ; shift ;;
+            --all)
+                from=$(( EPOCHSECONDS - gcp_gpu_audit_retention_days * 86400 ))
+                label="all time, to the ${gcp_gpu_audit_retention_days}d audit-log horizon"
+                shift ;;
+            --since)
+                from="$(h-gcp-gpu-since-epoch "${2:?--since needs a duration or a timestamp}")" @RET
+                label="since ${2}" ; shift 2 ;;
+            --actual|--bare)
+                flags+=( "$1" ) ; shift ;;
+            -h|--help)
+                h-gcp-gpu-spend-usage ; return 0 ;;
+            *)
+                ecerr "$0: unknown argument '${1}'"
+                h-gcp-gpu-spend-usage >&2
+                return 1 ;;
+        esac
+    done
+    : "${from:=$(h-gcp-gpu-month-start)}"
 
-    local rows
-    if rows="$(h-gcp-gpu-spend-bq "$from" "$to")" && test -n "$rows" ; then
-        typeset -g gcp_gpu_spend_source=bigquery
-    else
-        if h-gcp-gpu-billing-table >/dev/null 2>&1 ; then
-            typeset -g gcp_gpu_spend_source=bigquery
-            rows=''
-        else
-            rows="$(h-gcp-gpu-spend-audit "$from" "$to")"
-            typeset -g gcp_gpu_spend_source=audit-estimate
-        fi
-    fi
-
-    ec "spend this ${label}, owner=${gcp_gpu_owner}:"
-    if test -z "$rows" ; then
-        ec "  (nothing)"
-    else
-        ec "$rows" | command awk -F'\t' '{ printf "  %-34s EUR %8.2f\n", $1, $2 ; s += $2 }
-                                          END { printf "  %-34s EUR %8.2f\n", "TOTAL", s + 0 }'
-    fi
-    h-gcp-gpu-spend-source-note
+    h-gcp-gpu-spend-run --from-epoch "$from" --to-epoch "$to" \
+        --window-label "$label" "${flags[@]}"
 }
-##
+
 function gcp-gpu-advice {
     #: `gcp-gpu-advice [SHAPE...]` -> which region can actually GIVE me this
     #: GPU right now. Free: it creates nothing.
