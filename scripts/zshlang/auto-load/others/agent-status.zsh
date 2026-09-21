@@ -162,7 +162,7 @@ function agent-status {
         agents=(
             claude
             codex
-            agy
+            # agy
         )
     fi
 
