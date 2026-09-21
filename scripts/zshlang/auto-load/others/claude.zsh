@@ -1034,7 +1034,7 @@ function h-claude-code-usage-arm-result-format {
             if [[ "${kind}" == weekly ]] ; then
                 ec "weekly has at least ${claude_code_usage_arm_weekly_remaining_pct}% remaining, not armed"
             else
-                ec "5h available, not armed"
+                ec "5h available, not armed (use \`deus\` to arm anyway)"
             fi
             ;;
         absent)
