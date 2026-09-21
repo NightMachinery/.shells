@@ -398,7 +398,7 @@ function pbadd {
     ##
     @darwinOnly
 
-    assert copy_files.swift "${(f@)$(re 'grealpath --' $@)}" @RET
+    assert copy_files.swift "${(f@)$(re realpath2 $@)}" @RET
 
     ##
     if bool "${pbadd_image_preview_p:-y}" ; then
