@@ -20,7 +20,7 @@
     ],
     "defaultMode": "plan"
   },
-  "model": "claude-fable-5-1[1m]",
+  "model": "sonnet",
   "hooks": {
     "PreToolUse": [
       {
@@ -132,5 +132,6 @@
   "remoteControlAtStartup": true,
   "inputNeededNotifEnabled": true,
   "agentPushNotifEnabled": true,
-  "voiceEnabled": false
+  "voiceEnabled": false,
+  "switchModelsOnFlag": false
 }

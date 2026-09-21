@@ -1,6 +1,9 @@
 {
   "permissions": {
     "allow": [
+      "Bash(git *)",
+      "Read(//Users/evar/code/skills/html-reports/skills/html-reports/**)",
+      "Bash(sh tests/run.sh)"
     ],
     "deny": []
   }
