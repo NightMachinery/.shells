@@ -87,10 +87,17 @@ EOF
 
 ##
 alias mac-mail-log="sudo log stream --predicate  '(process == \"smtpd\") || (process == \"smtp\")' --info" #this command starts filtering, so after that you get log messages when you start accessing smtp.
+##
+function os-lock {
+    : "Command+Ctrl+q locks natively; Use lock.as to press them ;)) (Needs assistive access)"
 
-alias lock='"/System/Library/CoreServices/Menu Extras/User.menu/Contents/Resources/CGSession" -suspend ; pmset displaysleepnow' # Command+Ctrl+q locks natively; Use lock.as to press them ;)) (Needs assistive access)
+    @darwinOnly
 
-function finder-hideicons() {
+    "/System/Library/CoreServices/Menu Extras/User.menu/Contents/Resources/CGSession" -suspend @RET
+    pmset displaysleepnow @RET
+}
+##
+function finder-hide-desktop-icons {
     defaults write com.apple.finder CreateDesktop false
     killall Finder
 }
