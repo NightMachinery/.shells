@@ -830,7 +830,10 @@ or set `claude_code_usage_arm_p=y` on a plain one:
 - `claude-code-usage-work-notify` (aliases `ccu-work-notify`,
   `ccs-work-notify`) — the work profile.
 - `claude-code-usage-all-notify` (aliases `ccu-notify`, `ccs-notify`,
-  `claude-code-status-notify`) — every profile, like the bare short names.
+  `claude-code-status-notify`) — every profile, like the bare short names. It
+  also arms a separate account-wide weekly notification when weekly remaining
+  is strictly below `claude_code_usage_arm_weekly_remaining_pct` (5 by
+  default), so the later weekly reset does not replace the 5-hour job.
 - `claude-code-usage-fable-notify` — the default profile's report, but
   scheduling the weekly **Fable** watcher rather than the profile one. Fable is
   not a profile, only an extra window on the default profile, so it cannot be
@@ -856,7 +859,9 @@ prefix because the `-notify` reports are the intended way in, not because they
 are off limits — reach for one when you already have a report in front of you.
 
 Each armed job lives in a tmux session named for the profile it watches:
-`claude-code-usage-<profile>-armed`, plus `claude-code-usage-fable-armed`.
+`claude-code-usage-<profile>-armed`, with the all-profile notifier's extra
+weekly job in `claude-code-usage-<profile>-weekly-armed`, plus
+`claude-code-usage-fable-armed`.
 So `tmux ls` says which profile is waiting on what, and the name doubles as
 the lock that keeps one job per profile.
 
@@ -869,6 +874,15 @@ the blocked windows, because a 5-hour rollover buys nothing while the weekly
 limit is still spent. A window the profile does not have at all — a team seat
 has no weekly window — is skipped. The result goes to
 `h-agent-usage-arm`, which adds the grace and does the rest.
+
+The all-profile notifier additionally applies a strict low-quota threshold to
+the account-wide weekly window. With the default value 5, 4.9% remaining arms
+the weekly job while exactly 5% does not. Set
+`claude_code_usage_arm_weekly_remaining_pct` globally, or around one command,
+to change that cutoff. This is a distinct job from the ordinary profile job;
+it does not alter the full-limit threshold used by single-profile notifiers or
+automatic continuation. Model-scoped weekly windows remain opt-in through
+their own notifier, such as `claude-code-usage-fable-notify`.
 
 When nothing is blocking, arming is skipped with a note; running it under
 `deus` arms for the next 5-hour rollover anyway, which is how to exercise the

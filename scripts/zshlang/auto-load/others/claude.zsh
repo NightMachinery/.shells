@@ -781,6 +781,7 @@ function claude-code-usage-all {
         #: look broken.
         for p in "${profiles[@]}" ; do
             h-claude-code-usage-arm-for-profile "${p}" >&2 || true
+            h-claude-code-usage-arm-weekly-for-profile "${p}" >&2 || true
         done
     fi
 
@@ -801,6 +802,10 @@ alias ccs-notify='claude-code-usage-all-notify'
 #: reset out and resuming afterwards is agent-neutral and lives in
 #: =agent-usage.zsh= under `agent_usage_*'. See =docs/agent-usage-armed.md=.
 typeset -g claude_code_usage_arm_full_pct="${claude_code_usage_arm_full_pct:-100}"
+#: The all-profile notifier also arms a separate account-wide weekly job when
+#: strictly less than this percentage remains. Separate means the later weekly
+#: reset does not replace the ordinary 5-hour notification.
+typeset -g claude_code_usage_arm_weekly_remaining_pct="${claude_code_usage_arm_weekly_remaining_pct:-5}"
 
 function h-claude-code-usage-arm-window {
     #: Prints "<percent>\t<resets_at_epoch>\t<label>" for one window of a
@@ -860,6 +865,14 @@ function h-claude-code-usage-arm-session {
     ec "claude-code-usage-${profile}-armed"
 }
 
+function h-claude-code-usage-arm-weekly-session {
+    #: The extra low-weekly-quota job used by the all-profile notifier.
+    local profile="${1}"
+    assert-args profile @RET
+
+    ec "claude-code-usage-${profile}-weekly-armed"
+}
+
 function h-claude-code-usage-arm {
     #: Arms, or re-arms, a one-shot notification for when the limits that
     #: currently block us have reset.
@@ -875,6 +888,8 @@ function h-claude-code-usage-arm {
     #: its bookkeeping included. See =docs/agent-usage-armed.md=.
     ##
     local full_pct="${claude_code_usage_arm_full_pct:-100}"
+    local full_exclusive_p="${claude_code_usage_arm_full_exclusive_p:-n}"
+    local reset_message="${claude_code_usage_arm_reset_message:-reset, usage available again}"
 
     local session="${1}" profile="${2}"
     assert-args session profile @RET
@@ -900,7 +915,10 @@ function h-claude-code-usage-arm {
         resets="${${out#*$'\t'}%%$'\t'*}"
         label="${out##*$'\t'}"
 
-        if (( pct >= full_pct )) && (( resets > 0 )) ; then
+        if (( resets > 0 )) && {
+            { bool "${full_exclusive_p}" && (( pct > full_pct )) } ||
+            { ! bool "${full_exclusive_p}" && (( pct >= full_pct )) }
+        } ; then
             blocked_labels+=("${label}")
 
             #: The LATEST reset among the blocked windows is when we are
@@ -927,7 +945,7 @@ function h-claude-code-usage-arm {
         msg="Claude Code (${profile}): ${out##*$'\t'} window rolled over"
     else
         reset_at=${blocked_at}
-        msg="Claude Code (${profile}): ${(j:, :)blocked_labels} reset, usage available again"
+        msg="Claude Code (${profile}): ${(j:, :)blocked_labels} ${reset_message}"
     fi
 
     #: The seat whose limit we are waiting on, so the tmux picker offers only
@@ -952,6 +970,32 @@ function h-claude-code-usage-arm-for-profile {
     session="$(h-claude-code-usage-arm-session "${profile}")" @RET
 
     h-claude-code-usage-arm "${session}" "${profile}" session weekly_all
+}
+
+function h-claude-code-usage-arm-weekly-for-profile {
+    #: Arms the separate low-weekly-quota job. The cutoff is expressed as
+    #: remaining quota for the public knob, while Claude reports utilization.
+    local remaining_pct="${claude_code_usage_arm_weekly_remaining_pct:-5}"
+    if [[ "${remaining_pct}" != <->(|.<->) ]] ||
+        (( remaining_pct < 0 || remaining_pct > 100 )) ; then
+        ecerr "$0: claude_code_usage_arm_weekly_remaining_pct must be between 0 and 100"
+        return 1
+    fi
+
+    local profile="${1}"
+    assert-args profile @RET
+
+    local session
+    session="$(h-claude-code-usage-arm-weekly-session "${profile}")" @RET
+
+    #: Strictly less than N percent remaining is strictly more than 100-N
+    #: percent utilized. The exclusive comparison keeps exactly 5% out when
+    #: the default is in force, including for fractional legacy percentages.
+    local used_pct=$(( 100 - remaining_pct ))
+    claude_code_usage_arm_full_pct="${used_pct}" \
+        claude_code_usage_arm_full_exclusive_p=y \
+        claude_code_usage_arm_reset_message='reset, weekly quota replenished' \
+        h-claude-code-usage-arm "${session}" "${profile}" weekly_all
 }
 
 #: Scheduling entry points. These arm the job and print no report,
@@ -1062,6 +1106,7 @@ function claude-code-usage-armed-sessions {
     local profile out=()
     for profile in "${claude_code_profile_order[@]}" ; do
         out+=("$(h-claude-code-usage-arm-session "${profile}")")
+        out+=("$(h-claude-code-usage-arm-weekly-session "${profile}")")
     done
     out+=('claude-code-usage-fable-armed')
 
