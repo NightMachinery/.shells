@@ -808,6 +808,40 @@ A live source is refused, since the running process keeps appending to it
 and the fork would be stale at once; quit that session first, or set
 `claude_code_session_import_force_p=y` to fork whatever exists now.
 
+### Resuming an in-process subagent
+
+An Agent-tool child has no session of its own: its transcript sits at
+`<parent uuid>/subagents/agent-<id>.jsonl`, every line marked as a sidechain
+of the parent. `claude-code-subagent-promote` copies it into a new top-level
+session, and the resume commands continue it like any other:
+
+```
+claude-resume-subagent-work <agent id>        # promote into work and resume there
+claude-code-subagent-resume <agent id> [profile] [claude args...]
+claude-code-subagent-promote <agent id> [profile]   # only write the copy, print its path
+```
+
+The argument is the transcript path or the agent id (`agent-` prefix optional,
+a unique prefix is enough), looked up under every profile. The copy gets a new
+uuid, `sessionId` set to it, `isSidechain` false and `agentId` dropped; message
+text is untouched, so paths to the parent's persisted tool output still work.
+It lands in the project directory of the child's own cwd, where the resume
+runs, and is named `<parent name> › <description> ⑂ <profile>`. Moving into a
+non-default profile asks first, as the import does.
+
+It refuses a child that may still be running: one written in the last
+`claude_code_subagent_promote_quiet_m` minutes (5), or whose last line is not a
+finished assistant turn. `claude_code_subagent_promote_force_p=y` overrides,
+for a child that died mid-call. A finished child can still be woken by its
+parent's `SendMessage`, so make sure the parent will not continue it.
+
+The promoted session is a main session, not the child: it gets the main system
+prompt, the full tool set and the target profile's instruction files, and the
+launcher's default model unless you pass `--model` (the promote prints the
+child's type and model as a reminder). Verified 2026-09-23 on a finished
+general-purpose child resumed under work with `--model sonnet`: it recalled
+its task in one line.
+
 
 ## Reset notifications
 

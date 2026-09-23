@@ -434,7 +434,8 @@ function h-claude-code-session-live-row-of {
 
 function h-claude-code-session-import-confirm {
     : "usage: h-claude-code-session-import-confirm <caller> <from-profile> <to-profile>"
-    #: The consent step of [agfi:claude-code-session-import]: a conversation moving into another
+    #: The consent step of [agfi:claude-code-session-import] and
+    #: [agfi:claude-code-subagent-promote]: a conversation moving into another
     #: non-default profile enters that profile's store before its overlay --
     #: the privacy guardrails of [agfi:claude-work] -- ever applies, so ask
     #: first unless claude_code_session_import_yes_p=y. Staying in the same
@@ -740,6 +741,197 @@ function claude-resume-work {
 }
 aliasfn claude-resume-work-fz claude-code-session-resume-fz work
 aliasfn claude-resume-work-all-fz claude_code_session_resume_scope=all claude-code-session-resume-fz work
+##
+#: Promoting an in-process subagent to a session of its own
+##
+function h-claude-code-subagent-resolve {
+    : "usage: h-claude-code-subagent-resolve <agent transcript|agent id>"
+    #: An in-process subagent's transcript from its path or its agent id (with
+    #: or without the `agent-' prefix; a unique prefix will do), looked up
+    #: under every profile. Such a transcript lives beside its parent's, at
+    #: =<projects>/<encoded cwd>/<parent uuid>/subagents/agent-<id>.jsonl=,
+    #: next to an `agent-<id>.meta.json' describing it.
+    ##
+    setopt localoptions bareglobqual
+
+    local input="${1}"
+    assert-args input @RET
+
+    if [[ "${input}" == *.jsonl ]] || [[ "${input}" == */* ]] ; then
+        if ! test -e "${input}" ; then
+            ecerr "$0: transcript does not exist: ${input}"
+            return 1
+        fi
+        ec "${input:a}"
+        return 0
+    fi
+
+    local id="${input#agent-}"
+
+    local -a projects_dirs
+    projects_dirs=("${(@f)$(h-claude-code-session-projects-dirs)}") @TRET
+
+    local -a hits
+    local d
+    for d in "${projects_dirs[@]}" ; do
+        hits+=( "${d}"/*/*/subagents/agent-"${id}"*.jsonl(N) )
+    done
+
+    if (( ${#hits} == 0 )) ; then
+        ecerr "$0: no subagent matches '${input}' under: ${(j:, :)projects_dirs}"
+        return 1
+    elif (( ${#hits} > 1 )) ; then
+        ecerr "$0: '${input}' is ambiguous:"
+        ecerr "  ${(pj:\n  :)hits}"
+        return 1
+    fi
+
+    ec "${hits[1]}"
+}
+
+function claude-code-subagent-promote {
+    : "usage: claude-code-subagent-promote <agent transcript|agent id> [to-profile]
+Copies an in-process subagent's transcript into a new top-level session; prints its path."
+    #: An Agent-tool child cannot be resumed as it is: every line of its
+    #: transcript is a sidechain line (`isSidechain: true', an `agentId', and
+    #: the *parent's* `sessionId'), and its file name is not a uuid. This
+    #: writes a rewritten copy as an ordinary session of <to-profile> (the
+    #: source's own profile by default) under a new uuid: `sessionId' set to
+    #: it, `isSidechain' false, `agentId' and `attributionAgent' (which no
+    #: top-level line carries) dropped. Only those fields are touched, with
+    #: jq, since the parent's uuid also appears in message text as the paths
+    #: of persisted tool output, which must keep pointing where they point.
+    #: The source is never modified.
+    #:
+    #: The copy goes into the project directory of the subagent's own cwd
+    #: ([agfi:h-agent-session-dir]), which is where the resume runs, and which
+    #: is often not the parent's: a parent that cd'd before spawning passes
+    #: its new cwd on. It is named `<parent name> › <description>' plus the
+    #: fork suffix, via [agfi:h-claude-code-session-title-append].
+    #:
+    #: What it does not carry over: the child's system prompt, tool set and
+    #: model. The promoted session starts with the main-session system prompt
+    #: and the target profile's instruction files, and the launcher's default
+    #: model unless you pass `--model'; the meta file's type and model are
+    #: printed as a reminder.
+    #:
+    #: A child still running would keep writing the source while the copy
+    #: acts on its own, so refuse unless the transcript has been quiet for
+    #: claude_code_subagent_promote_quiet_m minutes and ends on a finished
+    #: assistant turn (no pending tool call). A child that died mid-call
+    #: fails the second test forever; claude_code_subagent_promote_force_p=y
+    #: goes ahead once you have checked it is really gone.
+    ##
+    #: Claude Code's own shell runs commands under NO_BARE_GLOB_QUAL; the
+    #: `(Nmm-...)' below needs the option back to be a qualifier at all.
+    setopt localoptions bareglobqual
+
+    local force_p="${claude_code_subagent_promote_force_p:-n}"
+    local quiet_m="${claude_code_subagent_promote_quiet_m:-5}"
+
+    local input="${1}"
+    assert-args input @RET
+    ensure-cmd jq uuidgen @RET
+    h-claude-code-session-dep @RET
+
+    local source
+    source="$(h-claude-code-subagent-resolve "${input}")" @RET
+    if [[ "${source:t}" != agent-*.jsonl ]] || [[ "${source:h:t}" != subagents ]] ; then
+        ecerr "$0: not a subagent transcript (<parent uuid>/subagents/agent-<id>.jsonl): ${source}"
+        return 1
+    fi
+    local agent_id="${${source:t:r}#agent-}"
+
+    local from_profile
+    from_profile="$(h-claude-code-session-profile-of "${source}")" @RET
+    local to_profile="${2:-${from_profile}}"
+    h-claude-code-profile-assert "${to_profile}" @RET
+
+    local -a recent
+    recent=( "${source}"(Nmm-${quiet_m}) )
+    local finished_p
+    finished_p="$(command tail -n 1 -- "${source}" | command jq -r 'if .type == "assistant" and ([.message.content[]? | select(.type == "tool_use")] | length) == 0 then "y" else "n" end' 2>/dev/null)" || finished_p=n
+    if (( ${#recent} )) || [[ "${finished_p}" != y ]] ; then
+        local why="it ends on a pending tool call or a user turn"
+        (( ${#recent} )) && why="it was written in the last ${quiet_m} minutes"
+        if bool "${force_p}" ; then
+            ecerr "$0: warning: the subagent may still be running (${why}); the copy stops where it is now"
+        else
+            ecerr "$0: the subagent may still be running (${why}). Stop it first so two copies never act, or set claude_code_subagent_promote_force_p=y."
+            return 1
+        fi
+    fi
+
+    h-claude-code-session-import-confirm "$0" "${from_profile}" "${to_profile}" @RET
+
+    local to_home
+    to_home="$(h-claude-code-profile-config-home "${to_profile}")" @RET
+
+    #: The encoding Claude Code uses for project directories; see
+    #: [agfi:h-claude-code-session-live-list-sh]. The parent's is the fallback.
+    local enc cwd
+    if cwd="$(h-agent-session-dir "${source}" claude 2>/dev/null)" && test -n "${cwd}" ; then
+        enc="${cwd//[^[:alnum:]]/-}"
+    else
+        enc="${source:h:h:h:t}"
+    fi
+
+    local new
+    new="${$(uuidgen):l}" @TRET
+
+    local target_dir="${to_home}/projects/${enc}"
+    local target="${target_dir}/${new}.jsonl"
+    assert mkdir -p "${target_dir}" @RET
+    if ! command jq --compact-output --arg sid "${new}" \
+        '.sessionId = $sid | .isSidechain = false | del(.agentId, .attributionAgent)' \
+        "${source}" > "${target}.tmp" ; then
+        ecerr "$0: could not rewrite ${source}"
+        command rm -f -- "${target}.tmp"
+        return 1
+    fi
+    assert command mv -- "${target}.tmp" "${target}" @RET
+
+    local meta="${source:r}.meta.json" desc='' agent_type='' model=''
+    if test -e "${meta}" ; then
+        desc="$(command jq -r '.description // empty' "${meta}")" || desc=''
+        agent_type="$(command jq -r '.agentType // empty' "${meta}")" || agent_type=''
+        model="$(command jq -r '.model // empty' "${meta}")" || model=''
+    fi
+
+    local parent_name=''
+    parent_name="$(agent_session claude name "${source:h:h}.jsonl" 2>/dev/null)" || parent_name=''
+    parent_name="$(h-claude-code-session-name-unforked "${parent_name}")" @TRET
+
+    local new_name
+    new_name="$(h-claude-code-session-fork-name "${parent_name:+${parent_name} › }${desc:-agent-${agent_id}}" "${to_profile}")" @TRET
+    h-claude-code-session-title-append "${target}" "${new_name}" "${new}" @RET
+
+    ecerr "$0: ${from_profile} -> ${to_profile}: '${new_name}' (${new}); it ran as ${agent_type:-?} on model ${model:-inherited}, and resumes with the main-session system prompt"
+    ec "${target}"
+}
+
+function claude-code-subagent-resume {
+    : "usage: claude-code-subagent-resume <agent transcript|agent id> [to-profile] [claude args...]
+Promotes an in-process subagent with claude-code-subagent-promote and resumes the copy."
+    ##
+    local session="${1}" to_profile="${2}"
+    local -a extra
+    extra=("${@[3,-1]}")
+    assert-args session @RET
+
+    local transcript
+    transcript="$(claude-code-subagent-promote "${session}" "${to_profile}")" @RET
+
+    claude-code-session-resume "${transcript}" '' "${extra[@]}"
+}
+aliasfn claude-resume-subagent claude-code-subagent-resume
+
+function claude-resume-subagent-work {
+    : "usage: claude-resume-subagent-work <agent transcript|agent id> [claude args...]"
+    #: [agfi:claude-code-subagent-resume] into the work profile.
+    ##
+    claude-code-subagent-resume "${1}" work "${@[2,-1]}"
+}
 ##
 #: The adapter: what =agent-session.zsh= asks of an agent, spelled
 #: `h-claude-session-<verb>'. See =docs/agent-sessions.md=.
