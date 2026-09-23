@@ -625,20 +625,20 @@ def render_vm_detail(st: Style, inst: dict, probe: tuple[str, str]) -> None:
 
 
 ##
-#: States in which an instance is billed for its machine.  RUNNING always.  A
-#: FLEX_START VM is billed for as long as it EXISTS, from create to delete, so
-#: one that has stopped but not yet been deleted still costs its full rate --
-#: the same model gcp_spend.py folds month-to-date with, so the burn here and
-#: the spend there cannot disagree about it.  PROVISIONING and STAGING are not
-#: billed: capacity has not been handed over yet.
-FLEX_BILLED_STATES = {"RUNNING", "STOPPING", "TERMINATED", "SUSPENDING", "SUSPENDED"}
-
-
 def billing_p(inst: dict) -> bool:
-    status = inst.get("status", "")
-    if model_of(inst) == "FLEX_START":
-        return status in FLEX_BILLED_STATES
-    return status == "RUNNING"
+    """Is this instance billed for its machine right now?  Only when RUNNING.
+
+    Every provisioning model, flex-start included: Google's flex-start
+    announcement says stopping "pauses billing and releases the underlying
+    resources", and the stop/suspend overview charges no CPU in STOPPING,
+    TERMINATED, SUSPENDING or SUSPENDED.  Disks keep billing in every state,
+    and are counted separately.  PROVISIONING and STAGING are not billed
+    either: capacity has not been handed over yet.
+
+    gcp_spend.py folds month-to-date over the same running intervals, so the
+    burn here and the spend there agree.
+    """
+    return inst.get("status", "") == "RUNNING"
 
 
 def gpus_of(inst: dict) -> tuple[int, str]:
@@ -735,9 +735,6 @@ def cmd_fleet(args: argparse.Namespace) -> int:
             print(f"  {st(f'{status:<11}', state_rgb)} {st(f'{n:>3}', dim)}  "
                   f"{st(f'{machine:<15}', dim)} {st(f'{model:<10}', model_rgb)}  "
                   f"{st(f'{zone:<16}', dim)} {st(f'{gpus:<22}', dim)} {st(eur, dim)}")
-
-        if any(billing_p(i) and i.get("status") != "RUNNING" for i in insts):
-            print(st("  a stopped FLEX_START VM still bills until it is DELETED, so it is counted.", GRAY))
 
     if billing_gpus:
         print(f"{label('gpus billing')}"

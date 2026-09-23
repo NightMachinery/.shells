@@ -41,12 +41,16 @@ hard way from this project's own history:
    the System Event log, and without them a spot VM that died at hour 3 and was
    deleted at hour 20 reads as seventeen hours of H100 that nobody paid for.
 
-3. Flex-start VMs cannot be stopped and resumed: their termination action must
-   be DELETE, and they bill for every hour the VM *exists*, not for the hours
-   it was RUNNING.  So a flex node whose guest shut itself down at 12:50 and
-   that was deleted at 14:26 is charged to 14:26.  For FLEX_START rows this
-   file therefore folds create->delete and ignores the intermediate stop-ish
-   events; for SPOT and STANDARD rows it folds the running intervals.
+3. Flex-start VMs bill like every other VM: compute only while RUNNING, disks
+   until deleted.  Google's flex-start announcement says "you can stop an
+   instance to pause billing and release the underlying resources", and a
+   later start places a new capacity request; the stop/suspend overview says
+   no CPU is charged in STOPPING or TERMINATED.  This file used to fold
+   FLEX_START rows create->delete on the belief that a stopped flex VM kept
+   billing until deleted, which over-reported every flex node that sat
+   stopped before its delete.  All rows now fold the running intervals, and
+   a create counts from its COMPLETION, so a request queued in Dynamic
+   Workload Scheduler costs nothing until the VM exists.
 """
 
 from __future__ import annotations
@@ -192,26 +196,15 @@ class Machine:
     def key(self):
         return (self.zone, self.name)
 
-    def is_flex(self):
-        return (self.model or "").upper() == "FLEX_START"
-
     def intervals(self, frm, to, now):
-        """Billing intervals clipped to [frm, to], as a list of (start, end)."""
-        if self.is_flex():
-            #: create -> delete, whatever happened in between.  A flex VM
-            #: cannot be stopped and resumed, so there is exactly one span of
-            #: existence per create, and every hour of it is billed.
-            ups = [e for e in self.events if e[2] == "insert"]
-            downs = [e for e in self.events if e[2] == "delete"]
-            evs = sorted(ups + downs)
-            if not downs and not self.alive:
-                #: The delete fell outside the log window; the last stop-ish
-                #: event is the best end we have.
-                tail = [e for e in self.events if e[1] == "down"]
-                if tail:
-                    evs = sorted(evs + [max(tail)])
-        else:
-            evs = sorted(e for e in self.events if e[2] not in IGNORED_METHODS)
+        """Billing intervals clipped to [frm, to], as a list of (start, end).
+
+        The running intervals, for every provisioning model: a stopped VM,
+        flex-start included, bills its disks and not its machine.  See point 3
+        of the module docstring, and `billing_p` in gcp_status.py, which must
+        agree with this.
+        """
+        evs = sorted(e for e in self.events if e[2] not in IGNORED_METHODS)
 
         out = []
         run = None
@@ -564,8 +557,8 @@ def render_estimate(args, inst_rows, dsk_rows, price, frm, to):
     print("  source  instance uptime reconstructed from the Admin Activity and System")
     print("          Event audit logs, times the local list-price table.")
     print("  counts  Compute Engine machine-hours (vCPU + RAM + GPU + local SSD) and")
-    print("          persistent disk. FLEX_START rows bill create->delete, since such a")
-    print("          VM cannot be stopped and resumed.")
+    print("          persistent disk. Machines bill while RUNNING, flex-start included;")
+    print("          disks bill until deleted.")
     print("  misses  network egress, external IP, snapshots, images, GCS, sustained-use")
     print("          and committed-use discounts, promotional credits, and anything not")
     print(f"          labelled owner={args.owner}.")

@@ -34,9 +34,11 @@ Two ownership rules in block 2 are easy to get wrong:
   carry no owner label at all, so a labelled `disks list` misses exactly the
   disks a fleet creates. The rule is `disk_is_ours` in `gcp_spend.py`, shared
   so the burn and the spend estimate count the same disks.
-- A FLEX_START VM bills from create to delete, so one that has stopped but
-  not been deleted is still counted at its full rate, and the block says so.
-  That is also how the month-to-date estimate folds it.
+- A machine bills only while RUNNING, flex-start included: stopping a
+  flex-start VM pauses its compute billing and releases the capacity (a start
+  re-enters the queue), and its disks keep billing like anyone else's. Both
+  this block and the month-to-date estimate count it that way. They used to
+  bill a stopped FLEX_START VM until its delete, which over-reported.
 
 Colour is on when stdout is a terminal that speaks 24-bit colour, kitty above
 all (`h-gcp-gpu-rich-p`: `TERM=xterm-kitty`, `$KITTY_WINDOW_ID`, or
@@ -178,9 +180,14 @@ cost real money to learn:
 - Preemption and guest-initiated shutdown are not in the Admin Activity log
   at all. They are System Event entries, and without reading that second log
   a preempted VM appears to keep billing until somebody deletes it.
-- Flex-start VMs cannot be stopped and resumed, and they bill for every hour
-  the VM *exists*, not for the hours it was RUNNING. Those rows are therefore
-  folded create-to-delete; spot and standard rows fold running intervals.
+- Every row folds the running intervals, flex-start included. Google's
+  flex-start announcement says "you can stop an instance to pause billing and
+  release the underlying resources", and the stop/suspend overview charges no
+  CPU in STOPPING or TERMINATED, only the attached disks and IPs. An earlier
+  version folded flex-start create-to-delete on the belief that a stopped
+  flex VM kept billing, which over-reported every node that sat stopped
+  before its delete. A create counts from its completion, so a request
+  queued for capacity costs nothing until the VM exists.
 
 Instances that still exist are cross-checked against the API's own
 `creationTimestamp`, `lastStartTimestamp` and `lastStopTimestamp`, which

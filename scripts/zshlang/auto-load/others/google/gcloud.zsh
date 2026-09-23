@@ -527,9 +527,10 @@ function h-gcp-gpu-spend-run {
     #: by `operation.id` so a FAILED create is not counted as a run, merges the
     #: Admin Activity log with the System Event log (preemption and guest
     #: shutdown are only in the latter), keys everything on `(zone, name)` so a
-    #: machine that has since been DELETED still counts, and models
-    #: flex-start's create->delete billing separately from spot's running
-    #: intervals. That is a program, not a pipeline.
+    #: machine that has since been DELETED still counts, and folds each
+    #: machine's running intervals from completed operations only, so a
+    #: flex-start request queued for capacity costs nothing until the VM
+    #: exists. That is a program, not a pipeline.
     #:
     #: Set `gcp_gpu_spend_memoi=y` for the cached variant. That is what the
     #: budget preflight on every `gcp-gpu-up` wants: three gcloud round trips
