@@ -323,6 +323,12 @@ function h-agent-session-select-fz {
     done
     lines="${lines%$'\n'}"
 
+    #: Only the subagent transcripts, for pickers whose command takes nothing
+    #: else ([agfi:claude-code-subagent-resume-fz]).
+    if bool "${agent_session_fz_subagents_only_p:-n}" ; then
+        lines="$(ec "${lines}" | gawk -F'\t' '$2 ~ /\/subagents\//')"
+    fi
+
     if test -z "${lines}" ; then
         ecerr "$0: no sessions for scope '${scope}' (agents: ${(j:, :)agents})"
         return 1

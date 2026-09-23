@@ -926,12 +926,42 @@ Promotes an in-process subagent with claude-code-subagent-promote and resumes th
 }
 aliasfn claude-resume-subagent claude-code-subagent-resume
 
+
+function claude-code-subagent-resume-fz {
+    : "usage: claude-code-subagent-resume-fz [to-profile] [claude args...]"
+    #: Picks a subagent transcript with the session picker, restricted to
+    #: subagents, and hands it to [agfi:claude-code-subagent-resume]. Scoped
+    #: like [agfi:claude-code-session-resume-fz].
+    ##
+    local scope="${claude_code_session_resume_scope:-project}"
+    local claude_code_view_session_fz_scope="${scope}"
+
+    local source
+    source="$(agent_session_fz_subagents_p=y agent_session_fz_subagents_only_p=y h-claude-code-session-select-fz)" @RET
+
+    claude-code-subagent-resume "${source}" "$@"
+}
+aliasfn claude-resume-subagent-fz claude-code-subagent-resume-fz
+aliasfn claude-code-subagent-resume-all-fz claude_code_session_resume_scope=all claude-code-subagent-resume-fz
+aliasfn claude-resume-subagent-all-fz claude-code-subagent-resume-all-fz
+
+function claude-resume-subagent-personal {
+    : "usage: claude-resume-subagent-personal <agent transcript|agent id> [claude args...]"
+    #: [agfi:claude-code-subagent-resume] into the default profile.
+    ##
+    claude-code-subagent-resume "${1}" default "${@[2,-1]}"
+}
+aliasfn claude-resume-subagent-personal-fz claude-code-subagent-resume-fz default
+aliasfn claude-resume-subagent-personal-all-fz claude_code_session_resume_scope=all claude-code-subagent-resume-fz default
+
 function claude-resume-subagent-work {
     : "usage: claude-resume-subagent-work <agent transcript|agent id> [claude args...]"
     #: [agfi:claude-code-subagent-resume] into the work profile.
     ##
     claude-code-subagent-resume "${1}" work "${@[2,-1]}"
 }
+aliasfn claude-resume-subagent-work-fz claude-code-subagent-resume-fz work
+aliasfn claude-resume-subagent-work-all-fz claude_code_session_resume_scope=all claude-code-subagent-resume-fz work
 ##
 #: The adapter: what =agent-session.zsh= asks of an agent, spelled
 #: `h-claude-session-<verb>'. See =docs/agent-sessions.md=.

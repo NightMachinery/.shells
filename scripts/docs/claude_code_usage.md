@@ -816,13 +816,25 @@ of the parent. `claude-code-subagent-promote` copies it into a new top-level
 session, and the resume commands continue it like any other:
 
 ```
-claude-resume-subagent-work <agent id>        # promote into work and resume there
 claude-code-subagent-resume <agent id> [profile] [claude args...]
+claude-code-subagent-resume-fz [profile] [claude args...]   # pick a subagent of this project
+claude-code-subagent-resume-all-fz [profile] ...            # pick from every project
+claude-resume-subagent-personal <agent id>    # promote into the default profile and resume
+claude-resume-subagent-personal-fz            # the same, picking with fzf
+claude-resume-subagent-personal-all-fz        # the same, picking from every project
+claude-resume-subagent-work <agent id>        # into work
+claude-resume-subagent-work-fz                # into work, picking with fzf
+claude-resume-subagent-work-all-fz            # into work, picking from every project
 claude-code-subagent-promote <agent id> [profile]   # only write the copy, print its path
 ```
 
 The argument is the transcript path or the agent id (`agent-` prefix optional,
-a unique prefix is enough), looked up under every profile. The copy gets a new
+a unique prefix is enough), looked up under every profile. The `-fz` forms use
+the session picker with subagent transcripts only
+(`agent_session_fz_subagents_only_p`), scoped by
+`claude_code_session_resume_scope` like the session pickers;
+`claude-resume-subagent`, `claude-resume-subagent-fz` and
+`claude-resume-subagent-all-fz` are the short names. The copy gets a new
 uuid, `sessionId` set to it, `isSidechain` false and `agentId` dropped; message
 text is untouched, so paths to the parent's persisted tool output still work.
 It lands in the project directory of the child's own cwd, where the resume
