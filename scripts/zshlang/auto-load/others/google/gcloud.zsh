@@ -1676,54 +1676,180 @@ function h-gcp-gpu-idle-timer-state {
     ec "${out:-unknown}"
 }
 
-function gcp-gpu-status {
-    h-gcp-gpu-deps @RET
+typeset -gA gcp_gpu_palette=(
+    #: The same four colours as `Style` in gcp_status.py, so the zsh half and
+    #: the Python half of one `gcp-gpu-status` look like one program.
+    gray   '150;150;150'
+    green  '120;190;120'
+    yellow '215;180;90'
+    red    '215;110;100'
+)
 
+function h-gcp-gpu-rich-p {
+    #: Colour for the gcp-gpu-* readouts: stdout is a terminal that speaks
+    #: 24-bit colour, kitty above all. Pipes, agents and dumb terminals get the
+    #: plain text, which stays what scripts have always seen.
+    test -z "${NO_COLOR}" || return 1
+    isOutTty || return 1
+    isKitty || [[ "${COLORTERM}" == (truecolor|24bit) ]]
+}
+
+function h-gcp-gpu-paint {
+    : "usage: h-gcp-gpu-paint COLOR[,bold] TEXT"
+    #: TEXT, coloured only when the caller has set `gcp_gpu_rich_p`. COLOR is a
+    #: key of `gcp_gpu_palette`, or empty for bold alone.
+    local rich_p="${gcp_gpu_rich_p:-n}"
+    local spec="${1}" text="${2}"
+
+    if ! bool "${rich_p}" ; then
+        ecn "${text}"
+        return 0
+    fi
+
+    local -a codes
+    [[ "${spec}" == *,bold ]] && codes+=( 1 )
+    local rgb="${gcp_gpu_palette[${spec%,bold}]}"
+    test -n "${rgb}" && codes+=( "38;2;${rgb}" )
+
+    printf '\e[%sm%s\e[0m' "${(j:;:)codes}" "${text}"
+}
+
+function h-gcp-gpu-kv {
+    : "usage: h-gcp-gpu-kv LABEL VALUE"
+    #: One `label          value` line, in the column layout every gcp-gpu-*
+    #: readout shares: the label padded to 14, greyed when rich.
+    ec "$(h-gcp-gpu-paint gray "${(r:14:)1}") ${2}"
+}
+
+function h-gcp-gpu-fleet-run {
+    : "usage: h-gcp-gpu-fleet-run [--bare]"
+    #: `gcp_status.py fleet`: every instance of ours in any state, grouped,
+    #: then disks with the orphans called out, then the live burn. `--bare`
+    #: prints the burn alone, EUR/hr, compute plus disks.
+    #:
+    #: The configured data disk is ours and carries no owner label, so it is
+    #: named, exactly as [agfi:h-gcp-gpu-spend-run] names it.
+    local -a extra
+    test -n "${gcp_gpu_data_disk}" && extra=( --extra-disk "${gcp_gpu_data_disk}" )
+
+    h-gcp-gpu-status-run fleet "${extra[@]}" "$@"
+}
+
+function h-gcp-gpu-status-instance {
+    #: The configured instance, `$gcp_gpu_instance`: the first block of
+    #: [agfi:gcp-gpu-status].
     local json
     json="$(h-gcp-gpu-instance-json)"
 
-    ec "instance       ${gcp_gpu_instance}  (${gcp_gpu_zone}, ${gcp_gpu_project})"
+    h-gcp-gpu-kv instance "$(h-gcp-gpu-paint ,bold "${gcp_gpu_instance}")  (${gcp_gpu_zone}, ${gcp_gpu_project})"
 
     if test -z "$json" ; then
-        ec "state          ABSENT -- no instance by that name in this zone"
-        ec "burn           EUR 0.00/hr"
-    else
-        local vm_state machine model gpu started
-        vm_state="$(ec "$json"  | command jq -r '.status')"
-        machine="$(ec "$json" | command jq -r '.machineType | split("/") | last')"
-        model="$(ec "$json"   | command jq -r '.scheduling.provisioningModel // "STANDARD"')"
-        gpu="$(ec "$json"     | command jq -r '[.guestAccelerators[]? | "\(.acceleratorCount)x \(.acceleratorType | split("/") | last)"] | join(", ") // ""')"
-        started="$(ec "$json" | command jq -r '.lastStartTimestamp // empty')"
-
-        ec "state          ${vm_state}"
-        ec "machine        ${machine}   ${model}"
-        ec "gpu            ${gpu:-(none reported)}"
-
-        if [[ "$vm_state" == RUNNING ]] && test -n "$started" ; then
-            local epoch
-            epoch="$(h-gcp-gpu-epoch-of "$started")" && test -n "$epoch" \
-                && ec "uptime         $(h-gcp-gpu-dur-human $(( EPOCHSECONDS - epoch )))"
-        fi
-
-        if [[ "$vm_state" == TERMINATED ]] ; then
-            ec "why            $(h-gcp-gpu-last-stop-reason)"
-        fi
-
-        if [[ "$vm_state" == RUNNING ]] ; then
-            ec "idle timer     $(h-gcp-gpu-idle-timer-state)  (threshold ${gcp_gpu_idle_min}m)"
-            ec "burn           EUR $(h-gcp-gpu-price "$machine" "$model")/hr"
-        else
-            ec "burn           EUR 0.00/hr  (disks still bill: gcp-gpu-disks)"
-        fi
+        h-gcp-gpu-kv state "$(h-gcp-gpu-paint gray ABSENT) -- no instance by that name in this zone"
+        h-gcp-gpu-kv burn "EUR 0.00/hr  (this instance only; the fleet is below)"
+        return 0
     fi
 
-    ec ""
-    local cap spent
-    cap="$(h-gcp-gpu-budget-cap)"
-    spent="$(h-gcp-gpu-spend-total "$(h-gcp-gpu-month-start)" "$EPOCHSECONDS")"
-    printf 'month-to-date  EUR %.2f  of EUR %s  (EUR %.2f left)\n' \
-        "$spent" "$cap" $(( cap - spent ))
-    h-gcp-gpu-spend-source-note
+    local vm_state machine model gpu started
+    vm_state="$(ec "$json"  | command jq -r '.status')"
+    machine="$(ec "$json" | command jq -r '.machineType | split("/") | last')"
+    model="$(ec "$json"   | command jq -r '.scheduling.provisioningModel // "STANDARD"')"
+    gpu="$(ec "$json"     | command jq -r '[.guestAccelerators[]? | "\(.acceleratorCount)x \(.acceleratorType | split("/") | last)"] | join(", ") // ""')"
+    started="$(ec "$json" | command jq -r '.lastStartTimestamp // empty')"
+
+    local state_color=gray
+    [[ "$vm_state" == RUNNING ]] && state_color=green
+    h-gcp-gpu-kv state "$(h-gcp-gpu-paint "${state_color}" "${vm_state}")"
+    h-gcp-gpu-kv machine "${machine}   ${model}"
+    h-gcp-gpu-kv gpu "${gpu:-(none reported)}"
+
+    if [[ "$vm_state" == RUNNING ]] && test -n "$started" ; then
+        local epoch
+        epoch="$(h-gcp-gpu-epoch-of "$started")" && test -n "$epoch" \
+            && h-gcp-gpu-kv uptime "$(h-gcp-gpu-dur-human $(( EPOCHSECONDS - epoch )))"
+    fi
+
+    if [[ "$vm_state" == TERMINATED ]] ; then
+        h-gcp-gpu-kv why "$(h-gcp-gpu-last-stop-reason)"
+    fi
+
+    if [[ "$vm_state" == RUNNING ]] ; then
+        h-gcp-gpu-kv 'idle timer' "$(h-gcp-gpu-idle-timer-state)  (threshold ${gcp_gpu_idle_min}m)"
+        h-gcp-gpu-kv burn "$(h-gcp-gpu-paint yellow "EUR $(h-gcp-gpu-price "$machine" "$model")/hr")  (this instance only; the fleet is below)"
+    else
+        h-gcp-gpu-kv burn "EUR 0.00/hr  (this instance only; its disks still bill; the fleet is below)"
+    fi
+}
+
+function gcp-gpu-status {
+    : "usage: gcp-gpu-status [--no-color | --color auto|always|never]"
+    #: Three blocks: the configured instance, then EVERY instance of ours with
+    #: the fleet's live burn, then month-to-date against the cap.
+    #:
+    #: It used to be the first block alone, so during a fleet it printed
+    #: `burn EUR 0.00/hr` for a stopped workstation while a fleet of
+    #: flex-start nodes under other names burned hundreds of euros an hour. The fleet block is what
+    #: makes the burn truthful; the month-to-date figure was already fleet-wide.
+    #:
+    #: The two slow blocks start in the background before the single-instance
+    #: calls, so the wall time is the slowest block rather than the sum. They
+    #: write to files and are printed in order, so the output never interleaves.
+    h-gcp-gpu-deps @RET
+    setopt localoptions no_monitor no_notify
+
+    local gcp_status_color=''
+    h-gcp-gpu-status-color-args "$@" @RET
+    if (( ${#reply} )) ; then
+        ecerr "$0: unknown argument(s): ${reply[*]}"
+        return 1
+    fi
+
+    local gcp_gpu_rich_p=n
+    case "${gcp_status_color:-auto}" in
+        always) gcp_gpu_rich_p=y ;;
+        never) ;;
+        *) h-gcp-gpu-rich-p && gcp_gpu_rich_p=y ;;
+    esac
+    local color=never
+    bool "${gcp_gpu_rich_p}" && color=always
+
+    local tmp
+    tmp="$(command mktemp -d)" @TRET
+    {
+        local month_start
+        month_start="$(h-gcp-gpu-month-start)"
+
+        { h-gcp-gpu-spend-total "${month_start}" "$EPOCHSECONDS" ; ec "${gcp_gpu_spend_source}" } \
+            > "${tmp}/spend" 2>/dev/null &
+        local spend_pid=$!
+        gcp_status_color="${color}" h-gcp-gpu-fleet-run > "${tmp}/fleet" 2> "${tmp}/fleet.err" &
+        local fleet_pid=$!
+
+        h-gcp-gpu-status-instance
+
+        wait "${fleet_pid}"
+        ec ""
+        command cat -- "${tmp}/fleet"
+        command cat -- "${tmp}/fleet.err" >&2
+
+        wait "${spend_pid}"
+        ec ""
+        local -a spend
+        spend=( "${(@f)$(< "${tmp}/spend")}" )
+        #: Dynamic scope: [agfi:h-gcp-gpu-spend-source-note] reads this.
+        local gcp_gpu_spend_source="${spend[2]}"
+        local spent="${spend[1]}" cap
+        cap="$(h-gcp-gpu-budget-cap)"
+        if [[ "${spent}" == <->(.<->)# ]] ; then
+            local spent_color=
+            (( spent >= cap )) && spent_color=red
+            h-gcp-gpu-kv month-to-date "$(h-gcp-gpu-paint "${spent_color:-,bold}" "$(printf 'EUR %.2f' "$spent")")$(printf '  of EUR %s  (EUR %.2f left)' "$cap" $(( cap - spent )))"
+            h-gcp-gpu-spend-source-note
+        else
+            h-gcp-gpu-kv month-to-date "$(h-gcp-gpu-paint red unavailable) -- the spend estimate failed; run gcp-gpu-spend to see why"
+        fi
+    } always {
+        command rm -rf -- "${tmp}"
+    }
 }
 ##
 function gcp-gpu-burn {

@@ -8,12 +8,14 @@ deployment.  This file is on the PUBLIC side, so it learns the project id, the
 owner label and the price table from the environment and from its arguments; it
 has no defaults for any of them and refuses to run without a project.
 
-Three subcommands:
+Four subcommands:
 
   vm         every RUNNING instance of ours, anywhere, with CPU/RAM/load/GPU and
              a storage line probed over ssh in parallel; regenerates the include.
   storage    persistent disks, local-SSD scratch arrays and GCS buckets.
   ssh-sync   regenerate the ssh include only.  One gcloud call, no ssh.
+  fleet      every instance of ours in ANY state, grouped, with GPUs, disks
+             (orphans called out) and the live burn in EUR/hr.  No ssh.
 
 The include is GENERATED: it is rewritten in full every time, so an instance
 that has been stopped or deleted disappears from it by construction.  Aliases
@@ -33,7 +35,11 @@ import re
 import subprocess
 import sys
 import tempfile
+from collections import defaultdict
 from pathlib import Path
+
+#: Same directory, and on PATH together, so a plain import finds it.
+from gcp_spend import disk_is_ours
 
 ##
 #: Auto-alias vocabulary.  40x40 = 1600 pairs, which is far more than a
@@ -142,11 +148,14 @@ class Style:
     def __init__(self, enabled: bool) -> None:
         self.enabled = enabled
 
-    def __call__(self, text: str, rgb: tuple[int, int, int] | None) -> str:
-        if not self.enabled or rgb is None:
+    def __call__(self, text: str, rgb: tuple[int, int, int] | None, bold: bool = False) -> str:
+        if not self.enabled or (rgb is None and not bold):
             return text
-        r, g, b = rgb
-        return f"\x1b[38;2;{r};{g};{b}m{text}\x1b[0m"
+        codes = ["1"] if bold else []
+        if rgb is not None:
+            r, g, b = rgb
+            codes.append(f"38;2;{r};{g};{b}")
+        return f"\x1b[{';'.join(codes)}m{text}\x1b[0m"
 
 
 GRAY = (150, 150, 150)
@@ -167,6 +176,10 @@ def color_enabled(mode: str) -> bool:
         return False
     if not sys.stdout.isatty():
         return False
+    #: kitty always speaks 24-bit colour, but a shell that reached it over ssh
+    #: or through `sudo' often lost COLORTERM on the way while TERM survived.
+    if os.environ.get("TERM") == "xterm-kitty" or os.environ.get("KITTY_WINDOW_ID"):
+        return True
     return os.environ.get("COLORTERM", "") in ("truecolor", "24bit")
 
 
@@ -612,6 +625,142 @@ def render_vm_detail(st: Style, inst: dict, probe: tuple[str, str]) -> None:
 
 
 ##
+#: States in which an instance is billed for its machine.  RUNNING always.  A
+#: FLEX_START VM is billed for as long as it EXISTS, from create to delete, so
+#: one that has stopped but not yet been deleted still costs its full rate --
+#: the same model gcp_spend.py folds month-to-date with, so the burn here and
+#: the spend there cannot disagree about it.  PROVISIONING and STAGING are not
+#: billed: capacity has not been handed over yet.
+FLEX_BILLED_STATES = {"RUNNING", "STOPPING", "TERMINATED", "SUSPENDING", "SUSPENDED"}
+
+
+def billing_p(inst: dict) -> bool:
+    status = inst.get("status", "")
+    if model_of(inst) == "FLEX_START":
+        return status in FLEX_BILLED_STATES
+    return status == "RUNNING"
+
+
+def gpus_of(inst: dict) -> tuple[int, str]:
+    n, kinds = 0, []
+    for acc in inst.get("guestAccelerators", []) or []:
+        n += int(acc.get("acceleratorCount", 0) or 0)
+        kinds.append(acc.get("acceleratorType", "").split("/")[-1])
+    return n, ",".join(sorted(set(kinds)))
+
+
+def fmt_eur(x: float) -> str:
+    return f"{x:,.2f}"
+
+
+def cmd_fleet(args: argparse.Namespace) -> int:
+    """Every instance of ours in every state, summarised, with the live burn.
+
+    One `instances list' (ours, any state) and one `disks list' (the whole
+    project: boot disks carry no owner label, so a labelled listing misses
+    exactly the disks a fleet creates), run at the same time.
+    """
+    project, owner = args.project, args.owner
+    st = Style(color_enabled(args.color))
+    prices = json.loads(os.environ.get("GCP_STATUS_PRICES", "{}"))
+    disk_prices = prices.get("disk", {})
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=2) as pool:
+        f_inst = pool.submit(instances, project, owner, False)
+        f_disk = pool.submit(gcloud, project, "compute", "disks", "list", "--format=json")
+        insts, disks_raw = f_inst.result(), f_disk.result()
+
+    own = {i["name"] for i in insts}
+    extra = set(args.extra_disk)
+    disks = [d for d in json.loads(disks_raw or "[]") if disk_is_ours(d, owner, own, extra)]
+
+    compute = 0.0
+    groups: dict[tuple, dict] = defaultdict(lambda: {"n": 0, "gpus": 0, "gpu_kind": "", "eur": 0.0, "billing": False})
+    states: dict[str, int] = defaultdict(int)
+    billing_gpus: dict[str, int] = defaultdict(int)
+    for inst in insts:
+        machine, model, status = machine_of(inst), model_of(inst), inst.get("status", "")
+        n_gpu, kind = gpus_of(inst)
+        bill = billing_p(inst)
+        rate = price_of(prices, machine, model) if bill else 0.0
+        compute += rate
+        states[status] += 1
+        if bill and n_gpu:
+            billing_gpus[kind] += n_gpu
+        g = groups[(status, machine, model, zone_of(inst))]
+        g["n"] += 1
+        g["gpus"] += n_gpu
+        g["gpu_kind"] = kind
+        g["eur"] += rate
+        g["billing"] = g["billing"] or bill
+
+    disk_month = 0.0
+    orphans = []
+    for d in disks:
+        dtype = d.get("type", "").split("/")[-1]
+        gb = int(d.get("sizeGb", 0) or 0)
+        cost = float(disk_prices.get(dtype, 0.11)) * gb
+        disk_month += cost
+        if not d.get("users"):
+            orphans.append((d["name"], d.get("zone", "").split("/")[-1], gb, dtype, cost))
+    disk_hour = disk_month / 730.0
+    burn = compute + disk_hour
+
+    if args.bare:
+        print(f"{burn:.4f}")
+        return 0
+
+    burn_rgb = RED if burn >= 50 else YELLOW if burn >= 1 else GREEN
+    label = lambda t: st(f"{t:<14} ", GRAY)
+
+    if not insts:
+        print(f"{label('fleet')}no instances labelled owner={owner} in {project}.")
+    else:
+        order = {"RUNNING": 0}
+        summary = ", ".join(f"{n} {s}" for s, n in sorted(states.items(), key=lambda kv: (order.get(kv[0], 1), kv[0])))
+        n_zones = len({zone_of(i) for i in insts})
+        print(f"{label('fleet')}{summary}  "
+              + st(f"({len(insts)} instances of owner={owner}, {n_zones} zone{'s' if n_zones != 1 else ''})", GRAY))
+
+        head = f"  {'STATE':<11} {'N':>3}  {'MACHINE':<15} {'MODEL':<10}  {'ZONE':<16} {'GPUS':<22} {'EUR/HR':>9}"
+        print(st(head, GRAY))
+        rows = sorted(groups.items(), key=lambda kv: (not kv[1]["billing"], -kv[1]["eur"], kv[0]))
+        for (status, machine, model, zone), g in rows:
+            gpus = f"{g['gpus']}x {g['gpu_kind']}" if g["gpus"] else "-"
+            eur = f"{g['eur']:>9.2f}" if g["billing"] else f"{'-':>9}"
+            state_rgb = GREEN if status == "RUNNING" else YELLOW if g["billing"] else GRAY
+            dim = None if g["billing"] else GRAY
+            model_rgb = YELLOW if model in ("SPOT", "FLEX_START") and g["billing"] else dim
+            n = g["n"]
+            print(f"  {st(f'{status:<11}', state_rgb)} {st(f'{n:>3}', dim)}  "
+                  f"{st(f'{machine:<15}', dim)} {st(f'{model:<10}', model_rgb)}  "
+                  f"{st(f'{zone:<16}', dim)} {st(f'{gpus:<22}', dim)} {st(eur, dim)}")
+
+        if any(billing_p(i) and i.get("status") != "RUNNING" for i in insts):
+            print(st("  a stopped FLEX_START VM still bills until it is DELETED, so it is counted.", GRAY))
+
+    if billing_gpus:
+        print(f"{label('gpus billing')}"
+              + ", ".join(f"{n}x {k}" for k, n in sorted(billing_gpus.items())))
+
+    tb = sum(int(d.get("sizeGb", 0) or 0) for d in disks) / 1000.0
+    print(f"{label('disks')}{len(disks)} of ours, {tb:,.1f} TB, "
+          f"EUR {disk_hour:,.2f}/hr  (EUR {disk_month:,.0f}/month)")
+    if orphans:
+        o_month = sum(o[4] for o in orphans)
+        names = ", ".join(f"{o[0]} ({o[2]} GB, {o[1]})" for o in sorted(orphans))
+        print(f"{label('orphan disks')}{st(f'{len(orphans)} attached to nothing, EUR {o_month:,.2f}/month', YELLOW)}: {names}")
+    else:
+        print(f"{label('orphan disks')}none")
+
+    burn_txt = f"EUR {fmt_eur(burn)}/hr"
+    print(f"{label('fleet burn')}{st(burn_txt, burn_rgb, bold=True)}  "
+          f"(compute {fmt_eur(compute)} + disks {fmt_eur(disk_hour)}), "
+          f"EUR {burn * 24:,.0f}/day if it all kept running")
+    return 0
+
+
+##
 def cmd_ssh_sync(args: argparse.Namespace) -> int:
     insts = instances(args.project, args.owner)
     write_include(
@@ -841,6 +990,12 @@ def main(argv: list[str]) -> int:
     v = subs.add_parser("vm", help="every RUNNING instance of ours, with live machine stats")
     v.add_argument("--no-ssh", action="store_true", help="skip the ssh probes")
     v.set_defaults(func=cmd_vm)
+
+    f = subs.add_parser("fleet", help="every instance of ours in any state, summarised, with the live burn")
+    f.add_argument("--extra-disk", action="append", default=[],
+                   help="a disk that is ours but carries no owner label; repeatable")
+    f.add_argument("--bare", action="store_true", help="print only the burn, EUR/hr")
+    f.set_defaults(func=cmd_fleet)
 
     s = subs.add_parser("ssh-sync", help="regenerate the ssh include only")
     s.add_argument("--quiet", action="store_true")
