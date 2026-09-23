@@ -1237,7 +1237,7 @@ their names, since they name the window rather than the document.
   resume, =codex-resume-fz= and =agy-resume-fz= being the narrowed forms.
 - =claude-code-session-resume-fz= --- pick a session of this project from any
   profile and resume it, forking it into another profile first when asked.
-  =claude-resume-fz=, =claude-resume-personal-fz= and =claude-resume-work-fz=
+  =claude-resume-fz=, =claude-resume-default-fz= and =claude-resume-work-fz=
   fix the target profile. This one stays Claude-only: profiles are a Claude
   Code idea, and the other agents have nothing to map them onto. The family is
   documented in =docs/claude_code_usage.md=.
@@ -1249,7 +1249,7 @@ their names, since they name the window rather than the document.
 Each viewer and each resume picker has a =-all-fz= variant that selects from
 every project's sessions instead of the current directory's:
 =agent-view-session-transcript-all-fz=, =claude-code-session-resume-all-fz=,
-=claude-resume-all-fz=, =claude-resume-personal-all-fz=,
+=claude-resume-all-fz=, =claude-resume-default-all-fz=,
 =claude-resume-work-all-fz=, and so on. The viewers set the picker's
 =agent_session_fz_scope= directly; the resume family sets its own
 =agent_session_resume_scope=, which =claude-code-session-resume-fz=

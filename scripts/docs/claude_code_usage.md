@@ -719,10 +719,10 @@ the other way round. `claude-code-session-resume` in
 claude-code-session-resume-fz                 # pick a session of this project, any profile
 claude-code-session-resume-all-fz             # the same, picking from every project
 claude-code-session-resume <uuid>             # resume it under the profile that owns it
-claude-code-session-resume <uuid> default     # fork it into the personal profile and resume there
-claude-resume-personal <uuid>                 # the same
-claude-resume-personal-fz                     # the same, picking the session with fzf
-claude-resume-personal-all-fz                 # the same, picking from every project
+claude-code-session-resume <uuid> default     # fork it into the default profile and resume there
+claude-resume-default <uuid>                  # the same
+claude-resume-default-fz                      # the same, picking the session with fzf
+claude-resume-default-all-fz                  # the same, picking from every project
 claude-resume-work <uuid>                     # the reverse
 claude-resume-work-fz                         # the reverse, picking with fzf
 claude-resume-work-all-fz                     # the reverse, picking from every project
@@ -736,7 +736,7 @@ profile first and pick the session interactively. What they offer is set by
 profile's sessions for the current directory, and `all` lists every profile's
 sessions for every project. The `-all-fz` forms are the `-fz` forms with that
 set to `all`: `claude-code-session-resume-all-fz`, `claude-resume-all-fz`,
-`claude-resume-personal-all-fz` and `claude-resume-work-all-fz`.
+`claude-resume-default-all-fz` and `claude-resume-work-all-fz`.
 `claude-resume`, `claude-resume-fz` and `claude-resume-all-fz` are the short
 names for their `claude-code-session-resume` counterparts. Codex and
 Antigravity have resume commands of their own now — `codex-resume-fz`,
@@ -819,9 +819,9 @@ session, and the resume commands continue it like any other:
 claude-code-subagent-resume <agent id> [profile] [claude args...]
 claude-code-subagent-resume-fz [profile] [claude args...]   # pick a subagent of this project
 claude-code-subagent-resume-all-fz [profile] ...            # pick from every project
-claude-resume-subagent-personal <agent id>    # promote into the default profile and resume
-claude-resume-subagent-personal-fz            # the same, picking with fzf
-claude-resume-subagent-personal-all-fz        # the same, picking from every project
+claude-resume-subagent-default <agent id>     # promote into the default profile and resume
+claude-resume-subagent-default-fz             # the same, picking with fzf
+claude-resume-subagent-default-all-fz         # the same, picking from every project
 claude-resume-subagent-work <agent id>        # into work
 claude-resume-subagent-work-fz                # into work, picking with fzf
 claude-resume-subagent-work-all-fz            # into work, picking from every project

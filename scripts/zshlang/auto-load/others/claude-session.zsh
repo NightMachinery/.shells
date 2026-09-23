@@ -723,15 +723,15 @@ aliasfn claude-resume-fz claude-code-session-resume-fz
 aliasfn claude-code-session-resume-all-fz claude_code_session_resume_scope=all claude-code-session-resume-fz
 aliasfn claude-resume-all-fz claude-code-session-resume-all-fz
 
-function claude-resume-personal {
+function claude-resume-default {
     #: [agfi:claude-code-session-resume] into the default profile: continue a
-    #: work session on the personal account.
-    #: Usage: claude-resume-personal <transcript|uuid> [claude args...]
+    #: work session on the default profile (the personal account).
+    #: Usage: claude-resume-default <transcript|uuid> [claude args...]
     ##
     claude-code-session-resume "${1}" default "${@[2,-1]}"
 }
-aliasfn claude-resume-personal-fz claude-code-session-resume-fz default
-aliasfn claude-resume-personal-all-fz claude_code_session_resume_scope=all claude-code-session-resume-fz default
+aliasfn claude-resume-default-fz claude-code-session-resume-fz default
+aliasfn claude-resume-default-all-fz claude_code_session_resume_scope=all claude-code-session-resume-fz default
 
 function claude-resume-work {
     #: [agfi:claude-code-session-resume] into the work profile.
@@ -945,14 +945,14 @@ aliasfn claude-resume-subagent-fz claude-code-subagent-resume-fz
 aliasfn claude-code-subagent-resume-all-fz claude_code_session_resume_scope=all claude-code-subagent-resume-fz
 aliasfn claude-resume-subagent-all-fz claude-code-subagent-resume-all-fz
 
-function claude-resume-subagent-personal {
-    : "usage: claude-resume-subagent-personal <agent transcript|agent id> [claude args...]"
+function claude-resume-subagent-default {
+    : "usage: claude-resume-subagent-default <agent transcript|agent id> [claude args...]"
     #: [agfi:claude-code-subagent-resume] into the default profile.
     ##
     claude-code-subagent-resume "${1}" default "${@[2,-1]}"
 }
-aliasfn claude-resume-subagent-personal-fz claude-code-subagent-resume-fz default
-aliasfn claude-resume-subagent-personal-all-fz claude_code_session_resume_scope=all claude-code-subagent-resume-fz default
+aliasfn claude-resume-subagent-default-fz claude-code-subagent-resume-fz default
+aliasfn claude-resume-subagent-default-all-fz claude_code_session_resume_scope=all claude-code-subagent-resume-fz default
 
 function claude-resume-subagent-work {
     : "usage: claude-resume-subagent-work <agent transcript|agent id> [claude args...]"
