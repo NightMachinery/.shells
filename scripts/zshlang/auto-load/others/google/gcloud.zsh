@@ -1854,18 +1854,21 @@ function h-gcp-gpu-status-run {
 }
 
 function h-gcp-gpu-status-color-args {
-    #: Pulls `--no-color`/`--color X` out of a flag list and prints the rest,
-    #: one per line, having set `$gcp_status_color` in the CALLER's scope.
-    local -a rest
+    #: Pulls `--no-color`/`--color X` out of a flag list: sets
+    #: `$gcp_status_color` in the CALLER's scope and hands the rest back in
+    #: `$reply`.
+    #:
+    #: It used to print the rest for the caller to capture with `$(...)`, and
+    #: a command substitution is a subshell, so the colour setting died with
+    #: it and `--no-color` never did anything.
+    reply=()
     while (( $# )) ; do
         case "$1" in
             --no-color|--no-colour) gcp_status_color=never ; shift ;;
             --color|--colour) gcp_status_color="${2:?--color needs auto|always|never}" ; shift 2 ;;
-            *) rest+=( "$1" ) ; shift ;;
+            *) reply+=( "$1" ) ; shift ;;
         esac
     done
-
-    ec "${(F)rest}"
 }
 
 function gcp-gpu-ssh-sync {
@@ -1914,10 +1917,9 @@ function gcp-vm-status {
     #: this prints are the ones it just wrote and a machine created a minute
     #: ago is reachable in the same call.
     local gcp_status_color=''
-    local -a rest
-    rest=( "${(@f)$(h-gcp-gpu-status-color-args "$@")}" )
+    h-gcp-gpu-status-color-args "$@" @RET
 
-    h-gcp-gpu-status-run vm "${(@)rest:#}"
+    h-gcp-gpu-status-run vm "${reply[@]}"
 }
 #: The name it was born with, kept working for muscle memory and old notes.
 aliasfn gcp-gpu-fleet gcp-vm-status
@@ -1932,10 +1934,9 @@ function gcp-storage-status {
     #: bucket, which is slow enough on a large one to be worth not doing by
     #: accident.
     local gcp_status_color=''
-    local -a rest
-    rest=( "${(@f)$(h-gcp-gpu-status-color-args "$@")}" )
+    h-gcp-gpu-status-color-args "$@" @RET
 
-    h-gcp-gpu-status-run storage "${(@)rest:#}"
+    h-gcp-gpu-status-run storage "${reply[@]}"
 }
 
 function gcp-gpu-disks {
