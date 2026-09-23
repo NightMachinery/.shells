@@ -510,15 +510,11 @@ function h-gcp-gpu-bucket-exists-p {
 }
 ##
 function h-gcp-gpu-log-read-dep {
-    #: Builds `golang/gcp-log-read` on first use. Optional: without Go,
-    #: `gcp_spend.py` falls back to `gcloud logging read` and gets the same
-    #: answer about six times more slowly, so a missing toolchain is not an
-    #: error here.
-    if whence -p gcp-log-read > /dev/null 2>&1 ; then
-        return 0
-    fi
-    whence -p go > /dev/null 2>&1 || return 1
-    ensure-dep1 gcp-log-read go-install-local "${NIGHTDIR}/golang/gcp-log-read"
+    #: Builds `golang/gcp-log-read` on first use and again after its source
+    #: changes. Optional: without Go, `gcp_spend.py` falls back to `gcloud
+    #: logging read` and gets the same answer about six times more slowly, so
+    #: a missing toolchain is not an error here.
+    go-local-dep --optional gcp-log-read "${NIGHTDIR}/golang/gcp-log-read"
 }
 
 function h-gcp-gpu-spend-run {

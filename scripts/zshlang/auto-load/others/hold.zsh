@@ -27,19 +27,13 @@
 ##
 
 function h-hold-dep {
-    #: Builds the binary on first use, like [agfi:h-agent-session-dep].
-    #:
-    #: The probe is `whence -p', a PATH search that stops at the first hit,
-    #: rather than [agfi:isdefined-cmd]: reading `$commands' fills the whole
-    #: command hash, and in a garden shell -- which forks per call, so the hash
-    #: is never warm -- that is tens of milliseconds every time.
+    #: Builds the binary on first use and again after its source changes,
+    #: like [agfi:h-agent-session-dep]. [agfi:go-local-dep] keeps the check
+    #: fork-free: `$commands' is never read, since its first read fills the
+    #: whole command hash, and in a garden shell -- which forks per call, so
+    #: the hash is never warm -- that is tens of milliseconds every time.
     ##
-    if whence -p night_hold > /dev/null 2>&1 ; then
-        return 0
-    fi
-
-    ensure-cmd go @RET
-    ensure-dep1 night_hold go-install-local "${NIGHTDIR}/golang/night_hold" @RET
+    go-local-dep night_hold "${NIGHTDIR}/golang/night_hold"
 }
 
 function h-hold-resource {

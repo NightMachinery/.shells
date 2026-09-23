@@ -13,21 +13,16 @@
 #: where they existed, so an override in `personal/' keeps working.
 ##
 function h-agent-session-dep {
-    #: Ensures the renderer is built and on PATH, building it on first use.
+    #: Ensures the renderer is built, on PATH and not older than its source.
     #:
-    #: The probe is `whence -p', a PATH search that stops at the first hit, and
-    #: not [agfi:isdefined-cmd]. Reading `$commands' fills the whole command
-    #: hash, and in a garden shell -- which forks per call, so the hash is
-    #: never warm -- that measured 65ms every time, against 6ms for a lookup
-    #: that stops early. This guard is on the path of every render, name, live
-    #: listing and preview, so it is worth the odd spelling.
+    #: This guard is on the path of every render, name, live listing and
+    #: preview, so the probe must stay cheap: reading `$commands' fills the
+    #: whole command hash, and in a garden shell -- which forks per call, so
+    #: the hash is never warm -- that measured 65ms every time, against 6ms for
+    #: a lookup that stops early. [agfi:go-local-dep] does the early-stopping
+    #: lookup and its freshness check without forking.
     ##
-    if whence -p agent_session > /dev/null 2>&1 ; then
-        return 0
-    fi
-
-    ensure-cmd go @RET
-    ensure-dep1 agent_session go-install-local "${NIGHTDIR}/golang/agent_session" @RET
+    go-local-dep agent_session "${NIGHTDIR}/golang/agent_session"
 }
 
 function h-agent-session-name {

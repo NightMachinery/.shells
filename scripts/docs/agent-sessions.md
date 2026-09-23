@@ -135,7 +135,10 @@ for every client. And [agfi:h-agent-session-dep], which guards every render,
 name, listing and preview, probes with `whence -p agent_session` rather than
 reading `$commands`: the latter makes zsh hash the whole `PATH`, 65ms in a
 garden shell that forks per call and so never has a warm hash. That guard went
-from 124ms to about 1ms.
+from 124ms to about 1ms. Since 2026-09-23 it goes through [agfi:go-local-dep],
+which also rebuilds the binary when its Go source is newer; the fork-free check
+costs 0.5-0.8ms more per call. Before that an edited renderer never reached the
+installed binary, which once ran eight days and four commits behind.
 
 Every number here is measured through the BrishGarden fork, which itself costs
 about 62ms, so the floor is not zero. The corpus picker is the one path still

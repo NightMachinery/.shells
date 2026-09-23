@@ -225,7 +225,8 @@ takes about 7s. The audit-log read dominates. `gcloud logging read` pages
 through it sequentially, about five seconds a page, which made it 30-45s on
 its own; `golang/gcp-log-read` cuts the window into eight time slices and
 fetches them at once, returning the same entries in about 5s. It is built on
-first use when Go is present, and without it the estimate falls back to
+first use when Go is present, and rebuilt when its source changes
+([agfi:go-local-dep]); without it the estimate falls back to
 gcloud and gets the same answer slowly. It fails as a whole rather than
 return a partial read, since a missing lifecycle event under-reports.
 
