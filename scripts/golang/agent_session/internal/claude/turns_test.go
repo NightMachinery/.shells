@@ -324,6 +324,135 @@ func TestBookkeepingRecordsAreDropped(t *testing.T) {
 	}
 }
 
+// A message sent while a turn was running reaches the model only as a
+// `queued_command` attachment, with no user record of its own. Dropping it
+// hid every mid-turn question, so the answer after it read as a non sequitur.
+func TestQueuedMessageSplitsTheTurn(t *testing.T) {
+	records := conversationRecords([]record{
+		mkRecord(t, "assistant", "2026-08-10T10:00:00.000Z",
+			map[string]any{"type": "text", "text": "working"}),
+		mkRaw(t, map[string]any{
+			"type": "attachment", "timestamp": "2026-08-10T10:01:00.000Z",
+			"attachment": map[string]any{
+				"type": "queued_command", "commandMode": "prompt",
+				"prompt": "btw, use Sonnet", "origin": map[string]any{"kind": "human"},
+			},
+		}),
+		mkRecord(t, "assistant", "2026-08-10T10:01:05.000Z",
+			map[string]any{"type": "text", "text": "Noted on Sonnet."}),
+	})
+
+	got := renderOne(records, turns.Style{Org: true})
+	if !strings.Contains(got, "btw, use Sonnet") || !strings.Contains(got, "· queued") {
+		t.Errorf("queued message missing or unlabelled:\n%s", got)
+	}
+	if n := strings.Count(got, "* Assistant"); n != 2 {
+		t.Errorf("want the queued message to split the answer in two, got %d assistant headings:\n%s", n, got)
+	}
+	if strings.Index(got, "btw") > strings.Index(got, "Noted") {
+		t.Errorf("queued message should precede the reply to it:\n%s", got)
+	}
+}
+
+// A queued message the model was also handed as a record of its own is shown
+// once, as that record.
+func TestQueuedMessageDeliveredAsRecordIsNotRepeated(t *testing.T) {
+	note := "<task-notification><task-id>b1</task-id><status>completed</status></task-notification>"
+	records := conversationRecords([]record{
+		mkRaw(t, map[string]any{
+			"type": "attachment", "timestamp": "2026-08-10T10:01:00.000Z",
+			"attachment": map[string]any{
+				"type": "queued_command", "commandMode": "task-notification", "prompt": note,
+			},
+		}),
+		mkRaw(t, map[string]any{
+			"type": "user", "timestamp": "2026-08-10T10:01:01.000Z",
+			"message": map[string]any{"content": note},
+		}),
+	})
+	if len(records) != 1 || records[0].Type != "user" {
+		t.Errorf("want only the user record kept, got %d records", len(records))
+	}
+}
+
+// A compaction summary quotes the messages before it; that is not a delivery,
+// and must not hide the queued message it quotes.
+func TestCompactSummaryDoesNotHideQueuedMessage(t *testing.T) {
+	records := conversationRecords([]record{
+		mkRaw(t, map[string]any{
+			"type": "attachment", "timestamp": "2026-08-10T10:01:00.000Z",
+			"attachment": map[string]any{
+				"type": "queued_command", "commandMode": "prompt", "prompt": "what happened to X?",
+			},
+		}),
+		mkRaw(t, map[string]any{
+			"type": "user", "isCompactSummary": true, "timestamp": "2026-08-10T11:00:00.000Z",
+			"message": map[string]any{"content": "Summary. User asked: what happened to X?"},
+		}),
+	})
+	if len(records) != 2 {
+		t.Errorf("want the queued message kept beside the summary, got %d records", len(records))
+	}
+}
+
+// A short queued reply is not a copy of every longer message that contains it.
+func TestShortQueuedMessageIsNotMistakenForADuplicate(t *testing.T) {
+	records := conversationRecords([]record{
+		mkRaw(t, map[string]any{
+			"type": "user", "timestamp": "2026-08-10T10:00:00.000Z",
+			"message": map[string]any{"content": "ok, now run the second cell"},
+		}),
+		mkRaw(t, map[string]any{
+			"type": "attachment", "timestamp": "2026-08-10T10:01:00.000Z",
+			"attachment": map[string]any{"type": "queued_command", "commandMode": "prompt", "prompt": "ok"},
+		}),
+	})
+	if len(records) != 2 {
+		t.Errorf("want the queued \"ok\" kept, got %d records", len(records))
+	}
+}
+
+// Claude Code marks both its own notes and the messages other agents send as
+// `isMeta`; only the second kind says where it came from.
+func TestDeliveredMetaMessagesRender(t *testing.T) {
+	meta := func(content string, extra map[string]any) record {
+		obj := map[string]any{
+			"type": "user", "isMeta": true, "timestamp": "2026-08-10T10:02:00.000Z",
+			"message": map[string]any{"content": content},
+		}
+		for k, v := range extra {
+			obj[k] = v
+		}
+		return mkRaw(t, obj)
+	}
+	records := conversationRecords([]record{
+		meta("Another Claude session sent a message: hand-back text",
+			map[string]any{"origin": map[string]any{"kind": "peer", "from": "a1ece39e"}, "promptSource": "system"}),
+		meta("The coordinator sent a message while you were working: stop",
+			map[string]any{"origin": map[string]any{"kind": "coordinator"}}),
+		meta("Hourly recovery check", map[string]any{"promptSource": "system"}),
+		meta("Base directory for this skill: /x", nil),
+		meta("[Image: original 100x100]", nil),
+	})
+	if len(records) != 3 {
+		t.Fatalf("want the three delivered messages kept, got %d", len(records))
+	}
+
+	got := renderOne(records, turns.Style{Org: true})
+	for _, want := range []string{
+		"* Agent message [", "· from a1ece39e", "hand-back text",
+		"* Coordinator message [", "* Scheduled prompt [",
+	} {
+		if !strings.Contains(got, want) {
+			t.Errorf("want %q in:\n%s", want, got)
+		}
+	}
+	// The hourly prompt repeats; it opens closed.
+	if i := strings.Index(got, "* Scheduled prompt"); i < 0 || !strings.Contains(got[i:], ":VISIBILITY: folded") {
+		t.Errorf("scheduled prompt should be folded:\n%s", got)
+	}
+}
+
 // agent-name is the name Claude Code resolved for itself, so it wins when
 // present; it just does not always exist.
 func TestSessionNamePrecedence(t *testing.T) {

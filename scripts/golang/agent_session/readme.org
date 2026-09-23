@@ -651,10 +651,32 @@ Deliberately left out, all of it bookkeeping: =mode=, =permission-mode=,
 =agent-name= is not a section either, but it is not discarded: it feeds the
 session name, above.
 
-=queue-operation= is left out for a subtler reason. Half of what gets enqueued
-is delivered and therefore already appears as an ordinary user message, so
-rendering it would duplicate; the other half was withdrawn before it was ever
-sent. 49 of 96 local enqueues fall in the first group.
+=queue-operation= is left out because it only says a message is waiting. What
+the model actually receives is one of two records, and both are rendered:
+
+- *Queued* --- =attachment/queued_command=, a message that arrived while a turn
+  was running and was handed to the model at its next step. It has no user
+  record of its own, so it is its own turn, splitting the answer where the model
+  first saw it: =* User [2026-09-22 Tue 15:00] · queued=. =origin.kind= (or,
+  for a task notification, =commandMode=) picks the heading: =User= for a
+  message you typed, =Agent message · from <id>= for another session's
+  SendMessage, =Coordinator message= inside a subagent, =Task notification=.
+  A queued message whose text equals a delivered user record is shown once.
+- *Delivered while idle* --- an ordinary =user= record. When it came from
+  somewhere other than the prompt it is =isMeta=, like the harness's own notes,
+  and is told apart by carrying =origin= (peer, coordinator, task
+  notification) or =promptSource: system= (a scheduled task's prompt, rendered
+  folded as =Scheduled prompt= because it repeats every hour). Meta records
+  with neither --- skill bodies, image placeholders, command caveats, system
+  reminders --- stay out.
+
+Until 2026-09-23 neither was rendered: the =remove= half of the queue
+operations was read as "withdrawn", when it is the step that injects the
+message into the running turn. One coordinator transcript lost 21 mid-turn
+prompts, 54 agent messages, 54 task notifications and 19 scheduled prompts
+from its main thread, and its subagents lost their coordinator's instructions.
+A compaction summary quotes the earlier prompts, which is why the loss was
+easy to miss: the text was in the document, only not where it was sent.
 
 * Subagents
 

@@ -19,17 +19,25 @@ import (
 // bookkeeping -- rides on records of its own type.
 
 type record struct {
-	Type      string   `json:"type"`
-	Subtype   string   `json:"subtype"`
-	IsMeta    bool     `json:"isMeta"`
-	Timestamp string   `json:"timestamp"`
-	Message   *message `json:"message"`
+	Type    string `json:"type"`
+	Subtype string `json:"subtype"`
+	IsMeta  bool   `json:"isMeta"`
+	// The summary a compaction starts the new context with. It quotes the
+	// messages before it, so it proves nothing about what was delivered.
+	IsCompactSummary bool     `json:"isCompactSummary"`
+	Timestamp        string   `json:"timestamp"`
+	Message          *message `json:"message"`
 
 	// `system` records keep their payload at the top level, unlike messages.
 	// Raw, because other record types put an object here.
 	Content json.RawMessage `json:"content"`
 
 	nameFields
+
+	// Who a message came from when it was not typed at this session's prompt,
+	// and the channel it came in on; see [record.delivered].
+	Origin       *origin `json:"origin"`
+	PromptSource string  `json:"promptSource"`
 
 	Attachment      *attachment      `json:"attachment"`
 	CompactMetadata *compactMetadata `json:"compactMetadata"`
@@ -289,6 +297,21 @@ type attachment struct {
 	// model: the seat the session is running on. Written when the session
 	// starts and again whenever `/model` changes it.
 	Identity *modelIdentity `json:"identity"`
+
+	// queued_command: a message that arrived while a turn was running and was
+	// handed to the model at its next step. See [queuedTurn].
+	Prompt      json.RawMessage `json:"prompt"`
+	CommandMode string          `json:"commandMode"`
+	Origin      *origin         `json:"origin"`
+}
+
+// Where a message that nobody typed here came from: `human` (typed, but while
+// a turn was running), `peer` (another session's SendMessage, a subagent's
+// hand-back among them), `coordinator` (the parent, writing to a subagent),
+// `task-notification`, `auto-continuation`. `From` is the sender's agent id.
+type origin struct {
+	Kind string `json:"kind"`
+	From string `json:"from"`
 }
 
 // What a `model` attachment says the session is running on. Only the id is kept:
@@ -360,18 +383,35 @@ func decodeBlocks(m *message) []turns.Block {
 // Everything else in a transcript is bookkeeping and stays out: `mode`,
 // `permission-mode`, `agent-name`/`agent-color`/`agent-setting`,
 // `bridge-session`, `file-history-snapshot`/`-delta`, and `last-prompt`, which
-// only repeats the message next to it. `queue-operation` is left out for a
-// subtler reason: half of what gets enqueued is delivered and so already shows
-// up as an ordinary user message, and the other half was withdrawn before it
-// was ever sent. Most `attachment` payloads are harness internals
-// (`task_reminder`, `skill_listing`, `deferred_tools_delta`); only a file you
-// edited yourself says anything about the conversation.
+// only repeats the message next to it. `queue-operation` stays out because it
+// only says a message is waiting: what reaches the model is either an ordinary
+// user record, when the session was idle, or a `queued_command` attachment,
+// when a turn was running (the `remove` operations), and it is those that are
+// rendered. Most `attachment` payloads are harness internals (`skill_listing`,
+// `deferred_tools_delta`); a file you edited yourself and a queued message are
+// the ones that say something about the conversation.
+//
+// Meta records are the harness's own, except the ones [record.delivered]
+// recognizes as a message somebody sent.
 func conversationRecords(all []record) []record {
+	// A queued message the model was also handed as a record of its own
+	// would otherwise be rendered twice. Equality, not containment: a queued
+	// "ok" is inside half the messages of a session. And not a compaction
+	// summary, which quotes the earlier messages without delivering them.
+	delivered := map[string]bool{}
+	for _, rec := range all {
+		if rec.Type == "user" && !rec.IsCompactSummary && (!rec.IsMeta || rec.delivered()) {
+			if t := blocksText(decodeBlocks(rec.Message)); t != "" {
+				delivered[t] = true
+			}
+		}
+	}
+
 	var out []record
 	for _, rec := range all {
 		switch rec.Type {
 		case "user", "assistant":
-			if rec.IsMeta {
+			if rec.IsMeta && !rec.delivered() {
 				continue
 			}
 		case "system":
@@ -392,6 +432,10 @@ func conversationRecords(all []record) []record {
 				if rec.Attachment.ItemCount == 0 {
 					continue
 				}
+			case "queued_command":
+				if t := rec.queuedText(); t == "" || delivered[t] {
+					continue
+				}
 			default:
 				continue
 			}
@@ -401,6 +445,91 @@ func conversationRecords(all []record) []record {
 		out = append(out, rec)
 	}
 	return out
+}
+
+// Whether a meta `user` record is a message somebody sent rather than the
+// harness talking to itself. Claude Code marks both kinds `isMeta`; what sets
+// the messages apart is that they say where they came from. An `origin` is
+// written on another session's SendMessage (a subagent's hand-back among
+// them), on the coordinator's messages to a subagent and on task
+// notifications; `promptSource: system` on the prompt a scheduled task fires.
+// What stays out has neither: skill bodies, image placeholders, command
+// caveats and system reminders.
+func (r record) delivered() bool {
+	if r.Type != "user" {
+		return false
+	}
+	return (r.Origin != nil && r.Origin.Kind != "") || r.PromptSource == "system"
+}
+
+// The text of a queued message, which is a bare string or, when it carried an
+// image, a block list.
+func (r record) queuedText() string {
+	if r.Attachment == nil {
+		return ""
+	}
+	return blocksText(decodeBlocks(&message{Content: r.Attachment.Prompt}))
+}
+
+func blocksText(bs []turns.Block) string {
+	var parts []string
+	for _, b := range bs {
+		if b.Type == "text" && strings.TrimSpace(b.Text) != "" {
+			parts = append(parts, strings.TrimSpace(b.Text))
+		}
+	}
+	return strings.Join(parts, "\n")
+}
+
+// The heading for a message that did not come from this session's own prompt,
+// its trailing note, and whether it opens folded. An empty heading means an
+// ordinary turn. `mode` is a queued message's `commandMode`, which is the only
+// thing a task notification's attachment carries to say what it is.
+func speaker(o *origin, mode, source string) (heading, note string, folded bool) {
+	kind := mode
+	if o != nil && o.Kind != "" {
+		kind = o.Kind
+	}
+	switch kind {
+	case "human", "prompt":
+		return "User", "", false
+	case "auto-continuation":
+		return "User", "auto-continuation", false
+	case "peer":
+		if o.From != "" {
+			return "Agent message", "from " + o.From, false
+		}
+		return "Agent message", "", false
+	case "coordinator":
+		return "Coordinator message", "", false
+	case "task-notification":
+		return "Task notification", "", false
+	case "":
+		if source == "system" {
+			// The same prompt every hour; read once, then skipped.
+			return "Scheduled prompt", "", true
+		}
+		return "User", "", false
+	}
+	return strings.ToUpper(kind[:1]) + kind[1:], "", false
+}
+
+// A queued message as a turn of its own: it arrived between two steps of a
+// running turn, so it splits that turn where the model first saw it. Without
+// it the answer reads as a non sequitur, since the question it answers is not
+// in the document. `queued` in the note says why it lands mid-answer.
+func queuedTurn(rec record) turns.Turn {
+	a := rec.Attachment
+	heading, note, folded := speaker(a.Origin, a.CommandMode, "")
+	if note == "" {
+		note = "queued"
+	} else {
+		note = "queued · " + note
+	}
+	return turns.Turn{
+		Role: "user", Heading: heading, Note: note, TS: rec.Timestamp, Folded: folded,
+		Blocks: []turns.TimedBlock{{B: turns.Block{Type: "text", Text: rec.queuedText()}, TS: rec.Timestamp}},
+	}
 }
 
 // Results arrive as user turns, because that is how they are sent back to the
@@ -439,6 +568,10 @@ func buildTurns(records []record, blocks [][]turns.Block, results map[string]tur
 	var out []turns.Turn
 
 	for i, rec := range records {
+		if rec.Type == "attachment" && rec.Attachment.Type == "queued_command" {
+			out = append(out, queuedTurn(rec))
+			continue
+		}
 		if rec.Type != "user" && rec.Type != "assistant" {
 			out = appendEvent(out, rec)
 			continue
@@ -468,11 +601,23 @@ func buildTurns(records []record, blocks [][]turns.Block, results map[string]tur
 		// new heading rather than hiding inside one. Annotating sub-headings
 		// instead would miss a switch that lands on a plain text block, which
 		// has no heading to annotate.
-		if n := len(out); n > 0 && out[n-1].Role == rec.Type && out[n-1].Model == model {
+		//
+		// A delivered message has a heading of its own, so it neither merges
+		// nor takes what follows it: an agent's hand-back must not swallow the
+		// prompt typed after it.
+		heading, note, folded := "", "", false
+		if rec.IsMeta {
+			heading, note, folded = speaker(rec.Origin, "", rec.PromptSource)
+		}
+		if n := len(out); n > 0 && heading == "" && out[n-1].Heading == "" &&
+			out[n-1].Role == rec.Type && out[n-1].Model == model {
 			out[n-1].Blocks = append(out[n-1].Blocks, keep...)
 			continue
 		}
-		out = append(out, turns.Turn{Role: rec.Type, TS: rec.Timestamp, Model: model, Blocks: keep})
+		out = append(out, turns.Turn{
+			Role: rec.Type, TS: rec.Timestamp, Model: model, Blocks: keep,
+			Heading: heading, Note: note, Folded: folded,
+		})
 	}
 
 	return out
