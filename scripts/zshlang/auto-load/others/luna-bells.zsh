@@ -1517,26 +1517,169 @@ function h-bell-agent-name-read {
     '
 }
 
+##
+#: Subagents wait too, and a fleet of them makes the bells worthless. Whether a
+#: subagent's bell rings at all is one global setting, read at call time from a
+#: state file, so every agent (and every BrishGarden shell, which is a pool)
+#: follows a change at once with no brishz-restart. See ./docs/bell-auto.md.
+typeset -g agent_bell_subagents_file="${XDG_STATE_HOME:-${HOME}/.local/state}/night/agent-bell-subagents"
+
+function agent-bell-subagents {
+    : "never|os-only|normal|unset|status: how a subagent's bell behaves, for every agent at once
+
+never (the default): no sound, no notification. os-only: sound and desktop notification,
+never Telegram. normal: the same as a main agent."
+    ##
+    local mode="${1:-status}"
+    case "$mode" in
+        never|os-only|normal)
+            command mkdir -p "${agent_bell_subagents_file:h}" @RET
+            print -r -- "$mode" > "${agent_bell_subagents_file}" @RET
+            ;;
+        unset)
+            command rm -f -- "${agent_bell_subagents_file}" @RET
+            ;;
+        status) ;;
+        *)
+            ecerr "$0: usage: $0 never|os-only|normal|unset|status"
+            return 1
+            ;;
+    esac
+    ec "subagent bells: $(h-agent-bell-subagents-mode)"
+}
+
+function h-agent-bell-subagents-mode {
+    : "the effective subagent bell mode; a set \$agent_bell_subagents beats the state file"
+    #: `$(<file)' reads without forking. An unknown value means never: the safe
+    #: failure is a quiet subagent, which its parent reports anyway, not a
+    #: Telegram flood from a hand-edited typo.
+    local mode="${agent_bell_subagents}"
+    if test -z "$mode" && test -r "${agent_bell_subagents_file}" ; then
+        mode="$(<"${agent_bell_subagents_file}")"
+        mode="${mode//[[:space:]]/}"
+    fi
+    case "$mode" in
+        never|os-only|normal) ;;
+        '') mode=never ;;
+        *)
+            ecerr "$0: unknown subagent bell mode ${(qqq)mode}; treating it as never"
+            mode=never
+            ;;
+    esac
+    ec "$mode"
+}
+
+function h-agent-role-marks {
+    : "tmux-set @agent_role for the caller's session: sub|main|unset|status"
+    local mode="${1}" opt=@agent_role
+    if test -z "${TMUX_PANE}" ; then
+        ecerr "$0: not inside tmux (no \$TMUX_PANE); the role is kept on the tmux session"
+        return 1
+    fi
+    case "$mode" in
+        sub|main) command tmux set-option -t "${TMUX_PANE}" "$opt" "$mode" @RET ;;
+        unset) command tmux set-option -u -t "${TMUX_PANE}" "$opt" @RET ;;
+        status) ;;
+        *) ecerr "$0: usage: $0 sub|main|unset|status" ; return 1 ;;
+    esac
+    local own
+    own="$(command tmux show-option -qv -t "${TMUX_PANE}" "$opt")"
+    ec "$(command tmux display-message -p -t "${TMUX_PANE}" '#{session_name}'): mark ${own:-unset}, role $(h-bell-agent-role "${TMUX_PANE}" "${TMUX_SUBAGENT_NODE:+1}" '')"
+}
+aliasfn agent-mark-me-as-sub h-agent-role-marks sub
+aliasfn agent-mark-me-as-main h-agent-role-marks main
+aliasfn agent-mark-me-unset h-agent-role-marks unset
+aliasfn agent-mark-me-status h-agent-role-marks status
+
+function h-bell-agent-role {
+    : "sub|main for the agent session behind a hook: h-bell-agent-role <pane> <node-p> <id>"
+    #: Runs in BrishGarden, which sees none of the agent's environment, so the
+    #: hook forwards what it knows as arguments. First hit wins:
+    #:   1. an explicit @agent_role on the agent's tmux session (agent-mark-me-as-*);
+    #:   2. the agent was launched with TMUX_SUBAGENT_NODE set (tmux-subagents);
+    #:   3. its tmux session is named ag--* (the tmux-subagents naming convention);
+    #:   4. otherwise main.
+    #: The session is the forwarded pane's, or else the one whose @agent_session
+    #: identity (left by the agents' own tmux hooks) names this session id,
+    #: which covers hooks that forward nothing. One tmux call either way.
+    ##
+    local pane="${1}" node_p="${2}" id="${3}"
+    local line='' name='' role=''
+
+    if test -n "$pane" ; then
+        line="$(command tmux display-message -p -t "$pane" '#{session_name}'$'\t''#{@agent_role}' 2>/dev/null)" || line=''
+    elif test -n "$id" ; then
+        local l
+        for l in "${(@f)$(command tmux list-sessions -F '#{session_name}'$'\t''#{@agent_role}'$'\t''#{@agent_session}' 2>/dev/null)}" ; do
+            if [[ "${l#*$'\t'*$'\t'}" == *$'\t'"${id}"$'\t'* ]] ; then
+                line="$l"
+                break
+            fi
+        done
+    fi
+    if test -n "$line" ; then
+        name="${line%%$'\t'*}"
+        role="${${line#*$'\t'}%%$'\t'*}"
+    fi
+
+    case "$role" in
+        sub|main) ec "$role" ; return 0 ;;
+    esac
+    if test -n "$node_p" || [[ "$name" == ag--* ]] ; then
+        ec sub
+    else
+        ec main
+    fi
+}
+
 function h-bell-agent-hook {
     : "shared entry point for the coding-agent hooks
 
 Turns the agent's hook payload into a bell plus a notification. The payload is JSON,
-taken from \$4 or from stdin, and carries a message only for some hook events (Claude
-Code's Notification but not its Stop), hence the fallback."
+taken from the argument after <app> <engine> <fallback> [--pane=P] [--node=1] or from
+stdin, and carries a message only for some hook events (Claude Code's Notification but
+not its Stop), hence the fallback. A subagent's bell follows [agfi:agent-bell-subagents]."
     ##
-    local app="${1}" engine="${2}" fallback="${3}" input="${4}"
+    local app="${1}" engine="${2}" fallback="${3}"
+    shift 3
+    #: What the agent's environment knows, forwarded by the hook command as
+    #: single words, since brishz2.dash joins its argv into one string that the
+    #: garden evaluates: an empty value would vanish and a spaced one split.
+    local pane='' node_p=''
+    while (( $# )) ; do
+        case "$1" in
+            --pane=*) pane="${1#--pane=}" ;;
+            --node=*) node_p="${1#--node=}" ;;
+            *) break ;;
+        esac
+        shift
+    done
+    local input="${1}"
 
     if test -z "$input" && ! test -t 0 ; then
         #: Bounded: an inherited pipe that never closes must not wedge the agent's hook.
         input="$(gtimeout 2 cat)" || input=''
     fi
 
-    local msg='' cwd='' id='' name=''
+    local msg='' cwd='' id='' name='' json_p=''
     if test -n "$input" && ec "$input" | command jq --exit-status --slurp \
         'length == 1 and (.[0] | type == "object")' >/dev/null 2>&1 ; then
+        json_p=y
         msg="$(ec "$input" | command jq --raw-output '.message | strings' 2>/dev/null)" || msg=''
         cwd="$(ec "$input" | command jq --raw-output '.cwd | strings' 2>/dev/null)" || cwd=''
         id="$(h-bell-agent-payload-id "$input")" || id=''
+    fi
+
+    #: Before the name lookup, so a silenced subagent costs one tmux call.
+    local tlg="${bell_auto_tlg:-auto}"
+    if [[ "$(h-bell-agent-role "$pane" "$node_p" "$id")" == sub ]] ; then
+        case "$(h-agent-bell-subagents-mode)" in
+            never) return 0 ;;
+            os-only) tlg=n ;;
+        esac
+    fi
+
+    if test -n "$json_p" ; then
         name="$(h-bell-agent-name "$app" "$input" "$id" 2>/dev/null)" || name=''
     fi
 
@@ -1564,6 +1707,7 @@ Code's Notification but not its Stop), hence the fallback."
     group="$(h-bell-agent-group "$app" "$cwd" "$id")"
 
     bell_auto_sleep=10 bell_auto_notif_msg="$msg" bell_auto_notif_group="$group" \
+        bell_auto_tlg="$tlg" \
         notif_ignore_dnd_p=y notif_image="$icon" notif_group="$group" \
         awaysh bell-auto "$engine"
 }

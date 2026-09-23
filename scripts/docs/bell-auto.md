@@ -155,7 +155,9 @@ notification hooks are added.
 
 For the payload to arrive, the hook in `~/.claude/settings.json` must forward stdin:
 
-    brishz_in=MAGIC_READ_STDIN brishz2.dash bell-claude
+    brishz_in=MAGIC_READ_STDIN brishz2.dash bell-claude "--pane=$TMUX_PANE" "--node=${TMUX_SUBAGENT_NODE:+1}"
+
+The two leading words are for the subagent gate (see "Subagents" below).
 
 Reading stdin is bounded by a 2s `gtimeout`, so an inherited pipe that never closes
 cannot wedge the agent's hook.
@@ -210,6 +212,87 @@ prompt submission too, which is right: the session is being worked on either way
 Codex's bell is not wired in the tracked configs, so it has no ack line either;
 `bell-codex-ack` exists for when it is, and `h-bell-agent-ack` reads whichever id
 field the agent's payload carries.
+
+### Subagents
+
+A **subagent** here means an agent running in its own tmux session on behalf of
+another agent, such as a tmux-subagents child. Its waits are the parent's business,
+not yours, so by default its bells are dropped. In-process subagents (Claude's Agent
+tool) are out of scope: they fire no bell hooks of their own.
+
+The policy is one global enum, set with [agfi:agent-bell-subagents]:
+
+- `never` (the default): a subagent's hook returns before any sound, desktop
+  notification or Telegram line.
+- `os-only`: sound and desktop notification, never Telegram. It runs the normal
+  ladder with `bell_auto_tlg=n`.
+- `normal`: exactly what a main agent gets.
+
+`agent-bell-subagents os-only` writes the value to
+`~/.local/state/night/agent-bell-subagents` (under `XDG_STATE_HOME` when set);
+`agent-bell-subagents unset` removes it, and `agent-bell-subagents` alone prints
+the effective mode. The hook reads the file on every call (`$(<file)`, no fork), so a
+change applies to every agent and every BrishGarden shell at once, with no
+`brishz-restart`. A shell global would not: BrishGarden is a **pool** of persistent
+zsh shells (one per `brishz_session`, up to `BRISHGARDEN_N`), and `brishz typeset -g
+...` changes only the shell that ran it. A non-empty `agent_bell_subagents` variable
+still beats the file, for tests and one-off calls. An unknown value warns on stderr
+and acts as `never`, because the failure it risks is a missed subagent bell rather
+than a Telegram flood.
+
+**Role resolution**, in `h-bell-agent-role`, first hit wins:
+
+1. an explicit `@agent_role` (`sub` or `main`) on the agent's tmux session;
+2. a forwarded `--node=1`, meaning `TMUX_SUBAGENT_NODE` was non-empty in the agent;
+3. a tmux session name starting with `ag--`, the tmux-subagents naming convention;
+4. otherwise `main`.
+
+The session is found from the forwarded `--pane=`. Without one, the hook matches the
+payload's session id against the `@agent_session` identity the agents' own hooks leave
+on their tmux sessions (`h-agent-tmux-identity-set`). That fallback covers Codex's old
+notify line, and Claude sessions whose hooks predate the forwarding.
+
+**Marks** set the explicit role on the caller's tmux session, via `$TMUX_PANE`, like
+`tnameme`: `agent-mark-me-as-sub`, `agent-mark-me-as-main`, `agent-mark-me-unset`,
+and `agent-mark-me-status`, which prints the session's mark and the role the bell
+hook would resolve.
+Outside tmux they warn and return 1. They work from any agent's shell tool, because
+every agent shell inherits `TMUX_PANE`.
+
+**Forwarding.** The garden does not see the agent's environment, so the hooks pass
+what the gate needs as leading arguments: `--pane=$TMUX_PANE` and
+`--node=${TMUX_SUBAGENT_NODE:+1}`. Only a flag goes over for the node, never its
+value. The reason is that `brishz2.dash` joins its words with spaces and the garden
+evals the result, so each forwarded argument must be one word that is safe to eval.
+An empty value still arrives as `--node=` rather than vanishing.
+
+Per agent:
+
+- **Claude Code**: the `Notification` and `Stop` hooks in
+  `configFiles/claude-code/settings.json` forward both words. `~/.claude/settings.json`
+  and `~/.claude-work/settings.json` are both symlinks to that file, so both profiles
+  get the change. Running sessions pick it up too: the hooks reference says "Direct
+  edits to hooks in settings files are normally picked up automatically by the file
+  watcher" (code.claude.com/docs/en/hooks), so no restart is needed. Hooks
+  are not snapshotted for the life of the session.
+- **Codex**: its `notify` program receives the payload as the last argv word and is
+  exec'd without a shell, so the untracked `~/.codex/config.toml` needs a small shim
+  to expand the variables:
+
+      notify = ["zsh", "-fc", "exec brishzq.zsh h-codex-notify \"--pane=$TMUX_PANE\" \"--node=${TMUX_SUBAGENT_NODE:+1}\" \"$1\"", "codex-notify"]
+
+  `h-codex-notify` passes the leading words through to `bell-codex`. The old line
+  (`["brishzq.zsh", "h-codex-notify"]`) still works, through the identity fallback.
+  Restart running Codex sessions to be sure they use the new line; until then the
+  old one keeps working through that fallback.
+- **Antigravity**: it has no bell hook, so there is nothing to gate. The marks still
+  work in its shells.
+
+Acknowledgement (`bell-*-ack`) is unchanged: a gated subagent left nothing behind,
+so removing its group is a harmless no-op.
+
+Accepted misses: a child that fires its first hook before its tmux identity or name
+exists resolves as `main`, and so does a subagent outside tmux with no forwarded node.
 
 ### Making them persist until dismissed
 
@@ -356,3 +439,7 @@ updates/clears, profile isolation, malformed payloads, Unicode and metacharacter
 missing tools, lookup failures/timeouts, matching transport text, and stable
 acknowledgement groups. After reloading BrishGarden, the same file can be sourced
 through `brishz` to check the definitions held by its persistent shell.
+
+`zshlang/tests/bell-agent-subagents.zsh` covers the subagent gate the same way, with a
+fake `tmux` on `PATH`: every role-resolution step, each mode through `bell-claude`,
+the Codex argv path with and without forwarded words, the ack group and the setter.

@@ -38,6 +38,15 @@ function h-codex-notify-suppressed-p {
 }
 
 function h-codex-notify {
+    #: Usage: h-codex-notify [--pane=P] [--node=1] <payload>. Codex appends the
+    #: payload to its `notify' argv; the words before it are forwarded from
+    #: Codex's environment by the shim in ~/.codex/config.toml, for
+    #: [agfi:h-bell-agent-role]. Only the bell wants them, not the ack.
+    local -a forward=()
+    while [[ "$1" == --(pane|node)=* ]] ; do
+        forward+=("$1")
+        shift
+    done
     local info="$1"
 
     # ec "${info}" | jq . >> ~/logs/codex_notifs|| true
@@ -51,7 +60,7 @@ function h-codex-notify {
         return 0
     fi
 
-    bell-codex "${info}"
+    bell-codex "${forward[@]}" "${info}"
 }
 ##
 function codex-ask {
