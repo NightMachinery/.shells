@@ -120,20 +120,26 @@ On macOS, `grep`, `sed`, `date`, `stat`, `find`, `awk` and `xargs` are the BSD
 versions. When you need GNU flags or behaviour, call the g-prefixed GNU tools:
 `ggrep`, `gsed`, `gdate`, `gstat`, `gfind`, `gawk`, `gxargs`.
 
-## Detached Background Jobs
+## Background Jobs
 
-Launch a long-lived job that nobody needs to hear back from with
-`awaysh-bnamed NAME cmd...`. BrishGarden runs it detached, with stdio on
-`/dev/null`, so it outlives your shell and session; `ps` shows it as
-`zsh NAME_MARKER cmd...` (upper-cased, `-` becomes `_`), and `kill-marker NAME`
-stops it.
+For a job that must outlive your shell and session:
 
-- It runs in the garden's working directory and environment, not yours: pass
-  absolute paths (`awaysh-bnamed-rp` resolves existing file arguments), and
-  redirect output to a log yourself, since errors vanish otherwise.
-- A job whose completion you must be told about stays one of your harness's own
-  tracked background tasks (Claude Code's `run_in_background`, for example). A
-  detached job cannot notify you.
+- `tmux-job-start NAME [VAR=val...] cmd...` runs it in tmux session NAME, in
+  your working directory, forwarding only the leading `VAR=val` arguments; its
+  output stays in the pane (`tmux attach`, `capture-pane`). It refuses a NAME
+  that is still running; `tmux-job-status NAME`, and `tmux-job-stop NAME` kills
+  the process tree. Prefer it for a job that must run once or whose output
+  someone will read.
+- `awaysh-bnamed NAME cmd...` is fire-and-forget under BrishGarden, in the
+  garden's working directory and environment (pass absolute paths), with output
+  on `/dev/null` unless the command redirects it. NAME is only a `ps` marker
+  (`zsh NAME_MARKER ...`, for `kill-marker NAME`), not unique: a second call
+  starts a second job. Brish sees edited functions only after `brishz-restart`;
+  when it may be stale use `awaysh-v3 cmd...`, a setsid'ed `zsh -c` in your
+  working directory and environment that loads the functions fresh, with no
+  marker and output on `/dev/null`.
+- A job whose completion must notify you stays a harness-tracked background
+  task (Claude Code's `run_in_background`, for example); none of these can.
 
 # Git Commit Guidelines
 
