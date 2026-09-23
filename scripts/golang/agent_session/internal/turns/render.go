@@ -100,6 +100,11 @@ type ToolResult struct {
 	// The body's language, when the adapter knows it: `json` for a result it
 	// pretty-printed, empty for output whose syntax nobody can vouch for.
 	Lang string
+	// Where the full output was saved, when the body is only a preview of it,
+	// and what to say about it beside the link: its size, and whether the
+	// file is still there.
+	Saved     string
+	SavedNote string
 }
 
 // Options for Render.
@@ -634,6 +639,25 @@ func (r *renderer) renderResult(level int, res ToolResult) {
 		r.heading(level, title+stamp)
 		r.block(res.Lang, res.Body)
 	}
+	if res.Saved != "" {
+		r.savedLink(res.Saved, res.SavedNote)
+	}
+}
+
+// A link to the file holding a result's full output, under the preview the
+// transcript kept of it. The preview is what the model saw; the file is the
+// rest.
+func (r *renderer) savedLink(path, note string) {
+	label := "Full output"
+	if note != "" {
+		label += " (" + note + ")"
+	}
+	r.ensureBlank()
+	if r.Org {
+		r.out.WriteString("[[file:" + path + "][" + label + "]]\n")
+		return
+	}
+	r.out.WriteString("[" + label + "](<" + path + ">)\n")
 }
 
 func decodeInput(raw json.RawMessage) map[string]json.RawMessage {

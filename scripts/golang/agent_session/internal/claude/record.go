@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"regexp"
 	"strings"
 	"time"
 
@@ -551,14 +552,40 @@ func indexResults(records []record, blocks [][]turns.Block) map[string]turns.Too
 			if b.Type != "tool_result" || !calls[b.ToolUseID] {
 				continue
 			}
-			out[b.ToolUseID] = turns.ToolResult{
+			res := turns.ToolResult{
 				Body:    turns.FlattenResult(b.Content),
 				IsError: b.IsError,
 				TS:      records[i].Timestamp,
 			}
+			res.Saved, res.SavedNote = persistedOutput(res.Body)
+			out[b.ToolUseID] = res
 		}
 	}
 	return out
+}
+
+// A result too large for the context is saved to a file under
+// `<session>/tool-results/`, and the transcript keeps only a preview that
+// opens with where the rest went:
+//
+//	<persisted-output>
+//	Output too large (235.4KB). Full output saved to: /…/tool-results/b7.txt
+//
+// The preview is what the model saw, so it stays the body; the file is linked
+// under it. Claude Code does not promise to keep these files, so a missing one
+// is said to be gone rather than linked as though it were there.
+var persistedRe = regexp.MustCompile(`\A\s*<(?:persisted-)?output>\s*Output (?:too large|truncated) \(([^)]*)\)\. Full output saved to: (\S+)`)
+
+func persistedOutput(body string) (path, note string) {
+	m := persistedRe.FindStringSubmatch(body)
+	if m == nil {
+		return "", ""
+	}
+	path, note = m[2], m[1]
+	if _, err := os.Stat(path); err != nil {
+		note += ", no longer on disk"
+	}
+	return path, note
 }
 
 // Consecutive records that share a role become one turn. Claude Code writes

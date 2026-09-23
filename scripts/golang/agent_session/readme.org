@@ -486,6 +486,16 @@ adapter pretty-printed says so, and its block is =#+begin_src json= rather than
 an example block --- =turns.ToolResult= carries a =Lang= for exactly that, left
 empty for output whose syntax nobody can vouch for.
 
+A Claude result too large for the context is saved under
+=<session>/tool-results/=, and the transcript keeps only a 2KB preview headed
+=<persisted-output> Output too large (235.4KB). Full output saved to: <path>=.
+The preview stays the body, since it is what the model saw, and a link to the
+file follows it: =[[file:<path>][Full output (235.4KB)]]=. Claude Code does not
+promise to keep those files, so one that is gone gets =, no longer on disk= in
+the label rather than a link that silently leads nowhere. On the pandoc path the
+link comes out as =[[<path>][...]]=, which org opens as the same file. Only the
+preview's own header counts: the phrase anywhere else in a result is text.
+
 =Thinking= is prose, not a block. Every agent's reasoning summary is markdown:
 =**Checking the CLI help**= paragraphs from Codex, the same shape from Claude
 and Antigravity. Rendered verbatim it showed its own asterisks and lost its

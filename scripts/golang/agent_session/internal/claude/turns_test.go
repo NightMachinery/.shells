@@ -324,6 +324,52 @@ func TestBookkeepingRecordsAreDropped(t *testing.T) {
 	}
 }
 
+// A result too large for the context keeps only a preview; the file holding
+// the rest is linked under it, and a file that has gone is said to be gone.
+func TestPersistedOutputIsLinked(t *testing.T) {
+	saved := filepath.Join(t.TempDir(), "b7.txt")
+	if err := os.WriteFile(saved, []byte("everything"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	gone := filepath.Join(t.TempDir(), "gone.txt")
+	preview := func(path string) string {
+		return "<persisted-output>\nOutput too large (235.4KB). Full output saved to: " + path +
+			"\n\nPreview (first 2KB):\nline one\nline two\n</persisted-output>"
+	}
+	call := func(id string) record {
+		return mkRecord(t, "assistant", "2026-08-10T10:00:00.000Z", map[string]any{
+			"type": "tool_use", "id": id, "name": "Bash", "input": map[string]any{"command": "cat big"},
+		})
+	}
+	result := func(id, body string) record {
+		return mkRecord(t, "user", "2026-08-10T10:00:01.000Z", map[string]any{
+			"type": "tool_result", "tool_use_id": id, "content": body,
+		})
+	}
+	records := []record{
+		call("tu_1"), result("tu_1", preview(saved)),
+		call("tu_2"), result("tu_2", preview(gone)),
+		call("tu_3"), result("tu_3", "a\nb\nFull output saved to: /x.txt"),
+	}
+
+	org := renderOne(records, turns.Style{Org: true})
+	for _, want := range []string{
+		"[[file:" + saved + "][Full output (235.4KB)]]",
+		"[[file:" + gone + "][Full output (235.4KB, no longer on disk)]]",
+		"line two",
+	} {
+		if !strings.Contains(org, want) {
+			t.Errorf("want %q in:\n%s", want, org)
+		}
+	}
+	if strings.Contains(org, "[[file:/x.txt]") {
+		t.Errorf("only a preview's own header counts, not the phrase anywhere in a result:\n%s", org)
+	}
+	if md := renderOne(records[:2], turns.Style{}); !strings.Contains(md, "[Full output (235.4KB)](<"+saved+">)") {
+		t.Errorf("markdown link missing:\n%s", md)
+	}
+}
+
 // A message sent while a turn was running reaches the model only as a
 // `queued_command` attachment, with no user record of its own. Dropping it
 // hid every mid-turn question, so the answer after it read as a non sequitur.
