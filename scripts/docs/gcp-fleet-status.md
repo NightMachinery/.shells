@@ -1,10 +1,66 @@
-# gcp-vm-status / gcp-storage-status / gcp-gpu-ssh-sync / gcp-gpu-spend
+# gcp-gpu-status / gcp-gpu-budget / gcp-vm-status / gcp-storage-status / gcp-gpu-ssh-sync / gcp-gpu-spend
 
-Three read-only reporting commands over our own GCP GPU fleet, in
+Read-only reporting commands over our own GCP GPU fleet, in
 `zshlang/auto-load/others/google/gcloud.zsh`, backed by
-`python/gcp/gcp_status.py`. All three share one gcloud inventory call
-(`h-gcp-gpu-status-run`) rather than each shelling out on their own, so
-running more than one in a row costs one API round trip, not several.
+`python/gcp/gcp_status.py` and `python/gcp/gcp_spend.py`. The
+`gcp_status.py` ones share one wrapper (`h-gcp-gpu-status-run`) that hands
+over the project, the owner label and the price table, so none of the Python
+has a default for anything that identifies a deployment.
+
+## gcp-gpu-status
+
+`gcp-gpu-status [--no-color | --color auto|always|never]` (alias `ggs`)
+prints three blocks:
+
+1. The configured instance (`$gcp_gpu_instance`): state, machine,
+   provisioning model, GPU, uptime, why it last stopped, the idle timer, and
+   its own burn, labelled as that instance's alone.
+2. The fleet: every instance carrying our owner label, in any state and any
+   zone, grouped by state, machine type, provisioning model and zone, with
+   GPU counts and EUR/hr per group; then the GPUs that are billing, every disk
+   of ours with its hourly and monthly cost, the orphan disks (attached to
+   nothing) by name, and the fleet burn, compute plus disks.
+3. Month-to-date against the cap, with where the figure came from.
+
+It used to be block 1 alone. During a fleet of flex-start nodes under
+generated names it therefore printed a burn of EUR 0.00/hr for a stopped
+workstation while the fleet burned two orders of magnitude more than the
+month-to-date line could explain. Block 2 is what makes the burn truthful.
+
+Two ownership rules in block 2 are easy to get wrong:
+
+- A disk is ours when it carries our label, is attached to an instance of
+  ours, shares a name with one, or is the configured data disk. Boot disks
+  carry no owner label at all, so a labelled `disks list` misses exactly the
+  disks a fleet creates. The rule is `disk_is_ours` in `gcp_spend.py`, shared
+  so the burn and the spend estimate count the same disks.
+- A FLEX_START VM bills from create to delete, so one that has stopped but
+  not been deleted is still counted at its full rate, and the block says so.
+  That is also how the month-to-date estimate folds it.
+
+Colour is on when stdout is a terminal that speaks 24-bit colour, kitty above
+all (`h-gcp-gpu-rich-p`: `TERM=xterm-kitty`, `$KITTY_WINDOW_ID`, or
+`COLORTERM=truecolor`, and `NO_COLOR` unset). Pipes and agents get the plain
+layout, one `label  value` per line in a fixed column, as before.
+
+The fleet block and the month-to-date figure start in the background before
+the single-instance calls, and are printed in order once done. Measured on a
+large fleet: 52s before, about 3-4s warm, 7-11s when the month-to-date cache
+has just expired.
+
+## gcp-gpu-budget
+
+`gcp-gpu-budget` prints the cap, month-to-date, what is left, the days left,
+the current burn (the same fleet burn as above), when the cap is reached if
+that burn holds, and two projections that each state their assumption: this
+month's average daily pace carried to month end, and the current burn held
+for every remaining day.
+
+It used to print one figure, `pace + burn * 24 * days_left`. That counts the
+rest of the month twice, since the pace term already carries the average
+spend to the last day, and during a fleet it produced a number larger than
+either assumption allows. Fleets are bursts, so neither projection is a
+forecast; they bracket one, and "cap reached in" is the line to act on.
 
 ## gcp-vm-status
 
@@ -164,17 +220,30 @@ per-machine one.
 
 ### Cost of running it
 
-An estimate over a month is three read-only gcloud calls and takes a few tens
-of seconds, dominated by the log read. `--all` scans the full audit-log
-retention window and takes minutes, so it is not something to put in a prompt
-or a loop; `$gcp_gpu_audit_retention_days` sets how far back that reaches.
-The budget preflight uses a memoised variant with a short TTL so that
-creating a batch of machines does not pay for the scan once per machine.
+An estimate over a month is three read-only calls, run concurrently, and
+takes about 7s. The audit-log read dominates. `gcloud logging read` pages
+through it sequentially, about five seconds a page, which made it 30-45s on
+its own; `golang/gcp-log-read` cuts the window into eight time slices and
+fetches them at once, returning the same entries in about 5s. It is built on
+first use when Go is present, and without it the estimate falls back to
+gcloud and gets the same answer slowly. It fails as a whole rather than
+return a partial read, since a missing lifecycle event under-reports.
+
+`--all` scans the full audit-log retention window and takes much longer, so
+it is not something to put in a prompt or a loop;
+`$gcp_gpu_audit_retention_days` sets how far back that reaches.
+
+`gcp-gpu-status`, `gcp-gpu-budget` and the budget preflight on every
+`gcp-gpu-up` use a memoised variant with a five-minute TTL. The memo key is
+the command line, so the window's end is rounded down to the TTL: with the
+current second in the key, the cache never hit, and every call paid for the
+full scan and for the failing BigQuery probe again.
 
 ## Where the fleet-status logic lives
 
-The three functions above are thin zsh wrappers; the actual inventory,
+The functions above are thin zsh wrappers; the actual inventory,
 ssh-probing and formatting logic is Python
-(`python/gcp/gcp_status.py`), invoked once per call and reused across all
-three subcommands (`vm`, `storage`, `ssh-sync`) so the parsing code is
-written once.
+(`python/gcp/gcp_status.py`), invoked once per call and reused across its
+subcommands (`vm`, `storage`, `ssh-sync`, `fleet`) so the parsing code is
+written once. The spend reconstruction is `python/gcp/gcp_spend.py`, and the
+parallel audit-log read is `golang/gcp-log-read`.
