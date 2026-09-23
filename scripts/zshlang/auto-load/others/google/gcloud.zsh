@@ -715,7 +715,13 @@ function gcp-gpu-override {
 }
 
 function gcp-gpu-budget {
+    : "usage: gcp-gpu-budget [--no-color | --color auto|always|never]"
     h-gcp-gpu-deps @RET
+
+    local gcp_status_color=''
+    h-gcp-gpu-status-color-args "$@" @RET
+    h-gcp-gpu-rich-resolve
+    local gcp_gpu_rich_p="${REPLY}"
 
     local cap month_start month_end spent
     cap="$(h-gcp-gpu-budget-cap)"
@@ -730,20 +736,46 @@ function gcp-gpu-budget {
     elapsed_days=$(( (EPOCHSECONDS - month_start) / 86400.0 ))
     days_left=$(( (month_end - EPOCHSECONDS) / 86400.0 ))
 
-    local projected burn
-    burn="$(gcp-gpu-burn --bare)"
+    #: Everything of ours that bills right now, compute plus disks, the same
+    #: figure `gcp-gpu-status` prints as the fleet burn.
+    local -F burn
+    burn="$(h-gcp-gpu-fleet-run --bare)" || burn=0
+
+    #: Two projections, each saying what it assumes, instead of one.
+    #:
+    #: The old single figure was `pace + burn * 24 * days_left`, and that counts
+    #: the rest of the month twice: the pace term already carries this month's
+    #: average spend forward to the last day, and the burn term then added the
+    #: current rate over those same days on top. During a fleet it printed a
+    #: number bigger than either assumption can produce and called it
+    #: `projected`. Fleets are bursts, so neither
+    #: figure is a forecast; they bracket one, and `cap reached` is the one to
+    #: act on.
+    local -F pace hold
+    hold=$(( spent + burn * 24 * days_left ))
     if (( elapsed_days > 0 )) ; then
-        #: Run-rate so far, carried forward, plus whatever is burning right now.
-        projected="$(printf '%.2f' $(( spent / elapsed_days * (elapsed_days + days_left) + burn * 24 * days_left )))"
+        pace=$(( spent / elapsed_days * (elapsed_days + days_left) ))
     else
-        projected="$(printf '%.2f' $(( spent )))"
+        pace=$(( spent ))
     fi
 
-    print -r -- "cap            EUR ${cap} / month  (${gcp_gpu_budget_config})"
-    printf   'month-to-date  EUR %.2f\n' "$spent"
-    print -r -- "remaining      EUR ${remaining}"
-    printf   'days left      %.1f\n' "$days_left"
-    print -r -- "projected     ~EUR ${projected}  (run-rate + current burn)"
+    h-gcp-gpu-kv cap "EUR ${cap} / month  (${gcp_gpu_budget_config})"
+    h-gcp-gpu-kv month-to-date "$(h-gcp-gpu-paint ,bold "$(printf 'EUR %.2f' "$spent")")"
+    h-gcp-gpu-kv remaining "EUR ${remaining}"
+    h-gcp-gpu-kv 'days left' "$(printf '%.1f' "$days_left")"
+    h-gcp-gpu-kv 'burn now' "$(printf 'EUR %.2f/hr' "$burn")  (every instance and disk of ours; gcp-gpu-status)"
+
+    if (( spent < cap && burn > 0 )) ; then
+        local -F hours_to_cap=$(( (cap - spent) / burn ))
+        if (( hours_to_cap < days_left * 24 )) ; then
+            h-gcp-gpu-kv 'cap reached' "$(h-gcp-gpu-paint red,bold "in ~$(h-gcp-gpu-dur-human $(( int(hours_to_cap * 3600) )))") if the current burn holds"
+        else
+            h-gcp-gpu-kv 'cap reached' "not this month, even if the current burn holds"
+        fi
+    fi
+
+    h-gcp-gpu-kv projected "$(printf '~EUR %.2f' "$pace")  at this month's average daily pace so far"
+    h-gcp-gpu-kv '' "$(printf '~EUR %.2f  if the current burn ran for all %.1f days left' "$hold" "$days_left")"
 
     if (( spent >= cap )) ; then
         ecerr "OVER CAP. 'gcp-gpu-up' will refuse until the month rolls over."
@@ -1694,6 +1726,19 @@ function h-gcp-gpu-rich-p {
     isKitty || [[ "${COLORTERM}" == (truecolor|24bit) ]]
 }
 
+function h-gcp-gpu-rich-resolve {
+    #: `$gcp_status_color` (auto|always|never, from --color/--no-color) ->
+    #: `REPLY=y|n`.
+    local mode="${gcp_status_color:-auto}"
+    REPLY=n
+    case "${mode}" in
+        always) REPLY=y ;;
+        never) ;;
+        *) h-gcp-gpu-rich-p && REPLY=y ;;
+    esac
+    return 0
+}
+
 function h-gcp-gpu-paint {
     : "usage: h-gcp-gpu-paint COLOR[,bold] TEXT"
     #: TEXT, coloured only when the caller has set `gcp_gpu_rich_p`. COLOR is a
@@ -1803,12 +1848,8 @@ function gcp-gpu-status {
         return 1
     fi
 
-    local gcp_gpu_rich_p=n
-    case "${gcp_status_color:-auto}" in
-        always) gcp_gpu_rich_p=y ;;
-        never) ;;
-        *) h-gcp-gpu-rich-p && gcp_gpu_rich_p=y ;;
-    esac
+    h-gcp-gpu-rich-resolve
+    local gcp_gpu_rich_p="${REPLY}"
     local color=never
     bool "${gcp_gpu_rich_p}" && color=always
 
