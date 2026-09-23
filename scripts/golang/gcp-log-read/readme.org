@@ -1,0 +1,57 @@
+#+TITLE: gcp-log-read
+
+=gcloud logging read=, but fast: the query window is cut into time slices that
+are fetched in parallel. Prints the same JSON array of raw LogEntry objects,
+newest first, so a caller can use either one.
+
+* Why this exists
+The Logging API pages sequentially, and on an audit-log query each page takes
+the backend about five seconds, whether it holds forty entries or eight
+hundred. A month of fleet lifecycle events came to six pages, so
+=gcloud logging read= spent 30 to 45 seconds waiting on round trips it cannot
+overlap. That one call was most of the runtime of =gcp-gpu-status=.
+
+Eight slices, each queried on its own, finish in about five seconds and return
+the same entries. Measured on the real project: an identical set
+of =insertId=​s, same field layout.
+
+It is Go and not a thread pool in the Python caller because the job is
+concurrent HTTP with retries and nothing else, and one static binary does that
+without starting eight copies of gcloud.
+
+* Install
+#+begin_src zsh :eval never
+go-install-local "${NIGHTDIR}/golang/gcp-log-read"
+#+end_src
+
+Built on first use by [agfi:h-gcp-gpu-log-read-dep], so nothing needs doing by
+hand. It is optional: without it, =gcp_spend.py= falls back to
+=gcloud logging read= and gets the same answer more slowly.
+
+* Use
+#+begin_src sh :eval never
+gcp-log-read --project=P --since=2026-09-01T00:00:00Z \
+    --filter='resource.type="gce_instance" AND protoPayload.methodName:"instances.insert"'
+#+end_src
+
+- =--filter= must NOT carry a timestamp bound: every slice adds its own
+  =timestamp>== and =timestamp<=, so a boundary entry lands in exactly one.
+- =--until= defaults to now. =--slices= defaults to 8. =--limit N= keeps the
+  newest N, as gcloud's =--limit= does.
+- Auth: =$GCP_ACCESS_TOKEN= when set, otherwise
+  =gcloud auth print-access-token= for the active account.
+
+* Behaviour worth knowing
+- *All or nothing.* Any slice that fails fails the run, with a non-zero exit.
+  A partial read drops lifecycle events silently, and a spend estimate built
+  on one under-reports. The caller falls back to gcloud instead.
+- *Retries* 429 and 5xx with exponential backoff. The read quota is per
+  project, so on a shared project other people's queries spend it too.
+- *Empty pages are not the end.* The API can return no entries and still hand
+  back a page token when it hit a scan deadline; only a missing token stops
+  the paging.
+- *Stdlib only*, pinned to =go 1.21=, so =go install= works offline.
+
+* Tests
+=go test ./...= runs against a fake Logging API (paging, the empty page, a 429,
+a hard 403). Run it on a server, not the laptop.
