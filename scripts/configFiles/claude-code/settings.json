@@ -38,7 +38,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "brishz_async=y brishz_in=MAGIC_READ_STDIN brishz2.dash bell-claude"
+            "command": "brishz_async=y brishz_in=MAGIC_READ_STDIN brishz2.dash bell-claude \"--pane=$TMUX_PANE\" \"--node=${TMUX_SUBAGENT_NODE:+1}\""
           }
         ]
       }
@@ -48,7 +48,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "brishz_async=y brishz_in=MAGIC_READ_STDIN brishz2.dash bell-claude"
+            "command": "brishz_async=y brishz_in=MAGIC_READ_STDIN brishz2.dash bell-claude \"--pane=$TMUX_PANE\" \"--node=${TMUX_SUBAGENT_NODE:+1}\""
           }
         ]
       }
