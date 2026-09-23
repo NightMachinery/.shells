@@ -432,6 +432,92 @@ function h-claude-code-session-live-row-of {
     return 1
 }
 
+function h-claude-code-session-import-confirm {
+    : "usage: h-claude-code-session-import-confirm <caller> <from-profile> <to-profile>"
+    #: The consent step of [agfi:claude-code-session-import]: a conversation moving into another
+    #: non-default profile enters that profile's store before its overlay --
+    #: the privacy guardrails of [agfi:claude-work] -- ever applies, so ask
+    #: first unless claude_code_session_import_yes_p=y. Staying in the same
+    #: profile, or moving into the default one, needs no consent.
+    ##
+    local yes_p="${claude_code_session_import_yes_p:-n}"
+
+    local caller="${1}" from_profile="${2}" to_profile="${3}"
+    assert-args caller to_profile @RET
+
+    if [[ "${to_profile}" == default ]] || [[ "${to_profile}" == "${from_profile}" ]] || bool "${yes_p}" ; then
+        return 0
+    fi
+
+    local to_home
+    to_home="$(h-claude-code-profile-config-home "${to_profile}")" @RET
+
+    ecerr "${caller}: the whole conversation so far will be stored under profile '${to_profile}' (${to_home}); its own instruction files, including any privacy guardrails, only apply from here on."
+    if ! { : </dev/tty ; } 2>/dev/null ; then
+        ecerr "${caller}: no terminal to confirm on; set claude_code_session_import_yes_p=y to proceed"
+        return 1
+    fi
+    if ! ask "Import into '${to_profile}' anyway?" n ; then
+        ecerr "${caller}: aborted; nothing was written"
+        return 1
+    fi
+}
+
+function h-claude-code-session-name-unforked {
+    : "usage: h-claude-code-session-name-unforked <name>"
+    #: <name> without any fork suffix (`claude_code_session_import_name_suffix'
+    #: for any registered profile), so a fork of a fork keeps one suffix, not a
+    #: trail of them.
+    ##
+    local name_suffix="${claude_code_session_import_name_suffix:- ⑂ %s}"
+
+    local name="${1}"
+
+    local p sfx
+    for p in "${claude_code_profile_order[@]}" ; do
+        sfx="$(printf -- "${name_suffix}" "${p}")"
+        name="${name%"${sfx}"}"
+    done
+
+    ec "${name}"
+}
+
+function h-claude-code-session-fork-name {
+    : "usage: h-claude-code-session-fork-name <name> <to-profile>"
+    #: The name a fork into <to-profile> gets: [agfi:h-claude-code-session-name-unforked]
+    #: plus the suffix for <to-profile>.
+    ##
+    local name_suffix="${claude_code_session_import_name_suffix:- ⑂ %s}"
+
+    local name="${1}" to_profile="${2}"
+    assert-args name to_profile @RET
+
+    name="$(h-claude-code-session-name-unforked "${name}")" @TRET
+    ec "${name}$(printf -- "${name_suffix}" "${to_profile}")"
+}
+
+function h-claude-code-session-title-append {
+    : "usage: h-claude-code-session-title-append <transcript> <name> <session-id>"
+    #: Names a session by appending both an `agent-name' line, which
+    #: `agent_session claude name' prefers, and a `custom-title' line, which
+    #: is what `/rename' writes and stops Claude Code re-titling.
+    ##
+    local transcript="${1}" name="${2}" sid="${3}"
+    assert-args transcript name sid @RET
+
+    #: The transcript is a jsonl; make sure the new lines start on their own.
+    #: Command substitution strips a trailing newline, so a last byte that is
+    #: one comes back empty; comparing it against $'\n' was always unequal and
+    #: added a blank line to every import.
+    if test -n "$(command tail -c 1 -- "${transcript}")" ; then
+        ec >> "${transcript}"
+    fi
+    command jq --compact-output --null-input \
+        --arg name "${name}" --arg sid "${sid}" \
+        '{type: "agent-name", agentName: $name, sessionId: $sid},
+         {type: "custom-title", customTitle: $name, sessionId: $sid}' >> "${transcript}"
+}
+
 function claude-code-session-import {
     #: Forks a session into another profile: copies its transcript and the
     #: state keyed by its uuid into the target profile's config home under a
@@ -476,8 +562,6 @@ function claude-code-session-import {
     ##
     local remove_source_p="${claude_code_session_import_remove_source_p:-n}"
     local force_p="${claude_code_session_import_force_p:-n}"
-    local yes_p="${claude_code_session_import_yes_p:-n}"
-    local name_suffix="${claude_code_session_import_name_suffix:- ⑂ %s}"
 
     local to_profile="${2}"
     assert-args to_profile @RET
@@ -517,17 +601,7 @@ function claude-code-session-import {
         fi
     fi
 
-    if [[ "${to_profile}" != default ]] && ! bool "${yes_p}" ; then
-        ecerr "$0: the whole conversation so far will be stored under profile '${to_profile}' (${to_home}); its own instruction files, including any privacy guardrails, only apply from here on."
-        if ! { : </dev/tty ; } 2>/dev/null ; then
-            ecerr "$0: no terminal to confirm on; set claude_code_session_import_yes_p=y to proceed"
-            return 1
-        fi
-        if ! ask "Import into '${to_profile}' anyway?" n ; then
-            ecerr "$0: aborted; nothing was written"
-            return 1
-        fi
-    fi
+    h-claude-code-session-import-confirm "$0" "${from_profile}" "${to_profile}" @RET
 
     local target_dir="${to_home}/projects/${enc}"
     local target="${target_dir}/${new}.jsonl"
@@ -556,23 +630,10 @@ function claude-code-session-import {
     if test -z "${name}" ; then
         name="${old[1,8]}"
     fi
-    #: A fork of a fork keeps one suffix, not a trail of them.
-    local p sfx
-    for p in "${claude_code_profile_order[@]}" ; do
-        sfx="$(printf -- "${name_suffix}" "${p}")"
-        name="${name%"${sfx}"}"
-    done
     local new_name
-    new_name="${name}$(printf -- "${name_suffix}" "${to_profile}")" @TRET
+    new_name="$(h-claude-code-session-fork-name "${name}" "${to_profile}")" @TRET
 
-    #: The transcript is a jsonl; make sure the new lines start on their own.
-    if [[ "$(tail -c 1 "${target}")" != $'\n' ]] ; then
-        ec >> "${target}"
-    fi
-    jq --compact-output --null-input \
-        --arg name "${new_name}" --arg sid "${new}" \
-        '{type: "agent-name", agentName: $name, sessionId: $sid},
-         {type: "custom-title", customTitle: $name, sessionId: $sid}' >> "${target}" @RET
+    h-claude-code-session-title-append "${target}" "${new_name}" "${new}" @RET
 
     if bool "${remove_source_p}" ; then
         #: `trs' narrates on stdout; keep stdout for the path.
