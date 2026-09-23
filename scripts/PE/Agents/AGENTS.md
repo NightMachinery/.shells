@@ -114,6 +114,27 @@ binary can produce subtly wrong output rather than an error.
   a helper called from inside the very wrapper it would re-enter — `command`
   is mandatory, not stylistic.
 
+## macOS Tools Are BSD
+
+On macOS, `grep`, `sed`, `date`, `stat`, `find`, `awk` and `xargs` are the BSD
+versions. When you need GNU flags or behaviour, call the g-prefixed GNU tools:
+`ggrep`, `gsed`, `gdate`, `gstat`, `gfind`, `gawk`, `gxargs`.
+
+## Detached Background Jobs
+
+Launch a long-lived job that nobody needs to hear back from with
+`awaysh-bnamed NAME cmd...`. BrishGarden runs it detached, with stdio on
+`/dev/null`, so it outlives your shell and session; `ps` shows it as
+`zsh NAME_MARKER cmd...` (upper-cased, `-` becomes `_`), and `kill-marker NAME`
+stops it.
+
+- It runs in the garden's working directory and environment, not yours: pass
+  absolute paths (`awaysh-bnamed-rp` resolves existing file arguments), and
+  redirect output to a log yourself, since errors vanish otherwise.
+- A job whose completion you must be told about stays one of your harness's own
+  tracked background tasks (Claude Code's `run_in_background`, for example). A
+  detached job cannot notify you.
+
 # Git Commit Guidelines
 
 ## General Rules
