@@ -509,6 +509,18 @@ function h-gcp-gpu-bucket-exists-p {
         --project="${gcp_gpu_project}" &>/dev/null
 }
 ##
+function h-gcp-gpu-log-read-dep {
+    #: Builds `golang/gcp-log-read` on first use. Optional: without Go,
+    #: `gcp_spend.py` falls back to `gcloud logging read` and gets the same
+    #: answer about six times more slowly, so a missing toolchain is not an
+    #: error here.
+    if whence -p gcp-log-read > /dev/null 2>&1 ; then
+        return 0
+    fi
+    whence -p go > /dev/null 2>&1 || return 1
+    ensure-dep1 gcp-log-read go-install-local "${NIGHTDIR}/golang/gcp-log-read"
+}
+
 function h-gcp-gpu-spend-run {
     #: The engine behind [agfi:gcp-gpu-spend]: `python/gcp/gcp_spend.py`, told
     #: the project, the owner label, the price table and the billing dataset,
@@ -529,10 +541,16 @@ function h-gcp-gpu-spend-run {
     ensure-cmd gcp_spend.py @RET
     h-gcp-gpu-conf-assert gcp_gpu_project @RET
 
-    local -x GCP_SPEND_PRICES GCP_SPEND_BILLING_DATASET GCP_SPEND_BILLING_ACCOUNT
+    local -x GCP_SPEND_PRICES GCP_SPEND_BILLING_DATASET GCP_SPEND_BILLING_ACCOUNT GCP_SPEND_LOGREAD
     GCP_SPEND_PRICES="$(h-gcp-gpu-price-json)"
     GCP_SPEND_BILLING_DATASET="${gcp_gpu_billing_dataset}"
     GCP_SPEND_BILLING_ACCOUNT="${gcp_gpu_billing_account}"
+    #: The audit-log read was 30-45s of every estimate; `gcp-log-read` does it
+    #: in about 5s. See [agfi:h-gcp-gpu-log-read-dep].
+    GCP_SPEND_LOGREAD=''
+    if h-gcp-gpu-log-read-dep ; then
+        GCP_SPEND_LOGREAD="$(whence -p gcp-log-read)"
+    fi
 
     local -a args
     args=(
@@ -611,6 +629,16 @@ function h-gcp-gpu-spend-total {
     #: about EUR 300/hour. A budget guard that cannot see the fleet is not a
     #: guard, and `gcp-gpu-up` had been asking it for permission all along.
     local from="${1:?}" to="${2:?}" out
+
+    #: Quantised to the cache TTL when it means "now". The memo key is the
+    #: command line, and with `--to-epoch $EPOCHSECONDS` in it the key changed
+    #: every second, so the cache never hit and every `gcp-gpu-status` paid for
+    #: the full audit-log scan (and for the failing BigQuery probe) again. The
+    #: price is a figure up to one TTL old, which the cache accepted anyway.
+    integer ttl="${gcp_gpu_audit_cache_ttl}"
+    if (( ttl > 0 && to > EPOCHSECONDS - ttl )) ; then
+        to=$(( to - to % ttl ))
+    fi
 
     if out="$(gcp_gpu_spend_memoi=y h-gcp-gpu-spend-run \
                   --from-epoch "$from" --to-epoch "$to" --actual --bare 2>/dev/null)" \
