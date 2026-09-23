@@ -104,9 +104,10 @@ function go-local-dep {
     #: fills the whole command hash (60ms here, with 355 PATH entries). A
     #: loop over `$path' in zsh measured 0.5ms, twice the builtins. Freshness
     #: is one glob with qualifiers plus `-nt'. `(#q...)' rather than bare
-    #: qualifiers, which `no_bare_glob_qual' (set interactively) would read
-    #: as a pattern. Measured on 2026-09-23: 0.7-1.0ms per call, against
-    #: 0.2ms for the bare `whence -p' probe this replaced.
+    #: qualifiers, which `no_bare_glob_qual' would read as a pattern; Claude
+    #: Code's Bash tool sets that option in the shells it runs. Measured on
+    #: 2026-09-23: 0.7-1.0ms per call, against 0.2ms for the bare `whence -p'
+    #: probe this replaced.
     #:
     #: A failed rebuild warns and keeps the old binary, so a half-written edit
     #: does not take the tool down with it; so does a stale binary on a host

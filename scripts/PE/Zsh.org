@@ -347,7 +347,7 @@ function foo {
 
 =ensure-dep1= additionally knows how to install what is missing. It checks, runs the install command, =rehash=es, then re-checks, so a fresh clone works on first use rather than after a separate setup step:
 #+begin_src zsh :eval never
-ensure-dep1 agent_session go-install-local "${NIGHTDIR}/golang/agent_session" @RET
+ensure-dep1 kitty-theme kitty-theme-install @RET
 #+end_src
 
 Guard only what the current code path actually needs. E.g. a renderer that only shells out to =pandoc= for one output format should check for it inside that branch, not unconditionally:
@@ -357,34 +357,22 @@ if [[ "${format}" == org-pandoc ]] ; then
 fi
 #+end_src
 
-Prefer =ensure-dep1= for things we build ourselves out of this repo (a local Go or Rust tool), and =ensure-cmd= for things the user is expected to install, since we should not silently install system packages on their behalf.
+Prefer [agfi:go-local-dep] (below) for a local Go tool, =ensure-dep1= for other things we build ourselves out of this repo (a Rust tool), and =ensure-cmd= for things the user is expected to install, since we should not silently install system packages on their behalf.
 
 - Work better done in Go lives in =golang/<name>/=, one module per tool (=module <name>= in =go.mod=), with =*_test.go= tests and a =readme.org= for install and use.
 
 zsh keeps the policy, Go does the work. The zsh side stays a thin wrapper that reuses the existing helpers, decides the fallbacks and formats the output; the binary is a pure computation/IO unit that emits JSON (or another parseable format) and takes no interactive decisions of its own.
 
-Never check in a binary. Build on first use with an =h-<thing>-dep= guard, called from every wrapper that needs the tool:
+Never check in a binary. Build on first use with an =h-<thing>-dep= guard, called from every wrapper that needs the tool, and let [agfi:go-local-dep] do the work:
 #+begin_src zsh :eval never
 function h-agent-session-dep {
-    ensure-cmd go @RET
-    ensure-dep1 agent_session go-install-local "${NIGHTDIR}/golang/agent_session" @RET
+    go-local-dep agent_session "${NIGHTDIR}/golang/agent_session"
 }
 #+end_src
 
-=ensure-dep1= only builds when the command is missing, and =rehash=es afterwards, so a fresh clone works on first use rather than after a separate setup step.
+=go-local-dep= builds when the binary is missing, and also rebuilds it when any non-test =*.go=, =go.mod= or =go.sum= in the module is newer than the binary, so an edited tool reaches the installed copy (=ensure-dep1= never rebuilds: the renderer once ran eight days stale). Pass =--optional= when the caller has a fallback and a missing Go toolchain is not an error.
 
-When such a guard sits on a hot path, probe with =whence -p= and return early, rather than testing =$+commands=:
-#+begin_src zsh :eval never
-function h-agent-session-dep {
-    if whence -p agent_session > /dev/null 2>&1 ; then
-        return 0
-    fi
-    ensure-cmd go @RET
-    ...
-}
-#+end_src
-
-Reading =$commands= (which is what =isdefined-cmd= and =(( $+commands[x] ))= do) makes zsh hash every directory in =PATH=. In a brish garden shell, which forks per call and so never has a warm hash, that measured 65ms against 6ms for =whence -p=, which stops at the first hit. The guard above is in front of every render, listing and preview of a session, and the early return took it from 124ms to about 1ms per call.
+It is safe on a hot path: the fresh case forks nothing (=whence -p=, then ~=name~ expansion, one =(#q.Nom[1])= glob and =-nt=) and costs about 1ms. Do not probe with =$+commands= instead. Reading =$commands= (which is what =isdefined-cmd= and =(( $+commands[x] ))= do) makes zsh hash every directory in =PATH=. In a brish garden shell, which forks per call and so never has a warm hash, that measured 65ms against 6ms for =whence -p=, which stops at the first hit. The session guard is in front of every render, listing and preview, and avoiding that read took it from 124ms to about 1ms per call.
 
 Keep these tools stdlib-only where you can, and pin an older =go= line in =go.mod= than the installed toolchain (ours use =go 1.21=) so =GOTOOLCHAIN= never tries to fetch one. Both keep =go install= working offline, which matters for any tool that may have to run before the network is up.
 
