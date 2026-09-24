@@ -211,9 +211,15 @@ What it does not do:
 The text typed by the armed `Continue.` engine (`docs/agent-usage-armed.md`) is a
 prompt submission too, which is right: the session is being worked on either way.
 
-Codex's bell is not wired in the tracked configs, so it has no ack line either;
-`bell-codex-ack` exists for when it is, and `h-bell-agent-ack` reads whichever id
-field the agent's payload carries.
+Codex's `UserPromptSubmit` hook (`configFiles/codex/hooks.json`) runs
+`bell-codex-ack` the same way. `h-bell-agent-ack` reads whichever id field the
+agent's payload carries: Codex's notify payload names the thread in `thread-id`,
+its hooks in `session_id`, and for a main session the two are the same id (Codex's
+`AgentControl`: "session_id is equal to the root thread's ID"). A Codex subagent's
+hooks carry its *root's* id, so a subagent's prompt acks the parent. That is
+harmless: a parent that is spawning subagents is not waiting on you. Codex trusts
+hook handlers by hash, so after this file changes, accept the handlers once in the
+TUI's startup review or the ack never runs.
 
 ### Retracting a sent batch
 

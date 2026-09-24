@@ -758,7 +758,8 @@ The wiring, per agent:
   `UserPromptSubmit` also runs `bell-claude-ack`, which takes back the
   session's stored bell notifications; see `docs/bell-auto.md`.
 - **Codex**: `configFiles/codex/hooks.json`, the same two events, as a second
-  handler object beside the autoname one. Codex trusts handlers *by hash*, so
+  handler object beside the autoname one. `UserPromptSubmit` also runs
+  `bell-codex-ack`, the counterpart of `bell-claude-ack`. Codex trusts handlers *by hash*, so
   every edit to that file makes its handlers untrusted until you accept them
   once in the TUI's startup review. Worse, a handler's non-JSON stdout on exit
   0 is injected into the model's context as extra context, which is why every
