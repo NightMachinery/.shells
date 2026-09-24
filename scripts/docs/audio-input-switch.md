@@ -133,6 +133,7 @@ built-in mic and the next press unmutes it normally.
   by name keeps hearing it: a recording already in progress (the STT recorders
   pick their device by name when they start), or a meeting app set to a
   specific mic rather than the system default.
+  The mute alert says so in one line whenever a soft mute is in effect.
 - On 2026-09-24 the iPhone microphone was listed and could be selected, but it
   recorded digital silence, both from a terminal and from inside Hammerspoon
   (which already has microphone permission for STT). The phone itself was not

@@ -196,7 +196,11 @@ function input-volume-mute-toggle {
       #: point, so it shares that id rather than opening a band of its own.
       local alert_id="${volume_mute_alert_id_prefix}input"
       ##
-      if with-input-volume volume-mute-p-hs  ; then
+      if audio-input-soft-mute-p ; then
+        #: A soft mute only moves the system default; see [agfi:audio-input-soft-mute].
+        alert_dur=3
+        alert "input muted; apps that picked the iPhone mic still hear it"
+      elif with-input-volume volume-mute-p-hs  ; then
         alert "input muted"
       else
         alert "INPUT UNMUTED"
