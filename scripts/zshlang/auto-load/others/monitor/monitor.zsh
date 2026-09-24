@@ -318,6 +318,333 @@ function audio-input-get {
     ##
     audio_default_what=input h-audio-default-get
 }
+##
+#: * Default audio input: listing, switching, and a glyph for the menubar
+#:
+#: <spec> is `builtin', `iphone', a device UID, or an exact device name. The
+#: two kinds are resolved by transport, never by name: the built-in name is
+#: model dependent, and the iPhone's name is personal. With the lid shut the
+#: built-in microphone is disconnected in hardware and records digital silence.
+#: See [[file:~/scripts/docs/audio-input-switch.md]].
+
+function clamshell-p {
+    : "returns 0 iff the laptop lid is closed"
+    @darwinOnly
+    ##
+    local out
+    out="$(ioreg -r -k AppleClamshellState -d 4)" @TRET
+
+    [[ "$out" == *'"AppleClamshellState" = Yes'* ]]
+}
+aliasfn clamshell-is clamshell-p
+
+function h-audio-input-kind-classify {
+    : "<name> <transport> -> builtin|bluetooth|iphone|other
+
+Pure classification, no lookup. Takes the transport in either spelling:
+Hammerspoon's (Built-in, UNKNOWN) or system_profiler's JSON (builtin, unknown)."
+    local name="${(L)1}" transport="${(L)${2//[^[:alnum:]]/}}"
+
+    if [[ "$transport" == builtin ]] ; then
+        ec builtin
+    elif [[ "$transport" == bluetooth* ]] ; then
+        ec bluetooth
+    elif [[ "$transport" == unknown || "$name" == *iphone* ]] ; then
+        #: A Continuity microphone. CoreAudio gives it a transport type that
+        #: neither Hammerspoon nor system_profiler has a name for.
+        ec iphone
+    else
+        ec other
+    fi
+}
+
+function audio-input-devices-get-hs {
+    : "outputs: one line per input device: name<TAB>transport<TAB>uid"
+    @darwinOnly
+    ##
+    local out
+    out="$(h-hammerspoon-eval 'return audioInputDevicesGet()')" @RET
+    if [[ -z "$out" ]] ; then
+        return 1
+    fi
+
+    ec "$out"
+}
+
+function audio-input-devices-get-system-profiler {
+    : "outputs: one line per input device: name<TAB>transport<TAB>(no uid)"
+    @darwinOnly
+    ##
+    #: Slow (~200ms), but needs no Hammerspoon.
+    system_profiler -json SPAudioDataType 2>/dev/null |
+        jq -r '.SPAudioDataType[]?._items[]?
+            | select(.coreaudio_device_input)
+            | [._name, ((.coreaudio_device_transport // "") | sub("^coreaudio_device_type_"; "")), ""]
+            | @tsv'
+}
+
+function audio-input-devices-get {
+    : "outputs: one line per input device: name<TAB>transport<TAB>uid
+Gateway: tries the fast Hammerspoon helper, falls back to system_profiler."
+    @darwinOnly
+    ##
+    local out
+    if out="$(audio-input-devices-get-hs 2>/dev/null)" ; then
+        ec "$out"
+    else
+        audio-input-devices-get-system-profiler
+    fi
+}
+
+function audio-input-list {
+    : "outputs: the name of each input device, one per line"
+    @darwinOnly
+    ##
+    local out line
+    out="$(audio-input-devices-get)" @RET
+
+    for line in "${(@f)out}" ; do
+        ec "${line%%$'\t'*}"
+    done
+}
+
+function h-audio-input-resolve {
+    : "<spec> -> the name of the first input device matching it"
+    local spec="${1}"
+    assert-args spec @RET
+
+    local out
+    out="$(audio-input-devices-get)" @RET
+
+    local line fields name transport uid
+    for line in "${(@f)out}" ; do
+        fields=("${(@ps:\t:)line}")
+        name="${fields[1]}" transport="${fields[2]}" uid="${fields[3]}"
+
+        if [[ "$spec" == (builtin|iphone) ]] ; then
+            if [[ "$(h-audio-input-kind-classify "$name" "$transport")" == "$spec" ]] ; then
+                ec "$name"
+                return 0
+            fi
+        elif [[ "$spec" == "$name" || ( -n "$uid" && "$spec" == "$uid" ) ]] ; then
+            ec "$name"
+            return 0
+        fi
+    done
+
+    ecerr "$0: no input device matches: ${spec}"
+    return 1
+}
+
+function audio-input-switch-hs {
+    : "<name>: makes the exactly named input device the default, via Hammerspoon"
+    @darwinOnly
+    ##
+    local name="${1}"
+    assert-args name @RET
+
+    if [[ "$name" == *']]'* ]] ; then
+        #: It would close the Lua long string the name travels in.
+        ecerr "$0: cannot pass a name containing ']]': ${name}"
+        return 1
+    fi
+
+    local res
+    res="$(h-hammerspoon-eval "return audioInputDefaultSetByName([[${name}]])")" @RET
+    if [[ "$res" != ok ]] ; then
+        ecerr "$0: ${name}: ${res:-no answer}"
+        return 1
+    fi
+}
+
+function audio-input-switch-sas {
+    : "<name>: makes the exactly named input device the default, via SwitchAudioSource"
+    @darwinOnly
+    ##
+    local name="${1}"
+    assert-args name @RET
+
+    ensure-dep-switchaudio @RET
+
+    command SwitchAudioSource -t input -s "$name" >/dev/null @RET
+
+    #: Re-read, rather than trust the exit status.
+    local now
+    now="$(command SwitchAudioSource -c -t input)" @TRET
+    if [[ "$now" != "$name" ]] ; then
+        ecerr "$0: asked for ${name}, the default input is ${now}"
+        return 1
+    fi
+}
+
+function audio-input-switch-darwin {
+    : "<spec>: makes the matching input device the default
+Gateway: Hammerspoon, falling back to SwitchAudioSource."
+    @darwinOnly
+    ##
+    local spec="${1}"
+    assert-args spec @RET
+
+    local name
+    name="$(h-audio-input-resolve "$spec")" @RET
+
+    if ! audio-input-switch-hs "$name" 2>/dev/null ; then
+        ecgray "$0: Hammerspoon could not switch, falling back to SwitchAudioSource."
+        audio-input-switch-sas "$name" @RET
+    fi
+
+    ecgray "input: ${name}"
+    if [[ "$spec" == builtin ]] && clamshell-p ; then
+        ecerr "$0: warning: the lid is closed, so the built-in microphone records silence."
+    fi
+
+    menubar-refresh @STRUE
+}
+
+function audio-input-switch {
+    : "<spec>: makes the matching input device the default
+spec: builtin, iphone, a device UID, or an exact device name (see audio-input-list)"
+    if isDarwin ; then
+        audio-input-switch-darwin "$@"
+    else
+        @NA
+    fi
+}
+
+function audio-input-p {
+    : "<spec>: returns 0 iff the default input device matches spec"
+    @darwinOnly
+    ##
+    local spec="${1}"
+    assert-args spec @RET
+
+    local want now
+    want="$(h-audio-input-resolve "$spec" 2>/dev/null)" || return 1
+    now="$(audio-input-get)" @RET
+
+    [[ "${now%%$'\n'*}" == "$want" ]]
+}
+
+function audio-input-toggle {
+    : "<spec> [<other spec>=builtin]: switches to spec, or back to the other one if spec is already the default"
+    local spec="${1}" other="${2:-builtin}"
+    assert-args spec @RET
+
+    if audio-input-p "$spec" ; then
+        audio-input-switch "$other"
+    else
+        audio-input-switch "$spec"
+    fi
+}
+
+aliasfn iphone-mic-on audio-input-switch iphone
+aliasfn iphone-mic-off audio-input-switch builtin
+aliasfn iphone-mic-p audio-input-p iphone
+aliasfn iphone-mic-toggle audio-input-toggle iphone builtin
+##
+function audio-input-state-get-hs {
+    : "outputs: name, transport, muted (true|false|nomute), volume (0-100|novolume), one per line"
+    @darwinOnly
+    ##
+    local out
+    out="$(h-hammerspoon-eval 'return audioInputStateGet()')" @RET
+    if [[ -z "$out" ]] ; then
+        return 1
+    fi
+
+    ec "$out"
+}
+
+function audio-input-state-get {
+    : "outputs: name, transport, muted (true|false|nomute), volume (0-100|novolume), one per line
+Gateway: Hammerspoon, falling back to system_profiler, which knows nothing about mute."
+    @darwinOnly
+    ##
+    local out
+    if out="$(audio-input-state-get-hs 2>/dev/null)" ; then
+        ec "$out"
+    else
+        out="$(audio-input-get-system-profiler)" @RET
+        ec "${out}"$'\nnomute\nnovolume'
+    fi
+}
+
+function h-audio-input-kind {
+    : "<name> <transport> -> the kind, with builtin split into builtin-clamshell while the lid is closed"
+    local kind
+    kind="$(h-audio-input-kind-classify "$@")" @RET
+
+    if [[ "$kind" == builtin ]] && clamshell-p ; then
+        kind=builtin-clamshell
+    fi
+
+    ec "$kind"
+}
+
+function audio-input-kind-get {
+    : "outputs: builtin|builtin-clamshell|bluetooth|iphone|other|none, for the default input"
+    @darwinOnly
+    ##
+    local out
+    out="$(audio-input-state-get 2>/dev/null)" || out=''
+
+    local lines=("${(@f)out}")
+    if [[ -z "${lines[1]}" ]] ; then
+        ec none
+        return 0
+    fi
+
+    h-audio-input-kind "${lines[1]}" "${lines[2]}"
+}
+
+#: Overridable: set it after this file loads. `<kind>-muted' wins over `muted';
+#: a closed lid shows the same warning muted or not, since it records nothing either way.
+if (( ! ${+audio_input_glyphs} )) ; then
+    typeset -gA audio_input_glyphs=(
+        builtin '💻'
+        builtin-clamshell '🚫'
+        builtin-clamshell-muted '🚫'
+        bluetooth '🎧'
+        iphone '📱'
+        other '🎤'
+        none '❔'
+        muted '🔇'
+    )
+fi
+
+function audio-input-glyph-get {
+    : "outputs: one symbol for the default input device and whether it is muted
+Used by the xbar menubar plugin zshlang/menubar/date.sh."
+    @darwinOnly
+    ##
+    local out
+    out="$(audio-input-state-get 2>/dev/null)" || out=''
+
+    local lines=("${(@f)out}")
+    local name="${lines[1]}" transport="${lines[2]}" muted="${lines[3]}" volume="${lines[4]}"
+
+    local kind=none
+    if [[ -n "$name" ]] ; then
+        kind="$(h-audio-input-kind "$name" "$transport")" @RET
+    fi
+
+    #: The osascript mute backend mutes an input by setting its volume to 0,
+    #: so that counts as muted too.
+    if [[ "$muted" == true || "$volume" == 0 ]] ; then
+        ec "${audio_input_glyphs[${kind}-muted]:-${audio_input_glyphs[muted]}}"
+    else
+        ec "${audio_input_glyphs[$kind]}"
+    fi
+}
+
+function menubar-refresh {
+    : "[<plugin>=date.1m.bash]: asks xbar to rerun a plugin now rather than at its next interval"
+    @darwinOnly
+    ##
+    local plugin="${1:-date.1m.bash}"
+
+    command open -g "xbar://app.xbarapp.com/refreshPlugin?path=${plugin}"
+}
 
 function h-headphones-classify-p {
     : "returns 0 iff <name> <transport> describes a device likely worn in/on the ear

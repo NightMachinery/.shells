@@ -72,3 +72,53 @@ function audioDeviceMutedSet(spec, muted)
 
     return tostring(now)
 end
+
+--- * Default audio input
+--
+-- The zsh side is [agfi:audio-input-switch] and [agfi:audio-input-glyph-get];
+-- see docs/audio-input-switch.md. Policy (which device counts as the iPhone,
+-- what `builtin' means, which glyph to show) lives in zsh. These only report
+-- and act, and they are named functions for the same `hammerspoon -c' payload
+-- limit described above.
+
+-- One line per input device: name, transport, UID, tab separated. hs reports a
+-- Continuity (iPhone) microphone's transport as "UNKNOWN", since it has no
+-- name for that CoreAudio transport type.
+function audioInputDevicesGet()
+    local lines = {}
+    for _, d in ipairs(hs.audiodevice.allInputDevices()) do
+        lines[#lines + 1] = table.concat(
+            {d:name() or "", d:transportType() or "", d:uid() or ""}, "\t")
+    end
+    return table.concat(lines, "\n")
+end
+
+-- Returns "ok", "nodevice", or "failed". The default is re-read after the
+-- write rather than trusting setDefaultInputDevice's boolean.
+function audioInputDefaultSetByName(name)
+    local d = hs.audiodevice.findInputByName(name)
+    if not d then return "nodevice" end
+
+    d:setDefaultInputDevice()
+
+    local now = hs.audiodevice.defaultInputDevice()
+    if now and now:uid() == d:uid() then return "ok" end
+    return "failed"
+end
+
+-- name, transport, muted, volume: one per line. muted is "true", "false", or
+-- "nomute" (a Continuity microphone has no mute control); volume is a number
+-- or "novolume".
+function audioInputStateGet()
+    local d = hs.audiodevice.defaultInputDevice()
+    if not d then return "" end
+
+    local muted = d:inputMuted()
+    local volume = d:inputVolume()
+    return table.concat({
+        d:name() or "",
+        d:transportType() or "",
+        muted == nil and "nomute" or tostring(muted),
+        volume == nil and "novolume" or tostring(math.floor(volume + 0.5)),
+    }, "\n")
+end

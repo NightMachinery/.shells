@@ -29,6 +29,9 @@ to. With the laptop lid closed that mic is not merely quiet — measured with
 invisible: you got an empty or hallucinated transcript with no indication that
 the wrong microphone had been used.
 
+To switch the default input (for example to an iPhone while the lid is shut),
+see [audio-input-switch.md](audio-input-switch.md).
+
 Hardcoding `:1` instead would not fix it. Indices renumber as devices connect
 and disconnect, so the correct index changes the moment the earbuds are
 unpaired.
