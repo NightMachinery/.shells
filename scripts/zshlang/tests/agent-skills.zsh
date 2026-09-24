@@ -213,7 +213,52 @@ agent-skills-test-assert "symlinked Claude skill directory should be preserved" 
 [[ ! -e ${foreign}/SKILL.md ]] || \
     agent-skills-test-fail "nothing should be written inside the foreign directory"
 
+# A whole-directory link to the very skill we would link is another installer's
+# layout for the same thing: accepted as it is, and reported as linked.
+claude_case="${agent_skills_test_tmp}/claude-equivalent-dir-link"
+command mkdir -p -- "${claude_case}/skills"
+command ln -s -- "${agent_skills_src_dir}/clean" "${claude_case}/skills/clean"
+claude_code_profiles[test]="${claude_case}"
+agent-skills-link >/dev/null 2>&1 || \
+    agent-skills-test-fail "an equivalent Claude directory link should be accepted"
+linked_path="${claude_case}/skills/clean"
+expected_path="${agent_skills_src_dir}/clean"
+[[ -L ${linked_path} && ${linked_path:A} == ${expected_path:A} ]] || \
+    agent-skills-test-fail "an equivalent Claude directory link should be left as it is"
+doctor_output="$(h-agent-skills-doctor 2>&1)"
+[[ ${doctor_output} == *'directory-linked'* && ${doctor_output} != *'UNTRACKED'* ]] || \
+    agent-skills-test-fail "doctor should accept an equivalent Claude directory link"
+
+# Dangling links, to the skill directory or to its file, are what a skill that
+# moved between roots leaves behind; there is nothing behind them to lose.
+claude_case="${agent_skills_test_tmp}/claude-dangling"
+command mkdir -p -- "${claude_case}/skills/clean"
+command ln -s -- "${agent_skills_test_tmp}/moved-away/clean/SKILL.md" "${claude_case}/skills/clean/SKILL.md"
+command ln -s -- "${agent_skills_test_tmp}/moved-away/extra" "${claude_case}/skills/extra"
+claude_code_profiles[test]="${claude_case}"
+doctor_output="$(h-agent-skills-doctor 2>&1)"
+[[ ${doctor_output} == *'DANGLING'* ]] || \
+    agent-skills-test-fail "doctor should name a dangling Claude link"
+agent-skills-link >/dev/null 2>&1 || \
+    agent-skills-test-fail "dangling Claude links should be replaced, not refused"
+for name in clean extra ; do
+    linked_path="${claude_case}/skills/${name}/SKILL.md"
+    expected_path="${agent_skills_src_dir}/${name}/SKILL.md"
+    [[ -L ${linked_path} && ! -L ${linked_path:h} && ${linked_path:A} == ${expected_path:A} ]] || \
+        agent-skills-test-fail "dangling Claude link for ${name} should be relinked to its source"
+done
+
 claude_code_profiles[test]="${agent_skills_test_tmp}/claude"
+
+# The Codex seat replaces a dangling directory link the same way.
+command rm -- "${agent_skills_codex_dir}/extra"
+command ln -s -- "${agent_skills_test_tmp}/moved-away/extra" "${agent_skills_codex_dir}/extra"
+agent-skills-link >/dev/null 2>&1 || \
+    agent-skills-test-fail "a dangling Codex link should be replaced, not refused"
+linked_path="${agent_skills_codex_dir}/extra"
+expected_path="${agent_skills_src_dir}/extra"
+[[ -L ${linked_path} && ${linked_path:A} == ${expected_path:A} ]] || \
+    agent-skills-test-fail "dangling Codex link should be relinked to its source"
 
 # Duplicate names must fail before any target mutation, rather than picking a root.
 command mkdir -p -- "${agent_skills_notes_dir}/clean"

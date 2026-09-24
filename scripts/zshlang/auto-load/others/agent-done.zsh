@@ -132,6 +132,22 @@ function h-agent-skills-names {
     return 0
 }
 
+function h-agent-skills-dangling-p {
+    : "usage: h-agent-skills-dangling-p <path>; whether <path> is a symlink to nothing"
+    #: Always safe to replace: there is nothing behind it to lose. This is what
+    #: a skill leaves behind when it moves out of one of our roots.
+    test -L "${1}" && ! test -e "${1}"
+}
+
+function h-agent-skills-equivalent-dirlink-p {
+    : "usage: h-agent-skills-equivalent-dirlink-p <SKILL.md target> <SKILL.md source>; whether the target's directory is a symlink to the source's"
+    #: Another installer's layout (a whole-directory link, as npx skills and
+    #: hand-made links produce) for the very skill we would link. Same bytes,
+    #: same sibling files, so there is nothing to fix.
+    local target="${1}" src="${2}"
+    test -L "${target:h}" && [[ "${target:h:A}" == "${src:h:A}" ]]
+}
+
 function agent-skills-link {
     : "installs every tracked agent skill into each agent's skills directory"
     #: Symlinks, not copies: the tracked file stays the only copy, so a fix
@@ -164,6 +180,9 @@ function agent-skills-link {
                 target="${target:h}"
                 if test -L "${target}" && [[ "${target:A}" == "${src:A}" ]] ; then
                     continue
+                elif h-agent-skills-dangling-p "${target}" ; then
+                    ecgray "$0: replacing the dangling link ${target/#${HOME}/~}"
+                    command rm -- "${target}" @RET
                 elif test -e "${target}" || test -L "${target}" ; then
                     ecerr "$0: ${target/#${HOME}/~} is not our directory link (expected ${${src:A}/#${HOME}/~}); leaving it alone. Remove it and re-run $0."
                     ret=1
@@ -181,6 +200,19 @@ function agent-skills-link {
             #: reason this costs one stat rather than a write.
             if test -L "${target}" && [[ "${target:A}" == "${src:A}" ]] ; then
                 continue
+            fi
+            if h-agent-skills-equivalent-dirlink-p "${target}" "${src}" ; then
+                continue
+            fi
+
+            #: Links to nothing, whether the skill directory or the file in it,
+            #: are what a skill that moved between roots leaves behind.
+            if h-agent-skills-dangling-p "${target:h}" ; then
+                ecgray "$0: replacing the dangling link ${${target:h}/#${HOME}/~}"
+                command rm -- "${target:h}" @RET
+            elif h-agent-skills-dangling-p "${target}" ; then
+                ecgray "$0: replacing the dangling link ${target/#${HOME}/~}"
+                command rm -- "${target}" @RET
             fi
 
             #: A symlinked `<dir>/<name>' is never ours: we always create that
@@ -289,8 +321,12 @@ function h-agent-skills-doctor {
             fi
 
             ecbold "skill ${name}: ${target/#${HOME}/~} (${agent})"
-            if ! test -e "${target}" && ! test -L "${target}" ; then
+            if h-agent-skills-dangling-p "${target}" || h-agent-skills-dangling-p "${target:h}" ; then
+                ecerr "  DANGLING: run agent-skills-link"
+            elif ! test -e "${target}" && ! test -L "${target}" ; then
                 ecerr "  MISSING: run agent-skills-link"
+            elif [[ "${agent}" != codex ]] && h-agent-skills-equivalent-dirlink-p "${target}" "${src}" ; then
+                ec "  = directory-linked to ${${src:h}/#${NIGHTDIR}/.}"
             elif ! test -L "${target}" ; then
                 ecerr "  UNTRACKED: not the expected symlink. Compare with ${src/#${NIGHTDIR}/.} before re-linking."
             elif [[ "${target:A}" == "${src:A}" ]] ; then

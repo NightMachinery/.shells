@@ -91,7 +91,17 @@ will no longer discover these skills after cleanup; use a current client.
 
 ### A target the linker does not recognise
 
-The linker only ever writes where it finds nothing. If something is already
+Two shapes are not collisions, and the linker handles them on its own:
+
+- a whole-directory symlink to the very skill it would link, the layout
+  `npx skills` and hand-made links produce. It is the same skill with the same
+  sibling files, so it is accepted as it is, and `h-agent-skills-doctor` reports
+  it as directory-linked. `delegate-to-web-chat` was installed this way on
+  2026-09-21 and warned on every launch until this was allowed;
+- a dangling symlink, to the skill directory or to its `SKILL.md`. Nothing sits
+  behind it to lose, so it is replaced, and the doctor calls it `DANGLING`.
+
+Otherwise the linker only ever writes where it finds nothing. If something is already
 sitting at a skill's place, it is reported on stderr, left exactly as it is, and
 `agent-skills-link` returns non-zero. That covers three shapes, on every seat
 alike rather than on Codex alone:
@@ -111,9 +121,9 @@ The repair is always manual: look at what is there, remove it, and re-run
 cannot tell its own leftovers from a file you meant to keep, and guessing wrong
 loses your work.
 
-A skill that moves between roots leaves exactly this behind. Two things have to
-happen, and only the first is obvious: the old link has to go, and the **old
-source directory has to be removed from disk**. Untracked files -- a
+A skill that moves between roots leaves a link to its old place behind. Once the
+old path is gone that link dangles and is replaced automatically, but only then:
+the **old source directory has to be removed from disk**. Untracked files -- a
 `__pycache__`, a stray build artifact -- keep git from taking the directory with
 the move, so the dead path stays resolvable and the old link keeps looking
 plausible. `html-reports` leaving `~/notes/skills` for its own repository on
