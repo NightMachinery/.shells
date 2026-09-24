@@ -193,6 +193,7 @@ function input-volume-mute-toggle {
       else
         alert "INPUT UNMUTED"
       fi
+      awaysh-fast menubar-refresh
       ##
       # awaysh-fast alert "input-volume: $(with-input-volume volume-get)"
     }

@@ -16,6 +16,7 @@
 -- live with the helper.
 
 audioWatcherDebounceTimer = nil
+audioWatcherInputDebounceTimer = nil
 audioWatcherMuteDevice = nil
 
 local DEBOUNCE = 1.0
@@ -43,6 +44,17 @@ local function notifyAudioChanged()
     -- The mute watcher below is bound to one specific device, so it has to
     -- follow the default around.
     attachMuteWatcher()
+end
+
+-- The default INPUT changing only has to reach the menubar glyph (see
+-- h-hook-audio-input-change), so it gets its own timer and hook: debouncing it
+-- together with dOut would let an input switch cancel a pending output one.
+local function notifyAudioInputChanged()
+    local device = hs.audiodevice.defaultInputDevice()
+    brishz_eval_q_hs({"h-hook-audio-input-change",
+                      device and device:name() or "",
+                      device and device:transportType() or ""},
+                     "audio-watcher")
 end
 
 --- ** Ownership reconciliation
@@ -97,6 +109,15 @@ end
 local function audioDeviceCallback(event)
     -- The watcher fires for volume, mute, input and output events alike. A
     -- volume nudge must cost a string compare and nothing more.
+    -- Event codes are four characters: this one is "dIn " with a trailing
+    -- space (measured), so a bare "dIn" never matches.
+    if event == "dIn " then
+        if audioWatcherInputDebounceTimer then
+            audioWatcherInputDebounceTimer:stop()
+        end
+        audioWatcherInputDebounceTimer = hs.timer.doAfter(DEBOUNCE, notifyAudioInputChanged)
+        return
+    end
     if event ~= "dOut" then return end
 
     if audioWatcherDebounceTimer then

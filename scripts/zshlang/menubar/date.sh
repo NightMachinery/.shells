@@ -54,6 +54,11 @@ stopwatch_text="$(brishz.dash menu_stopwatch_format=min serr reval-true menu-sto
 
 last_idle_min="$(brishz.dash last-idle-get-min)"
 
+mic_glyph="$(brishz.dash audio-input-glyph-get 2>/dev/null)"
+#: One symbol for the default microphone; see docs/audio-input-switch.md.
+#: xbar ignores ANSI in the title, so "muted" is a symbol of its own.
+mic_prefix="${mic_glyph:+${mic_glyph} }"
+
 
 # current_date="$(date "+%b%-m/%d")"
 #: Gregorian
@@ -62,9 +67,9 @@ current_date="$(brishz.dash datej)"
 #: Jalali
 
 if [ -n "$stopwatch_text" ]; then
-    printf '⏱️%s ¦ %d ¦ %s\n' "$stopwatch_text" "$last_idle_min" "$current_date"
+    printf '%s⏱️%s ¦ %d ¦ %s\n' "$mic_prefix" "$stopwatch_text" "$last_idle_min" "$current_date"
 else
-    printf '%.0f ¦ %s\n' "$last_idle_min" "$current_date"
+    printf '%s%.0f ¦ %s\n' "$mic_prefix" "$last_idle_min" "$current_date"
     # %02d
 fi
 echo "---"

@@ -88,6 +88,18 @@ not stop the others from running."
     awaysh-fast sony-battery-on-audio-change "$name" "$transport"
 }
 ##
+function h-hook-audio-input-change {
+    : "fired when the default audio input device changes
+
+Called by hammerspoon/core/audio-watcher.lua with the new device's name and
+transport, debounced and filtered to dIn events. Same fan-out rationale as
+[agfi:h-hook-audio-output-change]."
+    local name="${1}" transport="${2}"
+
+    #: The menubar mic glyph would otherwise lag by up to a minute.
+    awaysh-fast menubar-refresh
+}
+##
 function tealy-connect-hook {
     # fsay "Tealy connected"
 
