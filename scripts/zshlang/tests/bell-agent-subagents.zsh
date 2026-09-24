@@ -40,6 +40,8 @@ esac' > "${fixture}/bin/tmux"
     function h-bell-claude { print -r -- Claude > "${fixture}/sound"; }
     function h-bell-codex { print -r -- Codex > "${fixture}/sound"; }
     local bell_auto_stop_mode=bell+notif bell_auto_tlg=y bell_auto_tlg_t=0 bell_auto_tlg_dest=fixture-dest
+    #: Sent batches are recorded in redis; keep them off the live keys.
+    local bell_tlg_batch_key_prefix="bell_tlg_test_${$}_batch" bell_tlg_group_key_prefix="bell_tlg_test_${$}_group"
     local bell_auto_notif_alert=n bell_skip_first='' bell_auto_sf='' bell_auto_exit=()
     local agent_bell_subagents=''
     local agent_bell_subagents_file="${fixture}/mode"

@@ -514,7 +514,7 @@ function h-bell-notif-enqueue {
 
 Entries are stored as '<group>TAB<msg>' so that [agfi:h-bell-notif-remove] can take
 back one session's line once that session has been answered; an empty group is a
-leading tab. [agfi:h-bell-notif-drain] strips the tag again."
+leading tab. [agfi:h-bell-tlg-render] strips the tag again."
     ##
     local msg="${1}" group="${2}"
     test -z "$msg" && return 1
@@ -530,17 +530,15 @@ function h-bell-notif-since {
 }
 
 function h-bell-notif-drain {
-    : "outputs every queued message, oldest first, without its group tag, and empties the queue"
+    : "outputs every queued entry, oldest first and still tagged, and empties the queue"
+    #: The tags travel on into the sent batch's record, which is what lets an
+    #: answer take its line back after sending ([agfi:h-bell-tlg-retract]).
     local out
     out="$(redism lrange "$bell_notif_queue_key" 0 -1)" || return 1
 
     h-bell-notif-clear
 
-    local -a lines
-    lines=( "${(@f)out}" )
-    #: Everything up to the first tab is the tag. Entries queued before tagging
-    #: existed have no tab and pass through whole.
-    ec "${(F)lines[@]#*$'\t'}"
+    ec "$out"
 }
 
 function h-bell-notif-remove {
@@ -549,17 +547,7 @@ function h-bell-notif-remove {
     local group="${1}"
     test -n "$group" || return 1
 
-    local out
-    out="$(redism lrange "$bell_notif_queue_key" 0 -1)" || return 1
-    test -n "$out" || return 0
-
-    local entry
-    for entry in "${(@f)out}" ; do
-        if [[ "${entry%%$'\t'*}" == "$group" ]] ; then
-            #: count 0: every copy of this exact entry, not just the first.
-            silent redism lrem "$bell_notif_queue_key" 0 "$entry" || true
-        fi
-    done
+    h-bell-list-remove-group "$bell_notif_queue_key" "$group" @RET
 
     #: With the queue empty, the anchor must go too, so the next message
     #: re-anchors the deadline on itself rather than on a line that was taken back.
@@ -572,6 +560,234 @@ function h-bell-notif-clear {
     silent redism del "$bell_notif_queue_key" "$bell_notif_since_key" || true
 }
 aliasfn bell-notif-pending redism lrange bell_notif_pending 0 -1
+
+function h-bell-list-remove-group {
+    : "usage: h-bell-list-remove-group <key> <group>; drops the entries tagged <group> from the redis list <key>"
+    local key="${1}" group="${2}"
+    test -n "$key" && test -n "$group" || return 1
+
+    local out
+    out="$(redism lrange "$key" 0 -1)" || return 1
+    test -n "$out" || return 0
+
+    local entry
+    for entry in "${(@f)out}" ; do
+        #: An entry without a tab predates tagging and belongs to nobody.
+        if [[ "$entry" == *$'\t'* && "${entry%%$'\t'*}" == "$group" ]] ; then
+            #: count 0: every copy of this exact entry, not just the first.
+            silent redism lrem "$key" 0 "$entry" || true
+        fi
+    done
+}
+##
+#: Telegram batches that went out, kept so that answering a session can take its
+#: line back afterwards: edited out while other lines remain, and the message
+#: deleted with the last one. Per batch, `<prefix>:<batch>:lines' holds the tagged
+#: entries still pending and `<prefix>:<batch>:meta' a hash of dest, host, the sent
+#: message ids and the text last shown; `<group prefix>:<group>' is the set of
+#: batches holding a line of that group. See ./docs/bell-auto.md.
+typeset -g bell_tlg_batch_key_prefix='bell_tlg_batch'
+typeset -g bell_tlg_group_key_prefix='bell_tlg_group'
+
+function h-bell-tlg-render {
+    : "usage: h-bell-tlg-render <host> <tagged-entry>...; the Telegram text for these entries, empty for none"
+    local host="${1}"
+    local -a lines=( "${@[2,-1]}" )
+    #: Everything up to the first tab is the tag. Entries queued before tagging
+    #: existed have no tab and pass through whole.
+    lines=( "${(@)lines#*$'\t'}" )
+    lines=( "${(@)lines:#}" )
+    (( ${#lines} )) || return 0
+
+    lines=( "${(@u)lines}" )  #: the same message from five sessions is still one line
+    ec "${(F)lines}"$'\n'"(${host})"
+}
+
+function h-bell-tlg-batch-render {
+    : "the current Telegram text of sent batch <batch>, empty once every line is answered"
+    local batch="${1}"
+    local key="${bell_tlg_batch_key_prefix}:${batch}"
+
+    local out host
+    out="$(redism lrange "${key}:lines" 0 -1)" || return 1
+    test -n "$out" || return 0
+    host="$(redism hget "${key}:meta" host)" || host=''
+
+    h-bell-tlg-render "$host" "${(@f)out}"
+}
+
+function h-bell-tlg-batch-new {
+    : "usage: h-bell-tlg-batch-new <dest> <host> <tagged-entry>...; records a batch about to be sent, and outputs its id"
+    #: A week: past 48 hours Telegram refuses a bot's delete, but the tombstone edit
+    #: in [agfi:h-bell-tlg-batch-retire] still works, so a late answer can settle it.
+    local keep_t="${bell_auto_tlg_retract_t:-604800}"
+    local dest="${1}" host="${2}"
+    local -a entries=( "${@[3,-1]}" )
+    test -n "$dest" && (( ${#entries} )) || return 1
+
+    local batch="${EPOCHSECONDS}-${RANDOM}${RANDOM}"
+    local key="${bell_tlg_batch_key_prefix}:${batch}"
+
+    silent redism rpush "${key}:lines" "${entries[@]}" @RET
+    silent redism hset "${key}:meta" dest "$dest" host "$host" @RET
+    silent redism expire "${key}:lines" "$keep_t" || true
+    silent redism expire "${key}:meta" "$keep_t" || true
+
+    local group gkey
+    for group in "${(@u)${(@)${(@M)entries:#*$'\t'*}%%$'\t'*}:#}" ; do
+        gkey="${bell_tlg_group_key_prefix}:${group}"
+        silent redism sadd "$gkey" "$batch" || true
+        silent redism expire "$gkey" "$keep_t" || true
+    done
+
+    ec "$batch"
+}
+
+function h-bell-tlg-batch-forget {
+    : "usage: h-bell-tlg-batch-forget <batch>; drops the record of a batch that has nothing left to retract"
+    local batch="${1}"
+    local key="${bell_tlg_batch_key_prefix}:${batch}"
+
+    local out group
+    out="$(redism lrange "${key}:lines" 0 -1)" || out=''
+    for group in "${(@u)${(@)${(@M)${(@f)out}:#*$'\t'*}%%$'\t'*}:#}" ; do
+        silent redism srem "${bell_tlg_group_key_prefix}:${group}" "$batch" || true
+    done
+    silent redism del "${key}:lines" "${key}:meta" || true
+}
+
+function h-bell-tlg-send {
+    : "usage: h-bell-tlg-send <dest> <tagged-entry>...; sends the entries as one Telegram batch, kept for retraction"
+    local dest="${1}"
+    local -a entries=( "${@[2,-1]}" )
+
+    local host
+    host="$(hostname)"
+
+    #: Recorded before sending, so an answer that lands mid-send is not lost: it
+    #: takes its line out of the record, and the reconcile below catches up.
+    local batch text
+    batch="$(h-bell-tlg-batch-new "$dest" "$host" "${entries[@]}")" || batch=''
+    if test -n "$batch" ; then
+        text="$(h-bell-tlg-batch-render "$batch")" || text=''
+        if test -z "$text" ; then
+            h-bell-tlg-batch-forget "$batch"
+            return 0
+        fi
+    else
+        ecgray "$0: could not record the batch; it will not be retractable."
+        text="$(h-bell-tlg-render "$host" "${entries[@]}")"
+        test -n "$text" || return 0
+    fi
+
+    local -a text_lines=( "${(@f)text}" )
+    #: The last line is the host.
+    ec "$0: escalating $(( ${#text_lines} - 1 )) message(s) to Telegram."
+
+    #: Time-bounded because this must never be the thing that hangs, no matter how
+    #: [agfi:tsend] behaves. `reval-timeout' rather than `gtimeout', since tnotif is a
+    #: zsh function and an external timeout binary cannot run one.
+    local tnotif_opts=( --print-ids )
+    local out
+    if ! out="$(tlg_notifs="$dest" reval-timeout 60 tnotif "$text")" ; then
+        ecgray "$0: the Telegram escalation failed."
+        test -n "$batch" && h-bell-tlg-batch-forget "$batch"
+        return 1
+    fi
+    test -n "$batch" || return 0
+
+    #: Unquoted, so that no output is no ids rather than one empty one.
+    local -a ids=( ${(M)${(f)out}:#[[:digit:]]##} )
+    if (( ${#ids} == 0 )) ; then
+        h-bell-tlg-batch-forget "$batch"
+        return 0
+    fi
+
+    local key="${bell_tlg_batch_key_prefix}:${batch}"
+    silent redism hset "${key}:meta" ids "${(j: :)ids}" shown "$text" @RET
+    h-bell-tlg-reconcile "$batch"
+}
+
+function h-bell-tlg-reconcile {
+    : "brings sent batch <batch> in line with its remaining lines: edits them in, or deletes it once none are left"
+    local batch="${1}"
+    local key="${bell_tlg_batch_key_prefix}:${batch}"
+
+    local dest ids
+    dest="$(redism hget "${key}:meta" dest)" || return 1
+    ids="$(redism hget "${key}:meta" ids)" || return 1
+    #: No ids yet means the sender is still sending and reconciles after; no dest
+    #: means the batch was already retired or has expired.
+    test -n "$dest" && test -n "$ids" || return 0
+    local -a id_list=( ${(s: :)ids} )
+
+    #: Re-render after every edit: two answers racing can each edit with a text the
+    #: other has since outdated, and the last one to finish must see the final state.
+    #: Bounded, since each round is a network call.
+    local text shown i
+    for i in {1..5} ; do
+        text="$(h-bell-tlg-batch-render "$batch")" || return 1
+        if test -z "$text" ; then
+            h-bell-tlg-batch-retire "$batch" "$dest" "${id_list[@]}"
+            return $?
+        fi
+
+        shown="$(redism hget "${key}:meta" shown)" || return 1
+        [[ "$text" == "$shown" ]] && return 0
+
+        #: A batch too long for one message went out in chunks; it still gets
+        #: deleted at the end, but is not worth re-flowing across them meanwhile.
+        (( ${#id_list} == 1 )) || return 0
+
+        reval-timeout 60 tsend edit --parse-mode markdown -- "$dest" "${id_list[1]}" "$text" @RET
+        silent redism hset "${key}:meta" shown "$text" @RET
+    done
+}
+
+function h-bell-tlg-batch-retire {
+    : "usage: h-bell-tlg-batch-retire <batch> <dest> <id>...; deletes a fully answered batch's message"
+    local batch="${1}" dest="${2}"
+    local -a ids=( "${@[3,-1]}" )
+    local key="${bell_tlg_batch_key_prefix}:${batch}"
+
+    #: DEL answers 1 to exactly one caller, so racing answers delete once.
+    local claimed
+    claimed="$(redism del "${key}:meta")" || return 1
+    (( claimed == 1 )) || return 0
+    silent redism del "${key}:lines" || true
+
+    reval-timeout 60 tsend delete -- "$dest" "${ids[@]}" && return 0
+
+    #: Bots cannot delete a message older than 48 hours, even as admins, but can
+    #: edit their own at any age. So mark it settled rather than leave it looking
+    #: pending. See ./docs/bell-auto.md.
+    ecgray "$0: could not delete batch ${batch}; marking it answered instead."
+    local id
+    for id in "${ids[@]}" ; do
+        reval-timeout 60 tsend edit -- "$dest" "$id" "✓ answered" || return 1
+    done
+}
+
+function h-bell-tlg-retract {
+    : "takes <group>'s lines back out of every sent Telegram batch; see [agfi:h-bell-agent-ack]"
+    local group="${1}"
+    test -n "$group" || return 1
+
+    local gkey="${bell_tlg_group_key_prefix}:${group}"
+    local out
+    out="$(redism smembers "$gkey")" || return 1
+    test -n "$out" || return 0
+
+    local batch
+    for batch in "${(@f)out}" ; do
+        h-bell-list-remove-group "${bell_tlg_batch_key_prefix}:${batch}:lines" "$group" || continue
+        #: SREM per batch rather than DEL of the set: a batch sent while we work
+        #: here joins the set, and must stay for the next answer.
+        silent redism srem "$gkey" "$batch" || true
+        h-bell-tlg-reconcile "$batch" ||
+            ecgray "$0: could not update the Telegram batch ${batch}."
+    done
+}
 ##
 function h-bell-auto-notify {
     : "stages 2-4 of the escalation ladder; see [agfi:bell-auto] and ./docs/bell-auto.md
@@ -662,18 +878,8 @@ back, and stage 4 escalates to Telegram if they never do."
     pending="$(h-bell-notif-drain)" || return 0
     test -n "$pending" && ! isSpace "$pending" || return 0
 
-    local lines=( "${(@f)pending}" )
-    lines=( "${(@u)lines}" )  #: the same message from five sessions is still one line
-
-    ec "$0: escalating ${#lines} message(s) to Telegram."
-
     tlg-dest-assert "$tlg_dest" bell_auto_tlg_dest @RET
-
-    #: Time-bounded because this must never be the thing that hangs, no matter how
-    #: [agfi:tsend] behaves. `reval-timeout` rather than `gtimeout`, since tnotif is a
-    #: zsh function and an external timeout binary cannot run one.
-    tlg_notifs="$tlg_dest" reval-timeout 60 tnotif "${(F)lines}"$'\n'"($(hostname))" ||
-        ecgray "$0: the Telegram escalation failed."
+    h-bell-tlg-send "$tlg_dest" "${(@f)pending}"
 }
 
 function bell-auto {
@@ -1757,8 +1963,8 @@ function h-bell-agent-ack {
     : "hook body for the agent's prompt-submitted event: takes back this session's stored notifications
 
 The user answering the session is proof they saw it, so the desktop notification and
-the not-yet-sent Telegram line both go. A Telegram batch that already went out stays.
-Payload in \$2 or on stdin, as with [agfi:h-bell-agent-hook]. Silent throughout."
+the not-yet-sent Telegram line both go, and its line in any Telegram batch that already
+went out is edited out, the message deleted once no line is left. Payload in \$2 or on stdin, as with [agfi:h-bell-agent-hook]. Silent throughout."
     ##
     local app="${1}"
     test -n "$app" || return 0
@@ -1779,6 +1985,9 @@ Payload in \$2 or on stdin, as with [agfi:h-bell-agent-hook]. Silent throughout.
 
     silent notif-os-remove "$group" || true
     silent h-bell-notif-remove "$group" || true
+    #: Detached, since it talks to Telegram and the agent's hook must not wait on
+    #: the network. Each Telegram call inside is time-bounded.
+    awaysh h-bell-tlg-retract "$group"
 }
 ##
 function bell-claude-ack {

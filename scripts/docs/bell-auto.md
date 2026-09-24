@@ -91,9 +91,11 @@ machine to be quiet should not resurface later as a phone notification.
 
 Each entry is stored as `<group>TAB<message>`, the group being the caller's
 `bell_auto_notif_group` (empty for callers that have none, so a leading tab). The tag
-is what lets one session's line be taken back before the batch goes out
-(`h-bell-notif-remove`, see "Answering the session" below); the drain strips it, so
-the Telegram text and the duplicate-collapsing are unchanged.
+is what lets one session's line be taken back, before the batch goes out
+(`h-bell-notif-remove`) and after (`h-bell-tlg-retract`); see "Answering the session"
+below. The drain hands the tagged entries on, and `h-bell-tlg-render` strips the tags
+when it builds the text, so the Telegram text and the duplicate-collapsing are
+unchanged.
 
 Inspect the queue with `bell-notif-pending`, which shows the raw tagged entries.
 
@@ -194,13 +196,13 @@ behind:
 - the desktop notification, via `notif-os-remove` (`terminal-notifier -remove`);
 - its line in the Telegram queue, via `h-bell-notif-remove`. If that empties the
   queue the deadline anchor goes too, so the next message re-anchors on itself
-  rather than on a line that was taken back.
+  rather than on a line that was taken back;
+- its line in any Telegram batch that already went out, via `h-bell-tlg-retract`
+  (see "Retracting a sent batch" below). This part talks to Telegram, so the ack runs
+  it detached with `awaysh`, and the hook never waits on the network.
 
 What it does not do:
 
-- Retract a Telegram batch that already went out. `tsend` returns no message id
-  and the batch mixes several sessions' lines; if this ever matters, `tsend` needs
-  id output and an edit command first.
 - Stop the bell. Stage 1 already exits on any user activity, and a prompt is one.
 - Fire on a permission *approval*. Answering a permission prompt is not a prompt
   submission, so a "needs your permission" notification stays until the next `Stop`
@@ -212,6 +214,54 @@ prompt submission too, which is right: the session is being worked on either way
 Codex's bell is not wired in the tracked configs, so it has no ack line either;
 `bell-codex-ack` exists for when it is, and `h-bell-agent-ack` reads whichever id
 field the agent's payload carries.
+
+### Retracting a sent batch
+
+A batch mixes several sessions' lines in one Telegram message, so answering one
+session cannot simply delete it. Instead the message tracks what is still pending,
+the way the desktop notifications do: each answer edits its session's line out, and
+the answer that removes the last line deletes the message. Editing a message sends
+no push, so this is silent on the phone.
+
+Stage 4 (`h-bell-tlg-send`) records the batch in redis **before** sending: its tagged
+entries, its destination and host, and for each group the set of batches that hold
+one of its lines. After the send, `tsend --print-ids` gives the message id, which is
+added to the record. Recording first matters because an answer can land while the
+send is still in flight. That answer takes its line out of the record, finds no id
+yet and stops; the sender then reconciles once the id is in, and edits the line out.
+
+`h-bell-tlg-reconcile` re-renders the remaining entries and edits the message only
+when the text changed. When two answers race, each may edit with a text the other
+has already made stale, so every edit is followed by a re-render, and the last one to
+finish leaves the final state. The delete is claimed with a redis `DEL` of the
+batch's record, which returns 1 to exactly one caller, so racing answers delete once.
+
+Some lines never get answered, and they keep the message alive: callers with no
+group, and identical text from a session that has not been answered (duplicates
+collapse into one line, which goes only when every session behind it has answered).
+A batch too long for one message goes out in chunks; it is deleted at the end but
+not edited along the way.
+
+**Bots cannot delete a message older than 48 hours, even as channel admins.** The
+Bot API's `deleteMessage` lists "A message can only be deleted if it was sent less
+than 48 hours ago" before its admin rules, and TDLib, on which the Bot API server is
+built, checks the message's age before it looks at admin rights
+(`MessagesManager::can_delete_channel_message`: "bots can't delete messages older
+than 2 days"). Admin rights widen *which* messages a bot may delete, not *how old*
+they may be. A bot can, however, edit its own messages at any age
+(`has_edit_time_limit` is false for a bot's outgoing messages). `tsend` defaults to
+the Telethon backend, which talks MTProto directly rather than through the Bot API
+server, and whether the server enforces the same limit there is untested: the
+channel had no message old enough to try. So when the delete fails,
+`h-bell-tlg-batch-retire` edits the message down to a short "answered" tombstone
+instead, and the records outlive the 48 hours (`bell_auto_tlg_retract_t`) so that a
+late answer can still settle its batch.
+
+`bellaok` leaves sent batches alone. It silences the machine and drops what has not
+gone out; a message already on the phone still means a session is waiting.
+
+Tested by `zshlang/tests/bell-tlg-retract.zsh`, which uses real redis under scratch
+key names and a fake `tsend`.
 
 ### Subagents
 
@@ -350,6 +400,8 @@ Bell behaviour, all `@opts`-settable with the `bell_auto_` prefix:
   that still reaches you.
 - `bell_auto_tlg_t` — seconds of continued idleness before escalating. Default 900.
 - `bell_auto_tlg_poll` — watch-loop interval. Default 30.
+- `bell_auto_tlg_retract_t` — seconds to keep a sent batch's record, i.e. how long an
+  answer can still retract it.
 - `bell_auto_tlg_dest` — the Telegram chat for stage 4. Defaults to
   `$tlg_logger_notif`, a channel used for nothing else, and falls back to the general
   `$tlg_notifs` on hosts that do not define it.
