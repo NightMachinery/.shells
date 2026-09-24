@@ -579,6 +579,8 @@ function h-bell-auto-notify {
 Stage 2 posts a desktop notification, stage 3 quietly watches for the user coming
 back, and stage 4 escalates to Telegram if they never do."
     ##
+    #: A channel used for nothing else. Hosts without one keep the general channel.
+    local tlg_dest="${bell_auto_tlg_dest:-${tlg_logger_notif:-${tlg_notifs}}}"
     local msg="${1}"
 
     #: Notifications are opt-in per call site: without a message there is nothing
@@ -665,10 +667,12 @@ back, and stage 4 escalates to Telegram if they never do."
 
     ec "$0: escalating ${#lines} message(s) to Telegram."
 
+    tlg-dest-assert "$tlg_dest" bell_auto_tlg_dest @RET
+
     #: Time-bounded because this must never be the thing that hangs, no matter how
     #: [agfi:tsend] behaves. `reval-timeout` rather than `gtimeout`, since tnotif is a
     #: zsh function and an external timeout binary cannot run one.
-    reval-timeout 60 tnotif "${(F)lines}"$'\n'"($(hostname))" ||
+    tlg_notifs="$tlg_dest" reval-timeout 60 tnotif "${(F)lines}"$'\n'"($(hostname))" ||
         ecgray "$0: the Telegram escalation failed."
 }
 

@@ -36,7 +36,7 @@
     function h-bell-notif-remove { print -r -- "$1" > "${fixture}/queue-ack"; }
     function h-bell-claude { print -r -- Claude > "${fixture}/sound"; }
     function h-bell-codex { print -r -- Codex > "${fixture}/sound"; }
-    local bell_auto_stop_mode=bell+notif bell_auto_tlg=y bell_auto_tlg_t=0
+    local bell_auto_stop_mode=bell+notif bell_auto_tlg=y bell_auto_tlg_t=0 bell_auto_tlg_dest=fixture-dest
     local bell_auto_notif_alert=n bell_skip_first='' bell_auto_sf='' bell_auto_exit=()
 
     function check {

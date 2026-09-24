@@ -19,7 +19,7 @@ long stage 1 lasts.
 3. **Quiet watch.** No sound. Polls `idle-get` every `bell_auto_tlg_poll` seconds.
    If you touch the machine, it exits silently — you saw the notification.
 4. **Telegram.** If you stayed away for `bell_auto_tlg_t` seconds, everything queued
-   goes to your phone in one message.
+   goes to your phone in one message, sent to `bell_auto_tlg_dest`.
 
 At any point during stage 1, user activity ends the bell immediately, exactly as it
 always did.
@@ -350,6 +350,9 @@ Bell behaviour, all `@opts`-settable with the `bell_auto_` prefix:
   that still reaches you.
 - `bell_auto_tlg_t` — seconds of continued idleness before escalating. Default 900.
 - `bell_auto_tlg_poll` — watch-loop interval. Default 30.
+- `bell_auto_tlg_dest` — the Telegram chat for stage 4. Defaults to
+  `$tlg_logger_notif`, a channel used for nothing else, and falls back to the general
+  `$tlg_notifs` on hosts that do not define it.
 
 Notification plumbing:
 
