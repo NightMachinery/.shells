@@ -482,11 +482,20 @@ function audio-input-switch-darwin {
 Gateway: Hammerspoon, falling back to SwitchAudioSource."
     @darwinOnly
     ##
+    local clamshell_warn_p="${audio_input_switch_clamshell_warn_p:-y}"
+    local keep_soft_mute_p="${audio_input_switch_keep_soft_mute_p:-n}"
     local spec="${1}"
     assert-args spec @RET
 
     local name
     name="$(h-audio-input-resolve "$spec")" @RET
+
+    if ! bool "$keep_soft_mute_p" ; then
+        #: An explicit switch ends any soft mute: switching BACK is no longer
+        #: what a mute press should do, and the built-in mic gets its own mute
+        #: state back (so an explicit `builtin' is live, as asked).
+        h-audio-input-soft-mute-clear-if-set
+    fi
 
     if ! audio-input-switch-hs "$name" 2>/dev/null ; then
         ecgray "$0: Hammerspoon could not switch, falling back to SwitchAudioSource."
@@ -494,7 +503,7 @@ Gateway: Hammerspoon, falling back to SwitchAudioSource."
     fi
 
     ecgray "input: ${name}"
-    if [[ "$spec" == builtin ]] && clamshell-p ; then
+    if [[ "$spec" == builtin ]] && bool "$clamshell_warn_p" && clamshell-p ; then
         ecerr "$0: warning: the lid is closed, so the built-in microphone records silence."
     fi
 
@@ -541,6 +550,134 @@ aliasfn iphone-mic-on audio-input-switch iphone
 aliasfn iphone-mic-off audio-input-switch builtin
 aliasfn iphone-mic-p audio-input-p iphone
 aliasfn iphone-mic-toggle audio-input-toggle iphone builtin
+##
+#: ** Soft mute, for a microphone with no mute control
+#:
+#: A Continuity (iPhone) microphone exposes no CoreAudio mute or volume at all,
+#: so [agfi:input-volume-mute-toggle] cannot mute it. Soft mute switches to the
+#: built-in microphone instead, with the built-in's own mute flag set. That
+#: flag holds even if the lid is later opened, so a soft mute never turns into
+#: a live built-in mic. The device to go back to, and the built-in's mute state
+#: before we touched it, live in redis so every shell and the hotkey agree.
+
+redis-defvar input_soft_mute_device
+redis-defvar input_soft_mute_builtin_was_muted
+
+function h-audio-input-muted-get-hs {
+    : "<spec> -> true|false|nodevice|nomute, for a specific input device; fails iff Hammerspoon is unreachable"
+    h-hammerspoon-eval "return audioInputMutedGet([[${1}]])" 2>/dev/null
+}
+
+function h-audio-input-muted-set-hs {
+    : "<spec> <true|false> -> the state AFTER the write, or nodevice|nomute"
+    h-hammerspoon-eval "return audioInputMutedSet([[${1}]], ${2})" 2>/dev/null
+}
+
+function audio-input-mute-control-p {
+    : "returns 0 iff the default input device has a mute control"
+    @darwinOnly
+    ##
+    local out
+    out="$(audio-input-state-get-hs)" @RET
+
+    local lines=("${(@f)out}")
+    [[ "${lines[3]}" == (true|false) ]]
+}
+
+function h-audio-input-soft-mute-clear {
+    : "forgets the soft mute and gives the built-in mic back the mute state it had before"
+    local was
+    was="$(input_soft_mute_builtin_was_muted_get)" || was=''
+
+    if [[ "$was" == (true|false) ]] ; then
+        h-audio-input-muted-set-hs builtin "$was" >/dev/null @STRUE
+    fi
+
+    input_soft_mute_device_del @STRUE
+    input_soft_mute_builtin_was_muted_del @STRUE
+}
+
+function h-audio-input-soft-mute-clear-if-set {
+    : "h-audio-input-soft-mute-clear, but only when a soft mute is recorded"
+    local device
+    device="$(input_soft_mute_device_get)" || device=''
+
+    if [[ -n "$device" ]] ; then
+        h-audio-input-soft-mute-clear
+    fi
+}
+
+function audio-input-soft-mute-p {
+    : "returns 0 iff a soft mute is in effect"
+    @darwinOnly
+    ##
+    local device
+    device="$(input_soft_mute_device_get)" || device=''
+    if [[ -z "$device" ]] ; then
+        return 1
+    fi
+
+    if audio-input-p builtin ; then
+        return 0
+    fi
+
+    #: The default was moved by hand since, so the claim is stale.
+    h-audio-input-soft-mute-clear
+    return 1
+}
+
+function audio-input-soft-mute {
+    : "mutes the default input by switching to the built-in mic, muted"
+    @darwinOnly
+    ##
+    local out name
+    out="$(audio-input-get)" @TRET
+    name="${out%%$'\n'*}"
+
+    local was
+    was="$(h-audio-input-muted-get-hs builtin)" @RET
+    if [[ "$was" != (true|false) ]] ; then
+        ecerr "$0: cannot read the built-in mic's mute state: ${was:-no answer}"
+        return 1
+    fi
+
+    #: Mute BEFORE switching, so the built-in mic is never the live default,
+    #: not even for a moment.
+    if [[ "$(h-audio-input-muted-set-hs builtin true)" != true ]] ; then
+        ecerr "$0: could not mute the built-in mic"
+        return 1
+    fi
+
+    input_soft_mute_builtin_was_muted_set "$was" @RET
+    input_soft_mute_device_set "$name" @RET
+
+    #: The closed-lid warning is noise here: the mic is muted on purpose.
+    audio_input_switch_clamshell_warn_p=n audio_input_switch_keep_soft_mute_p=y audio-input-switch builtin @RET
+}
+
+function audio-input-soft-unmute {
+    : "undoes audio-input-soft-mute: switches back, then restores the built-in mic's own mute state"
+    @darwinOnly
+    ##
+    local device
+    device="$(input_soft_mute_device_get)" || device=''
+    if [[ -z "$device" ]] ; then
+        ecerr "$0: no soft mute in effect"
+        return 1
+    fi
+
+    #: Switch away FIRST, for the same reason soft mute mutes first.
+    if ! audio_input_switch_keep_soft_mute_p=y audio-input-switch "$device" ; then
+        ecerr "$0: cannot switch back to ${device}; staying on the built-in mic, muted"
+        #: Forget the claim without restoring, so the built-in stays muted
+        #: and the next press unmutes it the ordinary way.
+        input_soft_mute_device_del @STRUE
+        input_soft_mute_builtin_was_muted_del @STRUE
+        return 1
+    fi
+
+    h-audio-input-soft-mute-clear
+}
 ##
 function audio-input-state-get-hs {
     : "outputs: name, transport, muted (true|false|nomute), volume (0-100|novolume), one per line"
@@ -598,14 +735,14 @@ function audio-input-kind-get {
 }
 
 #: Overridable: set it after this file loads. `<kind>-muted' wins over `muted';
-#: a closed lid shows the same warning muted or not, since it records nothing either way.
+#: a muted built-in mic shows as muted even with the lid shut, since muting is the
+#: deliberate state (and what a soft mute leaves behind).
 #: iphone is the Apple logo, U+F8FF: private use, so it renders only in Apple fonts;
 #: the phone emoji was too small and dark to read in the menubar.
 if (( ! ${+audio_input_glyphs} )) ; then
     typeset -gA audio_input_glyphs=(
         builtin '💻'
         builtin-clamshell '🚫'
-        builtin-clamshell-muted '🚫'
         bluetooth '🎧'
         iphone $'\uF8FF'
         other '🎤'

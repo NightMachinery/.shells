@@ -176,11 +176,19 @@ function volume-mute-toggle {
 }
 
 function input-volume-mute-toggle {
+    : "toggles the default mic's mute; a mic with no mute control (an iPhone) is soft-muted"
+    #: See [agfi:audio-input-soft-mute].
     {
       ##
       # with-input-volume volume-mute-toggle @TRET
       ##
-      with-input-volume volume-mute-toggle-hs @TRET
+      if audio-input-soft-mute-p ; then
+        audio-input-soft-unmute @TRET
+      elif audio-input-mute-control-p ; then
+        with-input-volume volume-mute-toggle-hs @TRET
+      else
+        audio-input-soft-mute @TRET
+      fi
       ##
     } always {
       local alert_dur=2

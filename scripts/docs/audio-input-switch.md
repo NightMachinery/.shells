@@ -75,8 +75,8 @@ a Lua long string, so a name containing `]]` is refused.
 array `audio_input_glyphs` by the device kind: `builtin`, `builtin-clamshell`
 (the lid is shut, so this mic records silence), `bluetooth`, `iphone`, `other`,
 `none`. A muted device uses `<kind>-muted` if that key exists, and `muted`
-otherwise. `builtin-clamshell-muted` shows the same warning as unmuted, since
-the mic records nothing either way. A mic counts as muted when CoreAudio says
+otherwise. A muted built-in mic shows as muted even with the lid shut, because
+muting is the deliberate state, and it is what a soft mute leaves behind. A mic counts as muted when CoreAudio says
 so, or when its input volume is 0, which is how the osascript mute backend in
 `system.zsh` mutes. To change a symbol, set the array entry after the library
 loads.
@@ -101,12 +101,38 @@ The plugin reruns every minute. Three things refresh it sooner, through
 Other mute changes, such as the System Settings slider, still wait for the
 next minute.
 
+## Soft mute: muting a mic that has no mute control
+
+The Continuity microphone exposes neither mute nor input volume. A CoreAudio
+probe found no mute or volume property on its main element or on any channel
+(the built-in mic has both, writable). Hammerspoon returns nil for both, and
+osascript's `input volume` reads `missing value` and ignores writes.
+
+So hyper+F5 ([agfi:input-volume-mute-toggle]) soft-mutes such a mic instead:
+
+1. [agfi:audio-input-soft-mute] records the current mic and the built-in mic's
+   mute state in Redis (`input_soft_mute_device` and
+   `input_soft_mute_builtin_was_muted`).
+2. It mutes the built-in mic, then switches to it. Muting first means the
+   built-in mic is never the live default, even for a moment, and the mute
+   flag holds if the lid is opened later.
+3. The next press ([agfi:audio-input-soft-unmute]) switches back first, then
+   restores the built-in mic's own mute state.
+
+The claim is dropped, and the built-in mic's mute state restored, as soon as
+the default changes by any other route: an explicit [agfi:audio-input-switch]
+(including `iphone-mic-off`, which therefore gives you a live built-in mic),
+or any switch that [agfi:h-hook-audio-input-change] sees. Soft mute's own
+switches pass `audio_input_switch_keep_soft_mute_p` so that they do not cancel
+themselves. If the device to go back to has vanished, you stay on the muted
+built-in mic and the next press unmutes it normally.
+
 ## Limitations
 
-- The Continuity microphone exposes neither mute nor input volume: Hammerspoon
-  returns nil for both, and osascript's `input volume` reads `missing value` and
-  ignores writes. So the mute hotkey does nothing on it, and the menubar never
-  shows it as muted.
+- Soft mute changes the system default only. An app that opened the iPhone mic
+  by name keeps hearing it: a recording already in progress (the STT recorders
+  pick their device by name when they start), or a meeting app set to a
+  specific mic rather than the system default.
 - On 2026-09-24 the iPhone microphone was listed and could be selected, but it
   recorded digital silence, both from a terminal and from inside Hammerspoon
   (which already has microphone permission for STT). The phone itself was not

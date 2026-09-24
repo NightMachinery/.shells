@@ -96,6 +96,10 @@ transport, debounced and filtered to dIn events. Same fan-out rationale as
 [agfi:h-hook-audio-output-change]."
     local name="${1}" transport="${2}"
 
+    #: A soft mute ends when the default moves off the built-in mic by any
+    #: route; audio-input-soft-mute-p drops the claim when it finds it stale.
+    awaysh-fast audio-input-soft-mute-p
+
     #: The menubar mic glyph would otherwise lag by up to a minute.
     awaysh-fast menubar-refresh
 }

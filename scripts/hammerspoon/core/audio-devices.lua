@@ -122,3 +122,50 @@ function audioInputStateGet()
         volume == nil and "novolume" or tostring(math.floor(volume + 0.5)),
     }, "\n")
 end
+
+-- Per-device INPUT mute, for [agfi:audio-input-soft-mute]: it mutes the
+-- built-in microphone BEFORE making it the default, which the default-device
+-- helpers cannot do. `builtin' resolves as for output: UID first, then a
+-- Built-in transport scan, never the model-dependent name.
+local BUILTIN_MIC_UID = "BuiltInMicrophoneDevice"
+
+local function findInput(spec)
+    if spec == "builtin" then
+        local byUID = hs.audiodevice.findDeviceByUID(BUILTIN_MIC_UID)
+        if byUID and byUID:isInputDevice() then return byUID end
+
+        for _, d in ipairs(hs.audiodevice.allInputDevices()) do
+            if d:transportType() == "Built-in" then return d end
+        end
+        return nil
+    end
+
+    local byUID = hs.audiodevice.findDeviceByUID(spec)
+    if byUID and byUID:isInputDevice() then return byUID end
+
+    return hs.audiodevice.findInputByName(spec)
+end
+
+-- Same result words as audioDeviceMutedGet: true, false, nodevice, nomute.
+function audioInputMutedGet(spec)
+    local d = findInput(spec)
+    if not d then return "nodevice" end
+
+    local muted = d:inputMuted()
+    if muted == nil then return "nomute" end
+
+    return tostring(muted)
+end
+
+-- The state AFTER the write, for the same reason as audioDeviceMutedSet.
+function audioInputMutedSet(spec, muted)
+    local d = findInput(spec)
+    if not d then return "nodevice" end
+
+    d:setInputMuted(muted)
+
+    local now = d:inputMuted()
+    if now == nil then return "nomute" end
+
+    return tostring(now)
+end
