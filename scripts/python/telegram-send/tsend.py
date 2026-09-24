@@ -3,7 +3,9 @@
 """telegram-send
 Usage:
   tsend.py poll [--] <receiver> <question> [--option=<option>]... [--option-json=<json>]... [--options-parse-mode=<mode>] [--allow-multiple] [--allow-adding-options | --no-adding-options] [--poll-type=<type>] [--correct-index=<index>] [--explanation=<text>] [--open-period=<seconds>] [--close-date=<timestamp>] [--close-in=<when>] [--anonymous] [--disable-notification] [-v...] [--lock-timeout=<seconds>] [--lock-path=<lockpath>]
-  tsend.py [--file=<file>]... [--no-album --force-document --link-preview --parse-mode=<parser>] [-v...] [--lock-timeout=<seconds>] [--lock-path=<lockpath>] [--album | --no-album] [--] <receiver> <message>
+  tsend.py delete [-v...] [--lock-timeout=<seconds>] [--lock-path=<lockpath>] [--] <receiver> <message_id>...
+  tsend.py edit [--parse-mode=<parser>] [-v...] [--lock-timeout=<seconds>] [--lock-path=<lockpath>] [--] <receiver> <message_id> <message>
+  tsend.py [--file=<file>]... [--no-album --force-document --link-preview --parse-mode=<parser> --print-ids] [-v...] [--lock-timeout=<seconds>] [--lock-path=<lockpath>] [--album | --no-album] [--] <receiver> <message>
   tsend.py (-h | --help)
   tsend.py --version
 
@@ -22,6 +24,13 @@ Options:
     --parse_mode <parser>  Which parser to use for the message.
     --album  Send files as an album. (This flag has not been implemented for the first backend!)
     --no-album  Do not send files as an album.
+    --print-ids  Print the id of every message sent, one per line, on stdout. These are what the delete and edit commands take.
+
+  Delete command:
+    Deletes the given messages. Exits non-zero unless every one of them was deleted. Bots can only delete messages sent less than 48 hours ago, even as admins.
+
+  Edit command:
+    Replaces the text of one message (parse mode as for sending). Editing a message to the text it already has counts as success.
 
   Poll command:
     --option <option>  Adds an option to the poll. Use multiple times for more options. Markdown links are parsed by default. (poll command)
@@ -44,6 +53,9 @@ Examples:
   tsend.py poll --option '5 PM' --option '6 PM' -- some_friend "When should we play?"
   tsend.py poll --allow-adding-options --option '5 PM' --option '6 PM' -- some_friend "When should we play?"
   tsend.py poll --option 'hello [world](https://example.com)' --option 'plain option' -- some_friend "Pick one"
+  tsend.py --print-ids -- some_channel "draft"    # prints e.g. 42
+  tsend.py edit -- some_channel 42 "final"
+  tsend.py delete -- some_channel 42
 
 Dependencies:
   pip install -U pynight IPython aiofile docopt PySocks telethon python-telegram-bot dateparser
@@ -620,6 +632,23 @@ async def handle(e, attempt, max_retries, verbosity):
         await asyncio.sleep(min(2 ** attempt, 30))
 
 
+def record_sent(sent_ids, sent):
+    """Appends the id of every message in `sent` (a message, a list of them, or None)
+    to `sent_ids`, when the caller asked for ids at all."""
+    if sent_ids is None or sent is None:
+        return
+    if isinstance(sent, (list, tuple)):
+        for m in sent:
+            record_sent(sent_ids, m)
+        return
+    #: Telethon messages carry `id`, PTB ones `message_id`.
+    message_id = getattr(sent, "message_id", None)
+    if message_id is None:
+        message_id = getattr(sent, "id", None)
+    if message_id is not None:
+        sent_ids.append(message_id)
+
+
 async def discreet_send(
     client,
     receiver,
@@ -632,6 +661,7 @@ async def discreet_send(
     album_mode=True,
     max_retries=5,
     verbosity=1,
+    sent_ids=None,
 ):
     if file and len(file) > 1 and album_mode == False:
         res = None
@@ -646,6 +676,7 @@ async def discreet_send(
                 reply_to,
                 link_preview,
                 album_mode=True,
+                sent_ids=sent_ids,
             )
 
         return res
@@ -669,6 +700,7 @@ async def discreet_send(
                         allow_cache=False,
                         force_document=force_document,
                     )
+                    record_sent(sent_ids, last_msg)
                     sent = True
                     break
                 except Exception as e:
@@ -712,6 +744,7 @@ async def discreet_send(
                             link_preview=link_preview,
                             reply_to=(last_msg),
                         )
+                        record_sent(sent_ids, last_msg)
                         sent = True
                         break
 
@@ -758,11 +791,13 @@ async def discreet_send(
                 allow_cache=False,
                 caption="This message is too long, so it has been sent as a text file.",
             )
+            record_sent(sent_ids, last_msg)
             z("command rm {f}")
             if file:
                 last_msg = await client.send_file(
                     receiver, file, reply_to=(last_msg), allow_cache=False
                 )
+                record_sent(sent_ids, last_msg)
         return last_msg
 
 
@@ -776,6 +811,7 @@ async def ptb_send(
     verbosity=2,
     album_p=True,
     force_document=False,
+    sent_ids=None,
 ):
     from telegram import InputMediaPhoto, InputMediaDocument
 
@@ -783,9 +819,10 @@ async def ptb_send(
     if not files:
         for attempt in range(max_retries):
             try:
-                await bot.send_message(
+                sent = await bot.send_message(
                     chat_id=chat_id, text=message, parse_mode=parse_mode
                 )
+                record_sent(sent_ids, sent)
                 break
             except Exception as e:
                 await handle(e, attempt, max_retries, verbosity)
@@ -800,12 +837,13 @@ async def ptb_send(
         if 2 <= len(media_group) <= 10 and album_p:
             for attempt in range(max_retries):
                 try:
-                    await bot.send_media_group(
+                    sent = await bot.send_media_group(
                         chat_id=chat_id,
                         media=media_group,
                         caption=message,
                         parse_mode=parse_mode,
                     )
+                    record_sent(sent_ids, sent)
                     break
                 except Exception as e:
                     await handle(e, attempt, max_retries, verbosity)
@@ -814,19 +852,20 @@ async def ptb_send(
                 for attempt in range(max_retries):
                     try:
                         if not force_document and is_image:
-                            await bot.send_photo(
+                            sent = await bot.send_photo(
                                 chat_id=chat_id,
                                 photo=media.media,
                                 caption=message,
                                 parse_mode=parse_mode,
                             )
                         else:
-                            await bot.send_document(
+                            sent = await bot.send_document(
                                 chat_id=chat_id,
                                 document=media.media,
                                 caption=message,
                                 parse_mode=parse_mode,
                             )
+                        record_sent(sent_ids, sent)
                         break
                     except Exception as e:
                         await handle(e, attempt, max_retries, verbosity)
@@ -1056,16 +1095,168 @@ async def ptb_send_poll_from_telethon_resolution(client, poll_arguments, receive
         await ptb_send_poll(bot, poll_arguments, verbosity=verbosity)
 
 
+def parse_message_ids(raw):
+    if raw is None:
+        raw = []
+    elif not isinstance(raw, (list, tuple)):
+        #: docopt makes `<message_id>` a list only in the pattern that repeats it.
+        raw = [raw]
+    try:
+        ids = [int(i) for i in raw]
+    except ValueError:
+        raise SystemExit(f"Message ids must be integers: {raw!r}")
+    if not ids:
+        raise SystemExit("No message ids given.")
+    return ids
+
+
+def edit_text_check(message):
+    message = str(message or "").strip()
+    if not message:
+        raise SystemExit("Cannot edit a message to empty text.")
+    if len(message) > 4096:
+        raise SystemExit("Edited text exceeds Telegram's 4096-character limit.")
+    return message
+
+
+#: Errors about the message rather than the peer: re-resolving the peer cannot help,
+#: and neither can retrying (e.g. editing a message that was already deleted).
+MESSAGE_PERMANENT_ERRORS = (
+    "MessageIdInvalidError",
+    "MessageDeleteForbiddenError",
+    "MessageAuthorRequiredError",
+    "MessageEditTimeExpiredError",
+)
+
+
+async def telethon_peer_op(client, receiver, op, what, max_retries=5, verbosity=1):
+    """Runs `op(peer)`, re-resolving a stale peer once and retrying transient errors,
+    the way discreet_send does for sends."""
+    refreshed = False
+    attempt = 0
+    while attempt < max_retries:
+        try:
+            return await op(receiver)
+        except SendFailed:
+            raise
+        except Exception as err:
+            if is_permanent_error(err) and not refreshed:
+                refreshed = True
+                entity = await refresh_entity(client, receiver, verbosity)
+                if entity is not None:
+                    receiver = entity
+                    continue
+
+            if is_permanent_error(err) or type(err).__name__ in MESSAGE_PERMANENT_ERRORS:
+                raise SendFailed(f"Cannot {what}: {type(err).__name__}: {err}") from err
+
+            await handle(err, attempt, max_retries, verbosity)
+            attempt += 1
+
+    raise SendFailed(f"Failed to {what} after {max_retries} attempts.")
+
+
+async def telethon_delete(client, receiver, message_ids, verbosity=1):
+    async def op(peer):
+        affected = await client.delete_messages(peer, message_ids, revoke=True)
+        #: One AffectedMessages per chunk of ids; its pts_count is how many were
+        #: actually deleted. Telegram answers a message it will not delete (too old
+        #: for a bot, already gone) by deleting nothing, not with an error.
+        deleted = sum(getattr(a, "pts_count", 0) for a in (affected or []))
+        if verbosity >= 2:
+            print(f"Deleted {deleted} of {len(message_ids)} message(s).", file=sys.stderr)
+        if deleted < len(message_ids):
+            raise SendFailed(
+                f"Deleted only {deleted} of {len(message_ids)} message(s) in {receiver}."
+            )
+        return deleted
+
+    return await telethon_peer_op(
+        client, receiver, op, f"delete from {receiver}", verbosity=verbosity
+    )
+
+
+async def telethon_edit(client, receiver, message_id, message, parse_mode=None, verbosity=1):
+    from telethon.errors import MessageNotModifiedError
+
+    async def op(peer):
+        try:
+            return await client.edit_message(
+                peer, message_id, message, parse_mode=parse_mode, link_preview=False
+            )
+        except MessageNotModifiedError:
+            #: Already showing this text, which is what the caller wanted.
+            return None
+
+    return await telethon_peer_op(
+        client, receiver, op, f"edit {message_id} in {receiver}", verbosity=verbosity
+    )
+
+
+def ptb_error_is(e, fragment):
+    return fragment.lower() in str(e).lower()
+
+
+async def ptb_delete(bot, chat_id, message_ids, max_retries=5, verbosity=1):
+    for attempt in range(max_retries):
+        try:
+            #: deleteMessages returns True even when it skipped ids it could not
+            #: find, so a single id goes through deleteMessage, which does fail.
+            if len(message_ids) == 1:
+                return await bot.delete_message(chat_id=chat_id, message_id=message_ids[0])
+            return await bot.delete_messages(chat_id=chat_id, message_ids=message_ids)
+        except Exception as e:
+            if ptb_error_is(e, "message to delete not found") or ptb_error_is(
+                e, "message can't be deleted"
+            ):
+                raise SendFailed(f"Cannot delete from {chat_id}: {e}") from e
+            await handle(e, attempt, max_retries, verbosity)
+    raise SendFailed(f"Failed to delete from {chat_id} after {max_retries} attempts.")
+
+
+async def ptb_edit(bot, chat_id, message_id, message, parse_mode=None, max_retries=5, verbosity=1):
+    for attempt in range(max_retries):
+        try:
+            return await bot.edit_message_text(
+                text=message,
+                chat_id=chat_id,
+                message_id=message_id,
+                parse_mode=parse_mode,
+            )
+        except Exception as e:
+            if ptb_error_is(e, "message is not modified"):
+                return None
+            if ptb_error_is(e, "message to edit not found") or ptb_error_is(
+                e, "message can't be edited"
+            ):
+                raise SendFailed(f"Cannot edit {message_id} in {chat_id}: {e}") from e
+            await handle(e, attempt, max_retries, verbosity)
+    raise SendFailed(f"Failed to edit {message_id} in {chat_id} after {max_retries} attempts.")
+
+
 async def tsend(arguments):
     poll_mode = bool(arguments.get("poll"))
+    delete_mode = bool(arguments.get("delete"))
+    edit_mode = bool(arguments.get("edit"))
     poll_arguments = parse_poll_arguments(arguments) if poll_mode else None
     verbosity = _parse_verbosity(arguments)
 
     arguments["<receiver>"] = normalize_destination(arguments.get("<receiver>"))
 
+    message_ids = None
+    if delete_mode or edit_mode:
+        message_ids = parse_message_ids(arguments.get("<message_id>"))
+        if edit_mode and len(message_ids) != 1:
+            raise SystemExit("edit takes exactly one message id.")
+
+    #: None unless asked for, so the send paths skip the bookkeeping.
+    sent_ids = [] if arguments.get("--print-ids") else None
+
     parse_mode_str = arguments.get("--parse-mode", "markdown")
     message = None
-    if not poll_mode:
+    if edit_mode:
+        message = edit_text_check(arguments["<message>"])
+    elif not (poll_mode or delete_mode):
         arguments["<message>"] = str(arguments["<message>"])
         message = arguments["<message>"]
 
@@ -1090,27 +1281,24 @@ async def tsend(arguments):
     try:
         if backend == 2:
             # print("backend 2 used")
-            import telegram
-            from telegram.ext import ApplicationBuilder
-
-            proxy_url = os.environ.get("HTTP_PROXY")
-            if proxy_url:
-                app = (
-                    ApplicationBuilder()
-                    .token(token)
-                    .proxy(proxy_url)
-                    .get_updates_proxy(proxy_url)
-                    .build()
-                )
-                #: PTBDeprecationWarning: Deprecated since version 20.7: `ApplicationBuilder.proxy_url` is deprecated. Use `ApplicationBuilder.proxy` instead.
-
-                bot = app.bot
-            else:
-                bot = telegram.Bot(token)
+            bot = await _ptb_bot_from_env()
 
             async with bot:
                 if poll_mode:
                     await ptb_send_poll(bot, poll_arguments, verbosity=verbosity)
+                elif delete_mode:
+                    await ptb_delete(
+                        bot, p2int(arguments["<receiver>"]), message_ids, verbosity=verbosity
+                    )
+                elif edit_mode:
+                    await ptb_edit(
+                        bot,
+                        p2int(arguments["<receiver>"]),
+                        message_ids[0],
+                        message,
+                        parse_mode=ptb_get_parse_mode(parse_mode_str),
+                        verbosity=verbosity,
+                    )
                 else:
                     parse_mode = ptb_get_parse_mode(parse_mode_str)
 
@@ -1133,6 +1321,7 @@ async def tsend(arguments):
                             message=message,
                             parse_mode=parse_mode,
                             verbosity=verbosity,
+                            sent_ids=sent_ids,
                         )
                     else:
                         await ptb_send(
@@ -1141,6 +1330,7 @@ async def tsend(arguments):
                             message=message,
                             parse_mode=parse_mode,
                             verbosity=verbosity,
+                            sent_ids=sent_ids,
                         )
         else:  #: Telethon backend
             from telethon import TelegramClient
@@ -1192,6 +1382,20 @@ async def tsend(arguments):
                         )
                     else:
                         await telethon_send_poll(client, poll_arguments, verbosity=verbosity)
+                elif delete_mode:
+                    await telethon_delete(
+                        client, p2int(arguments["<receiver>"]), message_ids, verbosity=verbosity
+                    )
+                elif edit_mode:
+                    await telethon_edit(
+                        client,
+                        p2int(arguments["<receiver>"]),
+                        message_ids[0],
+                        message,
+                        #: "none" disables formatting, as for sends below.
+                        parse_mode=(None if parse_mode_str == "none" else parse_mode_str),
+                        verbosity=verbosity,
+                    )
                 else:
                     # print(arguments)
                     if parse_mode_str == "html":
@@ -1214,6 +1418,7 @@ async def tsend(arguments):
                         link_preview=arguments["--link-preview"],
                         album_mode=(not arguments["--no-album"]),
                         verbosity=verbosity,
+                        sent_ids=sent_ids,
                     )
 
             finally:
@@ -1232,6 +1437,10 @@ async def tsend(arguments):
                 check_pid_p=False,
                 verbose_p=False,
             )
+
+    if sent_ids is not None:
+        for message_id in sent_ids:
+            print(message_id)
 
 
 def parse_tsend(argv):
