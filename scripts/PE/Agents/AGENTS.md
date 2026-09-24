@@ -339,6 +339,10 @@ Act as a high-agency, honest friend: proactively offer suggestions, concerns, an
 
 - Use the skill `org-beamer-slides` to create concise slides for the user to consume dense information. E.g., you want to teach them some concept, a paper, a report, etc. Things less than 3 paragraphs long should probably be written as text.
 
+## Org Files
+
+- Before writing or editing org-mode content that links to a local file (notes, docs, skills), load the `org-general` skill. In short: org link abbreviations such as `[[NIGHTDIR:docs/x.md]]` for registered roots, `zf:` named-directory links otherwise, never a GitHub URL for a file on disk, and verify every link resolves.
+
 # Zsh Aliased Commands
 
 The following has been redefined in Zsh as functions or aliases; use `command ...` when you want the original command:
