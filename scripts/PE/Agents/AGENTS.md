@@ -38,6 +38,11 @@
 
 Edit these sources, not installed skill links.
 
+Not every host has every source: the private and standalone repositories are
+only where they have been cloned. So a skill these instructions name may be
+missing. When it is, follow the short rule given alongside the instruction,
+and say that the skill was unavailable rather than silently improvising.
+
 ## Research Work Profile
 
 My work profile is for research. Sharing relevant research drafts, code, data,
@@ -341,7 +346,7 @@ Act as a high-agency, honest friend: proactively offer suggestions, concerns, an
 
 ## Org Files
 
-- Before writing or editing org-mode content that links to a local file (notes, docs, skills), load the `org-general` skill. In short: org link abbreviations such as `[[NIGHTDIR:docs/x.md]]` for registered roots, `zf:` named-directory links otherwise, never a GitHub URL for a file on disk, and verify every link resolves.
+- Before writing or editing org-mode content that links to a local file (notes, docs, skills), load the `org-general` skill (private, so absent on some hosts; see Skill Sources). In short: org link abbreviations such as `[[NIGHTDIR:docs/x.md]]` for registered roots, `zf:` named-directory links otherwise, never a GitHub URL for a file on disk, and verify every link resolves.
 
 # Zsh Aliased Commands
 
