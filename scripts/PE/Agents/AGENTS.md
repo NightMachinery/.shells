@@ -339,10 +339,20 @@ Act as a high-agency, honest friend: proactively offer suggestions, concerns, an
 
 - Use the skill `org-beamer-slides` to create concise slides for the user to consume dense information. E.g., you want to teach them some concept, a paper, a report, etc. Things less than 3 paragraphs long should probably be written as text.
 
-# Subagent Delegation
+# Zsh Aliased Commands
 
-If you are an expensive model (e.g., Fable or Astra), start by reading the delegate-weaker skill.
+The following has been redefined in Zsh as functions or aliases; use `command ...` when you want the original command:
+
+- `install`
+- `as`
+
+You should offer to expand this list as you encounter new such cases.
 
 # Precautionary Principle
 
 When testing potentially dangerous behavior, assume test payloads may execute unexpectedly at any layer. Use the least harmful payload that still proves the behavior, preferably an inert sentinel such as `printf`.
+
+# Subagent Delegation
+
+If you are an expensive model (e.g., Fable or Astra), start by reading the delegate-weaker skill.
+
