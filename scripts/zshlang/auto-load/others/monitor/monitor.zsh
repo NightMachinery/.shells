@@ -599,13 +599,15 @@ function audio-input-kind-get {
 
 #: Overridable: set it after this file loads. `<kind>-muted' wins over `muted';
 #: a closed lid shows the same warning muted or not, since it records nothing either way.
+#: iphone is the Apple logo, U+F8FF: private use, so it renders only in Apple fonts;
+#: the phone emoji was too small and dark to read in the menubar.
 if (( ! ${+audio_input_glyphs} )) ; then
     typeset -gA audio_input_glyphs=(
         builtin '💻'
         builtin-clamshell '🚫'
         builtin-clamshell-muted '🚫'
         bluetooth '🎧'
-        iphone '📱'
+        iphone $'\uF8FF'
         other '🎤'
         none '❔'
         muted '🔇'
