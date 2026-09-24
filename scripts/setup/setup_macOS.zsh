@@ -8,6 +8,8 @@ if isDarwin ; then
     brew install util-linux
     lnrp "$(brew --prefix util-linux)/bin/setsid" ~/bin/setsid
 
+    brew install switchaudio-osx
+
     brew install --cask mactex
     brew install --cask handbrake
     brew install --cask adobe-acrobat-reader skim # foxit-pdf-editor

@@ -8,6 +8,11 @@ function ensure-dep-m1ddc {
     ensure-dep1 m1ddc brew install m1ddc || return $?
 }
 ##
+function ensure-dep-switchaudio {
+    #: SwitchAudioSource: the Hammerspoon-free backend of [agfi:audio-input-switch-darwin].
+    ensure-dep1 SwitchAudioSource brew install switchaudio-osx || return $?
+}
+##
 function kitty-theme-install {
     pip-install psutil 'git+git://github.com/fretboardfreak/kitty-theme-changer.git@master'
     # psutil is needed by kitty_theme_changer.conf.py
