@@ -34,8 +34,10 @@ of the exact path and draft before saving. See =./docs/note-skill.md=.
 Its source is =~/notes/skills/note/SKILL.md= in the private =notes-skills=
 repository. The linker discovers both that checkout and the public skills.
 
-Shared agent skills are installed by =agent-skills-link=. Codex uses directory
-links under =~/.agents/skills=; =agent-skills-prune-legacy-codex= safely removes
+Shared agent skills are installed by =agent-skills-link=, as one directory
+symlink per skill in every agent's skills directory, so a skill's sibling files
+come with it. Codex's live under =~/.agents/skills=;
+=agent-skills-prune-legacy-codex= safely removes
 our obsolete =~/.codex/skills= links after migration. Bundled =.system= skills
 are preserved. See =./docs/agent-done.md=.
 

@@ -11,13 +11,14 @@ done, because only it knows what it was doing, and [agfi:agent-done] decides
 
 ## One skill, three agents
 
-The skill is a single tracked file, `configFiles/agent-skills/done/SKILL.md`,
-symlinked into each agent's skills directory by [agfi:agent-skills-link]:
+The skill is a single tracked directory, `configFiles/agent-skills/done/`,
+symlinked as a whole into each agent's skills directory by
+[agfi:agent-skills-link]:
 
-    ~/.claude/skills/done/SKILL.md
-    ~/.claude-work/skills/done/SKILL.md
-    ~/.agents/skills/done/SKILL.md
-    ~/.gemini/config/skills/done/SKILL.md
+    ~/.claude/skills/done
+    ~/.claude-work/skills/done
+    ~/.agents/skills/done
+    ~/.gemini/config/skills/done
 
 The linker also reads `<name>/SKILL.md` from `~/notes/skills`, the separate
 private `notes-skills` checkout. `note` lives there. A missing private checkout
@@ -28,7 +29,7 @@ all use the same source discovery. Duplicate names across different sources
 are reported before linking anything, rather than silently overriding a skill.
 
 Moving a skill between sources requires updating its existing managed links:
-the linker preserves conflicting Codex links. Verify the old link target,
+the linker preserves conflicting links. Verify the old link target,
 replace only that known managed link, and run the linker again. Unrelated
 links and real files must be preserved.
 
@@ -65,13 +66,21 @@ migrate-workflows skill, which exists to move people off its older
 slash command support" as the reason. So one file can serve every agent, and
 the prose in it is the part worth getting right once.
 
-Codex user skills live under `~/.agents/skills`, independent of `CODEX_HOME`.
-The linker creates a whole-directory symlink there, so sibling scripts,
-references and assets accompany `SKILL.md`. Other agents retain their existing
-file-link layout. A conflicting Codex directory or unrelated symlink is
-reported and preserved, not overwritten, as it is on every other seat. This
-uses the documented
-[Codex discovery paths and directory-link support](https://learn.chatgpt.com/docs/build-skills#where-codex-loads-local-skills).
+Every seat gets a whole-directory symlink, `<dir>/<name>` pointing at the
+skill's source directory, so sibling `references/`, `scripts/` and `assets/`
+accompany `SKILL.md` and a skill can name them relative to its base directory.
+All three agents follow such links:
+
+- Claude Code documents symlinked skill folders in its
+  [skills docs](https://code.claude.com/docs/en/skills). It reports the link
+  path, such as `~/.claude-work/skills/<name>`, as the skill's base directory,
+  and sibling files read normally through it.
+- Codex documents its
+  [discovery paths and directory-link support](https://learn.chatgpt.com/docs/build-skills#where-codex-loads-local-skills).
+  Its user skills live under `~/.agents/skills`, independent of `CODEX_HOME`.
+- Antigravity's documentation does not mention links, but `agy` 1.2.9 lists a
+  directory-linked skill, expands it as `/<name>` in print mode, and reads its
+  sibling files through the link.
 
 To migrate an older installation:
 
@@ -91,28 +100,25 @@ will no longer discover these skills after cleanup; use a current client.
 
 ### A target the linker does not recognise
 
-Two shapes are not collisions, and the linker handles them on its own:
+Two shapes are not collisions, and the linker replaces them on its own,
+saying so on stderr before it does:
 
-- a whole-directory symlink to the very skill it would link, the layout
-  `npx skills` and hand-made links produce. It is the same skill with the same
-  sibling files, so it is accepted as it is, and `h-agent-skills-doctor` reports
-  it as directory-linked. `delegate-to-web-chat` was installed this way on
-  2026-09-21 and warned on every launch until this was allowed;
-- a dangling symlink, to the skill directory or to its `SKILL.md`. Nothing sits
-  behind it to lose, so it is replaced, and the doctor calls it `DANGLING`.
+- a dangling symlink at `<dir>/<name>`. Nothing sits behind it to lose, and the
+  doctor calls it `DANGLING`;
+- the file-link layout: a real directory whose only entry is a `SKILL.md`
+  symlink to the source's `SKILL.md`, or to nothing. It carries none of the
+  skill's sibling files, and the doctor calls it `FILE LINK ONLY`. The linker
+  unlinks that `SKILL.md` and removes the directory with `rmdir`, which refuses
+  if anything else has appeared in it.
 
-Otherwise the linker only ever writes where it finds nothing. If something is already
-sitting at a skill's place, it is reported on stderr, left exactly as it is, and
-`agent-skills-link` returns non-zero. That covers three shapes, on every seat
-alike rather than on Codex alone:
+Otherwise the linker only ever writes where it finds nothing. If something is
+already sitting at a skill's place, it is reported on stderr, left exactly as
+it is, and `agent-skills-link` returns non-zero. That covers, on every seat:
 
-- a plain file, which is somebody's own skill of that name, or one an agent
-  wrote itself;
-- a symlink resolving anywhere other than the tracked source;
-- a symlink standing in for the `<name>` directory itself. The linker never
-  resolves through one of those. `mkdir -p` succeeds on a link to an existing
-  directory, so `ln -s` would otherwise plant `SKILL.md` inside whatever it
-  points at, outside the agent's skills tree entirely.
+- a real file or directory, which is somebody's own skill of that name, or one
+  an agent wrote itself. A directory holding a `SKILL.md` link plus anything
+  else, hidden files included, counts as one;
+- a symlink resolving anywhere other than the tracked source directory.
 
 The repair is always manual: look at what is there, remove it, and re-run
 `agent-skills-link`. The message names the source it expected, and

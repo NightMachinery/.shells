@@ -158,10 +158,12 @@ linked_path="${agent_skills_codex_dir}/note"
 expected_path="${agent_skills_notes_dir}/note"
 [[ -L ${linked_path} && ${linked_path:A} == ${expected_path:A} ]] || \
     agent-skills-test-fail "Codex should link the private skill directory"
-linked_path="${agent_skills_test_tmp}/claude/skills/note/SKILL.md"
-expected_path="${agent_skills_notes_dir}/note/SKILL.md"
+linked_path="${agent_skills_test_tmp}/claude/skills/note"
 [[ -L ${linked_path} && ${linked_path:A} == ${expected_path:A} ]] || \
-    agent-skills-test-fail "Claude should link the private skill file"
+    agent-skills-test-fail "Claude should link the private skill directory"
+agent-skills-test-assert "Claude directory links should expose sibling resources" \
+    test -r "${agent_skills_test_tmp}/claude/skills/clean/scripts/helper.zsh"
+expected_path="${agent_skills_notes_dir}/note/SKILL.md"
 doctor_output="$(h-agent-skills-doctor 2>&1)"
 [[ ${doctor_output} == *'skill note:'* && ${doctor_output} != *'WRONG TARGET'* ]] || \
     agent-skills-test-fail "doctor should resolve private sources"
@@ -198,8 +200,8 @@ fi
 [[ "$(<${claude_case}/skills/clean/SKILL.md)" == mine ]] || \
     agent-skills-test-fail "plain Claude file should keep its contents"
 
-# A symlinked skill directory must never be written through: `mkdir -p' succeeds
-# on it and `ln -s' would then drop SKILL.md inside whatever it points at.
+# A skill directory link pointing somewhere else is somebody else's: it is
+# preserved, and nothing is written through it.
 claude_case="${agent_skills_test_tmp}/claude-dir-link"
 foreign="${agent_skills_test_tmp}/claude-foreign"
 command mkdir -p -- "${claude_case}/skills" "${foreign}"
@@ -226,8 +228,37 @@ expected_path="${agent_skills_src_dir}/clean"
 [[ -L ${linked_path} && ${linked_path:A} == ${expected_path:A} ]] || \
     agent-skills-test-fail "an equivalent Claude directory link should be left as it is"
 doctor_output="$(h-agent-skills-doctor 2>&1)"
-[[ ${doctor_output} == *'directory-linked'* && ${doctor_output} != *'UNTRACKED'* ]] || \
+[[ ${doctor_output} == *'= symlinked'* && ${doctor_output} != *'UNTRACKED'* ]] || \
     agent-skills-test-fail "doctor should accept an equivalent Claude directory link"
+
+# The file-link layout, a real directory holding only a SKILL.md link to the
+# source, is replaced by a directory link. Anything else in that directory,
+# hidden files included, keeps it from being touched.
+claude_case="${agent_skills_test_tmp}/claude-file-link-layout"
+command mkdir -p -- "${claude_case}/skills/"{clean,extra,wrong}
+for name in clean extra wrong ; do
+    command ln -s -- "${agent_skills_src_dir}/${name}/SKILL.md" "${claude_case}/skills/${name}/SKILL.md"
+done
+command touch -- "${claude_case}/skills/extra/keep.txt" "${claude_case}/skills/wrong/.keep"
+claude_code_profiles[test]="${claude_case}"
+doctor_output="$(h-agent-skills-doctor 2>&1)"
+[[ ${doctor_output} == *'FILE LINK ONLY'* ]] || \
+    agent-skills-test-fail "doctor should name the file-link layout"
+if agent-skills-link >/dev/null 2>&1 ; then
+    agent-skills-test-fail "a file-link directory with other contents should make linking fail"
+fi
+linked_path="${claude_case}/skills/clean"
+expected_path="${agent_skills_src_dir}/clean"
+[[ -L ${linked_path} && ${linked_path:A} == ${expected_path:A} ]] || \
+    agent-skills-test-fail "a file-link-only directory should become a directory link"
+agent-skills-test-assert "a migrated link should expose sibling resources" \
+    test -r "${claude_case}/skills/clean/scripts/helper.zsh"
+for name in extra wrong ; do
+    [[ -d ${claude_case}/skills/${name} && ! -L ${claude_case}/skills/${name} && -L ${claude_case}/skills/${name}/SKILL.md ]] || \
+        agent-skills-test-fail "a file-link directory with other contents (${name}) should be preserved"
+done
+agent-skills-test-assert "the extra file should be preserved" test -e "${claude_case}/skills/extra/keep.txt"
+agent-skills-test-assert "the hidden file should be preserved" test -e "${claude_case}/skills/wrong/.keep"
 
 # Dangling links, to the skill directory or to its file, are what a skill that
 # moved between roots leaves behind; there is nothing behind them to lose.
@@ -242,9 +273,9 @@ doctor_output="$(h-agent-skills-doctor 2>&1)"
 agent-skills-link >/dev/null 2>&1 || \
     agent-skills-test-fail "dangling Claude links should be replaced, not refused"
 for name in clean extra ; do
-    linked_path="${claude_case}/skills/${name}/SKILL.md"
-    expected_path="${agent_skills_src_dir}/${name}/SKILL.md"
-    [[ -L ${linked_path} && ! -L ${linked_path:h} && ${linked_path:A} == ${expected_path:A} ]] || \
+    linked_path="${claude_case}/skills/${name}"
+    expected_path="${agent_skills_src_dir}/${name}"
+    [[ -L ${linked_path} && ${linked_path:A} == ${expected_path:A} ]] || \
         agent-skills-test-fail "dangling Claude link for ${name} should be relinked to its source"
 done
 

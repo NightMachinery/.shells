@@ -18,5 +18,4 @@ requested worker is unavailable, the agent reports that and searches narrowly
 itself rather than silently choosing a more expensive model.
 
 Install through [agfi:agent-skills-link], the same shared mechanism as `done`;
-see `docs/agent-done.md`. The skill is self-contained so Claude's SKILL.md-only
-links and Codex's directory links both work.
+see `docs/agent-done.md`.

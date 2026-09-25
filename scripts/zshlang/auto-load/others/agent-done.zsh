@@ -2,7 +2,7 @@
 #: Ending a session on purpose: the `/done' skill every agent shares, and the
 #: exit path it calls.
 #:
-#: The skill itself is one tracked file, =configFiles/agent-skills/done/=,
+#: The skill itself is one tracked directory, =configFiles/agent-skills/done/=,
 #: symlinked into each agent's skills directory by [agfi:agent-skills-link].
 #: Claude Code, Codex and Antigravity all read `<dir>/<name>/SKILL.md' with
 #: `name'/`description' frontmatter (Codex uses `$done'), so one file
@@ -139,20 +139,32 @@ function h-agent-skills-dangling-p {
     test -L "${1}" && ! test -e "${1}"
 }
 
-function h-agent-skills-equivalent-dirlink-p {
-    : "usage: h-agent-skills-equivalent-dirlink-p <SKILL.md target> <SKILL.md source>; whether the target's directory is a symlink to the source's"
-    #: Another installer's layout (a whole-directory link, as npx skills and
-    #: hand-made links produce) for the very skill we would link. Same bytes,
-    #: same sibling files, so there is nothing to fix.
+function h-agent-skills-file-link-dir-p {
+    : "usage: h-agent-skills-file-link-dir-p <target dir> <skill source dir>; whether <target dir> is a real directory holding nothing but a SKILL.md link to that source's SKILL.md, or to nothing"
+    #: The file-link layout: a directory of our own making around one
+    #: SKILL.md link. It carries none of the skill's sibling files, and
+    #: nothing else lives in it, so swapping it for a directory link loses
+    #: nothing. Hidden entries count, so a directory somebody has put anything
+    #: into is never taken for one.
+    setopt localoptions bareglobqual
     local target="${1}" src="${2}"
-    test -L "${target:h}" && [[ "${target:h:A}" == "${src:h:A}" ]]
+    local skill="${target}/SKILL.md"
+    local -a entries
+    test -d "${target}" && ! test -L "${target}" || return 1
+    entries=( "${target}"/*(DN) )
+    (( ${#entries} == 1 )) && [[ "${entries[1]}" == "${skill}" ]] && test -L "${skill}" || return 1
+    [[ "${skill:A}" == "${src:A}/SKILL.md" ]] || h-agent-skills-dangling-p "${skill}"
 }
 
 function agent-skills-link {
     : "installs every tracked agent skill into each agent's skills directory"
-    #: Symlinks, not copies: the tracked file stays the only copy, so a fix
-    #: reaches all three agents at once and [agfi:agents-md-doctor] can tell a
-    #: link from a file somebody edited in place. Idempotent and quiet;
+    #: One directory symlink per skill, `<dir>/<name>' -> the source's skill
+    #: directory, for every agent. All three follow such links and read the
+    #: skill's sibling files (references/, scripts/, assets/) through them,
+    #: and Claude Code reports the link path as the skill's base directory.
+    #: Symlinks, not copies: the tracked tree stays the only copy, so a fix
+    #: reaches every agent at once and [agfi:h-agent-skills-doctor] can tell a
+    #: link from a directory somebody edited in place. Idempotent and quiet;
     #: `agent_skills_link_verbose_p=y' says what it did.
     #:
     #: Called from [agfi:h-agent-launch], so it is on the launch path of every
@@ -169,81 +181,41 @@ function agent-skills-link {
         dir="${line#*$'\t'}"
 
         for src in "${(@f)source_list}" ; do
-            name="${${src:h}:t}"
-            target="${dir}/${name}/SKILL.md"
+            src="${src:h}"
+            name="${src:t}"
+            target="${dir}/${name}"
 
-            if [[ "${agent}" == codex ]] ; then
-                #: Codex follows skill-directory links. Linking just SKILL.md
-                #: also loses sibling scripts/references. Never replace a
-                #: user-owned directory or an unrelated (even broken) link.
-                src="${src:h}"
-                target="${target:h}"
-                if test -L "${target}" && [[ "${target:A}" == "${src:A}" ]] ; then
-                    continue
-                elif h-agent-skills-dangling-p "${target}" ; then
-                    ecgray "$0: replacing the dangling link ${target/#${HOME}/~}"
-                    command rm -- "${target}" @RET
-                elif test -e "${target}" || test -L "${target}" ; then
-                    ecerr "$0: ${target/#${HOME}/~} is not our directory link (expected ${${src:A}/#${HOME}/~}); leaving it alone. Remove it and re-run $0."
-                    ret=1
-                    continue
-                fi
-                command mkdir -p -- "${dir}" @RET
-                command ln -s -- "${src:A}" "${target}" @RET
-                if bool "${verbose_p}" ; then
-                    ecgray "$0: linked ${target/#${HOME}/~} (${agent})"
-                fi
-                continue
-            fi
-
-            #: Already pointing at the tracked file: the common case, and the
-            #: reason this costs one stat rather than a write.
+            #: Already pointing at the tracked directory: the common case, and
+            #: the reason this costs one stat rather than a write.
             if test -L "${target}" && [[ "${target:A}" == "${src:A}" ]] ; then
                 continue
             fi
-            if h-agent-skills-equivalent-dirlink-p "${target}" "${src}" ; then
-                continue
-            fi
 
-            #: Links to nothing, whether the skill directory or the file in it,
-            #: are what a skill that moved between roots leaves behind.
-            if h-agent-skills-dangling-p "${target:h}" ; then
-                ecgray "$0: replacing the dangling link ${${target:h}/#${HOME}/~}"
-                command rm -- "${target:h}" @RET
-            elif h-agent-skills-dangling-p "${target}" ; then
+            if h-agent-skills-dangling-p "${target}" ; then
+                #: What a skill that moved between roots leaves behind.
                 ecgray "$0: replacing the dangling link ${target/#${HOME}/~}"
                 command rm -- "${target}" @RET
-            fi
-
-            #: A symlinked `<dir>/<name>' is never ours: we always create that
-            #: directory with `mkdir -p'. Resolving through it would be worse
-            #: than useless -- `mkdir -p' succeeds on a link to an existing
-            #: directory, and `ln -s' would then write SKILL.md *inside*
-            #: whatever it points at, outside the agent's own skills tree.
-            #: Checked before the target itself so the message names the real
-            #: problem when that foreign directory holds a SKILL.md of its own.
-            if test -L "${target:h}" ; then
-                ecerr "$0: ${${target:h}/#${HOME}/~} is a symlink, not our skill directory; leaving it alone"
+            elif h-agent-skills-file-link-dir-p "${target}" "${src}" ; then
+                ecgray "$0: replacing ${target/#${HOME}/~}, a directory holding only a SKILL.md link, with a link to ${${src:A}/#${HOME}/~}"
+                command rm -- "${target}/SKILL.md" @RET
+                #: rmdir, never rm -r: it refuses if anything appeared in the
+                #: meantime.
+                command rmdir -- "${target}" @RET
+            elif test -e "${target}" || test -L "${target}" ; then
+                #: Somebody's own skill of the same name -- a directory an
+                #: agent wrote itself, a link of their own -- or one of ours
+                #: left behind by a skill that moved between roots. Replacing
+                #: either silently would lose it, so name what we expected and
+                #: leave it: only you can tell those two apart.
+                ecerr "$0: ${target/#${HOME}/~} is not our directory link (expected ${${src:A}/#${HOME}/~}); leaving it alone. Remove it and re-run $0."
                 ret=1
                 continue
             fi
 
-            #: Anything else still here is somebody's own skill of the same
-            #: name -- a file an agent wrote itself, or a link of their own --
-            #: or one of ours left behind by a skill that moved between roots.
-            #: Replacing either silently would lose it, so name what we expected
-            #: and leave it. Same policy as the Codex branch above, and manual
-            #: for the same reason: only you can tell those two apart.
-            if test -e "${target}" || test -L "${target}" ; then
-                ecerr "$0: ${target/#${HOME}/~} is not our link (expected ${${src:A}/#${HOME}/~}); leaving it alone. Remove it and re-run $0."
-                ret=1
-                continue
-            fi
-
-            command mkdir -p -- "${target:h}" @RET
+            command mkdir -p -- "${dir}" @RET
             #: `-s' rather than `-sf': the guards above leave nothing to
             #: clobber, so a collision here is a race, and belongs in an error.
-            command ln -s -- "${src}" "${target}" @RET
+            command ln -s -- "${src:A}" "${target}" @RET
             if bool "${verbose_p}" ; then
                 ecgray "$0: linked ${target/#${HOME}/~} (${agent})"
             fi
@@ -312,21 +284,17 @@ function h-agent-skills-doctor {
         dir="${line#*$'\t'}"
 
         for src in "${(@f)source_list}" ; do
-            name="${${src:h}:t}"
-            target="${dir}/${name}/SKILL.md"
-
-            if [[ "${agent}" == codex ]] ; then
-                src="${src:h}"
-                target="${target:h}"
-            fi
+            src="${src:h}"
+            name="${src:t}"
+            target="${dir}/${name}"
 
             ecbold "skill ${name}: ${target/#${HOME}/~} (${agent})"
-            if h-agent-skills-dangling-p "${target}" || h-agent-skills-dangling-p "${target:h}" ; then
+            if h-agent-skills-dangling-p "${target}" ; then
                 ecerr "  DANGLING: run agent-skills-link"
             elif ! test -e "${target}" && ! test -L "${target}" ; then
                 ecerr "  MISSING: run agent-skills-link"
-            elif [[ "${agent}" != codex ]] && h-agent-skills-equivalent-dirlink-p "${target}" "${src}" ; then
-                ec "  = directory-linked to ${${src:h}/#${NIGHTDIR}/.}"
+            elif h-agent-skills-file-link-dir-p "${target}" "${src}" ; then
+                ecerr "  FILE LINK ONLY: sibling files are missing; run agent-skills-link"
             elif ! test -L "${target}" ; then
                 ecerr "  UNTRACKED: not the expected symlink. Compare with ${src/#${NIGHTDIR}/.} before re-linking."
             elif [[ "${target:A}" == "${src:A}" ]] ; then
