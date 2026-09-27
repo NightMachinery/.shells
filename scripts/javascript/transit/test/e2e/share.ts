@@ -95,6 +95,22 @@ const NOTICE: Message = {
 };
 
 /**
+ * Notices about lines no board of the fixture shows.
+ *
+ * The real feed carries every notice in the network, a few hundred at a time,
+ * and a page once asked the store about all of them in one URL too long for the
+ * server to read, then translated each on the device and offered each until the
+ * server's rate limit refused them. These are here so the harness can see the
+ * page ask about, and translate, only the one notice it shows.
+ */
+const ELSEWHERE: Message[] = Array.from({ length: 250 }, (_, index) => ({
+  title: `X${index}: Bauarbeiten`,
+  text: `Wegen Bauarbeiten entfällt auf der Linie X${index} bis auf Weiteres der Halt an einer erfundenen Haltestelle.`,
+  lines: [`X${index}`],
+  backend: 'mvg',
+}));
+
+/**
  * The translator this harness installs in place of the browser's.
  *
  * It counts two things separately. `availability` is asked on every load and is
@@ -131,6 +147,8 @@ interface RunCounts {
   credit: string;
   /** The translated body as the reader sees it. */
   text: string;
+  /** How many hashes each lookup the page sent to the store asked about. */
+  lookups: number[];
 }
 
 async function main(): Promise<void> {
@@ -217,8 +235,11 @@ async function main(): Promise<void> {
       const url = new URL(request.url);
       if (url.pathname === '/fake-mvg/messages') {
         // The departure backend's own shape for a service message, and only
-        // that: one invented notice about a line the fixture profile names.
-        return Response.json([{ title: NOTICE.title, text: NOTICE.text, lines: NOTICE.lines }]);
+        // that: one invented notice about a line the fixture profile names, and
+        // a few hundred about lines it does not.
+        return Response.json(
+          [NOTICE, ...ELSEWHERE].map((notice) => ({ title: notice.title, text: notice.text, lines: notice.lines })),
+        );
       }
       if (url.pathname === '/fake-translate/v2') {
         // Cloud Translation v2's answer shape, and nothing else about it. The
@@ -410,11 +431,14 @@ async function main(): Promise<void> {
           text: box ? box.childNodes[0].textContent : '',
         };
       })()`);
+      const lookups = seen
+        .filter((request) => request.includes('/address/api/translations?'))
+        .map((request) => (new URL(request).searchParams.get('hashes') ?? '').split(',').filter((hash) => hash.length > 0).length);
       console.log(
         `  ${label}: ${counts.calls} translate call(s), ${counts.creates} translator(s) created, ` +
-          `credit "${counts.credit}"`,
+          `credit "${counts.credit}", lookups of ${lookups.join(', ') || 'no'} hash(es)`,
       );
-      return counts;
+      return { ...counts, lookups };
     }
 
     // -------------------------------------------------- the first reader
@@ -424,6 +448,11 @@ async function main(): Promise<void> {
       'the first reader translates the notice itself and says so',
       first.calls > 0 && first.credit === 'translated on this device',
       `${first.calls} call(s) into the translator, and the panel credits "${first.credit}"`,
+    );
+    record(
+      'of a feed of 251 notices, the page asks about and translates only the one it shows',
+      first.calls === 1 && first.lookups.length >= 1 && first.lookups.every((count) => count === 1),
+      `${first.calls} translate call(s); lookups of ${first.lookups.join(', ') || 'no'} hash(es)`,
     );
 
     // What the planning server was told, asked of the server directly rather
@@ -488,17 +517,21 @@ async function main(): Promise<void> {
       served.credit === 'translated by server',
       `the panel credits "${served.credit}"`,
     );
+    // Counted for the one notice on screen. The server also translates the
+    // rest of the feed on its warming cycle, in batches, which is its own
+    // business and costs no reader anything.
+    const noticeTranslations = translateCalls.flat().filter((text) => text === NOTICE.text).length;
     record(
       'the server translated the notice once, not once per reader',
-      translateCalls.length >= 1 && translateCalls.every((batch) => batch.length === 1),
-      `${translateCalls.length} call(s) to the translation API, of ${translateCalls.map((batch) => batch.length).join(', ') || '-'} notice(s)`,
+      noticeTranslations === 1,
+      `${noticeTranslations} translation(s) of the notice across ${translateCalls.length} call(s) to the translation API`,
     );
     const secondServed = await readAs('a second reader against the same server');
-    const extra = translateCalls.length;
+    const extra = translateCalls.flat().filter((text) => text === NOTICE.text).length;
     record(
       'and a second reader against it costs no translation at all',
-      secondServed.calls === 0 && secondServed.text === served.text,
-      `${extra} call(s) to the translation API in total after two readers`,
+      secondServed.calls === 0 && secondServed.text === served.text && extra === 1,
+      `${extra} translation(s) of the notice in total after two readers`,
     );
 
     const passed = results.filter((result) => result.pass).length;

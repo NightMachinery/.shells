@@ -7,9 +7,12 @@
 // only a live pair can answer.
 //
 //   1. With a server, does the phone stop talking to the upstream APIs at all.
-//   2. Without one, does the page do the work itself and say so.
-//   3. When the server stops answering mid-session, does the page carry on.
-//   4. How much does the server actually save on a slow connection.
+//   2. Do the rows arrive without waiting for the journeys, even from a cold
+//      server: the boards and the journeys are two questions, and a page that
+//      asked them as one once waited seventeen seconds for its first row.
+//   3. Without one, does the page do the work itself and say so.
+//   4. When the server stops answering mid-session, does the page carry on.
+//   5. How much does the server actually save on a slow connection.
 //
 // The last one is a measurement rather than a pass, and it is reported both
 // ways round, because "it is faster" is the whole claim being made and a claim
@@ -90,6 +93,20 @@ interface RunResult {
 /** A request to one of the two public transit APIs, which the server exists to save. */
 function isUpstream(url: string): boolean {
   return url.includes('mvg.de') || url.includes('transitous.org');
+}
+
+/**
+ * An onward-calls lookup: where one run goes after it leaves.
+ *
+ * These go from the browser whether or not there is a server, by design (see
+ * `prepareCalls` in `src/page/data.ts`): one or two requests for a sheet, or
+ * for the via hint on a regional row, which nothing needs a server for. So
+ * behind a server they are the one kind of upstream request that is expected,
+ * and the check below tells them apart from the board and journey work the
+ * server exists to take off the phone.
+ */
+function isOnwardCalls(url: string): boolean {
+  return url.includes('transitous.org') && new URL(url).pathname.endsWith('/stoptimes');
 }
 
 /** A loopback port nothing else on this machine is likely to want. */
@@ -332,20 +349,37 @@ async function main(): Promise<void> {
     // machine that has been serving this page for more than half a minute, and
     // a cold server measures the upstream rather than the server.
     apiAnswers = 'through';
-    await load('warming the server', false);
+    const cold = await load('cold server', false);
     const warm = await load('warm server', false);
     const warmLine = await timingLine();
 
+    const warmWork = warm.upstreamRequests.filter((request) => !isOnwardCalls(request));
     record(
-      'with a server, the page asks it and nobody else',
-      warm.rows > 0 && warm.routes > 0 && warm.state.kind === 'server' && warm.upstreamRequests.length === 0,
+      'with a server, the page asks it for every board and journey, and the transit APIs for none',
+      warm.rows > 0 && warm.routes > 0 && warm.state.kind === 'server' && warmWork.length === 0,
       `${warm.rows} rows and ${warm.routes} journeys from ${warm.apiRequests.length} request(s) to the API and ` +
-        `${warm.upstreamRequests.length} to the transit APIs directly; the page settled on ${warm.state.kind}`,
+        `${warm.upstreamRequests.length} to the transit APIs directly, ` +
+        `${warm.upstreamRequests.length - warmWork.length} of them onward-calls lookups; the page settled on ${warm.state.kind}` +
+        // Which ones, by host and path only: a query string can carry a
+        // coordinate, and this output gets pasted into places.
+        (warm.upstreamRequests.length === 0
+          ? ''
+          : ` (${warm.upstreamRequests.map((request) => { const at = new URL(request); return `${at.host}${at.pathname}`; }).join(', ')})`),
     );
     record(
       'the page says where its data came from',
       warmLine.includes('via server'),
       `the timing line reads "${warmLine}"`,
+    );
+    record(
+      'the boards and the journeys are asked for separately',
+      warm.apiRequests.some((request) => request.includes('/boards/')) && warm.apiRequests.some((request) => request.includes('/profile/')),
+      warm.apiRequests.map((request) => new URL(request).pathname).join(', '),
+    );
+    record(
+      'even from a cold server, no row waits for a journey',
+      cold.toRowsMs !== null && cold.toRoutesMs !== null && cold.toRowsMs <= cold.toRoutesMs,
+      `rows at ${cold.toRowsMs ?? '-'} ms, journeys at ${cold.toRoutesMs ?? '-'} ms`,
     );
 
     // --------------------------------------------- the server stops answering
