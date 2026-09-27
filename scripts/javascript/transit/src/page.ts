@@ -31,7 +31,7 @@ import { cachedRoutes, destinationNameOf } from './page/commute.ts';
 import { createSwitchingSource, type SwitchingSource } from './page/source.ts';
 import { el, selectionInsideBoards, syncChildren } from './page/dom.ts';
 import { idbGet, idbSet, STORE_BOARDS } from './page/idb.ts';
-import { autoTranslate, primeMessageState, renderMessages, resetMessageFilters } from './page/messages.ts';
+import { adoptSharedTranslations, autoTranslate, noticesFor, primeMessageState, renderMessages, resetMessageFilters } from './page/messages.ts';
 import { rearm, setOnAlarmsChanged } from './page/notify.ts';
 import {
   beginRun,
@@ -445,6 +445,9 @@ async function refreshProfile(profileKey: string, force = false): Promise<void> 
       backendsUsed = result.backends;
       state.lastError = null;
       rearm(result.boards, Date.now());
+      // The boards decide which notices are relevant, so new boards may mean
+      // notices that have not been looked up or translated yet.
+      void translateVisibleNotices();
     }
     void idbSet(STORE_BOARDS, cacheKey(profileKey), data);
 
@@ -478,17 +481,36 @@ async function refreshMessages(): Promise<void> {
   try {
     const messages: Message[] = await source.fetchMessages(config);
     state.messages = messages;
-    // The source goes in because priming is also when the panel asks the
-    // planning server what the other readers have already translated. With no
-    // server there is nothing to ask and the panel behaves as it always did.
+    // The source goes in because the panel asks the planning server what the
+    // other readers have already translated. With no server there is nothing to
+    // ask and the panel behaves as it always did.
     await primeMessageState(messages, source);
-    render();
-    // Not awaited: the first translation may have to download a language pack,
-    // and the notices are readable in the meantime.
-    void autoTranslate(messages, render);
+    await translateVisibleNotices();
   } catch {
     /* a missing disruption list is not worth failing the render over */
   }
+}
+
+/**
+ * Bring translations for the notices on screen: the store's first, then the
+ * device's own for whatever the store did not have.
+ *
+ * Only the notices the panel shows. The feed carries every notice in the
+ * network, a few hundred of them, and a profile's lines are named in a handful;
+ * working through all of them is what once sent a lookup too long for the
+ * server to read and then a translation offer per notice until the server
+ * refused them. Called whenever what is on screen may have changed, and cheap
+ * when it has not: both steps skip what they have already done.
+ */
+async function translateVisibleNotices(): Promise<void> {
+  const config = state.config;
+  if (config === null || state.messages.length === 0) return;
+  const notices = noticesFor(state.messages, relevantLines(config));
+  await adoptSharedTranslations(notices);
+  render();
+  // Not awaited: the first translation may have to download a language pack,
+  // and the notices are readable in the meantime.
+  void autoTranslate(notices, render);
 }
 
 // ------------------------------------------------------------------- render
@@ -550,7 +572,12 @@ function selectProfile(key: string): void {
   // Cached boards first, so the tab switch is instant, then a refresh if what
   // we had is older than a glance.
   void loadCachedRoutes(key);
-  void loadCached(key).then(() => refreshProfile(key));
+  void loadCached(key).then(() => {
+    // Another profile names other lines. The cached boards are enough to know
+    // which, so the notices for them need not wait for the fresh fetch.
+    void translateVisibleNotices();
+    return refreshProfile(key);
+  });
 }
 
 /** How many distinct places this profile's boards plan towards, for the timing line. */

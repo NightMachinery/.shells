@@ -57,11 +57,24 @@ let showAcknowledged = false;
  */
 const showOriginal = new Set<string>();
 
-/** True once the automatic pass has run, so it runs once per load and not per paint. */
-let autoTranslated = false;
+/**
+ * Hashes the automatic pass has already taken on, so each notice is translated
+ * at most once per load however often the pass runs.
+ *
+ * A set rather than a once-per-load flag, because the pass now runs again
+ * whenever the notices on screen change: a profile switch, or a board that
+ * starts showing a line it did not show before. Each run translates only what
+ * is new to it.
+ */
+const autoHandled = new Set<string>();
 
-/** True while a translation run is in flight, so the control can say so. */
-let translating = false;
+/**
+ * How many translation runs are in flight, so the control can say so.
+ *
+ * A count rather than a flag: an automatic run and one the reader started can
+ * overlap, and the first to finish must not declare the other finished too.
+ */
+let translating = 0;
 
 /**
  * The identity of each message text, resolved ahead of time.
@@ -94,6 +107,16 @@ let sharing: TranslationShare | null = null;
  * write is idempotent, but it is a request that buys nothing.
  */
 const offered = new Set<string>();
+
+/**
+ * Hashes this client has already asked the shared store about, successfully.
+ *
+ * The lookup runs every time the notices on screen change, and a notice the
+ * store did not have a moment ago is one the automatic pass is about to
+ * translate here anyway, so asking about it again would be a request that
+ * finds nothing.
+ */
+const askedStore = new Set<string>();
 
 /**
  * Acknowledgements live under one key per message hash rather than one list.
@@ -195,6 +218,24 @@ function relevantMessages(messages: Message[], wanted: ReadonlySet<string>): Mes
   return messages.filter((message) => message.lines.some((line) => wanted.has(normaliseLine(line))));
 }
 
+/**
+ * The notices the panel would show for these lines, and the only ones worth a
+ * lookup or a translation.
+ *
+ * The operator publishes a few hundred notices across the whole network at any
+ * one time, and a profile's lines are named in a handful of them. Translating
+ * the rest on a phone was minutes of work nobody could see, and asking the
+ * store about all of them made a URL too long for the server to accept. A
+ * notice with no text has nothing to translate and is left out too.
+ *
+ * `configuredLines` is in the configuration's own spelling, as for
+ * `renderMessages`.
+ */
+export function noticesFor(messages: Message[], configuredLines: ReadonlySet<string>): Message[] {
+  const wanted = new Set([...configuredLines].map(normaliseLine));
+  return relevantMessages(messages, wanted).filter((message) => message.text.trim().length > 0);
+}
+
 /** The lines the relevant messages are about, normalised key to the operator's spelling. */
 function affectedLines(messages: Message[], wanted: ReadonlySet<string>): Map<string, string> {
   const affected = new Map<string, string>();
@@ -290,7 +331,7 @@ async function copyAll(messages: Message[], node: HTMLButtonElement): Promise<vo
 }
 
 async function translateAll(messages: Message[], onChange: () => void): Promise<void> {
-  translating = true;
+  translating += 1;
   onChange();
   try {
     // One at a time, with a repaint after each, so the translations appear as
@@ -302,7 +343,7 @@ async function translateAll(messages: Message[], onChange: () => void): Promise<
       void offerTranslation(message, produced);
     }
   } finally {
-    translating = false;
+    translating -= 1;
     onChange();
   }
 }
@@ -523,6 +564,7 @@ export function renderMessages(
 
   const providers = translationProviders();
   const untranslated = visible.filter((message) => {
+    if (message.text.trim().length === 0) return false;
     const hash = hashes.get(message.text);
     return hash === undefined || rememberedTranslation(hash) === null;
   });
@@ -533,11 +575,11 @@ export function renderMessages(
     setup.addEventListener('click', () => openKeyBox(onChange));
     actions.append(setup);
   } else {
-    const run = button('disruptions-translate', translating ? 'Translating…' : `Translate with ${providerLabel(primary)}`);
-    run.disabled = translating || untranslated.length === 0;
+    const run = button('disruptions-translate', translating > 0 ? 'Translating…' : `Translate with ${providerLabel(primary)}`);
+    run.disabled = translating > 0 || untranslated.length === 0;
     run.setAttribute(
       'aria-label',
-      `${translating ? 'Translating…' : `Translate with ${providerLabel(primary)}`}: ${
+      `${translating > 0 ? 'Translating…' : `Translate with ${providerLabel(primary)}`}: ${
         untranslated.length === 0 ? 'everything shown here is already translated' : `${untranslated.length} still to translate`
       }`,
     );
@@ -632,12 +674,8 @@ export function resetMessageFilters(): void {
  * shared one are all keyed by.
  *
  * `share` is where translations are pooled between the browsers reading this
- * page. It is awaited, unlike the provider probe below, because the whole
- * point is to render a translation somebody else already made INSTEAD of
- * starting one here, and a lookup that lands after the automatic pass has
- * already begun has saved nobody anything. It is one request against a server
- * on the same machine as the page, so the wait is the wait of a local round
- * trip; with no server it does not happen at all.
+ * page. It is parked here and asked by `adoptSharedTranslations`, which the
+ * page calls with the notices it is actually showing, not with all of them.
  */
 export async function primeMessageState(messages: Message[], share: TranslationShare): Promise<void> {
   sharing = share;
@@ -651,8 +689,6 @@ export async function primeMessageState(messages: Message[], share: TranslationS
     forgetStaleAcknowledgements(new Set(messages.map((message) => hashes.get(message.text) ?? '')));
   }
 
-  await adoptSharedTranslations(messages);
-
   // Not awaited: the probe only sharpens an answer the panel already has a
   // provisional version of, and the first paint should not wait on the browser
   // deciding whether it can download a language pack. The next repaint, thirty
@@ -661,9 +697,16 @@ export async function primeMessageState(messages: Message[], share: TranslationS
 }
 
 /**
- * Ask the shared store about every notice on screen, and take what it has.
+ * Ask the shared store about the notices on screen, and take what it has.
  *
- * Only the ones nothing is known about locally: the IndexedDB cache stays the
+ * `notices` is what the panel shows (see `noticesFor`), never the whole feed.
+ * Awaited by the page before the automatic pass starts, because the whole
+ * point is to render a translation somebody else already made INSTEAD of
+ * starting one here, and a lookup that lands after the pass has begun has
+ * saved nobody anything. With no server it does not happen at all.
+ *
+ * Only the ones nothing is known about locally, and only the ones not already
+ * asked about in this session: the IndexedDB cache stays the
  * layer in front of this, so a notice this browser has already translated, or
  * already picked up from the store on an earlier visit, costs no request at
  * all. What arrives is written into that same cache, keyed the same way, so the
@@ -673,17 +716,19 @@ export async function primeMessageState(messages: Message[], share: TranslationS
  * whose panel failed to render because a cache lookup went wrong would be a bad
  * trade at any price.
  */
-async function adoptSharedTranslations(messages: Message[]): Promise<void> {
-  if (sharing === null || messages.length === 0) return;
+export async function adoptSharedTranslations(notices: Message[]): Promise<void> {
+  if (sharing === null || notices.length === 0) return;
   const wanted = new Set<string>();
-  for (const message of messages) {
+  for (const message of notices) {
+    if (message.text.trim().length === 0) continue;
     const hash = hashes.get(message.text);
-    if (hash === undefined || rememberedTranslation(hash) !== null) continue;
+    if (hash === undefined || askedStore.has(hash) || rememberedTranslation(hash) !== null) continue;
     wanted.add(hash);
   }
   if (wanted.size === 0) return;
   try {
     const found = await sharing.fetchTranslations(TARGET_LANGUAGE, [...wanted]);
+    for (const hash of wanted) askedStore.add(hash);
     await Promise.all(
       Object.entries(found).map(async ([hash, entry]) => {
         if (!wanted.has(hash)) return;
@@ -699,23 +744,35 @@ async function adoptSharedTranslations(messages: Message[]): Promise<void> {
 }
 
 /**
- * Translate every notice, once per load, when the browser can do it on the
- * device and the reader is not already reading in the notices' own language.
+ * Translate the notices on screen, each at most once per load, when the
+ * browser can do it on the device and the reader is not already reading in the
+ * notices' own language.
+ *
+ * `notices` is what the panel shows (see `noticesFor`). Safe to call on every
+ * change of what is on screen: a notice already taken on by an earlier run is
+ * skipped, and one whose hash is not known yet is left for the run after
+ * `primeMessageState` has resolved it.
  *
  * Automatic only for the on-device translator. It is free and nothing leaves
  * the machine, so doing it unasked costs the reader nothing and saves them a
  * tap on every visit. Gemini stays a button: it spends their money and sends
  * the text to Google, and neither is a thing to do on their behalf.
  */
-export async function autoTranslate(messages: Message[], onChange: () => void): Promise<void> {
-  if (autoTranslated || messages.length === 0) return;
+export async function autoTranslate(notices: Message[], onChange: () => void): Promise<void> {
+  if (notices.length === 0) return;
   if (!uiLanguageDiffers()) return;
   await probeTranslationProviders();
   if (!chromeTranslationReady()) return;
-  autoTranslated = true;
-  const pending = messages.filter((message) => {
+  const pending: Message[] = [];
+  for (const message of notices) {
+    if (message.text.trim().length === 0) continue;
     const hash = hashes.get(message.text);
-    return hash === undefined || rememberedTranslation(hash) === null;
-  });
+    if (hash === undefined || autoHandled.has(hash) || rememberedTranslation(hash) !== null) continue;
+    // Claimed before anything is awaited, so two runs started a moment apart
+    // cannot both take the same notice.
+    autoHandled.add(hash);
+    pending.push(message);
+  }
+  if (pending.length === 0) return;
   await translateAll(pending, onChange);
 }
