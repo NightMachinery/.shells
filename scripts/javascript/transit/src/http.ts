@@ -15,8 +15,21 @@ export const HTTP_TIMEOUT_MS = 10_000;
  * Some edges in front of these APIs answer differently, or not at all, without
  * a browser-shaped User-Agent. Sending one is insurance, not deception: the
  * request rate stays well inside what a person clicking around would produce.
+ *
+ * The default only. A long-running process that makes many requests should
+ * say what it is: Transitous asks every server-side client for a User-Agent
+ * naming the application and its version, and a planning server that sent this
+ * one was indistinguishable from any other script. `TRANSIT_USER_AGENT`
+ * replaces it, read per request so a process can set it after import. A
+ * browser does not let a page set this header at all and sends a Referer
+ * instead, which Transitous accepts in its place.
  */
 export const USER_AGENT = 'Mozilla/5.0';
+
+/** The User-Agent a request goes out with right now. */
+export function userAgent(): string {
+  return envOverride('TRANSIT_USER_AGENT') ?? USER_AGENT;
+}
 
 export interface FetchJsonOptions {
   timeoutMs?: number;
@@ -43,7 +56,7 @@ export async function fetchJson<T>(url: string, options: FetchJsonOptions = {}):
     method: 'GET',
     headers: {
       Accept: 'application/json',
-      'User-Agent': USER_AGENT,
+      'User-Agent': userAgent(),
       ...(options.headers ?? {}),
     },
     signal: AbortSignal.timeout(options.timeoutMs ?? HTTP_TIMEOUT_MS),
