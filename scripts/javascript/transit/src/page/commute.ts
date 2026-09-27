@@ -175,6 +175,12 @@ export interface PlanProfileOptions {
    * written to the cache of the last visit's plans.
    */
   onlyIndexes?: ReadonlySet<number> | undefined;
+  /**
+   * Told why a board's search failed, for a caller that reports it; the
+   * planning server keeps the last few for its health check. The board comes
+   * back unanswered either way.
+   */
+  onBoardError?: ((index: number, error: unknown) => void) | undefined;
 }
 
 /**
@@ -432,7 +438,8 @@ export async function planProfile(options: PlanProfileOptions): Promise<ProfileR
         const byKey = new Map<string, PlannedRow>();
         for (const row of planned) byKey.set(rowKey(row.departure), row);
         return { index, routes: { rows: byKey, origin, destinationKey } as BoardRoutes };
-      } catch {
+      } catch (error) {
+        options.onBoardError?.(index, error);
         // A board with no plan is a board without the commute slot, not a broken
         // board. The departures are still correct and still the main thing, and
         // whatever journeys it had are kept: a search that failed says nothing

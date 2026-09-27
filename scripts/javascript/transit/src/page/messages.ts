@@ -354,11 +354,15 @@ async function translateAll(messages: Message[], onChange: () => void): Promise<
     // One at a time, with a repaint after each, so the translations appear as
     // they land rather than all at the end of a run that may take a while over
     // a phone connection.
+    let produced = 0;
     for (const message of messages) {
-      const produced = await translate(message.text);
+      const translation = await translate(message.text);
+      if (translation !== null) produced += 1;
       onChange();
-      offerTranslation(message, produced);
+      offerTranslation(message, translation);
     }
+    // eslint-disable-next-line no-console
+    console.info(`[transit] notices: translated ${produced} of ${messages.length} on this device`);
   } finally {
     translating -= 1;
     onChange();
@@ -394,7 +398,10 @@ function offerTranslation(message: Message, translation: Translation | null): vo
   offerQueue = offerQueue
     .then(async () => {
       if (offersRefused) return;
-      if (!(await share.shareTranslation(entry))) offersRefused = true;
+      if (await share.shareTranslation(entry)) return;
+      offersRefused = true;
+      // eslint-disable-next-line no-console
+      console.info('[transit] notices: the shared store refused a translation; offering no more this session');
     })
     .catch(() => undefined);
 }
@@ -753,6 +760,12 @@ export async function adoptSharedTranslations(notices: Message[]): Promise<void>
   try {
     const found = await sharing.fetchTranslations(TARGET_LANGUAGE, [...wanted]);
     for (const hash of wanted) askedStore.add(hash);
+    // eslint-disable-next-line no-console
+    console.info(
+      `[transit] notices: asked the shared store about ${wanted.size} of ${notices.length} shown, it had ${
+        Object.keys(found).filter((hash) => wanted.has(hash)).length
+      }`,
+    );
     await Promise.all(
       Object.entries(found).map(async ([hash, entry]) => {
         if (!wanted.has(hash)) return;

@@ -134,16 +134,67 @@ export function publishTiming(): void {
 let sourceKind: 'direct' | 'server' = 'direct';
 let sourceAgeMs: number | null = null;
 
-export function noteSource(kind: 'direct' | 'server', ageMs: number | null): void {
+/**
+ * What a server answer said about itself beyond its age, which is what tells a
+ * slow server from a slow connection.
+ */
+export interface SourceDetail {
+  /** Served past its freshness, with a new one being fetched behind it. */
+  stale?: boolean | undefined;
+  /** How long the server spent on this request, from its Server-Timing header. */
+  serverMs?: number | null | undefined;
+  /** How long the request took from here, the connection included. */
+  wallMs?: number | null | undefined;
+}
+
+let sourceDetail: SourceDetail = {};
+
+export function noteSource(kind: 'direct' | 'server', ageMs: number | null, detail: SourceDetail = {}): void {
   sourceKind = kind;
   sourceAgeMs = ageMs;
+  sourceDetail = detail;
+  if (kind === 'direct') journeyNote = null;
+}
+
+/**
+ * Where the last journeys answer came from, board by board.
+ *
+ * Behind a planning server a board's journeys come from the server, from this
+ * page when the server could not answer for it, or from nowhere. Counted
+ * because "journeys are missing" and "the server's searches are failing" were
+ * once the same fact and nothing on the page said so.
+ */
+export interface JourneyNote {
+  fromServer: number;
+  plannedHere: number;
+  missing: number;
+}
+
+let journeyNote: JourneyNote | null = null;
+
+export function noteJourneys(note: JourneyNote | null): void {
+  journeyNote = note;
 }
 
 /** What the page would say about where its data came from. */
 export function describeSource(): string {
   if (sourceKind === 'direct') return 'worked out here';
   const age = sourceAgeMs === null ? null : Math.round(sourceAgeMs / 1000);
-  return age === null ? 'via server' : `via server, ${age} s old`;
+  const parts = [age === null ? 'via server' : `via server, ${age} s old`];
+  if (sourceDetail.stale === true) parts.push('stale');
+  const { serverMs, wallMs } = sourceDetail;
+  if (typeof serverMs === 'number' && typeof wallMs === 'number') parts.push(`server ${serverMs} of ${wallMs} ms`);
+  else if (typeof wallMs === 'number') parts.push(`fetch ${wallMs} ms`);
+  return parts.join(', ');
+}
+
+/** The journeys half of the source line, or null when there is nothing to say. */
+export function describeJourneys(): string | null {
+  if (sourceKind === 'direct' || journeyNote === null) return null;
+  const parts = [`journeys ${journeyNote.fromServer} from server`];
+  if (journeyNote.plannedHere > 0) parts.push(`${journeyNote.plannedHere} planned here`);
+  if (journeyNote.missing > 0) parts.push(`${journeyNote.missing} missing`);
+  return parts.join(', ');
 }
 
 /** One line per board plus a total, short enough for a popover. */
@@ -152,6 +203,8 @@ export function describe(run: RunTiming): string {
   parts.push(describeSource());
   parts.push(`rows ${run.toRowsMs ?? '-'} ms`);
   if (run.toRoutesMs !== null) parts.push(`routes ${run.toRoutesMs} ms`);
+  const journeys = describeJourneys();
+  if (journeys !== null) parts.push(journeys);
   if (run.planMs !== null) parts.push(`plan ${run.planMs} ms for ${run.planBoards} board${run.planBoards === 1 ? '' : 's'}`);
   if (run.renderMs !== null) parts.push(`render ${run.renderMs} ms`);
   const pages = run.boards.reduce((sum, board) => sum + board.pages, 0);

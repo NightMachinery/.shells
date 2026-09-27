@@ -38,6 +38,7 @@ import {
 } from './wire.ts';
 import type { Message } from '../model.ts';
 import type { ExportedConfig } from './types.ts';
+import type { JourneyNote } from './timing.ts';
 
 export interface SourceFetchResult extends FetchProfileResult {
   /**
@@ -102,6 +103,35 @@ export interface SourceNote {
   kind: 'direct' | 'server';
   /** How old the server's answer was when it was handed over, or null for direct. */
   ageMs: number | null;
+  /** Whether the server handed it over past its freshness. */
+  stale?: boolean;
+  /** How long the server spent on the request, from its Server-Timing header. */
+  serverMs?: number | null;
+  /** How long the request took from here, the connection included. */
+  wallMs?: number;
+}
+
+/**
+ * One named duration out of a Server-Timing header, in whole milliseconds.
+ *
+ * The header is how the server says how much of a wait was its own, which is
+ * the half of the question a phone cannot measure: two seconds to the first row
+ * is a slow connection when the server took twenty milliseconds of it, and a
+ * cold server when it took all of it.
+ */
+export function serverTimingMs(header: string | null, name: string): number | null {
+  if (header === null) return null;
+  for (const entry of header.split(',')) {
+    const [metric, ...params] = entry.trim().split(';');
+    if (metric?.trim() !== name) continue;
+    for (const param of params) {
+      const [key, value] = param.trim().split('=');
+      if (key !== 'dur') continue;
+      const ms = Number(value);
+      return Number.isFinite(ms) ? Math.round(ms) : null;
+    }
+  }
+  return null;
 }
 
 /**
@@ -156,6 +186,8 @@ export interface ServerSourceOptions {
   base?: string;
   /** Called with the age of each answer, so the timing line can say it. */
   onNote?: (note: SourceNote) => void;
+  /** Told where each journeys answer came from, board by board. */
+  onJourneys?: (note: JourneyNote) => void;
   fetchImpl?: typeof fetch;
   /**
    * How to plan, here, a board the server set out to plan and could not.
@@ -222,6 +254,7 @@ export function createServerSource(options: ServerSourceOptions = {}): DataSourc
       // journeys are a separate question, asked by `planProfile` once these are
       // on screen, so no row waits for a journey search.
       const search = boardsSearch({ horizonMinutes: fetchOptions.horizonMinutes, startMs: fetchOptions.startMs });
+      const started = Date.now();
       const response = await call(`${base}/boards/${encodeURIComponent(fetchOptions.profile.key)}?${search}`, {
         headers: { Accept: 'application/json' },
       });
@@ -229,7 +262,13 @@ export function createServerSource(options: ServerSourceOptions = {}): DataSourc
       const answer = (await response.json()) as WireBoardsAnswer;
       if (answer.v !== WIRE_VERSION) throw new ServerError(`the planning server speaks version ${answer.v}`, 500);
       const { ageMs, stale } = answerAge(response);
-      options.onNote?.({ kind: 'server', ageMs });
+      options.onNote?.({
+        kind: 'server',
+        ageMs,
+        stale,
+        serverMs: serverTimingMs(response.headers.get('server-timing'), 'wait'),
+        wallMs: Date.now() - started,
+      });
       // Every board arrives at once, so the per-board progress the page draws
       // its skeletons from is reported as finished rather than as never having
       // happened: a board left `idle` reads as a board that is still loading.
@@ -259,6 +298,9 @@ export function createServerSource(options: ServerSourceOptions = {}): DataSourc
       const decoded = decodeRoutes(answer.routes);
       const results = await planUnanswered(planOptions, decoded.results);
       if (aborted()) return previous ?? null;
+      const fromServer = decoded.results.filter((result) => result.routes !== null).length;
+      const missing = results.filter((result) => result.routes === null).length;
+      options.onJourneys?.({ fromServer, plannedHere: results.length - fromServer - missing, missing });
       planOptions.onProgress?.(results.length, results.length);
       const at = Date.now();
       const boards = carryBoards(previous, decoded.wanted, results, at);
@@ -349,6 +391,7 @@ export interface SwitchingOptions {
   /** How long after falling back to ask again whether the server is there. */
   reprobeMs?: number;
   onNote?: (note: SourceNote) => void;
+  onJourneys?: (note: JourneyNote) => void;
   fetchImpl?: typeof fetch;
   now?: () => number;
 }
@@ -369,6 +412,7 @@ export function createSwitchingSource(options: SwitchingOptions = {}): Switching
   const server = createServerSource({
     base,
     ...(options.onNote === undefined ? {} : { onNote: options.onNote }),
+    ...(options.onJourneys === undefined ? {} : { onJourneys: options.onJourneys }),
     fetchImpl: call,
   });
   let kind: 'direct' | 'server' = 'direct';

@@ -39,6 +39,7 @@ import {
   markRender,
   markRoutes,
   markRows,
+  noteJourneys,
   noteSource,
   notePlanAborted,
   notePlanEnd,
@@ -381,7 +382,10 @@ function replanVisible(): void {
  * one; the same bytes are served from a host that has no server, and there the
  * page does the work itself exactly as it always has. See `page/source.ts`.
  */
-const source: SwitchingSource = createSwitchingSource({ onNote: (note) => noteSource(note.kind, note.ageMs) });
+const source: SwitchingSource = createSwitchingSource({
+  onNote: (note) => noteSource(note.kind, note.ageMs, { stale: note.stale, serverMs: note.serverMs, wallMs: note.wallMs }),
+  onJourneys: noteJourneys,
+});
 
 /**
  * How long after a stale server answer the page asks again.

@@ -199,7 +199,9 @@ describe('createServerSource', () => {
 
     await source.fetchProfile({ config: CONFIG, profile: PROFILE, startMs: NOW, horizonMinutes: 60, onStatus: () => {} });
 
-    expect(notes).toEqual([{ kind: 'server', ageMs: 3000 }]);
+    expect(notes).toHaveLength(1);
+    expect(notes[0]).toMatchObject({ kind: 'server', ageMs: 3000, stale: false, serverMs: null });
+    expect(typeof notes[0]?.wallMs).toBe('number');
   });
 
   test('boards and journeys are two questions to two endpoints, boards first', async () => {
@@ -251,6 +253,49 @@ describe('createServerSource', () => {
     await source.planProfile(planOptions(DEST_B));
 
     expect(urls).toHaveLength(2);
+  });
+
+  test("the server's own share of the wait is read from its Server-Timing header", async () => {
+    const notes: SourceNote[] = [];
+    const { fetchImpl } = mockFetch(
+      () =>
+        new Response(JSON.stringify(wireAnswer()), {
+          status: 200,
+          headers: { 'server-timing': 'wait;dur=12.6, compute;dur=4100;desc="departures"' },
+        }),
+    );
+    await createServerSource({ base, fetchImpl, onNote: (note) => notes.push(note) }).fetchProfile({
+      config: CONFIG,
+      profile: PROFILE,
+      startMs: NOW,
+      horizonMinutes: 60,
+      onStatus: () => {},
+    });
+    expect(notes[0]?.serverMs).toBe(13);
+  });
+
+  test('each journeys answer says how many boards came from the server, from here, and from nowhere', async () => {
+    const journeys: Array<{ fromServer: number; plannedHere: number; missing: number }> = [];
+    const fallbackPlan = async (): Promise<ProfileRoutes | null> => ({
+      boards: new Map([[1, { rows: new Map(), origin: null, destinationKey: DEST_A }]]),
+      at: NOW,
+      destinationKey: DEST_A,
+      stale: false,
+      key: 'own',
+    });
+    const { fetchImpl } = mockFetch(() =>
+      wireAnswer({
+        destinationKey: DEST_A,
+        routes: [
+          { index: 0, destinationKey: DEST_A, answered: true, origin: null, rows: [] },
+          { index: 1, destinationKey: DEST_A, answered: false, origin: null, rows: [] },
+          { index: 2, destinationKey: DEST_A, answered: false, origin: null, rows: [] },
+        ],
+      }),
+    );
+    const source = createServerSource({ base, fetchImpl, fallbackPlan, onJourneys: (note) => journeys.push(note) });
+    await source.planProfile(planOptions(DEST_A, [BOARD, BOARD, BOARD]));
+    expect(journeys).toEqual([{ fromServer: 1, plannedHere: 1, missing: 1 }]);
   });
 
   test('a stale boards answer says so, so the page can ask again a moment later', async () => {
