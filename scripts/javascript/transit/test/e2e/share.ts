@@ -359,7 +359,10 @@ async function main(): Promise<void> {
       const event = params as { requestId: string; request: { url: string } };
       const path = new URL(event.request.url).pathname;
       const now = Date.now();
-      if (path.includes('/api/profile/')) {
+      // Both halves of a profile: the boards, which the page asks for first,
+      // and the journeys, which it asks for once they are on screen. One
+      // fixture answers both, since it carries the fields of each.
+      if (path.includes('/api/profile/') || path.includes('/api/boards/')) {
         const answer: WireProfileAnswer = {
           v: WIRE_VERSION,
           at: now,

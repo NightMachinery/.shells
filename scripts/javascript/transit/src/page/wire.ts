@@ -48,6 +48,27 @@ export interface WireProfileAnswer {
   destinationKey: string;
 }
 
+/**
+ * A profile's boards alone.
+ *
+ * Answered separately from the journeys because the two cost wildly different
+ * amounts: the departures are a request per stop to a fast feed, a journey
+ * search is seconds at a slow planner. In one answer, the first row on screen
+ * waited for the slowest search, or for its timeout.
+ */
+export interface WireBoardsAnswer {
+  v: number;
+  /** When the server composed this, epoch milliseconds. */
+  at: number;
+  profileKey: string;
+  /** The instant the boards were asked about. */
+  startMs: number;
+  horizonMinutes: number;
+  /** Which backends answered, for the provenance line. */
+  backends: string[];
+  boards: Board[];
+}
+
 /** The service messages, which need no transformation but do need a version. */
 export interface WireMessages {
   v: number;
@@ -187,6 +208,20 @@ export function profileSearch(query: ProfileQuery): string {
   if (query.destinationKey !== null && query.destinationKey !== '') params.set('to', query.destinationKey);
   if (query.walkWeight !== undefined) params.set('walk_weight', String(query.walkWeight));
   if (query.earlyBufferMinutes !== undefined) params.set('early_buffer', String(query.earlyBufferMinutes));
+  return params.toString();
+}
+
+/**
+ * The boards half of a profile question, as a URL search string.
+ *
+ * Only what changes which departures come back. The planning knobs are left
+ * out, so every reader of one profile shares one answer whatever they are
+ * planning towards. The server reads it back with `readProfileQuery`.
+ */
+export function boardsSearch(query: Pick<ProfileQuery, 'horizonMinutes' | 'startMs'>): string {
+  const params = new URLSearchParams();
+  params.set('horizon', String(query.horizonMinutes));
+  params.set('start', String(query.startMs));
   return params.toString();
 }
 

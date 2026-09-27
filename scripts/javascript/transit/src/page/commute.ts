@@ -166,6 +166,15 @@ export interface PlanProfileOptions {
   previous?: ProfileRoutes | undefined;
   /** Told how many of this profile's planned boards have answered so far. */
   onProgress?: (done: number, total: number) => void;
+  /**
+   * Plan only the boards at these indexes, and leave the rest alone.
+   *
+   * For a page behind the planning server: the server answered for most boards
+   * and this plans the few it could not. A run limited this way is a patch on
+   * somebody else's answer rather than an answer of its own, so it is not
+   * written to the cache of the last visit's plans.
+   */
+  onlyIndexes?: ReadonlySet<number> | undefined;
 }
 
 /**
@@ -318,7 +327,7 @@ export interface PlanJob {
  * ones that came back empty.
  */
 export function planJobs(
-  options: Pick<PlanProfileOptions, 'config' | 'profile' | 'boards' | 'destinationKey'>,
+  options: Pick<PlanProfileOptions, 'config' | 'profile' | 'boards' | 'destinationKey' | 'onlyIndexes'>,
 ): PlanJob[] {
   /**
    * The places to ask about for one destination key, worked out once per key.
@@ -350,6 +359,7 @@ export function planJobs(
     const board = options.boards[index];
     const exported = options.profile.boards[index];
     if (board === undefined || exported === undefined || !exported.commute) continue;
+    if (options.onlyIndexes !== undefined && !options.onlyIndexes.has(index)) continue;
     const destinationKey = exported.destination ?? options.destinationKey;
     if (destinationKey === null) continue;
     const targets = targetsFor(destinationKey);
@@ -447,6 +457,6 @@ export async function planProfile(options: PlanProfileOptions): Promise<ProfileR
     stale: false,
     key,
   };
-  void idbSet(STORE_ROUTES, routesKey(options.profileKey), routes);
+  if (options.onlyIndexes === undefined) void idbSet(STORE_ROUTES, routesKey(options.profileKey), routes);
   return routes;
 }

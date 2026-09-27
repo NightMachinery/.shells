@@ -383,7 +383,16 @@ function replanVisible(): void {
  */
 const source: SwitchingSource = createSwitchingSource({ onNote: (note) => noteSource(note.kind, note.ageMs) });
 
-async function refreshProfile(profileKey: string, force = false): Promise<void> {
+/**
+ * How long after a stale server answer the page asks again.
+ *
+ * A stale answer is handed over at once with a fresh one being fetched behind
+ * it; a few seconds later the fresh one is usually there. Asked once, not until
+ * it is fresh: the refresh timer is thirty seconds behind it anyway.
+ */
+const STALE_REASK_MS = 5_000;
+
+async function refreshProfile(profileKey: string, force = false, reask = false): Promise<void> {
   const config = state.config;
   if (config === null) return;
   const profile = config.profiles.find((entry) => entry.key === profileKey);
@@ -413,13 +422,6 @@ async function refreshProfile(profileKey: string, force = false): Promise<void> 
       profile,
       startMs,
       horizonMinutes: state.horizonMinutes,
-      // Sent with the boards because a server answers both halves at once; the
-      // page's own path ignores it and is asked the second half separately.
-      plan: {
-        destinationKey: state.destinationKey,
-        walkWeight: state.walkWeight,
-        earlyBufferMinutes: state.earlyBufferMinutes,
-      },
       onStatus: (index, status) => {
         setStatus(profileKey, index, status);
         if (profileKey === state.profileKey) render();
@@ -448,6 +450,9 @@ async function refreshProfile(profileKey: string, force = false): Promise<void> 
       // The boards decide which notices are relevant, so new boards may mean
       // notices that have not been looked up or translated yet.
       void translateVisibleNotices();
+      if (result.stale === true && !reask) {
+        window.setTimeout(() => void refreshProfile(profileKey, true, true), STALE_REASK_MS);
+      }
     }
     void idbSet(STORE_BOARDS, cacheKey(profileKey), data);
 

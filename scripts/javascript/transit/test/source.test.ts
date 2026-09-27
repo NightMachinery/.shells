@@ -162,7 +162,7 @@ describe('createServerSource', () => {
     clearCalls();
   });
 
-  test('fetchProfile asks the server exactly once and reports every board ready', async () => {
+  test('fetchProfile asks the boards endpoint exactly once and reports every board ready', async () => {
     const { fetchImpl, urls } = mockFetch(() => wireAnswer({ boards: [BOARD, BOARD] }));
     const source = createServerSource({ base, fetchImpl });
     const seen: Array<[number, string]> = [];
@@ -176,7 +176,10 @@ describe('createServerSource', () => {
     });
 
     expect(urls).toHaveLength(1);
-    expect(urls[0]).toMatch(new RegExp(`^${base}/profile/${PROFILE.key}\\?`));
+    // The boards alone: a question with no journey in it, so no row waits for
+    // a journey search.
+    expect(urls[0]).toMatch(new RegExp(`^${base}/boards/${PROFILE.key}\\?`));
+    expect(urls[0]).not.toContain('to=');
     expect(result.boards).toHaveLength(2);
     expect(result.backends).toEqual(['transitous']);
     // Every board arrives at once, so a board left unreported would read to
@@ -199,7 +202,28 @@ describe('createServerSource', () => {
     expect(notes).toEqual([{ kind: 'server', ageMs: 3000 }]);
   });
 
-  test('a planProfile asked right after fetchProfile for the same query is answered from the held response', async () => {
+  test('boards and journeys are two questions to two endpoints, boards first', async () => {
+    const { fetchImpl, urls } = mockFetch((url) =>
+      url.includes('/boards/')
+        ? wireAnswer()
+        : wireAnswer({
+            destinationKey: DEST_A,
+            routes: [{ index: 0, destinationKey: DEST_A, answered: true, origin: null, rows: [] }],
+          }),
+    );
+    const source = createServerSource({ base, fetchImpl });
+
+    await source.fetchProfile({ config: CONFIG, profile: PROFILE, startMs: NOW, horizonMinutes: 60, onStatus: () => {} });
+    const routes = await source.planProfile(planOptions(DEST_A));
+
+    expect(urls).toHaveLength(2);
+    expect(urls[0]).toContain('/boards/');
+    expect(urls[1]).toContain('/profile/');
+    expect(urls[1]).toContain(`to=${encodeURIComponent(DEST_A)}`);
+    expect(routes?.boards).toBeInstanceOf(Map);
+  });
+
+  test('the same journeys question asked again within moments is answered from the held response', async () => {
     const { fetchImpl, urls } = mockFetch(() =>
       wireAnswer({
         destinationKey: DEST_A,
@@ -208,20 +232,10 @@ describe('createServerSource', () => {
     );
     const source = createServerSource({ base, fetchImpl });
 
-    await source.fetchProfile({
-      config: CONFIG,
-      profile: PROFILE,
-      startMs: NOW,
-      horizonMinutes: 60,
-      plan: { destinationKey: DEST_A },
-      onStatus: () => {},
-    });
-    expect(urls).toHaveLength(1);
-
-    const routes = await source.planProfile(planOptions(DEST_A));
+    await source.planProfile(planOptions(DEST_A));
+    await source.planProfile(planOptions(DEST_A));
 
     expect(urls).toHaveLength(1);
-    expect(routes?.boards).toBeInstanceOf(Map);
   });
 
   test('a planProfile for a different destination is a different question, and asks again', async () => {
@@ -233,19 +247,67 @@ describe('createServerSource', () => {
     );
     const source = createServerSource({ base, fetchImpl });
 
-    await source.fetchProfile({
-      config: CONFIG,
-      profile: PROFILE,
-      startMs: NOW,
-      horizonMinutes: 60,
-      plan: { destinationKey: DEST_A },
-      onStatus: () => {},
-    });
-    expect(urls).toHaveLength(1);
-
+    await source.planProfile(planOptions(DEST_A));
     await source.planProfile(planOptions(DEST_B));
 
     expect(urls).toHaveLength(2);
+  });
+
+  test('a stale boards answer says so, so the page can ask again a moment later', async () => {
+    const stale = mockFetch(
+      () => new Response(JSON.stringify(wireAnswer()), { status: 200, headers: { 'x-answer-age': '45', 'x-answer-stale': '1' } }),
+    );
+    const fresh = mockFetch(() => new Response(JSON.stringify(wireAnswer()), { status: 200, headers: { 'x-answer-age': '4' } }));
+    const ask = { config: CONFIG, profile: PROFILE, startMs: NOW, horizonMinutes: 60, onStatus: () => {} };
+
+    expect((await createServerSource({ base, fetchImpl: stale.fetchImpl }).fetchProfile(ask)).stale).toBe(true);
+    expect((await createServerSource({ base, fetchImpl: fresh.fetchImpl }).fetchProfile(ask)).stale).toBe(false);
+  });
+
+  test('a board the server could not answer is planned here, and only that board', async () => {
+    const asked: Array<number[]> = [];
+    const fallbackPlan = async (options: PlanProfileOptions): Promise<ProfileRoutes | null> => {
+      asked.push([...(options.onlyIndexes ?? [])]);
+      return {
+        boards: new Map([[1, { rows: new Map([['b', row('here')]]), origin: null, destinationKey: DEST_A }]]),
+        at: NOW,
+        destinationKey: DEST_A,
+        stale: false,
+        key: 'own',
+      };
+    };
+    const { fetchImpl } = mockFetch(() =>
+      wireAnswer({
+        destinationKey: DEST_A,
+        routes: [
+          { index: 0, destinationKey: DEST_A, answered: true, origin: null, rows: [['a', row('server')]] },
+          { index: 1, destinationKey: DEST_A, answered: false, origin: null, rows: [] },
+        ],
+      }),
+    );
+    const source = createServerSource({ base, fetchImpl, fallbackPlan });
+
+    const routes = await source.planProfile(planOptions(DEST_A, [BOARD, BOARD]));
+
+    expect(asked).toEqual([[1]]);
+    expect(routes?.boards.get(0)?.rows.get('a')?.best?.exitStop).toBe('server');
+    expect(routes?.boards.get(1)?.rows.get('b')?.best?.exitStop).toBe('here');
+  });
+
+  test('with every board answered by the server, nothing is planned here', async () => {
+    let calls = 0;
+    const fallbackPlan = async (): Promise<ProfileRoutes | null> => {
+      calls += 1;
+      return null;
+    };
+    const { fetchImpl } = mockFetch(() =>
+      wireAnswer({
+        destinationKey: DEST_A,
+        routes: [{ index: 0, destinationKey: DEST_A, answered: true, origin: null, rows: [['a', row('server')]] }],
+      }),
+    );
+    await createServerSource({ base, fetchImpl, fallbackPlan }).planProfile(planOptions(DEST_A));
+    expect(calls).toBe(0);
   });
 
   test('planProfile returns the previous answer unchanged, and asks nothing, when its key has not moved on', async () => {
@@ -287,7 +349,9 @@ describe('createServerSource', () => {
         ],
       }),
     );
-    const source = createServerSource({ base, fetchImpl });
+    // Nothing planned here for the unanswered board, so what this proves is
+    // the carrying rule alone rather than the fallback tested above.
+    const source = createServerSource({ base, fetchImpl, fallbackPlan: null });
 
     const routes = await source.planProfile({ ...planOptions(DEST_A, [BOARD, BOARD]), previous });
 
@@ -426,7 +490,7 @@ describe('createSwitchingSource', () => {
     const fetchImpl: typeof fetch = async (input) => {
       const url = String(input);
       if (url === `${base}/health`) return new Response('{}', { status: 200 });
-      if (url.startsWith(`${base}/profile/`)) {
+      if (url.startsWith(`${base}/boards/`)) {
         serverCalls += 1;
         return new Response('service unavailable', { status: 503 });
       }

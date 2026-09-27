@@ -8,8 +8,9 @@
 //
 // The SERVER source is the same package doing the same work once, on the
 // machine that hosts the page, with a warm cache. The phone then makes one
-// request and gets an answer that is usually already computed. On a slow
-// connection that is the difference between a dozen round trips and one.
+// request for the boards and one for the journeys, and gets answers that are
+// usually already computed. On a slow connection that is the difference
+// between dozens of round trips and two.
 //
 // The page does not choose between them at build time, because the same bytes
 // are served from both the mirror, which has the server, and the tailnet, which
@@ -21,12 +22,14 @@
 import { fetchMessages as fetchDirectMessages, fetchProfile as fetchDirect, prepareCalls } from './data.ts';
 import type { FetchProfileOptions, FetchProfileResult } from './data.ts';
 import { carryBoards, planKey, planProfile as planDirect } from './commute.ts';
-import type { PlanProfileOptions, ProfileRoutes } from './commute.ts';
+import type { BoardResult, PlanProfileOptions, ProfileRoutes } from './commute.ts';
 import {
+  boardsSearch,
   decodeRoutes,
   profileSearch,
   WIRE_VERSION,
   type ProfileQuery,
+  type WireBoardsAnswer,
   type WireMessages,
   type WireProfileAnswer,
   type WireTranslationPut,
@@ -36,22 +39,13 @@ import {
 import type { Message } from '../model.ts';
 import type { ExportedConfig } from './types.ts';
 
-/** The planning knobs a profile answer depends on that the boards do not. */
-export interface PlanView {
-  destinationKey: string | null;
-  walkWeight?: number | undefined;
-  earlyBufferMinutes?: number | undefined;
-}
-
-export interface SourceFetchOptions extends FetchProfileOptions {
+export interface SourceFetchResult extends FetchProfileResult {
   /**
-   * What the journeys would be planned for, sent with the boards.
-   *
-   * The page asks for boards first and journeys second, which is right when it
-   * is doing both itself. A server answers both in one request, so it has to be
-   * told the second question while being asked the first one.
+   * True when the server handed over an answer past its freshness and is
+   * fetching a new one behind it. The page asks once more a moment later, by
+   * which time the new one is usually there. Never set by the direct source.
    */
-  plan?: PlanView | undefined;
+  stale?: boolean;
 }
 
 /**
@@ -83,7 +77,7 @@ export interface TranslationShare {
 export interface DataSource extends TranslationShare {
   /** Which of the two this is, for the provenance line. */
   readonly kind: 'direct' | 'server';
-  fetchProfile(options: SourceFetchOptions): Promise<FetchProfileResult>;
+  fetchProfile(options: FetchProfileOptions): Promise<SourceFetchResult>;
   planProfile(options: PlanProfileOptions): Promise<ProfileRoutes | null>;
   fetchMessages(config: ExportedConfig): Promise<Message[]>;
 }
@@ -142,14 +136,20 @@ interface Held {
 }
 
 /**
- * How long a held answer may serve the plan half of the same refresh.
+ * How long a held journeys answer may serve the same question again.
  *
- * The page asks for boards and then asks for journeys, a few milliseconds
- * apart, about the same instant. The server sent both in one answer, so the
- * second question is already answered; past a few seconds it is a different
- * question and is asked again.
+ * A change of an early buffer or a walking weight re-plans at once, and the
+ * page may ask the same question twice inside a second; past a few seconds it
+ * is a different moment and is asked again.
  */
 const HELD_MS = 5_000;
+
+/** How old the server says an answer is, and whether it is past its freshness. */
+function answerAge(response: Response): { ageMs: number; stale: boolean } {
+  const ageHeader = response.headers.get('x-answer-age');
+  const ageMs = ageHeader === null ? 0 : Math.max(0, Number(ageHeader) * 1000);
+  return { ageMs: Number.isFinite(ageMs) ? ageMs : 0, stale: response.headers.get('x-answer-stale') === '1' };
+}
 
 export interface ServerSourceOptions {
   /** Where the API is, relative to the page. The mount, as the manifest spells it. */
@@ -157,6 +157,11 @@ export interface ServerSourceOptions {
   /** Called with the age of each answer, so the timing line can say it. */
   onNote?: (note: SourceNote) => void;
   fetchImpl?: typeof fetch;
+  /**
+   * How to plan, here, a board the server set out to plan and could not.
+   * The page's own planner unless a test says otherwise; null plans nothing.
+   */
+  fallbackPlan?: ((options: PlanProfileOptions) => Promise<ProfileRoutes | null>) | null;
 }
 
 /**
@@ -169,6 +174,7 @@ export interface ServerSourceOptions {
 export function createServerSource(options: ServerSourceOptions = {}): DataSource {
   const base = options.base ?? 'api';
   const call = options.fetchImpl ?? ((input: RequestInfo | URL, init?: RequestInit) => fetch(input, init));
+  const fallbackPlan = options.fallbackPlan === undefined ? planDirect : options.fallbackPlan;
   let held: Held | null = null;
 
   async function ask(query: ProfileQuery): Promise<Held> {
@@ -181,25 +187,49 @@ export function createServerSource(options: ServerSourceOptions = {}): DataSourc
     if (!response.ok) throw new ServerError(`the planning server said ${response.status}`, response.status);
     const answer = (await response.json()) as WireProfileAnswer;
     if (answer.v !== WIRE_VERSION) throw new ServerError(`the planning server speaks version ${answer.v}`, 500);
-    const ageHeader = response.headers.get('x-answer-age');
-    const ageMs = ageHeader === null ? 0 : Math.max(0, Number(ageHeader) * 1000);
-    held = { query: search, answer, ageMs: Number.isFinite(ageMs) ? ageMs : 0, at: Date.now() };
-    options.onNote?.({ kind: 'server', ageMs: held.ageMs });
+    held = { query: search, answer, ageMs: answerAge(response).ageMs, at: Date.now() };
     return held;
+  }
+
+  /**
+   * Plan here the boards the server set out to plan and could not.
+   *
+   * The server's searches can fail for reasons that have nothing to do with
+   * this phone: the planner slowing one busy address down is the one that has
+   * actually happened. The phone asks from its own address, so for the boards
+   * that came back unanswered it does what it would have done with no server
+   * at all, and only for those. A failure here leaves them unanswered, which
+   * is what they were.
+   */
+  async function planUnanswered(planOptions: PlanProfileOptions, results: BoardResult[]): Promise<BoardResult[]> {
+    const missing = results.filter((result) => result.routes === null).map((result) => result.index);
+    if (missing.length === 0 || fallbackPlan === null) return results;
+    let own: ProfileRoutes | null;
+    try {
+      own = await fallbackPlan({ ...planOptions, previous: undefined, onProgress: undefined, onlyIndexes: new Set(missing) });
+    } catch {
+      return results;
+    }
+    if (own === null) return results;
+    const planned = own.boards;
+    return results.map((result) => (result.routes !== null ? result : { index: result.index, routes: planned.get(result.index) ?? null }));
   }
 
   return {
     kind: 'server',
     async fetchProfile(fetchOptions) {
-      const view = fetchOptions.plan;
-      const { answer } = await ask({
-        profileKey: fetchOptions.profile.key,
-        horizonMinutes: fetchOptions.horizonMinutes,
-        startMs: fetchOptions.startMs,
-        destinationKey: view?.destinationKey ?? null,
-        walkWeight: view?.walkWeight,
-        earlyBufferMinutes: view?.earlyBufferMinutes,
+      // The boards alone, which the server has usually already fetched. The
+      // journeys are a separate question, asked by `planProfile` once these are
+      // on screen, so no row waits for a journey search.
+      const search = boardsSearch({ horizonMinutes: fetchOptions.horizonMinutes, startMs: fetchOptions.startMs });
+      const response = await call(`${base}/boards/${encodeURIComponent(fetchOptions.profile.key)}?${search}`, {
+        headers: { Accept: 'application/json' },
       });
+      if (!response.ok) throw new ServerError(`the planning server said ${response.status}`, response.status);
+      const answer = (await response.json()) as WireBoardsAnswer;
+      if (answer.v !== WIRE_VERSION) throw new ServerError(`the planning server speaks version ${answer.v}`, 500);
+      const { ageMs, stale } = answerAge(response);
+      options.onNote?.({ kind: 'server', ageMs });
       // Every board arrives at once, so the per-board progress the page draws
       // its skeletons from is reported as finished rather than as never having
       // happened: a board left `idle` reads as a board that is still loading.
@@ -208,12 +238,15 @@ export function createServerSource(options: ServerSourceOptions = {}): DataSourc
       // browser's to look up, and they have to be told which window. See
       // `prepareCalls`.
       prepareCalls(fetchOptions);
-      return { boards: answer.boards, backends: answer.backends };
+      return { boards: answer.boards, backends: answer.backends, stale };
     },
     async planProfile(planOptions) {
       const previous = planOptions.previous;
       const key = planKey(planOptions);
       if (previous !== undefined && !previous.stale && previous.key === key) return previous;
+      // A function rather than a read, because the signal is asked again after
+      // each await and a narrowed property would say it could not have moved.
+      const aborted = (): boolean => planOptions.signal?.aborted === true;
       const { answer } = await ask({
         profileKey: planOptions.profileKey,
         horizonMinutes: planOptions.horizonMinutes ?? 0,
@@ -222,11 +255,13 @@ export function createServerSource(options: ServerSourceOptions = {}): DataSourc
         walkWeight: planOptions.walkWeight,
         earlyBufferMinutes: planOptions.earlyBufferMinutes,
       });
-      if (planOptions.signal?.aborted === true) return previous ?? null;
-      const { results, wanted } = decodeRoutes(answer.routes);
+      if (aborted()) return previous ?? null;
+      const decoded = decodeRoutes(answer.routes);
+      const results = await planUnanswered(planOptions, decoded.results);
+      if (aborted()) return previous ?? null;
       planOptions.onProgress?.(results.length, results.length);
       const at = Date.now();
-      const boards = carryBoards(previous, wanted, results, at);
+      const boards = carryBoards(previous, decoded.wanted, results, at);
       if (boards.size === 0) return null;
       return { boards, at, destinationKey: planOptions.destinationKey ?? '', stale: false, key };
     },
