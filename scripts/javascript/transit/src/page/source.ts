@@ -70,8 +70,14 @@ export interface SourceFetchOptions extends FetchProfileOptions {
 export interface TranslationShare {
   /** What the store already has, in this language, for these hashes. */
   fetchTranslations(lang: string, hashes: string[]): Promise<WireTranslations>;
-  /** Offer one translation for the next reader. Resolves whatever happens. */
-  shareTranslation(entry: WireTranslationPut): Promise<void>;
+  /**
+   * Offer one translation for the next reader.
+   *
+   * Resolves whether the store is still taking offers: false once it has
+   * refused one (a 4xx, a rate limit included), which tells the caller to stop
+   * offering for the rest of the session rather than keep being refused.
+   */
+  shareTranslation(entry: WireTranslationPut): Promise<boolean>;
 }
 
 export interface DataSource extends TranslationShare {
@@ -117,7 +123,7 @@ export const directSource: DataSource = {
   planProfile: (options) => planDirect(options),
   fetchMessages: (config) => fetchDirectMessages(config),
   fetchTranslations: async () => ({}),
-  shareTranslation: async () => undefined,
+  shareTranslation: async () => true,
 };
 
 /** Thrown when the server answered, but not with an answer. */
@@ -275,7 +281,12 @@ export function createServerSource(options: ServerSourceOptions = {}): DataSourc
         headers: { 'content-type': 'application/json', Accept: 'application/json' },
         body: JSON.stringify(entry),
       });
-      if (!response.ok) throw new ServerError(`the planning server said ${response.status}`, response.status);
+      if (response.ok) return true;
+      // A refusal, as distinct from a fault: the store looked at the offer and
+      // said no, and the next offer will get the same answer. Offering on
+      // regardless is how one page load once collected two hundred 429s.
+      if (response.status >= 400 && response.status < 500) return false;
+      throw new ServerError(`the planning server said ${response.status}`, response.status);
     },
   };
 }
@@ -409,7 +420,9 @@ export function createSwitchingSource(options: SwitchingOptions = {}): Switching
     planProfile: (planOptions) => through((chosen) => chosen.planProfile(planOptions)),
     fetchMessages: (config) => through((chosen) => chosen.fetchMessages(config)),
     fetchTranslations: (lang, hashes) => shared((chosen) => chosen.fetchTranslations(lang, hashes), {}),
-    shareTranslation: (entry) => shared((chosen) => chosen.shareTranslation(entry), undefined),
+    // A server that has gone is not a refusal: there is nowhere to offer to
+    // right now, and the offer after the next probe may well be taken.
+    shareTranslation: (entry) => shared((chosen) => chosen.shareTranslation(entry), true),
   };
   if (typeof window !== 'undefined') window.__transitSource = source.state;
   return source;

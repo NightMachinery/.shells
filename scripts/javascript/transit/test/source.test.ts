@@ -336,6 +336,20 @@ describe('createServerSource', () => {
     await expect(createServerSource({ base, fetchImpl: broken.fetchImpl }).fetchTranslations('en', wanted)).rejects.toThrow();
   });
 
+  test('sharing a translation says whether the store still takes offers', async () => {
+    const entry = { hash: '0'.repeat(64), lang: 'en', source: 'browser' as const, text: 'x', original_length: 1 };
+    const taken = mockFetch(() => ({ stored: true }));
+    expect(await createServerSource({ base, fetchImpl: taken.fetchImpl }).shareTranslation(entry)).toBe(true);
+
+    // A rate limit is a refusal the next offer would get too, so the caller is
+    // told to stop rather than left to collect a 429 per notice.
+    const limited = mockFetch(() => new Response('slow down', { status: 429 }));
+    expect(await createServerSource({ base, fetchImpl: limited.fetchImpl }).shareTranslation(entry)).toBe(false);
+
+    const broken = mockFetch(() => new Response('oops', { status: 502 }));
+    await expect(createServerSource({ base, fetchImpl: broken.fetchImpl }).shareTranslation(entry)).rejects.toThrow();
+  });
+
   test('an answer speaking a different wire version rejects', async () => {
     const { fetchImpl } = mockFetch(() => wireAnswer({ v: WIRE_VERSION + 1 }));
     const source = createServerSource({ base, fetchImpl });

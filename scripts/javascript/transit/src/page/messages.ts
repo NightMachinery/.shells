@@ -109,6 +109,23 @@ let sharing: TranslationShare | null = null;
 const offered = new Set<string>();
 
 /**
+ * Offers go out one at a time, in the order they were made.
+ *
+ * All at once, a run of translations is a burst of writes the store's rate
+ * limit exists to refuse; in a line, each one waits for the store's answer to
+ * the last, which is also what lets a refusal stop the ones behind it.
+ */
+let offerQueue: Promise<void> = Promise.resolve();
+
+/**
+ * Set once the store has refused an offer, after which nothing more is offered
+ * in this session. The next reader's page will ask the store before
+ * translating anyway, so what is lost is at most a few translations a later
+ * reader makes again.
+ */
+let offersRefused = false;
+
+/**
  * Hashes this client has already asked the shared store about, successfully.
  *
  * The lookup runs every time the notices on screen change, and a notice the
@@ -340,7 +357,7 @@ async function translateAll(messages: Message[], onChange: () => void): Promise<
     for (const message of messages) {
       const produced = await translate(message.text);
       onChange();
-      void offerTranslation(message, produced);
+      offerTranslation(message, produced);
     }
   } finally {
     translating -= 1;
@@ -351,28 +368,35 @@ async function translateAll(messages: Message[], onChange: () => void): Promise<
 /**
  * Offer one translation this device produced to the next reader.
  *
- * Not awaited by the loop above, because nothing on screen is waiting for it:
- * the translation is already rendered and the offer is a favour to somebody
- * else's phone. Every reason not to offer is silent, and none of them is an
- * error the reader is shown.
+ * Queued rather than awaited by the loop above, because nothing on screen is
+ * waiting for it: the translation is already rendered and the offer is a
+ * favour to somebody else's phone. Every reason not to offer is silent, and
+ * none of them is an error the reader is shown.
  *
  * Only what this device produced. A translation that arrived FROM the store
  * carries the client kind that made it, and offering that back would let a
  * browser translation this page received get re-asserted under this page's own
  * name, which is exactly what the store's precedence rule exists to prevent.
  */
-async function offerTranslation(message: Message, translation: Translation | null): Promise<void> {
-  if (translation === null || translation.from !== undefined || sharing === null) return;
+function offerTranslation(message: Message, translation: Translation | null): void {
+  if (translation === null || translation.from !== undefined || sharing === null || offersRefused) return;
   const hash = hashes.get(message.text);
   if (hash === undefined || offered.has(hash)) return;
   offered.add(hash);
-  await sharing.shareTranslation({
+  const share = sharing;
+  const entry = {
     hash,
     lang: TARGET_LANGUAGE,
     source: sourceOfProvider(translation.provider),
     text: translation.text,
     original_length: message.text.length,
-  });
+  };
+  offerQueue = offerQueue
+    .then(async () => {
+      if (offersRefused) return;
+      if (!(await share.shareTranslation(entry))) offersRefused = true;
+    })
+    .catch(() => undefined);
 }
 
 // ------------------------------------------------------- the settings popover
