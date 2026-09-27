@@ -304,6 +304,38 @@ describe('createServerSource', () => {
     ).rejects.toThrow();
   });
 
+  test('a translation lookup is split into batches small enough for a URL, and the answers merged', async () => {
+    const wanted = Array.from({ length: 90 }, (_, index) => index.toString(16).padStart(64, '0'));
+    const { fetchImpl, urls } = mockFetch((url) => {
+      const hashes = (new URL(url).searchParams.get('hashes') ?? '').split(',');
+      const translations = Object.fromEntries(
+        hashes.map((hash) => [hash, { text: `en ${hash.slice(-2)}`, lang: 'en', source: 'google', at: NOW }]),
+      );
+      return { translations };
+    });
+    const source = createServerSource({ base, fetchImpl });
+
+    const found = await source.fetchTranslations('en', wanted);
+
+    // 40, 40 and 10: the request that once carried two hundred hashes in
+    // thirteen kilobytes of URL, and was refused as too large, is gone.
+    expect(urls).toHaveLength(3);
+    for (const url of urls) expect(url.length).toBeLessThan(4_000);
+    expect(Object.keys(found)).toHaveLength(90);
+  });
+
+  test('a failed batch costs only its own hashes; every batch failing rejects', async () => {
+    const wanted = Array.from({ length: 50 }, (_, index) => index.toString(16).padStart(64, '0'));
+    const halfBroken = mockFetch((_url, call) =>
+      call === 0 ? new Response('too large', { status: 431 }) : { translations: { [wanted[45] as string]: { text: 'x', lang: 'en', source: 'google', at: NOW } } },
+    );
+    const found = await createServerSource({ base, fetchImpl: halfBroken.fetchImpl }).fetchTranslations('en', wanted);
+    expect(Object.keys(found)).toEqual([wanted[45] as string]);
+
+    const broken = mockFetch(() => new Response('too large', { status: 431 }));
+    await expect(createServerSource({ base, fetchImpl: broken.fetchImpl }).fetchTranslations('en', wanted)).rejects.toThrow();
+  });
+
   test('an answer speaking a different wire version rejects', async () => {
     const { fetchImpl } = mockFetch(() => wireAnswer({ v: WIRE_VERSION + 1 }));
     const source = createServerSource({ base, fetchImpl });

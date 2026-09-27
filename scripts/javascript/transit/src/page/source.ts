@@ -82,8 +82,20 @@ export interface DataSource extends TranslationShare {
   fetchMessages(config: ExportedConfig): Promise<Message[]>;
 }
 
-/** How many hashes may be asked about in one lookup, so the URL stays a URL. */
+/** How many hashes one lookup may ask about in all, across its batches. */
 const MAX_LOOKUP_HASHES = 200;
+
+/**
+ * How many hashes go in one request.
+ *
+ * The hashes travel in the query string, sixty-four characters and an escaped
+ * comma each, and everything in front of the server adds its own headers and
+ * cookies to the same request. Two hundred of them made a request line of
+ * thirteen kilobytes, which with the access cookie on top was more than the
+ * server's sixteen-kilobyte header limit, and it answered 431. Forty is under
+ * three kilobytes, far from any limit anything in the chain is likely to have.
+ */
+const LOOKUP_BATCH = 40;
 
 /** What the last answer cost and where it came from, for the timing line. */
 export interface SourceNote {
@@ -221,21 +233,41 @@ export function createServerSource(options: ServerSourceOptions = {}): DataSourc
       return answer.messages;
     },
     async fetchTranslations(lang, wanted) {
-      // Asked in one request rather than one per notice, because the point of
-      // this is to save a phone round trips and a lookup per message would
-      // spend more of them than translating locally ever cost.
+      // Batched rather than one request per notice, because the point of this
+      // is to save a phone round trips and a lookup per message would spend
+      // more of them than translating locally ever cost. Batched rather than
+      // all in one, because the hashes travel in the URL; see `LOOKUP_BATCH`.
+      // The page asks only about the notices it shows, so this is nearly
+      // always a single request.
       const hashes = wanted.slice(0, MAX_LOOKUP_HASHES);
       if (hashes.length === 0) return {};
-      const query = new URLSearchParams({ lang, hashes: hashes.join(',') });
-      const response = await call(`${base}/translations?${query.toString()}`, {
-        headers: { Accept: 'application/json' },
-      });
-      if (!response.ok) throw new ServerError(`the planning server said ${response.status}`, response.status);
-      const answer = (await response.json()) as WireTranslationsAnswer;
-      // The envelope's other field says why an answer is thin, which is worth
-      // nothing to this page: with or without a budget on the other side, the
-      // hashes that did not come back are the ones to translate here.
-      return answer.translations ?? {};
+      const batches: string[][] = [];
+      for (let index = 0; index < hashes.length; index += LOOKUP_BATCH) batches.push(hashes.slice(index, index + LOOKUP_BATCH));
+      const settled = await Promise.allSettled(
+        batches.map(async (batch) => {
+          const query = new URLSearchParams({ lang, hashes: batch.join(',') });
+          const response = await call(`${base}/translations?${query.toString()}`, {
+            headers: { Accept: 'application/json' },
+          });
+          if (!response.ok) throw new ServerError(`the planning server said ${response.status}`, response.status);
+          const answer = (await response.json()) as WireTranslationsAnswer;
+          // The envelope's other field says why an answer is thin, which is
+          // worth nothing to this page: with or without a budget on the other
+          // side, the hashes that did not come back are the ones to translate
+          // here.
+          return answer.translations ?? {};
+        }),
+      );
+      // One batch failing costs only its own hashes. Only when every batch
+      // failed is it the lookup that failed, and the caller hears about it.
+      const found: WireTranslations = {};
+      let failure: unknown = null;
+      for (const outcome of settled) {
+        if (outcome.status === 'fulfilled') Object.assign(found, outcome.value);
+        else failure ??= outcome.reason;
+      }
+      if (failure !== null && settled.every((outcome) => outcome.status === 'rejected')) throw failure;
+      return found;
     },
     async shareTranslation(entry) {
       const response = await call(`${base}/translations`, {
