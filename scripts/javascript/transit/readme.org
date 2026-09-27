@@ -1760,12 +1760,17 @@ cosmetic either: the two upstreams wrap a notice at different widths and disagre
 about the non-breaking space, and without it a feed that gained a trailing
 newline overnight would invalidate every translation anybody had paid for.
 
-The flow on the page is in =src/page/messages.ts=. When the notices arrive, every
-hash the panel is about to render is asked of the server in one request, and
-whatever comes back is written into the same IndexedDB cache the page's own
-translations live in and rendered before any local translation is attempted. What
-this client then produces, by the browser's translator or by the Gemini button,
-is offered back once per hash. What it received is never offered back: a received
+The flow on the page is in =src/page/messages.ts=. When the notices arrive, and
+again whenever the boards on screen change, the notices the panel shows are asked
+of the server, never more than forty hashes to a request, and whatever comes back
+is written into the same IndexedDB cache the page's own translations live in and
+rendered before any local translation is attempted. Only the notices the panel
+shows: the feed carries every notice in the network, a few hundred at a time,
+and a page that worked through all of them sent a lookup too long for the server
+to read and then translated and offered every notice until the server's rate
+limit refused them. What this client then produces, by the browser's translator
+or by the Gemini button, is offered back once per hash, one offer at a time, and
+not at all after the first refusal. What it received is never offered back: a received
 translation carries the kind of client that made it, and re-asserting somebody
 else's work under this page's name is exactly what the server's precedence rule
 exists to prevent. The lookup and the offer both go through the data source in
@@ -1947,7 +1952,8 @@ for a fresh connection each time because the phone is the slowest link in the
 chain. Every one of those questions has the same answer for everybody who asks
 it in the same minute. So the page can also be answered by a small server
 running beside it, doing exactly that work once and keeping the answers warm,
-and then one request replaces all of them.
+and then two requests replace all of them: one for the boards and one for the
+journeys.
 
 The page does not choose between the two at build time, because the same bytes
 are served from a host that has such a server and from one that does not, and
@@ -1968,7 +1974,24 @@ back is the page as it has always been, and the only thing that changes is the
 provenance line in the timing note, which says either "via server, N s old" or
 "worked out here".
 
-Two details are less obvious than they look.
+Four details are less obvious than they look.
+
+The boards and the journeys are two questions, asked in that order, and never
+one. They cost wildly different amounts: the departures are a request per stop
+to a fast feed, a journey search is seconds at a slow planner. Asked as one
+answer, the first row on screen waited for the slowest search, or for its
+timeout, which is how a page behind a working server once took seventeen
+seconds to draw a row the departures alone would have drawn in one.
+
+A board the server set out to plan and could not is planned by the page itself,
+and only that board (=onlyIndexes= in =src/page/commute.ts=). The server's
+searches can fail for reasons that have nothing to do with the phone: a free
+planner slowing down one busy address is the one that has happened. The phone
+asks from its own address, so for the boards that came back unanswered it does
+what it would have done with no server at all. The timing line says how many
+boards' journeys came from the server, how many were planned here and how many
+are missing, and how much of the boards' wait was the server's own, from its
+=Server-Timing= header.
 
 A =Map= does not survive =JSON.stringify=. It becomes ={}=, with no error
 anywhere, and the journeys are held in maps two levels deep. So there is a wire
@@ -1984,6 +2007,12 @@ lets the page apply the same rule to a server's answer that it applies to its
 own searches: a board the run could not answer for keeps what it had. Both
 paths go through one function for that, because two implementations of a rule
 like this would drift apart within a week.
+
+A process can name itself to the upstream APIs through =TRANSIT_USER_AGENT=,
+which replaces the default User-Agent per request (=src/http.ts=). Transitous
+asks every server-side client for one naming the application and its version.
+A browser cannot set the header at all and sends a Referer, which Transitous
+accepts instead.
 
 The server itself is not in this package, and deliberately: it needs the
 configuration with the places in it, which is private, and it is deployed as
