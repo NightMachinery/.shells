@@ -13,3 +13,6 @@ Names follow `maccy-YYYYMMDD-HHMMSS-<history-id>.png` (or `.tiff`), using local
 time and the item's last-copy time. Existing files are skipped without being
 overwritten; newly saved paths are printed, one per line. The function needs
 macOS, Maccy, and Python 3.
+
+If SQLite cannot open the history database, the function retries twice. A
+persistent failure reports the database path along with SQLite's error.

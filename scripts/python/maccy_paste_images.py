@@ -5,11 +5,26 @@ import re
 import sqlite3
 import sys
 import tempfile
+import time
 from datetime import datetime
 from pathlib import Path
 
 
 CORE_DATA_EPOCH = 978307200
+
+
+def open_history(database: Path) -> sqlite3.Connection:
+    uri = f"{database.resolve().as_uri()}?mode=ro"
+    for attempt in range(3):
+        try:
+            return sqlite3.connect(uri, uri=True)
+        except sqlite3.OperationalError as error:
+            if attempt == 2:
+                raise sqlite3.OperationalError(
+                    f"unable to open read-only Maccy history at {database}: {error}"
+                ) from error
+            time.sleep(0.2 * (attempt + 1))
+    raise AssertionError("unreachable")
 
 
 def export_images(count: int, database: Path, destination: Path) -> None:
@@ -18,7 +33,7 @@ def export_images(count: int, database: Path, destination: Path) -> None:
     if not destination.is_dir():
         raise ValueError(f"output directory not found: {destination}")
 
-    connection = sqlite3.connect(f"{database.resolve().as_uri()}?mode=ro", uri=True)
+    connection = open_history(database)
     try:
         connection.execute("PRAGMA query_only = ON")
         connection.execute("BEGIN")
@@ -72,6 +87,10 @@ def export_images(count: int, database: Path, destination: Path) -> None:
                 if temporary is not None:
                     temporary.unlink(missing_ok=True)
             print(output)
+    except sqlite3.Error as error:
+        raise sqlite3.OperationalError(
+            f"unable to read Maccy history at {database}: {error}"
+        ) from error
     finally:
         connection.close()
 
