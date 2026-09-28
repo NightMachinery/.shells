@@ -60,7 +60,7 @@ function backup-private-common {
 ##
 function backup-file() {
     : "usage: backup-file FILE
-Snapshot FILE into its folder under backup_file_root, then prune that folder (see backup-file-prune)."
+Snapshot FILE into its folder under backup_file_root unless it matches the newest snapshot, then prune that folder (see backup-file-prune)."
     #: Doc: docs/backup-file.md
     assert isdefined-cmd gdate @RET
 
@@ -70,13 +70,19 @@ Snapshot FILE into its folder under backup_file_root, then prune that folder (se
         h-backup-file-dir "$f" @RET
         local dir="$REPLY"
 
-        cp --verbose --backup=t --suffix='.bak' "$f" "${dir}/$(gdate +"%Y %b %d %H:%M:%S")/" || {
-            local ret=$?
-            ecerr "$0: Failed with '$ret' for '$f'"
-            return $ret
-        }
-        # t: Always make numbered backups.
-        # suffix somehow doesn't seem to work
+        h-backup-file-snapshots "$dir" @RET
+        local newest="${reply[-1]#*$'\t'}"
+        if [[ -n "$newest" ]] && command cmp --silent -- "$f" "${dir}/${newest}/${f:t}" ; then
+            ecgray "$0: unchanged since '${newest}', not copied: $f"
+        else
+            cp --verbose --backup=t --suffix='.bak' "$f" "${dir}/$(gdate +"%Y %b %d %H:%M:%S")/" || {
+                local ret=$?
+                ecerr "$0: Failed with '$ret' for '$f'"
+                return $ret
+            }
+            # t: Always make numbered backups.
+            # suffix somehow doesn't seem to work
+        fi
 
         #: The snapshot is already taken, so a failed prune must not fail the backup.
         backup-file-prune "$f" @STRUE

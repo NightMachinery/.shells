@@ -17,6 +17,10 @@ The folder name carries a hash of the path as given, so two files with the
 same name in different places do not share a folder. `backup_file_root`
 overrides `~/base/backup/auto`.
 
+If FILE is byte-for-byte the same as the newest snapshot, no copy is made: a
+second identical copy restores nothing the first cannot. On a machine where
+the file rarely changes this keeps the folder to one snapshot per change.
+
 Callers:
 
 - `chronic-backup`, daily, for `$timetracker_db` and `$HISTFILE`.
