@@ -59,19 +59,107 @@ function backup-private-common {
 }
 ##
 function backup-file() {
+    : "usage: backup-file FILE
+Snapshot FILE into its folder under backup_file_root, then prune that folder (see backup-file-prune)."
+    #: Doc: docs/backup-file.md
     assert isdefined-cmd gdate @RET
 
     local f="${1:?}"
 
     if test -e "$f" ; then
-        cp --verbose --backup=t --suffix='.bak'  $f ~/base/backup/auto/"${f:t} $(md5m "$f")/$(gdate +"%Y %b %d %H:%M:%S")/" || {
+        h-backup-file-dir "$f" @RET
+        local dir="$REPLY"
+
+        cp --verbose --backup=t --suffix='.bak' "$f" "${dir}/$(gdate +"%Y %b %d %H:%M:%S")/" || {
             local ret=$?
             ecerr "$0: Failed with '$ret' for '$f'"
             return $ret
         }
         # t: Always make numbered backups.
         # suffix somehow doesn't seem to work
+
+        #: The snapshot is already taken, so a failed prune must not fail the backup.
+        backup-file-prune "$f" @STRUE
     fi
+}
+
+function backup-file-prune {
+    : "usage: backup-file-prune FILE...
+Trash FILE's snapshots except the last backup_file_keep_days days (30) and the oldest of each month."
+    #: Trashed with trs, not rm, so a prune can be undone with trs-restore; the
+    #: space only comes back once the trash is emptied (trash-empty-all).
+    local keep_days="${backup_file_keep_days:-30}"
+    local dry_run_p="${backup_file_prune_dry_run_p:-n}"
+    ensure-cmd gdate @RET
+
+    local cutoff
+    cutoff="$(gdate --date="${keep_days} days ago" +%Y-%m-%d)" @TRET
+
+    local f dir entry key month snapshots=() drop=()
+    local -A seen_months
+    for f in "$@" ; do
+        h-backup-file-dir "$f" @RET
+        dir="$REPLY"
+        test -d "$dir" || continue
+
+        h-backup-file-snapshots "$dir" @RET
+        snapshots=("${reply[@]}")
+        seen_months=()
+        drop=()
+        for entry in "${snapshots[@]}" ; do
+            #: Oldest first, so the first entry seen in a month is that month's oldest.
+            key="${entry%%$'\t'*}"
+            month="${key[1,7]}"
+            if (( ! ${+seen_months[$month]} )) ; then
+                seen_months[$month]=y
+            elif [[ ! "${key[1,10]}" < "$cutoff" ]] || [[ "$entry" == "${snapshots[-1]}" ]] ; then
+                : #: Inside the window, or the newest snapshot, which we never trash.
+            else
+                drop+=("${dir}/${entry#*$'\t'}")
+            fi
+        done
+
+        if (( ${#drop} == 0 )) ; then
+            continue
+        fi
+        if bool "$dry_run_p" ; then
+            ec "$0: would trash ${#drop} of ${#snapshots} snapshots in: ${dir}"
+            ec "${(@F)drop}"
+        else
+            ec "$0: trashing ${#drop} of ${#snapshots} snapshots in: ${dir}"
+            trs "${drop[@]}" @RET
+        fi
+    done
+}
+
+function h-backup-file-dir {
+    : "usage: h-backup-file-dir FILE
+Sets REPLY to the folder holding FILE's snapshots."
+    local root="${backup_file_root:-${HOME}/base/backup/auto}"
+    local f="${1:?}"
+
+    local hash
+    hash="$(md5m "$f")" @TRET
+    REPLY="${root}/${f:t} ${hash}"
+}
+
+function h-backup-file-snapshots {
+    : "usage: h-backup-file-snapshots DIR
+Sets reply to DIR's snapshots as 'ISO-TIME<TAB>NAME', oldest first."
+    #: Names are 'gdate +"%Y %b %d %H:%M:%S"', e.g. '2026 Sep 28 00:00:24', which do
+    #: not sort by date as text. A name that does not parse is left out, so nothing
+    #: downstream can ever trash it.
+    local dir="${1:?}"
+
+    local -A months=(Jan 01 Feb 02 Mar 03 Apr 04 May 05 Jun 06 Jul 07 Aug 08 Sep 09 Oct 10 Nov 11 Dec 12)
+    local keyed=() name
+    for name in "${dir}"/*(N/:t) ; do
+        if [[ "$name" =~ '^([0-9]{4}) ([A-Z][a-z]{2}) ([0-9]{2}) ([0-9]{2}:[0-9]{2}:[0-9]{2})$' ]] \
+            && (( ${+months[${match[2]}]} )) ; then
+            keyed+=("${match[1]}-${months[${match[2]}]}-${match[3]}T${match[4]}"$'\t'"${name}")
+        fi
+    done
+    reply=("${(@o)keyed}")
 }
 ### * eva
 function eva-backup1 {
