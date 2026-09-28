@@ -30,7 +30,8 @@ Telegram hotkey prefers Purple Telegram, then standard Telegram.
 
 [agfi:maccy-paste-images] saves recent PNG and TIFF items from Maccy's
 clipboard history into the current directory without changing the clipboard
-or history. See [[NIGHTDIR:docs/maccy-paste-images.md][usage and filename rules]].
+or history. SSH sessions use the local BrishGarden service. See
+[[NIGHTDIR:docs/maccy-paste-images.md][usage and filename rules]].
 
 * Zsh plugins
 

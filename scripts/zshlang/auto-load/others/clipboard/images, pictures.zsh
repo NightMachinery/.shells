@@ -18,6 +18,18 @@ Save the most recently copied n images from Maccy to the current directory."
         ecerr "$0: Maccy is available only on macOS"
         return 1
     fi
+
+    if isSSH ; then
+        ensure-cmd brishzq.zsh @RET
+        if ! bshEndpoint='' brishz-alive-p ; then
+            ecerr "$0: BrishGarden is unavailable; start it from a local GUI session"
+            return 1
+        fi
+        bshEndpoint='' brishz_out_file_p=y brishzq.zsh python3 \
+            "${nightdir}/python/maccy_paste_images.py" "${1-1}" "${db}" "${PWD}"
+        return $?
+    fi
+
     ensure-cmd python3 @RET
 
     command python3 "${nightdir}/python/maccy_paste_images.py" "${1-1}" "${db}" "${PWD}"
