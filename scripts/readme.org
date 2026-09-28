@@ -26,6 +26,12 @@ App-toggle hotkeys can name one app or an ordered list of running-app
 fallbacks; they toggle the first running candidate and never launch one. The
 Telegram hotkey prefers Purple Telegram, then standard Telegram.
 
+* Maccy image export
+
+[agfi:maccy-paste-images] saves recent PNG and TIFF items from Maccy's
+clipboard history into the current directory without changing the clipboard
+or history. See [[NIGHTDIR:docs/maccy-paste-images.md][usage and filename rules]].
+
 * Zsh plugins
 
 The shared =note= skill drafts concise notes under =~/notes=, uses Terra in
