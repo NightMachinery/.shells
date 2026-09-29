@@ -10,10 +10,11 @@ To link to a zsh function from comments/docs, use `[agfi:function-name]`, not `[
 
 ## Org-mode Links to Files
 
-In org files, link to a file **outside the current directory** under a root that
-org registers as a link abbreviation (`org-link-abbrev-alist` in
+In org files, link an org file or heading by ID (see Rules below). Link any
+*other* file **outside the current directory** under a root that org registers
+as a link abbreviation (`org-link-abbrev-alist` in
 `~/doom.d/autoload/org/links/night-links.el`) with that abbreviation:
-`[[NIGHTDIR:docs/bell-auto.md][bell-auto]]`, `[[nightNotesPublic:subjects/x.org]]`,
+`[[NIGHTDIR:docs/bell-auto.md][bell-auto]]`, `[[nightNotesPublic:subjects/x.pdf]]`,
 `DOOMDIR:`, `HOME:`. The private `org-general` skill has the full rules.
 
 Anywhere else, use a `zf:` link and a zsh dynamic named directory, never a relative
@@ -66,8 +67,11 @@ Why, rather than `[[file:../../../foo]]`:
 
 Rules:
 
-- Same-directory or sibling links (`[[file:models.org]]`) stay relative.
-  They are readable and move together with the file.
+- Link an org file or heading by ID, `[[id:UUID][title]]`, even in the same
+  directory: it survives moves and renames. Reuse the target's `:ID:` or add a
+  drawer with a fresh lowercase UUID; the `org-general` skill has the details.
+- Other same-directory or sibling files (images, Markdown) stay relative
+  (`[[file:plot.png]]`). They are readable and move together with the file.
 - `~[nightNotesPrivate]` and `~[nightNotesPublic]` are **not** named
   directories and resolve to nothing, despite the environment variables of
   those names existing. Use the `nightNotesPrivate:` and `nightNotesPublic:`
@@ -77,6 +81,7 @@ Rules:
   ```zsh
   path-unabbrev '~[cod]/uni/papers/FairGrad/'
   emacsclient -e '(org-link-expand-abbrev "NIGHTDIR:docs/bell-auto.md")'
+  emacsclient -e '(car (org-id-find "UUID"))'   #: nil means unresolved
   ```
 
   Check the printed path exists. Do not trust the link because it looks right.

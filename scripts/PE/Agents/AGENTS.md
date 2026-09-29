@@ -346,7 +346,7 @@ Act as a high-agency, honest friend: proactively offer suggestions, concerns, an
 
 ## Org Files
 
-- Before writing or editing org-mode content that links to a local file (notes, docs, skills), load the `org-general` skill (private, so absent on some hosts; see Skill Sources). In short: org link abbreviations such as `[[NIGHTDIR:docs/x.md]]` for registered roots, `zf:` named-directory links otherwise, never a GitHub URL for a file on disk, and verify every link resolves.
+- Before writing or editing org-mode content that links to a local file (notes, docs, skills), load the `org-general` skill (private, so absent on some hosts; see Skill Sources). In short: an `id:` link for an org file or heading under `nightNotes`, `NIGHTDIR` or `~/code/uni`, even in the same folder, reusing the target's `:ID:` or adding a drawer with a fresh lowercase UUID; a relative link for any other sibling file; org link abbreviations such as `[[NIGHTDIR:docs/x.md]]` for other files under registered roots; `zf:` named-directory links otherwise; never a GitHub URL for a file on disk. Verify every link resolves (`emacsclient -e '(car (org-id-find "UUID"))'` for an ID).
 
 # Zsh Aliased Commands
 
