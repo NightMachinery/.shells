@@ -21,7 +21,10 @@ Options:
     -f <file> --file=<file>  Sends a file, with message as its caption. (Can be specified multiple times, and sends all the files as an album. So they have to be the same kind of 'media'.)
     --force_document  Whether to send the given file as a document or not.
     --link_preview  Whether to show a preview of web links.
-    --parse_mode <parser>  Which parser to use for the message.
+    --parse-mode <parser>  Which parser to use for the message: "markdown" or "md" (what an omitted flag means), "html", "none", or "rich".
+        "rich" sends a rich message, whose Markdown Telegram parses itself: headings, tables, task lists, LaTeX, footnotes and <details>.
+        A rich message holds at most 32768 characters and 500 blocks; longer text fails rather than being split, and it cannot be combined with --file.
+        Bots need nothing extra, but user accounts need Premium. The Telethon backend needs Telethon 1.44 or newer; the Bot API backend (TSEND_BACKEND=2) needs no upgrade.
     --album  Send files as an album. (This flag has not been implemented for the first backend!)
     --no-album  Do not send files as an album.
     --print-ids  Print the id of every message sent, one per line, on stdout. These are what the delete and edit commands take.
@@ -31,6 +34,7 @@ Options:
 
   Edit command:
     Replaces the text of one message (parse mode as for sending). Editing a message to the text it already has counts as success.
+    With the rich parse mode, pass the whole new Markdown: Telegram never returns a rich message's source, so there is nothing to patch.
 
   Poll command:
     --option <option>  Adds an option to the poll. Use multiple times for more options. Markdown links are parsed by default. (poll command)
@@ -56,6 +60,7 @@ Examples:
   tsend.py --print-ids -- some_channel "draft"    # prints e.g. 42
   tsend.py edit -- some_channel 42 "final"
   tsend.py delete -- some_channel 42
+  tsend.py --parse-mode=rich -- some_friend "$(< notes.md)"    # tables, headings and math, rendered by Telegram
 
 Dependencies:
   pip install -U pynight IPython aiofile docopt PySocks telethon python-telegram-bot dateparser
@@ -641,6 +646,10 @@ def record_sent(sent_ids, sent):
         for m in sent:
             record_sent(sent_ids, m)
         return
+    if isinstance(sent, int) and not isinstance(sent, bool):
+        #: Raw sends know only the id.
+        sent_ids.append(sent)
+        return
     #: Telethon messages carry `id`, PTB ones `message_id`.
     message_id = getattr(sent, "message_id", None)
     if message_id is None:
@@ -1119,6 +1128,33 @@ def edit_text_check(message):
     return message
 
 
+RICH_PARSE_MODE = "rich"
+#: The Bot API's "Rich Message Limits". A rich message is also capped at 500
+#: blocks, counting nested blocks, list items and table rows, but only the
+#: server can count those, so that limit surfaces as its error.
+RICH_MESSAGE_MAX_CHARS = 32768
+
+
+def parse_mode_rich_p(parse_mode_str):
+    return str(parse_mode_str or "").strip().lower() == RICH_PARSE_MODE
+
+
+def rich_markdown_check(markdown):
+    """Returns `markdown` ready to send as a rich message, or exits saying why it cannot be one."""
+    #: Only blank lines are trimmed from the start: stripping all leading
+    #: whitespace would turn an indented code block into a paragraph.
+    markdown = re.sub(r"\A(?:[ \t]*\n)+", "", str(markdown or "")).rstrip()
+    if not markdown:
+        raise SystemExit("A rich message cannot be empty.")
+    if len(markdown) > RICH_MESSAGE_MAX_CHARS:
+        raise SystemExit(
+            f"Rich message is too long: {len(markdown)}/{RICH_MESSAGE_MAX_CHARS} characters. "
+            "tsend does not split rich messages; shorten it, or send it with --parse-mode=md, "
+            "which splits long text and sends very long text as a file."
+        )
+    return markdown
+
+
 #: Errors about the message rather than the peer: re-resolving the peer cannot help,
 #: and neither can retrying (e.g. editing a message that was already deleted).
 MESSAGE_PERMANENT_ERRORS = (
@@ -1129,9 +1165,12 @@ MESSAGE_PERMANENT_ERRORS = (
 )
 
 
-async def telethon_peer_op(client, receiver, op, what, max_retries=5, verbosity=1):
+async def telethon_peer_op(
+    client, receiver, op, what, max_retries=5, verbosity=1, *, fatal_p=None
+):
     """Runs `op(peer)`, re-resolving a stale peer once and retrying transient errors,
-    the way discreet_send does for sends."""
+    the way discreet_send does for sends. `fatal_p(err)`, when given, picks further
+    errors that fail at once instead of being retried."""
     refreshed = False
     attempt = 0
     while attempt < max_retries:
@@ -1147,7 +1186,11 @@ async def telethon_peer_op(client, receiver, op, what, max_retries=5, verbosity=
                     receiver = entity
                     continue
 
-            if is_permanent_error(err) or type(err).__name__ in MESSAGE_PERMANENT_ERRORS:
+            if (
+                is_permanent_error(err)
+                or type(err).__name__ in MESSAGE_PERMANENT_ERRORS
+                or (fatal_p is not None and fatal_p(err))
+            ):
                 raise SendFailed(f"Cannot {what}: {type(err).__name__}: {err}") from err
 
             await handle(err, attempt, max_retries, verbosity)
@@ -1176,11 +1219,34 @@ async def telethon_delete(client, receiver, message_ids, verbosity=1):
     )
 
 
-async def telethon_edit(client, receiver, message_id, message, parse_mode=None, verbosity=1):
+async def telethon_edit(
+    client,
+    receiver,
+    message_id,
+    message,
+    parse_mode=None,
+    verbosity=1,
+    *,
+    rich_message=None,
+):
+    """Replaces the text of `message_id`; with `rich_message` (see
+    telethon_rich_message), replaces it with that rich message instead."""
     from telethon.errors import MessageNotModifiedError
+    from telethon.tl import functions
 
     async def op(peer):
         try:
+            if rich_message is not None:
+                #: edit_message takes no rich_message, so this is the raw request.
+                return await client(
+                    functions.messages.EditMessageRequest(
+                        peer=peer,
+                        id=message_id,
+                        message="",
+                        rich_message=rich_message,
+                        no_webpage=True,
+                    )
+                )
             return await client.edit_message(
                 peer, message_id, message, parse_mode=parse_mode, link_preview=False
             )
@@ -1189,34 +1255,181 @@ async def telethon_edit(client, receiver, message_id, message, parse_mode=None, 
             return None
 
     return await telethon_peer_op(
-        client, receiver, op, f"edit {message_id} in {receiver}", verbosity=verbosity
+        client,
+        receiver,
+        op,
+        f"edit {message_id} in {receiver}",
+        verbosity=verbosity,
+        fatal_p=(telethon_rejected_p if rich_message is not None else None),
     )
+
+
+def telethon_rich_message(markdown, *, tl_types=None):
+    """Builds the InputRichMessageMarkdown for `markdown`, or exits naming the fix
+    when this Telethon predates rich messages. Call it before connecting, so that
+    case fails fast."""
+    if tl_types is None:
+        from telethon.tl import types as tl_types
+
+    rich_class = getattr(tl_types, "InputRichMessageMarkdown", None)
+    if rich_class is None:
+        import telethon
+        from telethon.tl.alltlobjects import LAYER
+
+        #: Rich messages arrived in layer 227, which Telethon 1.44.0 was the first
+        #: to ship. Probing the class rather than the version also covers a
+        #: patched or regenerated Telethon.
+        raise SystemExit(
+            f"--parse-mode=rich needs Telethon 1.44 or newer (layer 227+), but "
+            f"{sys.executable} has Telethon {telethon.__version__} (layer {LAYER}). "
+            "Run tsend with a Python whose Telethon is new enough, or use the "
+            "Bot API backend instead: TSEND_BACKEND=2."
+        )
+    return rich_class(markdown=markdown)
+
+
+def telethon_sent_message_id(result, *, random_id):
+    """The id of the message a raw SendMessageRequest created, or None.
+
+    Telegram may answer with an UpdateShortSentMessage, which carries nothing but
+    the id; otherwise the Updates pair our random_id with it."""
+    from telethon.tl import types
+
+    if isinstance(result, types.UpdateShortSentMessage):
+        return result.id
+    updates = getattr(result, "updates", None) or []
+    for update in updates:
+        if isinstance(update, types.UpdateMessageID) and update.random_id == random_id:
+            return update.id
+    for update in updates:
+        if isinstance(update, (types.UpdateNewMessage, types.UpdateNewChannelMessage)):
+            return update.message.id
+    return None
+
+
+def telethon_rejected_p(err):
+    """True when Telegram refused the request itself (malformed or oversized
+    content, a missing right, no Premium), which no retry can fix."""
+    from telethon.errors import BadRequestError, ForbiddenError
+
+    return isinstance(err, (BadRequestError, ForbiddenError))
+
+
+async def telethon_send_rich(
+    client, receiver, *, rich_message, link_preview=False, verbosity=1, sent_ids=None
+):
+    """Sends one rich message (see telethon_rich_message) and returns its id."""
+    from telethon.tl import functions
+
+    async def op(peer):
+        #: send_message takes no rich_message, so this is the raw request, which
+        #: needs the empty text alongside it.
+        request = functions.messages.SendMessageRequest(
+            peer=peer,
+            message="",
+            rich_message=rich_message,
+            no_webpage=not link_preview,
+        )
+        result = await client(request)
+        message_id = telethon_sent_message_id(result, random_id=request.random_id)
+        if verbosity >= 2:
+            print(
+                f"Sent rich message {message_id}; Telegram answered with "
+                f"{type(result).__name__}.",
+                file=sys.stderr,
+            )
+        if message_id is None:
+            print(
+                "tsend: sent, but Telegram's answer "
+                f"({type(result).__name__}) did not say the new message's id.",
+                file=sys.stderr,
+            )
+        return message_id
+
+    message_id = await telethon_peer_op(
+        client,
+        receiver,
+        op,
+        f"send a rich message to {receiver}",
+        verbosity=verbosity,
+        fatal_p=telethon_rejected_p,
+    )
+    record_sent(sent_ids, message_id)
+    return message_id
 
 
 def ptb_error_is(e, fragment):
     return fragment.lower() in str(e).lower()
 
 
-async def ptb_delete(bot, chat_id, message_ids, max_retries=5, verbosity=1):
+def ptb_rejected_p(e):
+    """True when the Bot API refused the request itself (bad arguments, a missing
+    right, a method this server lacks), which no retry can fix."""
+    from telegram.error import BadRequest, EndPointNotFound, Forbidden, InvalidToken
+
+    return isinstance(e, (BadRequest, EndPointNotFound, Forbidden, InvalidToken))
+
+
+async def ptb_retry(call, *, what, fatal_p, max_retries=5, verbosity=1):
+    """Awaits `call()`, retrying transient errors; those `fatal_p` picks fail at once."""
     for attempt in range(max_retries):
         try:
-            #: deleteMessages returns True even when it skipped ids it could not
-            #: find, so a single id goes through deleteMessage, which does fail.
-            if len(message_ids) == 1:
-                return await bot.delete_message(chat_id=chat_id, message_id=message_ids[0])
-            return await bot.delete_messages(chat_id=chat_id, message_ids=message_ids)
+            return await call()
         except Exception as e:
-            if ptb_error_is(e, "message to delete not found") or ptb_error_is(
-                e, "message can't be deleted"
-            ):
-                raise SendFailed(f"Cannot delete from {chat_id}: {e}") from e
+            if fatal_p(e):
+                raise SendFailed(f"Cannot {what}: {e}") from e
             await handle(e, attempt, max_retries, verbosity)
-    raise SendFailed(f"Failed to delete from {chat_id} after {max_retries} attempts.")
+    raise SendFailed(f"Failed to {what} after {max_retries} attempts.")
 
 
-async def ptb_edit(bot, chat_id, message_id, message, parse_mode=None, max_retries=5, verbosity=1):
-    for attempt in range(max_retries):
+def ptb_rich_message(markdown):
+    """The Bot API's InputRichMessage for `markdown`."""
+    return dict(markdown=markdown)
+
+
+async def ptb_delete(bot, chat_id, message_ids, max_retries=5, verbosity=1):
+    async def call():
+        #: deleteMessages returns True even when it skipped ids it could not
+        #: find, so a single id goes through deleteMessage, which does fail.
+        if len(message_ids) == 1:
+            return await bot.delete_message(chat_id=chat_id, message_id=message_ids[0])
+        return await bot.delete_messages(chat_id=chat_id, message_ids=message_ids)
+
+    return await ptb_retry(
+        call,
+        what=f"delete from {chat_id}",
+        fatal_p=lambda e: ptb_error_is(e, "message to delete not found")
+        or ptb_error_is(e, "message can't be deleted"),
+        max_retries=max_retries,
+        verbosity=verbosity,
+    )
+
+
+async def ptb_edit(
+    bot,
+    chat_id,
+    message_id,
+    message,
+    parse_mode=None,
+    max_retries=5,
+    verbosity=1,
+    *,
+    rich_markdown=None,
+):
+    """Replaces the text of `message_id`; with `rich_markdown`, replaces it with
+    that rich message instead."""
+
+    async def call():
         try:
+            if rich_markdown is not None:
+                #: editMessageText takes rich_message in place of text (Bot API
+                #: 10.1). PTB 20.8 predates it, and api_kwargs passes it through.
+                return await bot.edit_message_text(
+                    text=None,
+                    chat_id=chat_id,
+                    message_id=message_id,
+                    api_kwargs=dict(rich_message=ptb_rich_message(rich_markdown)),
+                )
             return await bot.edit_message_text(
                 text=message,
                 chat_id=chat_id,
@@ -1226,12 +1439,63 @@ async def ptb_edit(bot, chat_id, message_id, message, parse_mode=None, max_retri
         except Exception as e:
             if ptb_error_is(e, "message is not modified"):
                 return None
-            if ptb_error_is(e, "message to edit not found") or ptb_error_is(
-                e, "message can't be edited"
-            ):
-                raise SendFailed(f"Cannot edit {message_id} in {chat_id}: {e}") from e
-            await handle(e, attempt, max_retries, verbosity)
-    raise SendFailed(f"Failed to edit {message_id} in {chat_id} after {max_retries} attempts.")
+            raise
+
+    def fatal_p(e):
+        if rich_markdown is not None and ptb_rejected_p(e):
+            return True
+        return ptb_error_is(e, "message to edit not found") or ptb_error_is(
+            e, "message can't be edited"
+        )
+
+    return await ptb_retry(
+        call,
+        what=f"edit {message_id} in {chat_id}",
+        fatal_p=fatal_p,
+        max_retries=max_retries,
+        verbosity=verbosity,
+    )
+
+
+async def ptb_send_rich(
+    bot,
+    chat_id,
+    *,
+    markdown,
+    link_preview=False,
+    max_retries=5,
+    verbosity=1,
+    sent_ids=None,
+):
+    """Sends one rich message through the Bot API's sendRichMessage and returns its id."""
+    api_kwargs = dict(chat_id=chat_id, rich_message=ptb_rich_message(markdown))
+    if not link_preview:
+        api_kwargs["link_preview_options"] = dict(is_disabled=True)
+
+    async def call():
+        #: PTB 20.8 predates sendRichMessage (Bot API 10.1), so this goes through
+        #: its generic do_api_request, which answers with the raw Message dict.
+        return await bot.do_api_request("sendRichMessage", api_kwargs=api_kwargs)
+
+    sent = await ptb_retry(
+        call,
+        what=f"send a rich message to {chat_id}",
+        fatal_p=ptb_rejected_p,
+        max_retries=max_retries,
+        verbosity=verbosity,
+    )
+    message_id = sent.get("message_id") if isinstance(sent, dict) else None
+    if verbosity >= 2 and isinstance(sent, dict):
+        #: The only way to see what the server made of the Markdown: a rich
+        #: message never gives its source back.
+        blocks = (sent.get("rich_message") or {}).get("blocks") or []
+        kinds = ", ".join(str(b.get("type")) for b in blocks if isinstance(b, dict))
+        print(
+            f"Sent rich message {message_id}; Telegram parsed it into: {kinds or '?'}.",
+            file=sys.stderr,
+        )
+    record_sent(sent_ids, message_id)
+    return message_id
 
 
 async def tsend(arguments):
@@ -1253,12 +1517,29 @@ async def tsend(arguments):
     sent_ids = [] if arguments.get("--print-ids") else None
 
     parse_mode_str = arguments.get("--parse-mode", "markdown")
+    rich_p = parse_mode_rich_p(parse_mode_str)
     message = None
     if edit_mode:
-        message = edit_text_check(arguments["<message>"])
+        if rich_p:
+            message = rich_markdown_check(arguments["<message>"])
+        else:
+            message = edit_text_check(arguments["<message>"])
     elif not (poll_mode or delete_mode):
         arguments["<message>"] = str(arguments["<message>"])
         message = arguments["<message>"]
+        if rich_p:
+            if arguments["--file"]:
+                raise SystemExit(
+                    "--parse-mode=rich cannot be combined with --file: a rich message "
+                    "carries no attachments. Send the files with a separate tsend call."
+                )
+            message = rich_markdown_check(message)
+
+    #: Built before locking and connecting, so a Telethon without rich messages
+    #: fails at once.
+    telethon_rich = None
+    if rich_p and message is not None and backend != 2:
+        telethon_rich = telethon_rich_message(message)
 
     lock_timeout = float(arguments.get("--lock-timeout") or 10)
     lock_path = arguments.get("--lock-path")
@@ -1298,6 +1579,16 @@ async def tsend(arguments):
                         message,
                         parse_mode=ptb_get_parse_mode(parse_mode_str),
                         verbosity=verbosity,
+                        rich_markdown=(message if rich_p else None),
+                    )
+                elif rich_p:
+                    await ptb_send_rich(
+                        bot,
+                        p2int(arguments["<receiver>"]),
+                        markdown=message,
+                        link_preview=arguments["--link-preview"],
+                        verbosity=verbosity,
+                        sent_ids=sent_ids,
                     )
                 else:
                     parse_mode = ptb_get_parse_mode(parse_mode_str)
@@ -1395,6 +1686,16 @@ async def tsend(arguments):
                         #: "none" disables formatting, as for sends below.
                         parse_mode=(None if parse_mode_str == "none" else parse_mode_str),
                         verbosity=verbosity,
+                        rich_message=telethon_rich,
+                    )
+                elif telethon_rich is not None:
+                    await telethon_send_rich(
+                        client,
+                        p2int(arguments["<receiver>"]),
+                        rich_message=telethon_rich,
+                        link_preview=arguments["--link-preview"],
+                        verbosity=verbosity,
+                        sent_ids=sent_ids,
                     )
                 else:
                     # print(arguments)
