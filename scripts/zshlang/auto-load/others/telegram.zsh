@@ -236,6 +236,22 @@ function md2tlg {
     revaldbg tsend "${tsend_opts[@]}" -- "${me_tlg}" "${inargs[*]}"
 }
 
+function md2tlg2 {
+    : "usage: md2tlg2 [<markdown>...]
+Like md2tlg, but as a rich message: Telegram itself renders the tables, headings, task lists and math."
+
+    ensure-array tsend_opts
+    local tsend_opts=(
+        "${tsend_opts[@]}"
+        --parse-mode=rich
+    )
+
+    local inargs
+    in-or-args2 "$@" @RET
+
+    revaldbg tsend "${tsend_opts[@]}" -- "${me_tlg}" "${inargs[*]}"
+}
+
 function org2tlg {
     local dest="${1:-${me_tlg}}"
     tlg-dest-assert "$dest" @RET
@@ -254,6 +270,39 @@ function org2tlg {
     text_md="$(ec "$text" | org2md | sd '\\'"('|\"|#|\|)" '$1')" @TRET
 
     tsend-retry --parse-mode=md -- "${dest}" "$text_md" @RET
+}
+
+function org2tlg2 {
+    : "usage: org2tlg2 [<dest>]  (reads org from stdin, or the clipboard)
+Like org2tlg, but as a rich message: Telegram itself renders the tables, headings, task lists and math."
+
+    ensure-array tsend_opts
+    local opts=("${tsend_opts[@]}")
+    local dest="${1:-${me_tlg}}"
+    tlg-dest-assert "$dest" @RET
+    local text
+    text="$(cat-paste-if-tty)" @TRET
+    text="$(ec "$text" | org-header-rm-shared-level)" @TRET
+
+    #: GitHub-flavored Markdown, which is what Telegram's rich parser reads:
+    #: pipe tables instead of the space-aligned tables [agfi:org2md] writes, and
+    #: `$...$` math instead of GitHub's dollar-backtick form (`-tex_math_gfm`).
+    #: The spelling with an extension also keeps [agfi:pandoc-convert] from
+    #: adding md_code_blocks.lua, which would drop the language of code blocks.
+    #: The perl pass drops the `example` language pandoc gives example blocks.
+    #:
+    #: Unlike org2tlg, nothing is unescaped afterwards. Its `sd` pass exists only
+    #: because Telethon's Markdown parser shows backslash escapes verbatim; this
+    #: parser consumes them, and `\|` inside a table cell is load-bearing.
+    local text_md
+    text_md="$(ec "$text" |
+        @opts from org to gfm-tex_math_gfm @ pandoc-convert |
+        perl -lpe 's/^(```+)\s*example$/$1/')" @TRET
+
+    #: Plain tsend rather than [agfi:tsend-retry]: tsend already retries
+    #: transient failures, and what is left (no rich support, text over the
+    #: limit) is permanent, so retrying forever would hang.
+    revaldbg tsend "${opts[@]}" --parse-mode=rich -- "${dest}" "$text_md"
 }
 
 function org2tlg-with-props {
