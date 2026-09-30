@@ -288,7 +288,12 @@ edit `reload.lua` to change one for good.
 App-scoped modes should use the shared `ModalMode` helpers. qView is defined in
 `auto-load/qview.lua`, exposes `qview_bind_v2` and `qview_bind_v3`, and enters
 while qView is the frontmost app. Its overlay is positioned in the top-left
-corner. App-scoped modes are temporarily suspended while global modes such as
+corner. Its tag keys (g, b, r, n, m, x), `d` (trash) and `SPC c c` (dup) act
+on the file qView showed when the key was pressed: `qviewPathGet` asks qView's
+IPC socket (`/tmp/qview-<uid>.sock`, one JSON request and reply per line)
+over `hs.socket` at once, and the path travels to the garden as an argument.
+Leaving the lookup to zsh inside the garden call could tag, or trash, the next
+image instead. App-scoped modes are temporarily suspended while global modes such as
 Hyper or Purple are active, then re-sync with the frontmost app after the
 global mode stack exits.
 
