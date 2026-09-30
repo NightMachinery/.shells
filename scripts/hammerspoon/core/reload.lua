@@ -1,5 +1,11 @@
+--- hyper+cmd+L: the display off, now, with `pmset displaysleepnow' run here
+--- rather than asked of BrishGarden, so it works while the garden is down.
+--- @duplicateCode/1b519a792bdff17797752db59fc66c6d: display-off in
+--- zshlang/auto-load/others/power.zsh, which is the same pmset call.
 function display_off()
-    brishz_eval_hs("display-off")
+    gardenTask("/usr/bin/pmset", { "displaysleepnow" }, function(code, _, err)
+        if code ~= 0 then print("display_off: pmset exited " .. tostring(code) .. ": " .. err) end
+    end, 5, nil, "display_off")
 end
 hyper_bind_v2{mods={"cmd"}, key="l", pressedfn=display_off}
 ---

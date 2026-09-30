@@ -347,6 +347,8 @@ function display-off-brightness {
 }
 
 function display-off {
+	#: @duplicateCode/1b519a792bdff17797752db59fc66c6d: hyper+cmd+L runs
+	#: `pmset displaysleepnow' itself, display_off in hammerspoon/core/reload.lua.
 	local after="${1:-0}"
 
 	sleep-neon "$after"
