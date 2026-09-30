@@ -44,11 +44,38 @@ end)
 --     to = "pageup",
 -- }
 ---
+-- hyper+F5: toggle the default mic's mute. The common case, a mic with its
+-- own mute control and no soft mute in effect, is done here: flip its
+-- inputMuted, say so, and refresh the menubar. That works while BrishGarden
+-- is down, and skips the round trip. Everything else goes to zsh's
+-- input-volume-mute-toggle, because its soft mute (for an iPhone mic, which
+-- has no mute control) is a state machine in redis that every shell shares
+-- (input_soft_mute_device): a mic with no mute control, or a soft mute in
+-- effect, or a stale claim of one for zsh to clean up. A redis that is down
+-- reads as no soft mute, as it does in zsh.
+-- @duplicateCode/41f14dff47c97b495877bd43aa221281: input-volume-mute-toggle
+-- in zshlang/auto-load/others/system.zsh: the plain-toggle branch, the band's
+-- text, id and time, and the menubar refresh.
 -- You can set hyper+F5 to the dictation command in macOS settings.
-hyper_bind_v1("f5", function()
-                  brishz_eval_hs('awaysh-fast input-volume-mute-toggle')
-                  -- @needed awaysh-fast
-end)
+local kInputMuteAlertId = "volume-mute-input"
+
+function inputMuteToggle()
+    local dev = hs.audiodevice.defaultInputDevice()
+    local muted = dev and dev:inputMuted()
+    local soft = redisGet and redisGet("input_soft_mute_device")
+    if muted == nil or (soft ~= nil and soft ~= "") then
+        brishz_eval_hs('awaysh-fast input-volume-mute-toggle', 'hyper+F5')
+        return
+    end
+
+    dev:setInputMuted(not muted)
+    alert_gateway(dev:inputMuted() and "input muted" or "INPUT UNMUTED",
+                  { id = kInputMuteAlertId, seconds = 2, flashSeconds = 0.35 })
+    gardenTask("/usr/bin/open", { "-g", "xbar://app.xbarapp.com/refreshPlugin?path=date.1m.bash" },
+               function() end, 5, nil, "inputMuteToggle")
+end
+
+hyper_bind_v1("f5", function() inputMuteToggle() end)
 
 -- Bare hyper+F1/F2 steps brightness; hyper+ctrl+F1/F2 steps contrast. Both are
 -- dispatched from the eventtap in core/blackout-lock.lua along with the

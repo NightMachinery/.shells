@@ -178,6 +178,10 @@ function volume-mute-toggle {
 function input-volume-mute-toggle {
     : "toggles the default mic's mute; a mic with no mute control (an iPhone) is soft-muted"
     #: See [agfi:audio-input-soft-mute].
+    #: @duplicateCode/41f14dff47c97b495877bd43aa221281: hyper+F5 does the plain
+    #: toggle in Lua (inputMuteToggle in hammerspoon/core/window-media-bindings.lua)
+    #: and sends only the soft-mute cases here. Keep the band text, id and time
+    #: the same on both sides.
     {
       ##
       # with-input-volume volume-mute-toggle @TRET

@@ -113,6 +113,9 @@ Each of these has a counterpart in zsh, and both copies carry the same
   `core/reload.lua`).
 - hyper+F6, Do Not Disturb: the 'Get Focus', 'Focus Off' and 'Focus Set: Do
   Not Disturb' Shortcuts (`focusDndToggle` in `core/window-media-bindings.lua`).
+- hyper+F5, mic mute, for a mic with its own mute control and no soft mute in
+  effect (`inputMuteToggle` in `core/window-media-bindings.lua`). The iPhone
+  mic's soft mute is a redis state machine that stays in zsh.
 - hyper+d, dismiss notifications: `osascript` on `notif-dismiss-v2.jxa`
   (`core/app-hotkeys.lua`).
 - hyper+g, anycomplete: Google's and DuckDuckGo's suggestions over `hs.http`
