@@ -7,6 +7,10 @@
 #: See [agfi:hs-alert-v2] for the knob, and the "** Gateway" section of
 #: hammerspoon/alert/api.lua for the engine side.
 typeset -g focus_dnd_alert_id='focus-dnd'
+#: @duplicateCode/db397b926549ecdad428d7482282e83e: hyper+F6 toggles Do Not
+#: Disturb in Lua, focusDndToggle in hammerspoon/core/window-media-bindings.lua,
+#: with the same shortcut names, the same "Do Not Disturb" test, and this id
+#: and band text. Change both together.
 ##
 function focus-off {
     if isDarwin ; then

@@ -182,9 +182,48 @@ if not blackoutChordTapStart then
 end
 ---
 
-hyper_bind_v1("F6", function()
-                  brishz_eval_hs('awaysh-fast focus-do-not-disturb-toggle')
-end)
+-- hyper+F6: toggle Do Not Disturb, through the same two Shortcuts as zsh,
+-- run here so it works while BrishGarden is down: 'Get Focus' writes the
+-- current focus to a .txt file (the extension picks the output type), then
+-- 'Focus Off' or 'Focus Set: Do Not Disturb'. The band takes the zsh side's
+-- id, text and timing, so a toggle from either side rewrites the same band.
+-- @duplicateCode/db397b926549ecdad428d7482282e83e: focus-do-not-disturb-toggle,
+-- focus-get, focus-off and focus-do-not-disturb-on in
+-- zshlang/auto-load/others/macOS/focus.zsh.
+local kFocusDndAlertId = "focus-dnd"
+
+local function focusDndBand(text, color)
+    alert_gateway(text, { id = kFocusDndAlertId, seconds = 5, flashSeconds = 0.35, color = color })
+end
+
+function focusDndToggle()
+    local label = "focusDndToggle"
+    local tmp = os.tmpname()
+    os.remove(tmp)
+    tmp = tmp .. ".txt"
+    gardenTask("/usr/bin/shortcuts", { "run", "Get Focus", "-o", tmp }, function(code, _, err)
+        local f = io.open(tmp, "r")
+        local focus = f and f:read("a") or ""
+        if f then f:close() end
+        os.remove(tmp)
+        if code ~= 0 then
+            print(label .. ": Get Focus exited " .. tostring(code) .. ": " .. err)
+            return focusDndBand("Do Not Disturb: could not read the focus (" .. tostring(code) .. ")", "warn")
+        end
+
+        local on = focus:gsub("^%s+", ""):gsub("%s+$", "") == "Do Not Disturb"
+        gardenTask("/usr/bin/shortcuts", { "run", on and "Focus Off" or "Focus Set: Do Not Disturb" },
+                   function(code2, _, err2)
+            if code2 ~= 0 then
+                print(label .. ": shortcut exited " .. tostring(code2) .. ": " .. err2)
+                return focusDndBand("Do Not Disturb: the shortcut failed (" .. tostring(code2) .. ")", "warn")
+            end
+            focusDndBand(on and "Do Not Disturb: off" or "Do Not Disturb: ON")
+        end, 20, nil, label)
+    end, 20, nil, label)
+end
+
+hyper_bind_v1("F6", function() focusDndToggle() end)
 
 hyper_bind_v1("F7", function()
                   -- brishz_eval_hs('awaysh-fast hear-prev')
