@@ -50,8 +50,9 @@ the key `legacy` and released by `caffeinate-off-all`.
 `external-display-brightness.md`. The point of blanking is a dark screen on a
 machine that keeps working, which is exactly an idle-sleep problem.
 hyper+cmd+F1 is the exception. It does not blank anything: it runs
-`display-off-lock`, which gives the key up through `h-blackout-release` before
-it sleeps the panel and locks, so the top rung takes no key and leaves none
+`h-blackout-release`, which gives the key up, before it sleeps the panel and
+locks (the order of `display-off-lock`, done in Lua by `blackoutLockNow` in
+`hammerspoon/core/blackout-lock.lua`), so the top rung takes no key and leaves none
 held. That is tidiness rather than necessity, plus the fact that
 `h-blackout-release` is how the keep-blank loop gets stopped and the key goes
 along with it.
