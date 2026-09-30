@@ -1344,18 +1344,26 @@ and nothing needs the garden or zsh. There are two paths:
 - The **fast path** speaks kitty's remote-control protocol straight to its
   socket through `hs.socket`: one `ESC P @kitty-cmd <JSON> ESC \` message
   each way, with the payload fields documented in `rc_protocol.html` inside
-  the kitty bundle. A show is three calls: `ls` with match `state:active and
-  state:parent_active`, which lists only the active window of each OS
-  window's active tab (the panel's entry is both the window to show and the
-  one to focus), then `resize-os-window` with `action=show`, then
-  `focus-window`. A hide is `ls` plus `resize-os-window` with `action=hide`.
-  A show takes 12 to 19 ms (measured 2026-09-30). About 4 ms of that is
-  kitty answering `ls`, and about 4 ms is `hs.json.decode`, which is slow on
-  kitty's many small nested objects. The protocol version sent is the
-  installed kitty's own (kitty refuses a newer client), cached per kitty
-  process, because reading it from the bundle takes 7 ms.
+  the kitty bundle. The panel state comes from
+  `configFiles/kitty/kitty_panel_state.py`, a no_ui kitten that the RC
+  `kitten` command runs inside kitty: it reads only ids from kitty's tab
+  managers and answers `{win, active, firstTab, strays}` in about 100 bytes
+  and 2 ms. A show is then `resize-os-window` with `action=show` on `win`,
+  and `focus-window` on `active`; a hide is `resize-os-window` with
+  `action=hide`. Measured 2026-09-30 on real presses: a show in 57 to 92 ms,
+  most of it kitty ordering the window in and macOS activating it, and a
+  hide in 8 to 37 ms.
+  `ls` is not used here because it reports every matched window's
+  foreground processes. With hidden tabs (`docs/kitty-tab-hide.md`), each in
+  a hidden OS window of its own, even a two-window `ls` came to 635 KB,
+  which took kitty 40 ms to produce and `hs.json.decode` 100 ms to decode on
+  every press. The protocol version sent is the installed kitty's own (kitty
+  refuses a newer client), cached per kitty process, because reading it
+  from the bundle takes 7 ms.
 - The **slow path** handles everything else: no kitty, no panel yet, stray
-  tabs to fold in, or any fast-path error. Each step is an async `hs.task` on
+  tabs to fold in, or any fast-path error. It uses only kitty's documented
+  `ls` output, so it keeps working even if a kitty update breaks the
+  kitten. Each step is an async `hs.task` on
   `/Applications/kitty.app/Contents/MacOS/kitten @ --to <socket>`, killed
   after 10 s so a wedged kitty cannot pile tasks up. Its panel state comes
   from the full `kitten @ ls`, piped through `jq` in a small `/bin/sh`
@@ -1368,9 +1376,10 @@ and nothing needs the garden or zsh. There are two paths:
   mostly three launches of `kitten`, a 51 MB binary that takes 16 ms to
   start.
 
-Every show prints `kittyPanel: <label>: shown in N ms (fast|kitten)` to the
-console, and every fast hide `hidden in N ms`, so a slowdown or a fall back
-to the slow path is visible there.
+Every show prints `kittyPanel: <label>: shown in N ms (fast|kitten: <step
+times>)` to the console, with the time since the key press, and every fast
+hide `hidden in N ms`, so a slowdown, or a fall back to the slow path, can be
+traced to a step.
 
 `kittyPanelShow` first makes sure there is a panel. When kitty is not running
 it launches it (`open -b net.kovidgoyal.kitty --args --start-as minimized`)

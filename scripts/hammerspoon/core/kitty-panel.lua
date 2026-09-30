@@ -381,14 +381,20 @@ end
 -- protocol is one `ESC P @kitty-cmd <JSON> ESC \' each way; the payload
 -- fields are listed in rc_protocol.html inside the kitty bundle.
 --
--- The fast path reads only what a show or hide needs. `ls' matching
--- `state:active and state:parent_active' lists just the active window of
--- each OS window's active tab (4.5 KB in 3 ms, against 657 KB for the full
--- list), and the panel's entry is both the window to resize and the one to
--- focus. Anything else (no panel yet, no kitty, fold_strays on, any error)
--- goes to the slow path above, which handles every case.
+-- The state does not come from `ls' at all. `ls' reports every matched
+-- window's foreground processes, and a single hidden tab (see
+-- docs/kitty-tab-hide.md) made even a filtered two-window `ls' 635 KB,
+-- which took kitty 40 ms to produce and hs.json 100 ms to decode on every
+-- press. Instead the RC `kitten' command runs
+-- configFiles/kitty/kitty_panel_state.py inside kitty, which reads only ids
+-- from kitty's tab managers and answers in about 100 bytes and 2 ms.
+-- Anything unusual (no panel yet, no kitty, stray tabs to fold, any error)
+-- goes to the slow path above, which uses only kitty's documented `ls'
+-- output, so it keeps working even if a kitty update breaks the kitten.
 
-local kittyPanelFastMatch = "state:active and state:parent_active"
+-- The in-kitty state kitten. `nightdir' comes from init.lua.
+local kittyPanelStateKitten = (nightdir or (os.getenv("HOME") .. "/scripts")) ..
+                              "/configFiles/kitty/kitty_panel_state.py"
 
 -- The protocol version to send: kitty refuses a client newer than itself,
 -- so this is the installed kitty's own version. Cached per kitty process,
@@ -413,7 +419,9 @@ end
 
 -- One remote-control call: cb(true, data) or cb(false, err), exactly once.
 -- `data' is the reply's `data' field (a JSON string for ls), possibly nil.
-local function kittyRC(path, cmd, payload, cb)
+-- `trace', when given, is called with "conn" once connected and "reply" when
+-- the raw reply is in, for the timing line.
+local function kittyRC(path, cmd, payload, cb, trace)
     local frame = "\27P@kitty-cmd" ..
                   hs.json.encode({ cmd = cmd, version = kittyRCVersion(), payload = payload }) ..
                   "\27\\"
@@ -433,6 +441,7 @@ local function kittyRC(path, cmd, payload, cb)
     end
 
     sock = hs.socket.new(function(raw)
+        if trace then trace(string.format("reply(%d B)", #raw)) end
         local body = raw:match("^\27P@kitty%-cmd(.*)\27\\$")
         local ok, reply = pcall(hs.json.decode, body or "")
         if not ok or type(reply) ~= "table" then return finish(false, cmd .. ": unreadable reply") end
@@ -447,33 +456,38 @@ local function kittyRC(path, cmd, payload, cb)
     timer = kittyPanelAfter(2, function() finish(false, cmd .. ": no reply within 2 s") end)
 
     sock:connect(path, function()
+        if trace then trace("conn") end
         sock:write(frame)
         sock:read("\27\\")
     end)
 end
 
--- cb(win) with the panel's active window, or cb(nil, why); why is
--- "no panel" when kitty answered but has none.
-local function kittyPanelFastState(path, cb)
-    kittyRC(path, "ls", { match = kittyPanelFastMatch }, function(ok, data)
+-- cb(state) with the fields of kitty_panel_state.py (win, active, firstTab,
+-- strays), or cb(nil, why); why is "no panel" when kitty answered but has
+-- none. `match = "all"' makes sure kitty has a window to run the kitten
+-- over even when none of its windows has focus.
+local function kittyPanelFastState(path, cb, trace)
+    kittyRC(path, "kitten", { kitten = kittyPanelStateKitten, match = "all" }, function(ok, data)
         if not ok then return cb(nil, data) end
-        local okj, osws = pcall(hs.json.decode, data or "")
-        if not okj or type(osws) ~= "table" then return cb(nil, "ls: unreadable list") end
-
-        for _, osw in ipairs(osws) do
-            if osw.wm_class == kittyPanelClass then
-                for _, tab in ipairs(osw.tabs or {}) do
-                    for _, w in ipairs(tab.windows or {}) do
-                        return cb(w.id)
-                    end
-                end
-            end
-        end
-        cb(nil, "no panel")
-    end)
+        local okj, st = pcall(hs.json.decode, data or "")
+        if not okj or type(st) ~= "table" then return cb(nil, "kitten: unreadable state: " .. tostring(data)) end
+        st.strays = st.strays or {}
+        if not st.win then return cb(nil, "no panel") end
+        cb(st)
+    end, trace)
 end
 
 --- ** Show and hide
+
+-- ", N ms since the key press" when a press is recent (kittyHandler in
+-- core/window-media-bindings.lua records kittyPressAt), else "". It shows how
+-- long the main thread was busy before this file even started.
+function kittySincePress()
+    if not kittyPressAt then return "" end
+    local ms = (hs.timer.absoluteTime() - kittyPressAt) / 1e6
+    if ms > 2000 then return "" end
+    return string.format(", %.1f ms since the key press", ms)
+end
 
 -- One show at a time: a second press while the first is still creating the
 -- panel would otherwise create a second one. The watchdog frees the key if a
@@ -492,6 +506,12 @@ function kittyPanelShow(label)
     kittyPanelShowBusy = token
     local t0 = hs.timer.absoluteTime()
     local route = "fast"
+    local steps = {}
+
+    -- Milliseconds since t0, for the step list in the console line.
+    local function mark(name)
+        steps[#steps + 1] = string.format("%s %.1f", name, (hs.timer.absoluteTime() - t0) / 1e6)
+    end
     local watchdog = kittyPanelAfter(30, function()
         if kittyPanelShowBusy == token then
             kittyPanelShowBusy = nil
@@ -505,8 +525,10 @@ function kittyPanelShow(label)
         watchdog:stop()
         kittyPanelLive[watchdog] = nil
         if err then return kittyPanelFail(label .. ": " .. err) end
-        print(string.format("kittyPanel: %s: shown in %.1f ms (%s)", label,
-                            (hs.timer.absoluteTime() - t0) / 1e6, route))
+        print(string.format("kittyPanel: %s: shown in %.1f ms (%s%s)%s", label,
+                            (hs.timer.absoluteTime() - t0) / 1e6, route,
+                            #steps > 0 and (": " .. table.concat(steps, ", ")) or "",
+                            kittySincePress()))
     end
 
     local function slow(why)
@@ -518,19 +540,24 @@ function kittyPanelShow(label)
     end
 
     local path = kittySocketPath()
-    if not path or kitty_panel_fold_strays then return slow() end
+    if not path then return slow() end
 
-    kittyPanelFastState(path, function(win, why)
-        if not win then return slow(why) end
+    kittyPanelFastState(path, function(st, why)
+        mark("state")
+        if not st then return slow(why) end
+        if kitty_panel_fold_strays and #st.strays > 0 then return slow() end
 
-        kittyRC(path, "resize-os-window", { match = kittyMatchID(win), action = "show" }, function(ok, err)
+        kittyRC(path, "resize-os-window", { match = kittyMatchID(st.win), action = "show" }, function(ok, err)
+            mark("show")
             if not ok then return slow(err) end
-            kittyRC(path, "focus-window", { match = kittyMatchID(win) }, function(ok2, err2)
+            if not st.active then return done() end
+            kittyRC(path, "focus-window", { match = kittyMatchID(st.active) }, function(ok2, err2)
+                mark("focus")
                 if not ok2 then return slow(err2) end
                 done()
             end)
         end)
-    end)
+    end, mark)
 end
 
 -- Hides the panel. No kitty, no panel: nothing to do. A stray normal window
@@ -541,14 +568,16 @@ function kittyPanelHide(label)
     if not path then return end
 
     local t0 = hs.timer.absoluteTime()
-    kittyPanelFastState(path, function(win, why)
-        if win then
-            return kittyRC(path, "resize-os-window", { match = kittyMatchID(win), action = "hide" }, function(ok, err)
+    kittyPanelFastState(path, function(st, why)
+        local tState = (hs.timer.absoluteTime() - t0) / 1e6
+        if st then
+            return kittyRC(path, "resize-os-window", { match = kittyMatchID(st.win), action = "hide" }, function(ok, err)
                 if not ok then
                     print("kittyPanel: " .. label .. ": fast hide failed (" .. err .. "); using kitten")
                     return kittyPanelHideSlow(label)
                 end
-                print(string.format("kittyPanel: %s: hidden in %.1f ms", label, (hs.timer.absoluteTime() - t0) / 1e6))
+                print(string.format("kittyPanel: %s: hidden in %.1f ms (state %.1f)%s", label,
+                                    (hs.timer.absoluteTime() - t0) / 1e6, tState, kittySincePress()))
             end)
         end
         if why == "no panel" then return end
@@ -566,10 +595,14 @@ function kittyPanelInspect()
     if not path then return end
 
     local t0 = hs.timer.absoluteTime()
-    kittyPanelFastState(path, function(win, why)
+    kittyPanelFastState(path, function(st, why)
         local ms = (hs.timer.absoluteTime() - t0) / 1e6
-        print(string.format("kittyPanelInspect: fast: win=%s%s (%.1f ms)",
-                            tostring(win), win and "" or (" (" .. tostring(why) .. ")"), ms))
+        if st then
+            print(string.format("kittyPanelInspect: fast: win=%s active=%s firstTab=%s strays=%d (%.1f ms)",
+                                tostring(st.win), tostring(st.active), tostring(st.firstTab), #st.strays, ms))
+        else
+            print(string.format("kittyPanelInspect: fast: %s (%.1f ms)", tostring(why), ms))
+        end
 
         local t1 = hs.timer.absoluteTime()
         kittyPanelList("unix:" .. path, function(st, err)
