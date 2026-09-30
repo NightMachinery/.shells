@@ -89,11 +89,21 @@ EOF
 alias mac-mail-log="sudo log stream --predicate  '(process == \"smtpd\") || (process == \"smtp\")' --info" #this command starts filtering, so after that you get log messages when you start accessing smtp.
 ##
 function os-lock {
-    : "Command+Ctrl+q locks natively; Use lock.as to press them ;)) (Needs assistive access)"
+    : "Locks the session, then sleeps the display. Command+Ctrl+q locks natively; Use lock.as to press them ;)) (Needs assistive access)"
 
     @darwinOnly
 
-    "/System/Library/CoreServices/Menu Extras/User.menu/Contents/Resources/CGSession" -suspend @RET
+    #: `CGSession -suspend' was the way, and macOS 14 no longer ships that
+    #: binary: this failed before locking anything, so display-off-lock only
+    #: slept the panel. Hammerspoon's hs.caffeinate.lockScreen is what the
+    #: blackout rungs lock with (blackoutLockNow in
+    #: hammerspoon/core/blackout-lock.lua).
+    local cgsession="/System/Library/CoreServices/Menu Extras/User.menu/Contents/Resources/CGSession"
+    if [[ -x "$cgsession" ]] ; then
+        "$cgsession" -suspend @RET
+    else
+        hammerspoon -c 'hs.caffeinate.lockScreen()' @RET
+    fi
     pmset displaysleepnow @RET
 }
 ##

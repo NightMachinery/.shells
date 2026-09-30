@@ -45,8 +45,9 @@ that does not use any of this. It ends whatever blackout is up, turns the panel
 off and locks the session, in the order of `display-off-lock`:
 `h-blackout-release`, then the panel off, then the lock. Since 2026-09-30 the
 last two are done in Lua (`blackoutLockNow` in
-`hammerspoon/core/blackout-lock.lua`), because `os-lock` needs a `CGSession`
-binary that macOS 14 no longer ships. Nothing here is left asserted afterwards,
+`hammerspoon/core/blackout-lock.lua`), because `os-lock` needed a `CGSession`
+binary that macOS 14 no longer ships (it now locks through Hammerspoon when the
+binary is missing). Nothing here is left asserted afterwards,
 and the way back is whatever wakes a sleeping display rather than anything of
 ours. It was built the other way first, as a blackout that locked, and that
 combination has no exit: the keep-blank loop goes on writing brightness 0 at a
