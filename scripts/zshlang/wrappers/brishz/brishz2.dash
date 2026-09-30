@@ -1,5 +1,8 @@
 #!/usr/bin/env dash
 
-export PATH="$PATH:/usr/local/bin"
+#: /opt/homebrew/bin is for jq. Callers such as Hammerspoon's pipe.lua run us
+#: with launchd's bare PATH (/usr/bin:/bin:/usr/sbin:/sbin), where brishz.dash
+#: then fails with "jq: not found" and curl posts an empty body (exit 22).
+export PATH="$PATH:/usr/local/bin:/opt/homebrew/bin"
 
 brishz_quote=y brishz.dash "$@"
