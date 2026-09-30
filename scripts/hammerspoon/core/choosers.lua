@@ -471,9 +471,54 @@ end
 _G["wifi-chooser"] = wifiChooser
 hyper_bind_v2{mods={}, key="w", pressedfn=wifiChooser}
 ---
+-- Search suggestions for anycomplete: Google's, or DuckDuckGo's when Google
+-- fails, straight over hs.http rather than through BrishGarden, so hyper+g
+-- works while the garden is down. The old path also formatted the query into
+-- a zsh command with Lua's %q, which is not shell quoting: a `$(...)' in the
+-- clipboard ran in the garden. cb(list of strings) is called once.
+-- @duplicateCode/75d37f39797b269628a76eff06708a21: autosuggestions-gateway,
+-- autosuggestions-goo and autosuggestions-ddg in
+-- zshlang/auto-load/others/web.zsh: the endpoints, the user agent, and an
+-- empty query meaning the clipboard.
+local kSuggestHeaders = {
+    ["User-Agent"] = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/107.0.0.0 Safari/537.36",
+}
+
+local function suggestTrim(s)
+    return (tostring(s or ""):gsub("^%s+", ""):gsub("%s+$", ""))
+end
+
+function anycompleteSuggest(query, cb)
+    local q = suggestTrim(query)
+    if q == "" then q = suggestTrim(hs.pasteboard.getContents()) end
+    if q == "" then return cb({}) end
+    local enc = hs.http.encodeForQuery(q)
+
+    hs.http.asyncGet("http://suggestqueries.google.com/complete/search?client=firefox&ie=utf-8&oe=utf-8&q=" .. enc,
+                     kSuggestHeaders, function(status, body)
+        local ok, j = pcall(hs.json.decode, body or "")
+        if status == 200 and ok and type(j) == "table" and type(j[2]) == "table" then
+            return cb(j[2])
+        end
+        hs.http.asyncGet("https://duckduckgo.com/ac/?q=" .. enc, kSuggestHeaders, function(status2, body2)
+            local ok2, j2 = pcall(hs.json.decode, body2 or "")
+            local out = {}
+            if status2 == 200 and ok2 and type(j2) == "table" then
+                for _, e in ipairs(j2) do
+                    if type(e) == "table" and e.phrase then out[#out + 1] = e.phrase end
+                end
+            end
+            cb(out)
+        end)
+    end)
+end
+
 function anycomplete()
     local timer
-    local myTask = nil
+    -- Which refresh is current: an answer for an older query arrives late and
+    -- is dropped, since hs.http requests cannot be cancelled.
+    local generation = 0
+    local refreshChoices
     local tab = nil
     local antitab = nil
 
@@ -522,26 +567,18 @@ function anycomplete()
     --     end
     --     return out
     -- end)
-    function refreshChoices()
-        if myTask then
-            myTask:terminate()
-            myTask = nil
-        end
-        local q = c:query()
-        local cmd = ("autosuggestions-gateway %q"):format(q)
-        -- print("cmd: " .. cmd)
-        myTask = hs.task.new("/usr/local/bin/brishz2.dash",
-                             function(exitCode, stdOut, stdErr)
-                                 local res = stdOut
-                                 local out = {}
-                                 for l in res:gmatch("([^\r\n]+)\r?\n?") do
-                                     table.insert(out, {["text"] = l})
-                                 end
-                                 c:choices(out)
-                             end, {cmd})
-        if myTask  then
-            myTask:start()
-        end
+    refreshChoices = function()
+        generation = generation + 1
+        local mine = generation
+        local chooser = c
+        anycompleteSuggest(chooser:query(), function(list)
+            if mine ~= generation then return end
+            local out = {}
+            for _, l in ipairs(list) do
+                out[#out + 1] = { ["text"] = tostring(l) }
+            end
+            chooser:choices(out)
+        end)
     end
     c:queryChangedCallback(function(query)
             if timer and timer:running() then

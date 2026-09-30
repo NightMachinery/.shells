@@ -1,5 +1,8 @@
+#: @duplicateCode/75d37f39797b269628a76eff06708a21: hyper+g asks the same two
+#: endpoints from Lua, anycompleteSuggest in hammerspoon/core/choosers.lua.
+#: ie/oe pin the answer to UTF-8 whatever Google guesses from the address.
 function autosuggestions-goo() {
-    curl-useragent "http://suggestqueries.google.com/complete/search?client=firefox&q=$(ecn "$*"|url-encode.py)" | jqm '.[1] | .[]' || autosuggestions-ddg "$@"
+    curl-useragent "http://suggestqueries.google.com/complete/search?client=firefox&ie=utf-8&oe=utf-8&q=$(ecn "$*"|url-encode.py)" | jqm '.[1] | .[]' || autosuggestions-ddg "$@"
 }
 function autosuggestions-ddg() {
     curl-useragent "https://duckduckgo.com/ac/?q=$(ecn "$*"|url-encode.py)" | jqm '.[]|.phrase'
