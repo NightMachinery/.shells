@@ -59,6 +59,17 @@ handler starts, and entering hyper mode takes 10.5 ms (4.4 ms enabling its 71
 keys, 6.1 ms in `entered()`), which only delays a key pressed within that time
 of hyper.
 
+How the app comes forward is set by the global `app_hotkey_activate_via_ax`
+(default `false`). With `false`, the hotkey calls `app:unhide()`, since the
+second press of a hotkey hides its app, and then `app:_bringtofront(false)`,
+the call `hs.application:activate()` itself ends with
+(`SetFrontProcessWithOptions`, front window only). With `true` it calls
+`activate()` as it is, which first asks the target app over Accessibility for
+its focused window and makes it main: 3 to 8 ms of round trips to an app that
+answers promptly, and unbounded for one that does not. Set it to `true` in a
+file that loads earlier, or from the console, if an app with several windows,
+on several spaces say, ever comes forward with the wrong one.
+
 ## The ipc print recursion fix
 
 `hs -c` used to wedge whenever anything printed to the Hammerspoon console

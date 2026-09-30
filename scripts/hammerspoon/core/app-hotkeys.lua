@@ -143,6 +143,26 @@ appSwitchWatcher = hs.application.watcher.new(function(_, event, app)
 end)
 appSwitchWatcher:start()
 
+-- How an app hotkey brings its app forward.
+--
+-- false (the default): straight to the window server. unhide() first, since
+-- the second press of a hotkey hides its app; it is a no-op on a visible app.
+-- Then _bringtofront(false), the call hs.application:activate() itself ends
+-- with (SetFrontProcessWithOptions, front window only).
+--
+-- true: hs.application:activate() as it is, which before that asks the
+-- target app over Accessibility for its focused window and makes it main.
+-- That is 3 to 8 ms of round trips to an app that answers promptly, and
+-- unbounded when it does not. Switch this on if an app with several windows
+-- (on several spaces, say) ever comes forward with the wrong one.
+app_hotkey_activate_via_ax = app_hotkey_activate_via_ax or false
+
+local function appBringForward(app)
+    if app_hotkey_activate_via_ax then return app:activate() end
+    app:unhide()
+    return app:_bringtofront(false)
+end
+
 local function toggleFocusApp(app)
     local t0 = hs.timer.absoluteTime()
     local hyperNote = appSwitchHyperNote(t0)
@@ -154,7 +174,7 @@ local function toggleFocusApp(app)
         return
     end
 
-    app:activate()
+    appBringForward(app)
     local pending = { pid = app:pid(), name = app:name() or "?", t0 = t0,
                       handlerMs = appSwitchMs(t0, hs.timer.absoluteTime()), hyperNote = hyperNote }
     appSwitchPending = pending
