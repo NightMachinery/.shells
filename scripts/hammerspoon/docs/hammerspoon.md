@@ -50,7 +50,9 @@ Telegram and falls back to standard Telegram.
 Every press prints one console line, so a slow switch can be traced to where
 the time went: `appHotkey: <app>: activated N ms after the handler started
 (handler M ms; K ms after hyper went down (entering took E: keys A, entered()
-B))`, or `hidden` for a press that hides, or `no activation within 1 s`.
+B))`, or `no activation within 1 s`. A press that hides prints `returning to
+<app>` and then `hidden N ms after the handler started, once <app> had
+activated`.
 `appSwitchWatcher`, an `hs.application.watcher`, finishes the line when macOS
 reports the activation; `mode.down` in `modal-mode.lua` and
 `hyper_modality:entered` record the hyper timestamps. Measured 2026-09-30:
@@ -69,6 +71,30 @@ its focused window and makes it main: 3 to 8 ms of round trips to an app that
 answers promptly, and unbounded for one that does not. Set it to `true` in a
 file that loads earlier, or from the console, if an app with several windows,
 on several spaces say, ever comes forward with the wrong one.
+
+The second press of a hotkey hides its app and returns you to the app you were
+in before. Left to itself, macOS activates an app of its own choosing when the
+frontmost app hides: hyper+x, hyper+k, hyper+k landed in Telegram rather than
+Emacs. The "recent apps" list, `recentApps`, holds the apps activated most
+recently, newest first, one entry per process; `recentAppsWatcher`, an
+`hs.application.watcher`, feeds it on every activation, so it follows every
+switch whatever made it, and nothing enumerates windows
+(`hs.window.orderedWindows` asks every process through Accessibility, and the
+"Handy Web Content" processes take 1.5 s each to answer; see
+`axLatencyReport`). The "transient apps" in `recentAppsTransient` never enter
+it, since they take focus for a moment and give it back: Hammerspoon itself,
+for choosers and the Secure Input webview; Maccy, whose popup is the hyper+v
+passthrough key; and Handy, whose dictation overlay is cmd+'. A password
+dialog such as sudo's askpass does enter it, and has quit by the next hide;
+the entries behind it are why this is a list and not one app.
+
+On a hide, the return target is the newest entry that is still running and not
+hidden (`appReturnUsable`: you hid that one on purpose). It is brought forward
+first, and the app is hidden only once the target's activation arrives
+(`appHideWatcher`), or after a second if it never does: hiding the app while it
+is still frontmost would let macOS choose again. When the target is kitty in
+panel mode, it comes back through `kittyPanelShow`, since kitty activating
+shows nothing by itself. With no target the app is simply hidden.
 
 ## The ipc print recursion fix
 
@@ -1463,27 +1489,15 @@ it is moved there.
 Both modes share two things. The first is the launch: kitty quits when its
 last window closes (`macos_quit_when_last_window_closed`), so "not running" is
 a normal state and the key has to start it. The second is the return of focus
-after a hide, which macOS will not do for you. `kittyReturnTo` holds the last
-activated app other than kitty and the transient apps in
-`kittyTransientBundles`: Hammerspoon itself, for choosers and the Secure Input
-webview; Maccy, whose popup is the hyper+v passthrough key; and Handy, whose
-dictation overlay is cmd+'. It is kept by `kittyFocusWatcher`, an
-`hs.application.watcher`, so the memory is refreshed by every switch you make
-and is never stale. The handler reads it at press time, before the hide,
-because the activation the hide causes would overwrite it; then
-`kittyFocusAfterHide` focuses the first of those candidates that is still
-running (its focused window, falling back to `activate()`, inside `pcall`).
-The candidates are `kittyReturnTo` and then `kittyReturnHistory`, the last
-six apps, newest first: a password dialog becomes the return target when it
-takes focus and has quit by the time kitty is hidden again, so the hide
-falls back to the app before it instead of leaving focus in an invisible
-kitty. Nothing in the
-kitty path enumerates windows: `hs.window.orderedWindows` asks every process
-through Accessibility, and the "Handy Web Content" processes take 1.5 s each
-to answer (see `axLatencyReport` in `core/app-hotkeys.lua`). In panel mode the
-same watcher also hides the panel when any non-transient app is activated, by
-an app hotkey, Cmd-Tab or a click, because an overlay cannot go behind the app
-you switch to.
+after a hide, which macOS will not do for you. The candidates are the "recent
+apps" list of `core/app-hotkeys.lua` (see "App hotkeys" above) without kitty,
+read at press time, before the hide, because the activation the hide causes
+would change it. `kittyFocusAfterHide` then focuses the first candidate that
+is still running and not hidden (its focused window, falling back to
+`activate()`, inside `pcall`). In panel mode `kittyFocusWatcher`, an
+`hs.application.watcher`, also hides the panel when any non-transient app is
+activated, by an app hotkey, Cmd-Tab or a click, because an overlay cannot go
+behind the app you switch to.
 
 Every press logs one line to the Hammerspoon console, `kittyHandler: press
 (<mode>); kitty <frontmost|running|not running>; frontmost=<app>; ->

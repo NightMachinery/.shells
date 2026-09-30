@@ -373,57 +373,22 @@ local function kittyStandardWindow(app)
     return nil
 end
 
--- Where hiding puts you back. An application watcher keeps the last app
--- other than kitty that was activated, so the memory is refreshed by every
--- switch you make and is never stale (the old `kitty_prev_app' was, whenever
+-- Where hiding puts you back: the newest app in recentApps
+-- (core/app-hotkeys.lua) other than kitty, read at press time. The same
+-- list the app hotkeys return through, fed by an application watcher on
+-- every switch, so it is never stale (the old `kitty_prev_app' was, whenever
 -- kitty had been reached by another route, and nil after every reload).
--- Nothing here enumerates windows: hs.window.orderedWindows asks every
--- process through Accessibility, and the "Handy Web Content" processes take
--- 1.5 s each to answer (see axLatencyReport in core/app-hotkeys.lua).
---
--- Apps that take focus for a moment and give it back must not become the
--- return target: Maccy's popup (hyper+v is a passthrough key), Handy's
--- dictation overlay (cmd+'), Hammerspoon itself for choosers and the Secure
--- Input webview on hyper.
-local kittyReturnTo = nil
-
--- The apps before it, newest first, so that a return target which has quit
--- since hands over to the one before: a password dialog (sudo's askpass, say)
--- becomes the return target when it takes focus, and is gone by the time you
--- hide kitty again.
-local kittyReturnHistory = {}
-local kittyReturnHistoryMax = 6
-
-local function kittyReturnPush(app)
-    kittyReturnTo = app
-    local pid = app:pid()
-    for i = #kittyReturnHistory, 1, -1 do
-        local ok, same = pcall(function() return kittyReturnHistory[i]:pid() == pid end)
-        if not ok or same then table.remove(kittyReturnHistory, i) end
-    end
-    table.insert(kittyReturnHistory, 1, app)
-    kittyReturnHistory[kittyReturnHistoryMax + 1] = nil
-end
-
--- Where a hide should return to, read at press time (see kittyPanelToggle):
--- kittyReturnTo first, then the history.
 local function kittyReturnCandidates()
-    local list = { kittyReturnTo }
-    for _, a in ipairs(kittyReturnHistory) do list[#list + 1] = a end
-    return list
+    return recentAppsCandidates(function(bid) return bid == kittyBundleID end)
 end
-local kittyTransientBundles = {
-    ["org.hammerspoon.Hammerspoon"] = true,
-    ["org.p0deje.Maccy"] = true,
-    ["com.pais.handy"] = true,
-}
 
--- Focuses the first candidate that is still running. A dead
--- hs.application raises or answers nil, hence the pcall.
+-- Focuses the first candidate that is still running and not hidden
+-- (appReturnUsable). A dead hs.application raises or answers nil, hence the
+-- pcall.
 local function kittyFocusAfterHide(candidates)
     for _, back in ipairs(candidates or {}) do
         local ok, done = pcall(function()
-            if not back:isRunning() then return false end
+            if not appReturnUsable(back) then return false end
             local win = back:focusedWindow()
             if win then win:focus() else back:activate() end
             return true
@@ -432,8 +397,8 @@ local function kittyFocusAfterHide(candidates)
     end
 end
 
--- In panel mode the watcher also hides the panel when kitty is left by any
--- other route (an app hotkey, Cmd-Tab, a click): a panel floats above
+-- In panel mode this watcher hides the panel when kitty is left by any route
+-- other than hyper+z (an app hotkey, Cmd-Tab, a click): a panel floats above
 -- fullscreen windows, so unlike a normal window it cannot be put behind the
 -- app you just switched to. kitty's own hide-on-focus-loss would do this too,
 -- but it also hides on Maccy and Handy. The check is one Accessibility query
@@ -446,9 +411,7 @@ end
 kittyFocusWatcher = hs.application.watcher.new(function(_, event, app)
     if event ~= hs.application.watcher.activated or not app then return end
     local bid = app:bundleID()
-    if bid == kittyBundleID or kittyTransientBundles[bid] then return end
-
-    kittyReturnPush(app)
+    if bid == kittyBundleID or recentAppsTransient[bid] then return end
 
     if kitty_hotkey_mode == "panel" then
         local kitty = getApp(kittyBundleID)
@@ -459,10 +422,10 @@ kittyFocusWatcher = hs.application.watcher.new(function(_, event, app)
 end)
 kittyFocusWatcher:start()
 
+-- The app in front when kitty was asked for. recentAppsWatcher has it
+-- already, unless it came to the front before the last reload.
 local function kittyRemember(front)
-    if front and front:bundleID() ~= kittyBundleID and not kittyTransientBundles[front:bundleID()] then
-        kittyReturnPush(front)
-    end
+    if front then recentAppsPush(front) end
 end
 
 --- ** Panel mode

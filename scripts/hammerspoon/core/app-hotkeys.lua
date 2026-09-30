@@ -108,6 +108,71 @@ function focusApp(appName)
     end
 end
 
+--- * Recent apps
+--
+-- The apps activated most recently, newest first, one entry per process:
+-- where a hide returns you to. The app hotkeys (the second press hides) and
+-- the kitty toggle (core/window-media-bindings.lua) both read it. An
+-- application watcher feeds it on every activation, so it follows every
+-- switch, whatever made it, and nothing here enumerates windows:
+-- hs.window.orderedWindows asks every process through Accessibility, and the
+-- "Handy Web Content" processes take 1.5 s each to answer.
+--
+-- Apps that take focus for a moment and give it back are left out, so they
+-- never become a return target: Maccy's popup (hyper+v is a passthrough
+-- key), Handy's dictation overlay (cmd+'), and Hammerspoon itself, for
+-- choosers and the Secure Input webview on hyper. A password dialog (sudo's
+-- askpass, say) does get in, and is gone by the next hide; the entries
+-- behind it are why this is a list and not one app.
+recentAppsTransient = {
+    ["org.hammerspoon.Hammerspoon"] = true,
+    ["org.p0deje.Maccy"] = true,
+    ["com.pais.handy"] = true,
+}
+
+recentApps = {}
+local recentAppsMax = 8
+
+function recentAppsPush(app)
+    local ok, bid, pid = pcall(function() return app:bundleID(), app:pid() end)
+    if not ok or not pid or recentAppsTransient[bid] then return end
+    for i = #recentApps, 1, -1 do
+        local okp, same = pcall(function() return recentApps[i]:pid() == pid end)
+        if not okp or same then table.remove(recentApps, i) end
+    end
+    table.insert(recentApps, 1, app)
+    recentApps[recentAppsMax + 1] = nil
+end
+
+--- The recent apps, newest first, less those skip(bundleID, pid) rejects.
+--- Read it at press time: the switch the press causes updates the list.
+function recentAppsCandidates(skip)
+    local list = {}
+    for _, a in ipairs(recentApps) do
+        local ok, keep = pcall(function() return not (skip and skip(a:bundleID(), a:pid())) end)
+        if ok and keep then list[#list + 1] = a end
+    end
+    return list
+end
+
+--- Whether `app' can take focus back: still running, and not hidden (you
+--- hid it on purpose). A dead hs.application raises or answers nil, hence
+--- the pcall. isHidden is one Accessibility query to that app alone.
+function appReturnUsable(app)
+    local ok, usable = pcall(function() return app:isRunning() and not app:isHidden() end)
+    return ok and usable or false
+end
+
+-- Global, so it is not collected.
+recentAppsWatcher = hs.application.watcher.new(function(_, event, app)
+    if event == hs.application.watcher.activated and app then recentAppsPush(app) end
+end)
+recentAppsWatcher:start()
+do
+    local front = hs.application.frontmostApplication()
+    if front then recentAppsPush(front) end
+end
+
 -- One console line per press, so a slow switch can be traced to where the
 -- time went: waiting for hyper mode to be entered (a key pressed right after
 -- hyper waits for all of it), the handler itself, or the target app, whose
@@ -163,14 +228,83 @@ local function appBringForward(app)
     return app:_bringtofront(false)
 end
 
+-- The second press of an app's hotkey hides the app and returns you to the
+-- app you were in before it. Left to itself, macOS activates an app of its
+-- own choosing when the frontmost app hides: hyper+x, hyper+k, hyper+k
+-- landed in Telegram rather than Emacs. So the return target, the newest
+-- entry of recentApps that is still running and not hidden, is brought
+-- forward first, and the app is hidden only once the target has activated
+-- (or after a second, if it never does): hiding the app while it is still
+-- frontmost would let macOS choose again. In panel mode the kitty panel
+-- comes back through kittyPanelShow, since kitty activating shows nothing by
+-- itself. With no target the app is simply hidden, as before.
+--
+-- appHidePending is the hide waiting for its target; the activation watcher
+-- below finishes it. Global, like appSwitchPending.
+appHidePending = nil
+
+-- `why' is nil when the return target activated, else why the hide went
+-- ahead without that.
+local function appHideFinish(why)
+    local p = appHidePending
+    if not p then return end
+    appHidePending = nil
+    hsCancel(p.timer)
+    pcall(function() p.app:hide() end)
+    print(string.format("appHotkey: %s: hidden %.1f ms after the handler started, %s",
+                        p.name, appSwitchMs(p.t0, hs.timer.absoluteTime()),
+                        why and (why .. "; " .. p.backName .. " was the return target")
+                            or ("once " .. p.backName .. " had activated")))
+end
+
+local function appReturnTarget(app)
+    local pid = app:pid()
+    for _, a in ipairs(recentAppsCandidates(function(_, apid) return apid == pid end)) do
+        if appReturnUsable(a) then return a end
+    end
+    return nil
+end
+
+local function appHideReturning(app, t0, hyperNote)
+    appHideFinish("superseded by another hide")
+
+    local name = app:name() or "?"
+    local back = appReturnTarget(app)
+    if not back then
+        app:hide()
+        print(string.format("appHotkey: %s: hidden, no app to return to (handler %.1f ms%s)", name,
+                            appSwitchMs(t0, hs.timer.absoluteTime()), hyperNote))
+        return
+    end
+
+    local pending = { app = app, name = name, backPid = back:pid(), backName = back:name() or "?", t0 = t0 }
+    appHidePending = pending
+    pending.timer = hsAfter(1, function()
+        if appHidePending == pending then appHideFinish("no activation within 1 s") end
+    end)
+
+    if back:bundleID() == "net.kovidgoyal.kitty" and kitty_hotkey_mode == "panel" and kittyPanelShow then
+        kittyPanelShow("appHotkey")
+    else
+        appBringForward(back)
+    end
+    print(string.format("appHotkey: %s: returning to %s (handler %.1f ms%s)", name, pending.backName,
+                        appSwitchMs(t0, hs.timer.absoluteTime()), hyperNote))
+end
+
+appHideWatcher = hs.application.watcher.new(function(_, event, app)
+    local p = appHidePending
+    if not p or event ~= hs.application.watcher.activated or not app then return end
+    if app:pid() == p.backPid then appHideFinish() end
+end)
+appHideWatcher:start()
+
 local function toggleFocusApp(app)
     local t0 = hs.timer.absoluteTime()
     local hyperNote = appSwitchHyperNote(t0)
 
     if app:isFrontmost() then
-        app:hide()
-        print(string.format("appHotkey: %s: hidden (handler %.1f ms%s)", app:name() or "?",
-                            appSwitchMs(t0, hs.timer.absoluteTime()), hyperNote))
+        appHideReturning(app, t0, hyperNote)
         return
     end
 
@@ -178,9 +312,7 @@ local function toggleFocusApp(app)
     local pending = { pid = app:pid(), name = app:name() or "?", t0 = t0,
                       handlerMs = appSwitchMs(t0, hs.timer.absoluteTime()), hyperNote = hyperNote }
     appSwitchPending = pending
-    -- Kept on `pending', which appSwitchPending holds, so it is not collected
-    -- before it fires.
-    pending.timer = hs.timer.doAfter(1, function()
+    hsAfter(1, function()
         if appSwitchPending ~= pending then return end
         appSwitchPending = nil
         print(string.format("appHotkey: %s: no activation within 1 s (handler %.1f ms%s)",
