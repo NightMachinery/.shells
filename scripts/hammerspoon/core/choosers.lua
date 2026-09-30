@@ -46,15 +46,25 @@ end
 --
 function ntagFinder()
     -- allows you to add (use enter or tab) or remove (shift+tab) tags from the selected files in Finder.
+    --
+    -- Every garden call here is asynchronous and takes an argument list. The
+    -- choices used to come from a synchronous brishz_eval on every keystroke,
+    -- which froze Hammerspoon for the round trip, and the query and the tag
+    -- went into zsh command strings through Lua's %q, which is not shell
+    -- quoting: a `$(...)' in either would have run in the garden.
     ---
     local timer
     local tab = nil
     local antitab = nil
+    local label = "ntagFinder"
+    -- Which refresh is current, so that a late answer for an older query is
+    -- dropped.
+    local generation = 0
     c = hs.chooser.new(function(x)
             if tab then tab:delete() end
             if antitab then antitab:delete() end
             if not x then return end
-            brishz_eval_q({"ntag-finder-sel-add", x.text})
+            brishz_eval_q_hs({"ntag-finder-sel-add", x.text}, label)
     end)
     c:placeholderText("ntag ...")
     -- c:width(95)
@@ -64,36 +74,40 @@ function ntagFinder()
                              if not x then
                                  return
                              end
-                             -- brishz_eval_hs(("ntag-finder-sel-add %q ; bell-lm-mhm"):format(x.text))
-                             brishz_eval_hs(("bell-lm-mhm ; ntag-finder-sel-add %q ; "):format(x.text))
+                             brishz_eval_hs("bell-lm-mhm", label)
+                             brishz_eval_q_hs({"ntag-finder-sel-add", x.text}, label)
     end)
     antitab = hs.hotkey.bind('shift', 'tab', function()
                                  local x = c:selectedRowContents()
                                  if not x then
                                      return
                                  end
-                                 -- brishz_eval_hs(("ntag-finder-sel-rm %q ; bell-pp-piece"):format(x.text))
-                                 brishz_eval_hs(("bell-pp-piece ; ntag-finder-sel-rm %q ; "):format(x.text))
+                                 brishz_eval_hs("bell-pp-piece", label)
+                                 brishz_eval_q_hs({"ntag-finder-sel-rm", x.text}, label)
     end)
-    c:choices(function()
-            local q = c:query()
-            local cmd = ("ntag-select %q"):format(q)
-            local res = brishz_eval(cmd)
+    local chooser = c
+    local function refresh()
+        generation = generation + 1
+        local mine = generation
+        brishz_eval_q_out_hs({"ntag-select", chooser:query()}, function(res)
+            if mine ~= generation then return end
             local out = {}
-            for l in res:gmatch("([^\r\n]+)\r?\n?") do
+            for l in (res or ""):gmatch("([^\r\n]+)\r?\n?") do
                 -- @upstreambug https://github.com/Hammerspoon/hammerspoon/issues/2574
                 -- table.insert(out, {["text"] = hs.styledtext.ansi(l, {font={size=25}})})
                 table.insert(out, {["text"] = l})
             end
-            return out
-    end)
+            chooser:choices(out)
+        end, label, { quiet = true })
+    end
     c:queryChangedCallback(function(query)
             if timer and timer:running() then
                 timer:stop()
             end
-            timer = hs.timer.doAfter(0.0, function() c:refreshChoicesCallback() end)
+            timer = hs.timer.doAfter(0.0, refresh)
     end)
     c:show()
+    refresh()
 end
 hyper_bind_v2{mods={"cmd"}, key='n', pressedfn=ntagFinder}
 --- * Emoji Chooser

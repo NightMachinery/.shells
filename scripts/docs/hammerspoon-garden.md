@@ -19,6 +19,9 @@ The code is the "BrishGarden calls that say when it is down" section of
 - `brishz_eval_out_hs(cmd, callback, label, opts)`: like `brishz_eval_hs`,
   but hands the trimmed stdout to `callback`, or `nil` on failure. The
   callback is called exactly once on every path.
+- `brishz_eval_q_out_hs(argv, callback, label, opts)`: the argument-list form
+  of that, through `brishzq.zsh`; `nil` also when the command itself failed.
+  `ntagFinder` (hyper+cmd+N) asks it on every keystroke.
 
 `label` names the caller in console lines and bands. `opts` is optional:
 

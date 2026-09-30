@@ -503,6 +503,19 @@ function brishz_eval_out_hs(cmd, callback, label, opts)
     end)
 end
 
+--- The argument-list form of brishz_eval_out_hs: brishzq.zsh, so every
+--- element arrives as one word, and the callback gets the trimmed stdout, or
+--- nil when the call or the command failed (brishzq.zsh exits with the
+--- command's own status). For a chooser that asks the garden on every
+--- keystroke without blocking, or quoting what was typed into zsh.
+function brishz_eval_q_out_hs(argv, callback, label, opts)
+    label = label or "brishz_eval_q_out_hs"
+    gardenCall(gardenBrishzq, argv, label, opts, function(code, out)
+        if code ~= 0 then return callback(nil) end
+        callback((tostring(out or "")):gsub("^%s+", ""):gsub("%s+$", ""))
+    end)
+end
+
 --- The liveness probe: one TCP connect every 60 s, so a dead garden is
 --- noticed within a minute rather than at the next failed hotkey (the
 --- 2026-09-29 outage went unnoticed for 15 hours). While the garden is down
