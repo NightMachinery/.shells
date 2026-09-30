@@ -960,7 +960,8 @@ Until 2026-09-30 the whole rung was `display-off-lock` in the garden, whose
 `os-lock` runs `CGSession -suspend`. macOS 14 no longer ships that binary, so
 the rung slept the panel and never locked the session; with the garden down it
 did neither, and an escalated blackout left a black screen, a live keyboard and
-an unlocked session.
+an unlocked session. `os-lock` itself now falls back to
+`hs.caffeinate.lockScreen()` over `hammerspoon -c` when the binary is missing.
 
 It used to be a blackout, and that was a trap with no exit. `blackoutChordBegin`
 plus `lockScreen` left the keep-blank loop running across the lock. The loop
