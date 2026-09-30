@@ -27,6 +27,8 @@ function h-qview-open {
 }
 ##
 function qview-path-get {
+  #: @duplicateCode/ce70dc7e3ffc07c958b26ca897aaa904: Hammerspoon asks the same
+  #: socket itself, qviewPathGet in hammerspoon/auto-load/qview.lua.
   local socket="${QVIEW_IPC_SOCKET}"
   assert-args socket @RET
 
@@ -61,10 +63,16 @@ typeset -g qview_deletion_log="${HOME}/.qview/deletion_log"
 typeset -g qview_trash_dir="${HOME}/.qview/trash"
 
 function qview-trs {
+  : "[<file>]: trashes <file>, by default the one qView shows"
   #: @seeAlso [agfi:qview-restore-last]
+  #: Hammerspoon's d key passes the file it read when the key was pressed
+  #: (qviewPathGet in hammerspoon/auto-load/qview.lua), so a key pressed just
+  #: before the next image cannot trash the one after it.
   ###
-  local f
-  f="$(qview-path-get)" @RET
+  local f="${1}"
+  if [[ -z "$f" ]] ; then
+    f="$(qview-path-get)" @RET
+  fi
 
   if ! test -e "$f" ; then
     ecerr "$0: nonexistent file: $f"
