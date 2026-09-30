@@ -56,9 +56,11 @@ function scrollHandler(evNum)
     end
     stopTimerS()
     appName = application.frontmostApplication():name()
-    iterm_focus = exec_raw('/usr/local/bin/redis-cli --raw get iterm_focus')
-    -- hs.alert.show("App: " .. appName .. ", iterm_focus: " .. iterm_focus .. ", NH: " .. evNum)
-    iterm_focus = (iterm_focus == 'TERMINAL_WINDOW_BECAME_KEY\n')
+    -- core/redis.lua's client: /usr/local/bin/redis-cli no longer exists (it
+    -- is brew's, under /opt/homebrew now), and a bare redis-cli has no auth
+    -- (docs/redis-hardening.md). No fork either, on every noise event.
+    iterm_focus = (redisGet and redisGet("iterm_focus")) == 'TERMINAL_WINDOW_BECAME_KEY'
+    -- hs.alert.show("App: " .. appName .. ", iterm_focus: " .. tostring(iterm_focus) .. ", NH: " .. evNum)
 
     if popclickScrollEnabled then
         if evNum == 1 then
