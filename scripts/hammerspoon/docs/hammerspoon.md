@@ -142,10 +142,12 @@ Which to use, with warm measurements from this machine:
 - `brishz_eval_hs(cmd, label)` — 7.5ms, and the only one that reports a failure
 
 Inside Hammerspoon prefer `brishz_eval_hs` for anything whose output you do not
-need: it is the cheapest of them and it logs a non-zero exit. `brishz_eval_bg`
-exists for Lua without Hammerspoon. Anything synchronous blocks the main thread,
-which is also the hotkey and event thread, so treat 53ms as 53ms of frozen
-keyboard.
+need: it is the cheapest of them and it logs a non-zero exit. When BrishGarden
+is down it says so in a band; see `docs/hammerspoon-garden.md` in the scripts
+root for that, and for writing a hotkey that does not need BrishGarden at all.
+`brishz_eval_bg` exists for Lua without Hammerspoon. Anything synchronous
+blocks the main thread, which is also the hotkey and event thread, so treat
+53ms as 53ms of frozen keyboard.
 
 The `_q` distinction is about cost. Quoting means going through `brishzq.zsh`
 rather than the small dash client, which is about 25ms of zsh startup — worth it
