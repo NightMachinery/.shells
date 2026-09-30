@@ -99,6 +99,27 @@ Set it to a closed port such as 7231 to play a dead BrishGarden, test with
 inert commands (`print -r -- sentinel`), and swap `alert_gateway` for a
 recorder while testing, so no band reaches the screen.
 
+## What no longer needs BrishGarden
+
+Each of these has a counterpart in zsh, and both copies carry the same
+`@duplicateCode/<id>` tag, so grepping the tag finds the other one.
+
+- hyper+z, the kitty panel: kitty's remote-control socket
+  (`core/kitty-panel.lua`).
+- hyper+cmd+L, display off: `pmset displaysleepnow` (`display_off` in
+  `core/reload.lua`).
+- hyper+F6, Do Not Disturb: the 'Get Focus', 'Focus Off' and 'Focus Set: Do
+  Not Disturb' Shortcuts (`focusDndToggle` in `core/window-media-bindings.lua`).
+- hyper+d, dismiss notifications: `osascript` on `notif-dismiss-v2.jxa`
+  (`core/app-hotkeys.lua`).
+- hyper+g, anycomplete: Google's and DuckDuckGo's suggestions over `hs.http`
+  (`anycompleteSuggest` in `core/choosers.lua`).
+- FIM completion: `hammerspoon/bin/fim-get.zsh`, which sources `fim.zsh`
+  itself (`core/fim.lua`).
+- The load bell: `hs.sound` (`core/reload.lua`).
+- Ending a blackout, and rung three's panel-off and lock: in Lua when the
+  garden call fails (`core/blackout-lock.lua`).
+
 ## Writing a hotkey that does not need BrishGarden
 
 Most hotkeys do not need anything BrishGarden holds. Prefer, in order:
