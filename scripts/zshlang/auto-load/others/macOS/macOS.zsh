@@ -192,3 +192,44 @@ function app-icon-get {
     ec "$out"
 }
 ##
+function darwin-responsible-get {
+    : "usage: darwin-responsible-get [<pid>]; prints '<pid> <executable>' of the process macOS privacy checks (TCC) hold responsible for <pid>, by default this shell"
+    #: TCC does not judge the process that asks for a permission. It judges
+    #: that process's "responsible process": an ancestor fixed at spawn,
+    #: inherited through fork, exec and daemonisation, and never reassigned.
+    #: `ps' ancestry cannot show it, because a daemon's parent is launchd, so
+    #: this asks the kernel. See =docs/tmux-kitty-tcc.md=.
+    #:
+    #: `responsibility_get_pid_responsible_for_pid' is undocumented SPI in
+    #: libSystem, callable without privileges. If a macOS release drops it,
+    #: this fails with no output, and callers read that as "unknown".
+    ##
+    local pid="${1:-$$}"
+    if [[ "${pid}" != <-> ]] ; then
+        ecerr "$0: not a pid: ${pid}"
+        return 1
+    fi
+    isDarwin || return 1
+
+    python3 - "${pid}" <<'EOF'
+import ctypes
+import sys
+
+try:
+    libc = ctypes.CDLL(None)
+    get = libc.responsibility_get_pid_responsible_for_pid
+except (OSError, AttributeError):
+    sys.exit(1)
+get.argtypes = [ctypes.c_int]
+get.restype = ctypes.c_int
+
+pid = get(int(sys.argv[1]))
+if pid <= 0:
+    sys.exit(1)
+
+buf = ctypes.create_string_buffer(4096)
+n = libc.proc_pidpath(pid, buf, ctypes.sizeof(buf))
+print(pid, buf.value.decode(errors="replace") if n > 0 else "?")
+EOF
+}
+##
