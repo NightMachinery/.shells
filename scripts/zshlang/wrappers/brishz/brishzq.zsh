@@ -70,6 +70,43 @@ isEmacs () {
     [[ -n "${NIGHT_EMACS_P}" ]]
 }
 ##
+function h-brishzq-b64-payloads {
+    : "usage: h-brishzq-b64-payloads <cmd> <stdin>
+Prints base64(<cmd>), a '.', then base64(<stdin>); the <stdin> MAGIC_READ_STDIN reads our own stdin."
+    #: For brishz_binary: jq is not binary-safe (it turns invalid UTF-8 into
+    #: U+FFFD), so the raw bytes pass through the base64 binary before jq
+    #: sees them. They go through a pipe, never argv, which is size-limited
+    #: and shown by `ps`. The '.' is outside the base64 alphabet. Any line
+    #: breaks the encoder adds are fine: the garden ignores whitespace there.
+    setopt localoptions pipefail
+    local cmd="$1" stdin="$2"
+
+    print -rn -- "$cmd" | command base64 || return $?
+    print -rn -- '.'
+    if [[ "$stdin" == 'MAGIC_READ_STDIN' ]] ; then
+        command base64 || return $?
+    else
+        print -rn -- "$stdin" | command base64 || return $?
+    fi
+}
+
+function h-brishzq-binary-header-p {
+    : "usage: h-brishzq-binary-header-p <header-file>
+Succeeds when the headers curl dumped there include X-Brish-Binary: 1."
+    #: curl dumps the headers of every response it got (a redirect's, a
+    #: 100 Continue's), with CRLF line ends. Header names are
+    #: case-insensitive, and the garden sends this one lowercased.
+    local header_file="$1" line
+
+    for line in "${(@f)$(<"$header_file")}" ; do
+        line="${line%$'\r'}"
+        if [[ "${line:l}" =~ '^x-brish-binary:[[:space:]]*1[[:space:]]*$' ]] ; then
+            return 0
+        fi
+    done
+    return 1
+}
+##
 # typeset -a gray=( 170 170 170 )
 # ecgray () {
 #     {
@@ -98,8 +135,13 @@ local failure_expected="${brishz_failure_expected}"
 local nolog="${brishz_nolog}"
 local summary_p="${brishz_summary_p:-y}"
 local endpoint="${bshEndpoint:-http://127.0.0.1:${GARDEN_PORT:-7230}}/zsh/"
+#: brishz_binary=y: exact bytes both ways, over the garden's binary
+#: transport (cmd_b64, stdin_b64, binary: 1); see docs/brishz-binary.md.
+#: It needs a garden process started with BRISH_BINARY=1.
+local binary_p="${brishz_binary}"
 
 #: @safety features that work around the upstream brish bug of not supporting binary IO and corrupting text
+#: brishz_binary=y supersedes them; they stay for gardens without binary support.
 local out_from_file_p="${brishz_out_file_p}"
 local eval_from_file_p="${brishz_eval_file_p}"
 
@@ -166,7 +208,12 @@ fi
 
 local stdin="${brishz_in}"
 local stdin_file_p=''
-if [[ "$stdin" == 'MAGIC_READ_STDIN' ]] ; then
+if bool "$binary_p" ; then
+    #: h-brishzq-b64-payloads streams stdin into base64 and it travels in
+    #: the request as stdin_b64, so it also reaches a remote garden, which
+    #: cannot read our temp files.
+    test -n "${debug_p}" && ec "brishzq.zsh: binary mode, stdin: ${stdin}"
+elif [[ "$stdin" == 'MAGIC_READ_STDIN' ]] ; then
     test -n "${debug_p}" && ec 'brishzq.zsh: reading stdin'
 
     stdin_file_p='y'
@@ -207,7 +254,22 @@ fi
 local v=1
 local req
 
-if test -n "${stdin_file_p}" ; then
+if bool "$binary_p" ; then
+    #: The command goes only in cmd_b64, never also in cmd: a garden that
+    #: predates the _b64 fields then gets an empty command and runs nothing.
+    #: `setopt` inside `$(...)` stays in that subshell.
+    req="$(setopt pipefail
+        h-brishzq-b64-payloads "$input_cmd[*]" "$stdin" \
+            | command jq --raw-input --slurp --compact-output \
+            --arg nolog "$nolog" \
+            --arg failure_expected "$failure_expected" \
+            --arg s "$session" \
+            --arg v $v \
+            'split(".") as $p | {"cmd_b64": $p[0], "stdin_b64": $p[1], "binary": 1, "session": $s, "json_output": $v, "nolog": $nolog, "failure_expected": $failure_expected}')" || {
+        ec "brishzq.zsh: could not encode the binary request" >&2
+        exit 1
+    }
+elif test -n "${stdin_file_p}" ; then
     local stdin_f
     stdin_f="$(mktemp)" || {
         ec "Failed to create temporary file for stdin." >&2
@@ -231,6 +293,57 @@ req="$(print -nr -- "$stdin" \
     --arg v $v \
     'inputs as $i | {"cmd": $c, "session": $s, "stdin": $i, "json_output": $v, "nolog": $nolog, "failure_expected": $failure_expected}')"
 fi
+
+if bool "$binary_p" ; then
+    #: A garden with binary support marks its reply with X-Brish-Binary: 1.
+    #: Any other garden has refused or ignored the request, so without the
+    #: header we fail rather than print its reply as the command's output.
+    #: Every reply is HTTP 200, so `--fail` cannot tell.
+    local header_file
+    header_file="$(command mktemp)" || exit $?
+    local curl_cmd=( command curl $opts[@] --fail --silent --location --dump-header "$header_file" --header "Content-Type: application/json" --request POST --data-binary '@-' $endpoint )
+
+    test -n "${debug_p}" && ec "brishzq.zsh: req: ${req}"
+    if test -n "$copy_cmd" && ((${+commands[pbcopy]})) ; then
+        <<<"$(gq print -nr -- $req) | $(gq "$curl_cmd[@]")" pbcopy
+    fi
+
+    local out ret header_p=''
+    out="$(print -rn -- "$req" | "$curl_cmd[@]")"
+    ret=$?
+    if h-brishzq-binary-header-p "$header_file" ; then
+        header_p=y
+    fi
+    command rm -f -- "$header_file" || true
+    if (( ret != 0 )) ; then
+        exit "$ret"
+    fi
+    if test -z "$header_p" ; then
+        ec "brishzq.zsh: garden lacks binary support (no X-Brish-Binary header); restart the garden process with BRISH_BINARY=1" >&2
+        exit 201
+    fi
+
+    #: `--exit-status`, since some jq builds exit 0 on a parse error.
+    local fields_str
+    local -a fields
+    if fields_str="$(ec "$out" | command jq --exit-status --raw-output --join-output 'if (.out_b64|type) == "string" and (.err_b64|type) == "string" and (.retcode|type) == "number" then "\(.out_b64) \(.err_b64) \(.retcode)" else error("not a binary CmdResult") end' 2>/dev/null)" ; then
+        fields=( "${(@s: :)fields_str}" )
+        if bool "$out_from_file_p" ; then
+            command cat -- "$out_file" || exit $?
+        else
+            print -rn -- "$fields[1]" | command base64 --decode || exit $?
+        fi
+
+        print -rn -- "$fields[2]" | command base64 --decode >&2
+
+        exit "$fields[3]"
+    else
+        #: Not a command's result: a notice, such as a magic command's log.
+        ec "$out"
+        exit 200
+    fi
+fi
+
 local cmd=( curl $opts[@] --fail --silent --location --header "Content-Type: application/json" --request POST --data '@-' $endpoint )
 
 test -n "${debug_p}" && ec "brishzq.zsh: req: ${req}"
