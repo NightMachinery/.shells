@@ -30,7 +30,8 @@ describe('arrivals at a far stop', () => {
     const rows = [
       dep({ at: T0, runId: 'mvg:1', stop: 'de:00000:1' }),
       dep({ at: T0 + 2 * MIN, runId: 'mvg:1', stop: 'de:00000:2' }),
-      dep({ at: T0 + 5 * MIN, runId: 'mvg:2', stop: 'de:00000:1' }),
+      // Not live here either, so there is no delay to carry to the far stop.
+      dep({ at: T0 + 5 * MIN, runId: 'mvg:2', stop: 'de:00000:1', realtimeKnown: false }),
     ];
     const far = [
       dep({ at: T0 + 20 * MIN, runId: 'mvg:1', stop: 'de:00000:9', realtime: T0 + 22 * MIN, realtimeKnown: true }),
@@ -132,7 +133,7 @@ describe('arrivals found through the timetable', () => {
   });
 
   test('with no live row at the far stop the timetable time stands, marked as such', () => {
-    const rows = [dep({ at: T0 })];
+    const rows = [dep({ at: T0, realtimeKnown: false })];
     const timetableAt = new Map([['de:00000:1', [dep({ at: T0, tripId: 'trip-a', backend: 'transitous' })]]]);
     const farTimetable = [dep({ at: T0 + 20 * MIN, tripId: 'trip-a', realtimeKnown: false, backend: 'transitous' })];
     attachArrivals(rows, { far: [], farTimetable, timetableAt }, board);
@@ -185,6 +186,34 @@ describe('arrivals found through the timetable', () => {
     const far = [dep({ at: T0 + 19 * MIN, runId: 'mvg:1' })];
     attachArrivals(rows, { far, farTimetable, timetableAt }, board);
     expect(rows[0]?.arrival?.at).toBe(T0 + 19 * MIN);
+  });
+});
+
+describe('an arrival estimated from the delay at the boarding stop', () => {
+  test('a far stop with no live figure yet gets its timetable moved by the live delay here', () => {
+    const rows = [dep({ at: T0, realtime: T0 + 4 * MIN, delayMin: 4, runId: 'mvg:1' })];
+    attachArrivals(rows, { far: [dep({ at: T0 + 20 * MIN, runId: 'mvg:1', realtimeKnown: false })] }, {});
+    expect(rows[0]?.arrival).toEqual({ at: T0 + 24 * MIN, realtimeKnown: false, estimated: true });
+  });
+
+  test('on time and live here is an estimate too: the timetable, now with evidence', () => {
+    const rows = [dep({ at: T0, runId: 'mvg:1' })];
+    attachArrivals(rows, { far: [dep({ at: T0 + 20 * MIN, runId: 'mvg:1', realtimeKnown: false })] }, {});
+    expect(rows[0]?.arrival).toEqual({ at: T0 + 20 * MIN, realtimeKnown: false, estimated: true });
+  });
+
+  test('a live figure at the far stop wins over the estimate', () => {
+    const rows = [dep({ at: T0, realtime: T0 + 4 * MIN, runId: 'mvg:1' })];
+    attachArrivals(rows, { far: [dep({ at: T0 + 20 * MIN, realtime: T0 + 22 * MIN, runId: 'mvg:1' })] }, {});
+    expect(rows[0]?.arrival).toEqual({ at: T0 + 22 * MIN, realtimeKnown: true });
+  });
+
+  test('the timetable path is estimated the same way', () => {
+    const rows = [dep({ at: T0, realtime: T0 + 3 * MIN })];
+    const timetableAt = new Map([['de:00000:1', [dep({ at: T0, tripId: 'trip-a', backend: 'transitous' })]]]);
+    const farTimetable = [dep({ at: T0 + 20 * MIN, tripId: 'trip-a', realtimeKnown: false, backend: 'transitous' })];
+    attachArrivals(rows, { far: [], farTimetable, timetableAt }, { lines: ['16'] });
+    expect(rows[0]?.arrival).toEqual({ at: T0 + 23 * MIN, realtimeKnown: false, estimated: true });
   });
 });
 

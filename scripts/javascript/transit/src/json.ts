@@ -77,7 +77,13 @@ export function departureJson(dep: Departure, board: WalkSource, now: number, mu
       ? {}
       : {
           arrival:
-            dep.arrival === null ? null : { at: toIso(dep.arrival.at), realtime_known: dep.arrival.realtimeKnown },
+            dep.arrival === null
+              ? null
+              : {
+                  at: toIso(dep.arrival.at),
+                  realtime_known: dep.arrival.realtimeKnown,
+                  estimated: dep.arrival.estimated === true,
+                },
         }),
   };
 }

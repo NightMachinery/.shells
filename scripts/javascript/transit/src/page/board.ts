@@ -736,7 +736,7 @@ function rowSheet(dep: Departure, board: Board, context: BoardContext, usual: Ma
       `at ${at}`,
       dep.arrival === null
         ? 'not found'
-        : `${timeLabel(dep.arrival.at, context.now, context.timezone)}${dep.arrival.realtimeKnown ? ', live' : ', timetable'}`,
+        : `${timeLabel(dep.arrival.at, context.now, context.timezone)}, ${arrivalKind(dep.arrival)}`,
     );
   }
   row('times from', dep.realtimeKnown && !context.planned ? `${dep.backend}, live` : `${dep.backend}, timetable`);
@@ -845,13 +845,21 @@ function stateBadge(dep: Departure, context: BoardContext): HTMLElement {
   return node;
 }
 
+/** What kind of figure an arrival is, in the words the sheet and the label use. */
+function arrivalKind(arrival: NonNullable<Departure['arrival']>): string {
+  if (arrival.realtimeKnown) return 'live';
+  if (arrival.estimated === true) return 'estimated from its delay so far';
+  return 'timetable';
+}
+
 /**
  * When this row's vehicle reaches the board's far stop.
  *
  * A dash rather than an empty slot when the run was not found there, unlike the
  * onward connection: on a board that asks this, the arrival is the column the
  * rows are ordered by, and a blank in it would read as a layout gap rather than
- * as "this one does not say". Drawn softer when it is only the timetable's.
+ * as "this one does not say". Drawn softer when it is only the timetable's, and
+ * between the two when it is the timetable moved by a live delay.
  */
 function arrivalCell(dep: Departure, board: Board, context: BoardContext): HTMLElement {
   const label = board.arriveAt === undefined ? '' : arriveLabel(board.arriveAt);
@@ -860,9 +868,13 @@ function arrivalCell(dep: Departure, board: Board, context: BoardContext): HTMLE
     node.setAttribute('aria-label', `arrival at ${label} not found`);
     return node;
   }
-  const node = el('span', `arrival${dep.arrival.realtimeKnown ? '' : ' arrival-plan'}`);
+  const kind = dep.arrival.realtimeKnown ? '' : dep.arrival.estimated === true ? ' arrival-estimate' : ' arrival-plan';
+  const node = el('span', `arrival${kind}`);
   node.append(timeNode(dep.arrival.at, context.now, context.timezone, 'arrival-time'));
-  node.setAttribute('aria-label', `arrives ${label} ${timeLabel(dep.arrival.at, context.now, context.timezone)}`);
+  node.setAttribute(
+    'aria-label',
+    `arrives ${label} ${timeLabel(dep.arrival.at, context.now, context.timezone)}, ${arrivalKind(dep.arrival)}`,
+  );
   return node;
 }
 

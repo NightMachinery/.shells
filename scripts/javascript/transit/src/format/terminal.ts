@@ -128,7 +128,10 @@ function nearRow(dep: Departure, options: TerminalOptions, board: Board, highlig
     // Not dimmed like the onward slot: on a board that asks for it, this is the
     // time the rows are ordered by.
     const label = arriveLabel(board.arriveAt);
-    pieces.push(dep.arrival === null ? `→ ${label} -` : `→ ${label} ${clockTime(dep.arrival.at, options.timezone)}`);
+    // A tilde for an estimate, as the page slants it: the timetable there moved
+    // by the delay the vehicle is running at here.
+    const approx = dep.arrival !== null && !dep.arrival.realtimeKnown && dep.arrival.estimated === true ? '~' : '';
+    pieces.push(dep.arrival === null ? `→ ${label} -` : `→ ${label} ${approx}${clockTime(dep.arrival.at, options.timezone)}`);
   }
   if (dep.stopTag !== undefined) pieces.push(options.color ? dim(`@${dep.stopTag}`) : `@${dep.stopTag}`);
 

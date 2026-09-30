@@ -1,6 +1,6 @@
 import { normaliseLine } from './filter.ts';
 import { sameDestinationLabel } from './label.ts';
-import type { ArriveAtConfig, Departure } from './model.ts';
+import type { Arrival, ArriveAtConfig, Departure } from './model.ts';
 
 // Arrivals further down the line. A board may name one stop its vehicles go on
 // to, and every row then carries the time that same vehicle reaches it. That is
@@ -118,6 +118,21 @@ function aggregatorTrip(row: Departure, timetable: readonly Departure[] | undefi
 }
 
 /**
+ * What the far stop's row says about this row's vehicle getting there.
+ *
+ * Its live figure when it has one. When it has none, which the live feed does
+ * past about half an hour ahead, the timetabled minute there moved by the delay
+ * the vehicle is running at here, provided that delay is itself live: a tram
+ * four minutes late where the reader boards it is, until anything says
+ * otherwise, four minutes late further on. Otherwise the timetable.
+ */
+function arrivalFrom(row: Departure, far: Departure): Arrival {
+  if (far.realtimeKnown) return { at: far.realtime, realtimeKnown: true };
+  if (row.realtimeKnown) return { at: far.planned + (row.realtime - row.planned), realtimeKnown: false, estimated: true };
+  return { at: far.realtime, realtimeKnown: false };
+}
+
+/**
  * Write each row's arrival at the far stop onto it, in place.
  *
  * A row that finds nothing gets `null`, never a guess. That covers a run that
@@ -137,7 +152,7 @@ export function attachArrivals(rows: Departure[], sources: ArrivalSources, filte
     const runs = row.runId === undefined ? undefined : farByRun.get(row.runId);
     const live = runs === undefined ? undefined : earliestAfter(row, runs);
     if (live !== undefined) {
-      row.arrival = { at: live.realtime, realtimeKnown: live.realtimeKnown };
+      row.arrival = arrivalFrom(row, live);
       continue;
     }
     const trip = aggregatorTrip(row, sources.timetableAt?.get(row.stop));
@@ -146,10 +161,7 @@ export function attachArrivals(rows: Departure[], sources: ArrivalSources, filte
       row.arrival = null;
       continue;
     }
-    const seen = sameScheduled(scheduled, far);
-    row.arrival = seen === undefined
-      ? { at: scheduled.realtime, realtimeKnown: scheduled.realtimeKnown }
-      : { at: seen.realtime, realtimeKnown: seen.realtimeKnown };
+    row.arrival = arrivalFrom(row, sameScheduled(scheduled, far) ?? scheduled);
   }
 }
 

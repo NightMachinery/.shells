@@ -175,10 +175,22 @@ letter and then the headsign only when a line is timetabled to cross itself at a
 stop, and nothing looser: a late tram shares its expected minute with the next
 tram's timetabled one.
 
-A row the timetable places at the far stop but the live feed has no row for
-carries the timetabled time, drawn softer on the page as it is not live. A row
-nothing could place carries a dash. The far stop costs two requests on the page,
-its live departures and its timetable. The boarding stops' timetables cost
+Three kinds of figure come out, drawn three ways on the page. Live is the far
+stop's own forecast, in the accent colour. An estimate is the far stop's
+timetabled minute moved by the delay the vehicle is live at where it is boarded,
+in the accent colour without its weight, slanted, and with a tilde in the
+terminal: a tram four minutes late at the boarding stop is taken to be four
+minutes late further on, until the feed says otherwise. Otherwise the timetable,
+drawn softer. A row nothing could place carries a dash.
+
+The estimate turns up less often than it sounds as if it should. The live feed
+marks a vehicle live at every stop or at none, so a tram with no forecast at the
+far stop usually has none where it is boarded either, and then there is no delay
+to carry. It covers the moments the two disagree, and the far stops whose answer
+came from the timetable because the live feed did not reach that far.
+
+The far stop costs two requests on the page, its live departures and its
+timetable. The boarding stops' timetables cost
 nothing where the live feed publishes no platform, which is the case for trams:
 the page asks for those timetables anyway to borrow the platform from, and this
 is the same question with the same answer.
@@ -859,8 +871,9 @@ short stop tag. The tag is non-null only on a board with more than one stop,
 where it is the only thing distinguishing two otherwise identical rows. Each
 board also carries =stop_labels=, the label map, or null when the board declares
 none. A board with a far stop carries it as =arrive_at= (null otherwise), and
-each of its departures an =arrival= with the ISO instant and whether it was a
-live figure, or null when the run was not found there.
+each of its departures an =arrival= with the ISO instant, whether it was a live
+figure, and whether it is an estimate from the delay at the boarding stop; null
+when the run was not found there.
 
 =config-export= emits =schema_version=, =defaults=, =backends= and =profiles=.
 It carries *no* timestamp. The page repository refreshes this file by re-running

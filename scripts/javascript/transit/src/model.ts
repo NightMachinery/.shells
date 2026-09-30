@@ -92,11 +92,10 @@ export interface Departure {
   runId?: string;
   /**
    * When this row's vehicle reaches the stop its board's `arriveAt` names,
-   * read off that stop's own departures for the same run. Absent means the
-   * board asks no such question; null means it does and this run could not be
-   * found there.
+   * read off that stop's own departures for the same run. Absent means the board asks no such
+   * question; null means it does and this run could not be found there.
    */
-  arrival?: { at: number; realtimeKnown: boolean } | null;
+  arrival?: Arrival | null;
   /**
    * Set when a board filtered by a place the vehicle must call at and this row
    * could not be checked against it.
@@ -110,6 +109,23 @@ export interface Departure {
   /** False when only a scheduled time exists; the page draws a hollow dot. */
   realtimeKnown: boolean;
   color?: string | null;
+}
+
+/**
+ * A vehicle reaching a board's far stop.
+ *
+ * Three kinds of figure, and the reader acts on them differently. Live is the
+ * feed's own forecast for the far stop. Estimated is the timetable there moved
+ * by the delay the vehicle is running at where it was boarded, which is what a
+ * feed that has no forecast that far ahead yet would say if it did. Neither is
+ * the timetable alone: the vehicle was not live anywhere this board looked.
+ */
+export interface Arrival {
+  at: number;
+  /** The far stop's feed had a live figure for this vehicle. */
+  realtimeKnown: boolean;
+  /** Not live at the far stop, but moved by the vehicle's live delay at its boarding stop. */
+  estimated?: boolean;
 }
 
 /** A rendered board: one titled panel of one or more stops. */
