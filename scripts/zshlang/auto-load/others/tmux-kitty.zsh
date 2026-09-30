@@ -194,16 +194,63 @@ function h-tmux2kitty-marker {
 }
 
 function h-tmux2kitty-windows {
-    : "usage: h-tmux2kitty-windows <socket>; prints one '<window id> TAB <id> TAB <pid> TAB <name>' line per moved job"
+    : "usage: h-tmux2kitty-windows <socket>; prints one '<window id> TAB <id> TAB <pid> TAB <name> TAB shown|hidden' line per moved job"
+    #: `hidden' means the job's tab is not in the main OS window, which is
+    #: where [agfi:tmux2kitty-hide] takes it; kitty itself reports no
+    #: visibility. The main OS window is the panel (`wm_class' `kitty-panel',
+    #: see =hammerspoon/docs/hammerspoon.md=), or else the first one holding a
+    #: tab that is not a moved job.
+    ##
     local sock="${1}"
     assert-args sock @RET
     ensure-cmd jq @RET
 
     kitty @ --to "${sock}" ls | command jq -r '
-        .[].tabs[].windows[]
+        . as $all
+        | ( [ $all[] | select(.wm_class == "kitty-panel") | .id ][0]
+            // [ $all[] | select(any(.tabs[]; all(.windows[]; .user_vars.tmux2kitty == null))) | .id ][0]
+          ) as $main
+        | $all[] | .id as $os
+        | .tabs[].windows[]
         | select(.user_vars.tmux2kitty != null)
-        | [.id, .user_vars.tmux2kitty, .pid, (.user_vars.tmux2kitty_name // "")]
+        | [.id, .user_vars.tmux2kitty, .pid, (.user_vars.tmux2kitty_name // ""),
+           (if $os == $main then "shown" else "hidden" end)]
         | @tsv'
+}
+
+function h-tmux2kitty-main-tab {
+    : "usage: h-tmux2kitty-main-tab <socket>; sets REPLY to the id of the active tab in the main OS window"
+    local sock="${1}"
+    assert-args sock @RET
+
+    REPLY="$(kitty @ --to "${sock}" ls | command jq -r '
+        ( [ .[] | select(.wm_class == "kitty-panel") ][0]
+          // [ .[] | select(any(.tabs[]; all(.windows[]; .user_vars.tmux2kitty == null))) ][0] )
+        | [ .tabs[] | select(.is_active) | .id ][0] // empty')" @TRET
+    test -n "${REPLY}"
+}
+
+function h-tmux2kitty-state {
+    : "usage: h-tmux2kitty-state <socket> <name>; sets REPLY to shown or hidden, and fails when no such job runs"
+    local sock="${1}" name="${2}"
+    assert-args sock name @RET
+
+    h-tmux2kitty-id "${name}"
+    local id="${REPLY}"
+
+    local rows row
+    local -a f
+    rows="$(h-tmux2kitty-windows "${sock}")" @RET
+    for row in ${(f)rows} ; do
+        f=( "${(@ps:\t:)row}" )
+        if [[ "${f[2]}" == "${id}" ]] ; then
+            REPLY="${f[5]}"
+            return 0
+        fi
+    done
+
+    ecerr "$0: ${name} is not a job tmux2kitty moved into kitty"
+    return 1
 }
 
 function h-tmux2kitty-kill-tree {
@@ -331,8 +378,15 @@ function tmux2kitty {
     #:
     #: It refuses a pane that runs an interactive shell, as there is no job to
     #: re-run, unless `tmux2kitty_force_p' is set.
+    #:
+    #: `tmux2kitty_type' is kitty's `--type', plus `hidden': a tab that goes
+    #: straight into the background, see [agfi:tmux2kitty-hide].
     ##
-    local type="${tmux2kitty_type:-tab}"
+    local type="${tmux2kitty_type:-tab}" hide_p=''
+    if [[ "${type}" == hidden ]] ; then
+        type=tab
+        hide_p=y
+    fi
     local force_p="${tmux2kitty_force_p}"
 
     local target="${1}"
@@ -426,10 +480,13 @@ function tmux2kitty {
     command mkdir -p -- "${marker:h}" && ec "${name}" >| "${marker}"
 
     ecgray "$0: ${name} now runs in kitty window ${win}. See it with: tmux2kitty-text $(gq "${name}"), tmux2kitty-focus $(gq "${name}")"
+    if bool "${hide_p}" ; then
+        tmux2kitty-hide "${name}"
+    fi
 }
 
 function tmux2kitty-ls {
-    : "lists the jobs tmux2kitty moved into kitty: name, kitty window id, and the pid kitty started"
+    : "lists the jobs tmux2kitty moved into kitty: name, shown or hidden, kitty window id, and the pid kitty started"
     local sock
     sock="$(kitty-socket-get)" @RET
 
@@ -440,7 +497,7 @@ function tmux2kitty-ls {
     local -a f
     for row in ${(f)rows} ; do
         f=( "${(@ps:\t:)row}" )
-        ec "${f[4]:-${f[2]}}"$'\t'"window ${f[1]}"$'\t'"pid ${f[3]}"
+        ec "${f[4]:-${f[2]}}"$'\t'"${f[5]}"$'\t'"window ${f[1]}"$'\t'"pid ${f[3]}"
     done
 }
 
@@ -467,15 +524,96 @@ function tmux2kitty-text {
 }
 
 function tmux2kitty-focus {
-    : "usage: tmux2kitty-focus <name>; switches kitty to a moved job's window"
+    : "usage: tmux2kitty-focus <name>; switches kitty to a moved job's window, bringing it back first if hidden"
     local name="${1}"
     assert-args name @RET
 
     local sock
     sock="$(kitty-socket-get)" @RET
+    h-tmux2kitty-state "${sock}" "${name}" @RET
+    if [[ "${REPLY}" == hidden ]] ; then
+        tmux2kitty-show "${name}" @RET
+    fi
     h-tmux2kitty-match "${name}"
 
     kitty @ --to "${sock}" focus-window --match "${REPLY}"
+}
+
+function tmux2kitty-hide {
+    : "usage: tmux2kitty-hide <name>; takes a moved job's tab out of the tab bar, into a hidden kitty OS window of its own"
+    #: kitty can hide an OS window but not a tab, so the tab is detached into
+    #: a new OS window, which is then hidden. The job keeps running, and
+    #: [agfi:tmux2kitty-text] still reads it. Measured: about 0.1s, and focus
+    #: stays where it was.
+    #:
+    #: Each hidden job gets its own OS window: kitty cannot name one that
+    #: `detach-tab' creates, so there would be nothing to find a shared one by.
+    #: With `kitty_panel_fold_strays' on in Hammerspoon, every hyper+z folds
+    #: such windows back into the panel.
+    ##
+    local name="${1}"
+    assert-args name @RET
+
+    local sock
+    sock="$(kitty-socket-get)" @RET
+    h-tmux2kitty-state "${sock}" "${name}" @RET
+    if [[ "${REPLY}" == hidden ]] ; then
+        ecgray "$0: ${name} is already hidden"
+        return 0
+    fi
+
+    h-tmux2kitty-match "${name}"
+    local match="${REPLY}"
+    kitty @ --to "${sock}" detach-tab --match "${match}" @RET
+    kitty @ --to "${sock}" resize-os-window --match "${match}" --action hide @RET
+    ecgray "$0: ${name} is hidden; tmux2kitty-show $(gq "${name}") brings it back"
+}
+
+function tmux2kitty-show {
+    : "usage: tmux2kitty-show <name>; moves a hidden job's tab back into the main kitty window, as its active tab"
+    #: Moving the tab back is what shows it. Showing its own OS window instead
+    #: would put a normal window on whatever space macOS picks, which is what
+    #: the panel exists to avoid. kitty makes an arriving tab the active one,
+    #: and closes the emptied OS window by itself. If the panel is hidden, the
+    #: tab is there at the next hyper+z; nothing here focuses, since focusing a
+    #: hidden panel activates kitty on the wrong space.
+    ##
+    local name="${1}"
+    assert-args name @RET
+
+    local sock
+    sock="$(kitty-socket-get)" @RET
+    h-tmux2kitty-state "${sock}" "${name}" @RET
+    if [[ "${REPLY}" == shown ]] ; then
+        ecgray "$0: ${name} is already shown"
+        return 0
+    fi
+
+    h-tmux2kitty-match "${name}"
+    local match="${REPLY}"
+    if h-tmux2kitty-main-tab "${sock}" ; then
+        kitty @ --to "${sock}" detach-tab --match "${match}" --target-tab "id:${REPLY}" @RET
+    else
+        #: No main window to return to, only hidden ones: show its own.
+        kitty @ --to "${sock}" resize-os-window --match "${match}" --action show @RET
+    fi
+    ecgray "$0: ${name} is back as the active tab"
+}
+
+function tmux2kitty-toggle {
+    : "usage: tmux2kitty-toggle <name>; hides a moved job's tab if shown, and shows it if hidden"
+    local name="${1}"
+    assert-args name @RET
+
+    local sock
+    sock="$(kitty-socket-get)" @RET
+    h-tmux2kitty-state "${sock}" "${name}" @RET
+
+    if [[ "${REPLY}" == hidden ]] ; then
+        tmux2kitty-show "${name}"
+    else
+        tmux2kitty-hide "${name}"
+    fi
 }
 
 function tmux2kitty-stop {
@@ -585,10 +723,12 @@ function tmux2kitty-fz {
 function h-tmux2kitty-moved-fz {
     : "usage: h-tmux2kitty-moved-fz <verb> [query ...]; sets reply to the names of the moved jobs picked"
     #: `tmux2kitty_moved_fz_opts' reaches fz, e.g. `--no-multi' for a verb
-    #: that only makes sense once.
+    #: that only makes sense once. `tmux2kitty_moved_fz_state' (`shown' or
+    #: `hidden') lists only the jobs in that state.
     ##
     ensure-array tmux2kitty_moved_fz_opts
     local fz_opts=( "${tmux2kitty_moved_fz_opts[@]}" )
+    local state="${tmux2kitty_moved_fz_state}"
 
     local verb="${1}"
     shift
@@ -600,6 +740,13 @@ function h-tmux2kitty-moved-fz {
     if test -z "${rows}" ; then
         ecerr "$0: nothing has been moved into kitty"
         return 1
+    fi
+    if test -n "${state}" ; then
+        rows="${(F)${(@M)${(@f)rows}:#*$'\t'${state}$'\t'*}}"
+        if test -z "${rows}" ; then
+            ecerr "$0: no moved job is ${state}"
+            return 1
+        fi
     fi
 
     local picks
@@ -628,6 +775,35 @@ function tmux2kitty-focus-fz {
     tmux2kitty_moved_fz_opts=( --no-multi ) h-tmux2kitty-moved-fz focus "$@" @RET
 
     tmux2kitty-focus "${reply[1]}"
+}
+
+function tmux2kitty-hide-fz {
+    : "usage: tmux2kitty-hide-fz [query ...]; pick shown moved jobs and hide their tabs"
+    tmux2kitty_moved_fz_state=shown h-tmux2kitty-moved-fz hide "$@" @RET
+    local -a names=( "${reply[@]}" )
+
+    local name ret=0
+    for name in "${names[@]}" ; do
+        tmux2kitty-hide "${name}" || ret=$?
+    done
+    return "${ret}"
+}
+
+function tmux2kitty-show-fz {
+    : "usage: tmux2kitty-show-fz [query ...]; pick a hidden moved job and bring its tab back"
+    #: One pick, since each shown tab becomes the active one.
+    ##
+    tmux2kitty_moved_fz_state=hidden tmux2kitty_moved_fz_opts=( --no-multi ) \
+        h-tmux2kitty-moved-fz show "$@" @RET
+
+    tmux2kitty-show "${reply[1]}"
+}
+
+function tmux2kitty-toggle-fz {
+    : "usage: tmux2kitty-toggle-fz [query ...]; pick a moved job and hide or show it"
+    tmux2kitty_moved_fz_opts=( --no-multi ) h-tmux2kitty-moved-fz toggle "$@" @RET
+
+    tmux2kitty-toggle "${reply[1]}"
 }
 
 function tmux2kitty-stop-fz {
