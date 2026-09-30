@@ -206,6 +206,13 @@ function ivy {
     phoenix-reload
     ##
     if ! whitespace-is "$(pgrep tmux)" ; then
+        #: The one moment you are sure to be at kitty, able to restart a server
+        #: that a mosh or ssh session started; see [agfi:tmux-server-doctor].
+        tmux-server-kitty-p
+        if (( $? == 1 )) ; then
+            tmux-server-doctor || true
+        fi
+
         if ! ask "$0: tmux seems to be running already; Proceed?" N ; then
             ivy-tmux-title-set
             tmux attach -t ivy

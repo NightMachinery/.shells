@@ -165,5 +165,21 @@ function tmuxnew {
         command tmux kill-session -t "$1" &> /dev/null || true
     fi
 
+    #: The two hooks below are auto-load only as well, and a plugin-only load
+    #: skips them. See =docs/tmux-kitty-tcc.md=.
+    #:
+    #: A job [agfi:tmux2kitty] moved into kitty comes back here, so stop the
+    #: kitty copy first, or the two would fight over its port or files.
+    if (( ${+functions[h-tmux2kitty-reclaim]} )) ; then
+        h-tmux2kitty-reclaim "$1" || true
+    fi
+
+    #: A server started by this very call would hand its macOS permission
+    #: attribution to every pane it ever runs; [agfi:tmux-server-ensure] has
+    #: kitty start it when this shell is not kitty's.
+    if (( ${+functions[tmux-server-ensure]} )) ; then
+        tmux-server-ensure || true
+    fi
+
     command tmux new -d -s "$@"
 }

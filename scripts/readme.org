@@ -87,6 +87,12 @@ directory =z= finds: =codex-t scripts --resume= is =z scripts && codex-m
 carry a second, drifted copy of those helpers. See
 =./zshlang/plugins/tmux-z/README.md= and =./docs/tmux-z-launchers.md=.
 
+A tmux server and all its panes take their macOS permissions (TCC) from
+whichever client started the server, so one started from mosh answers to the
+ssh daemon. =tmuxnew= has kitty start the server instead; =tmux-server-doctor=
+says whom the running one answers to, and =tmux2kitty= moves a single job out
+of a bad server into a kitty tab. See =./docs/tmux-kitty-tcc.md=.
+
 =./zshlang/basic/conditions.zsh= keeps only the general predicates, so the
 public =basic.plugin.zsh= can expose them; host identity and personal
 infrastructure live in =./zshlang/basic/conditions-personal.zsh=, which only
