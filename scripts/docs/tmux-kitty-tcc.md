@@ -137,10 +137,10 @@ Pickers take an optional fuzzy query instead of a name:
   pane id, which cannot go stale between the pick and the move.
 - `tmux2kitty-text-fz`, `tmux2kitty-focus-fz` and `tmux2kitty-stop-fz` pick
   from `tmux2kitty-ls`. Focus takes a single pick.
-- Hiding and showing are not specific to moved jobs, so their pickers are the
-  generic `kitty-tab-hide-fz`, `kitty-tab-show-fz` and `kitty-tab-toggle-fz`,
-  which list every kitty tab. A moved job's tab is titled
-  `tmux2kitty: <name>`.
+- `tmux2kitty-hide-fz`, `tmux2kitty-show-fz` and `tmux2kitty-toggle-fz` are
+  the generic `kitty-tab-*-fz` pickers restricted to moved jobs' tabs, through
+  `kitty_tab_fz_match`. Hide lists only shown jobs, and show only hidden ones;
+  show and toggle take a single pick.
 
 [agfi:tmux2kitty] re-runs a pane's `pane_start_command` in its
 `pane_start_path`, as a new kitty tab (`--keep-focus`, `--hold`) that is

@@ -452,10 +452,13 @@ function kitty-tab-ls {
 function h-kitty-tab-fz {
     : "usage: h-kitty-tab-fz <verb> <shown|hidden|''> [query ...]; sets reply to the tab matches picked"
     #: `kitty_tab_fz_opts' reaches fz, e.g. `--no-multi' for a verb that only
-    #: makes sense once.
+    #: makes sense once. `kitty_tab_fz_match', a tab match expression, lists
+    #: only the tabs it matches, e.g. `var:tmux2kitty' for
+    #: [agfi:tmux2kitty-hide-fz].
     ##
     ensure-array kitty_tab_fz_opts
     local fz_opts=( "${kitty_tab_fz_opts[@]}" )
+    local match="${kitty_tab_fz_match}"
 
     local verb="${1}" state="${2}"
     shift 2
@@ -463,12 +466,19 @@ function h-kitty-tab-fz {
     query="$(fz-createquery "$@")"
 
     local rows
-    rows="$(kitty-tab-ls)" @RET
+    if test -n "${match}" ; then
+        #: kitty fails a match that finds no tab, which here only means an
+        #: empty list; a missing kitty is reported by the check first.
+        kitty-socket-get >/dev/null @RET
+        rows="$(kitty-tab-ls "${match}" 2>/dev/null)"
+    else
+        rows="$(kitty-tab-ls)" @RET
+    fi
     if test -n "${state}" ; then
         rows="${(F)${(@M)${(@f)rows}:#window_id:<->$'\t'${state}$'\t'*}}"
     fi
     if test -z "${rows}" ; then
-        ecerr "$0: no ${state:+${state} }kitty tabs"
+        ecerr "$0: no ${state:+${state} }kitty tabs${match:+ matching ${match}}"
         return 1
     fi
 

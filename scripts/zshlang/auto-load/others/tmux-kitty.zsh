@@ -679,6 +679,11 @@ function tmux2kitty-focus-fz {
     tmux2kitty-focus "${reply[1]}"
 }
 
+#: The generic tab pickers, restricted to the tabs of moved jobs.
+aliasfnq tmux2kitty-hide-fz kitty_tab_fz_match='var:tmux2kitty' kitty-tab-hide-fz
+aliasfnq tmux2kitty-show-fz kitty_tab_fz_match='var:tmux2kitty' kitty-tab-show-fz
+aliasfnq tmux2kitty-toggle-fz kitty_tab_fz_match='var:tmux2kitty' kitty-tab-toggle-fz
+
 function tmux2kitty-stop-fz {
     : "usage: tmux2kitty-stop-fz [query ...]; pick moved jobs, stop them and close their windows"
     h-tmux2kitty-moved-fz stop "$@" @RET

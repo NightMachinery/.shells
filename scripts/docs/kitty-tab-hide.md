@@ -55,7 +55,10 @@ space. If the panel is down, the tab is there at the next hyper+z.
   folded tab is then an ordinary shown tab.
 - Hidden tabs do not outlive kitty, any more than shown ones do.
 
-Knob: `kitty_tab_fz_opts` (array), extra options for the pickers' fz.
+Knobs for the pickers: `kitty_tab_fz_opts` (array), extra options for fz, and
+`kitty_tab_fz_match`, a tab match expression that restricts the list.
+`tmux2kitty-hide-fz` and its siblings are the pickers with it set to
+`var:tmux2kitty`.
 
 ## Untested
 
