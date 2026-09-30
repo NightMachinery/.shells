@@ -136,7 +136,8 @@ on its own last line via `--write-out` instead, so both halves of a failure,
 the code and the API's own words, are available to report.
 
 Note that after editing either file you must `brishz-restart` before the garden
-— and therefore Emacs's `z` — sees the change.
+— and therefore Emacs's `z` — sees the change. The Hammerspoon hotkey does not
+go through the garden, and sees it at once.
 
 ## The widget
 
@@ -266,6 +267,15 @@ to be focused:
   you wanted it.
 - `hyper+ctrl+right` — `deepseek`, for when the output matters more than the
   1.4s.
+
+The request runs `hammerspoon/bin/fim-get.zsh <provider> <prefix> <suffix>`, a
+standalone script that sources the minimal basic stack, `~/.privateShell` for
+the keys (as `brishzq.zsh` does), and this `fim.zsh`, then calls `fim-get`.
+It used to be `brishzq.zsh` asking BrishGarden, which meant no completion
+while the garden was down. The script is a launcher and copies nothing, so
+`fim.zsh` stays the one implementation; it is re-read on every request, so an
+edit reaches the hotkey at once, without `brishz-restart`. Starting it costs
+about 20 ms, next to 300 ms and more for the model.
 
 `hyper+shift+right` used to move the mouse pointer. Those four
 `hyper_bind_v2` arrow bindings in `hammerspoon/core/mouse.lua` are retired —

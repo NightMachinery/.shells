@@ -165,7 +165,10 @@ fimSymNone = fimSymNone or "∅"
 fimSymErr = fimSymErr or "✗"
 fimSymCopied = fimSymCopied or "📋"
 
-local kBrishzq = "/usr/local/bin/brishzq.zsh"
+--- fim-get itself, from zshlang/auto-load/others/fim.zsh, run by a standalone
+--- script over the minimal basic stack (about 20 ms) rather than asked of
+--- BrishGarden, so completion keeps working while the garden is down.
+local kFimGet = (nightdir or (os.getenv("HOME") .. "/scripts")) .. "/hammerspoon/bin/fim-get.zsh"
 local kPollSeconds = 0.02
 local kPasteRestoreSeconds = 0.3
 local kRequestBandSeconds = 30
@@ -982,7 +985,7 @@ local function request(st, runId, provider, prefix, suffix)
     st.suffix = suffix
     st.contextRunId = runId
 
-    local task = taskWithPath(kBrishzq, function(exitCode, stdOut, stdErr)
+    local task = taskWithPath(kFimGet, function(exitCode, stdOut, stdErr)
         -- A superseded run's callback must do nothing at all: it would
         -- otherwise overwrite the band and the state of the run that replaced
         -- it.
@@ -1016,11 +1019,11 @@ local function request(st, runId, provider, prefix, suffix)
         end
 
         showGhost(st, completion)
-    end, { "@opts", "provider", provider, "@", "fim-get", prefix, suffix })
+    end, { provider, prefix, suffix })
 
     if not task then
         teardown(st, true)
-        fimBand(fimHead(fimSymErr) .. " could not start brishzq.zsh", "crit")
+        fimBand(fimHead(fimSymErr) .. " could not start fim-get.zsh", "crit")
         return
     end
 
