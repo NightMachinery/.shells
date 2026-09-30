@@ -32,23 +32,13 @@ local kittyPanelClass = "kitty-panel"
 -- variable $kitty_panel_fold_strays; set it here or from the console.
 kitty_panel_fold_strays = kitty_panel_fold_strays or false
 
--- Running tasks and pending timers, referenced so they cannot be collected
--- before their callbacks fire.
-local kittyPanelLive = {}
+-- Running tasks, sockets and pending timers are pinned with hsPin and
+-- hsAfter (core/helpers.lua), so they are neither collected before their
+-- callbacks fire nor kept forever afterwards.
 
 local function kittyPanelFail(msg)
     print("kittyPanel: " .. msg)
     alert_gateway("kitty panel: " .. msg, { id = "kitty-panel", color = "warn" })
-end
-
-local function kittyPanelAfter(seconds, fn)
-    local t
-    t = hs.timer.doAfter(seconds, function()
-        kittyPanelLive[t] = nil
-        fn()
-    end)
-    kittyPanelLive[t] = true
-    return t
 end
 
 -- Path of the running kitty's remote-control socket, or nil.
@@ -86,31 +76,28 @@ end
 -- callback. That is why `ls' goes through jq (see kittyPanelList).
 local function kittyTask(bin, argv, cb, timeout)
     timeout = timeout or 10
-    local task, timer
-    local fired = false
+    local taskKey, timer
 
     local function finish(ok, out, err)
-        if fired then return end
-        fired = true
-        kittyPanelLive[task] = nil
-        if timer then
-            timer:stop()
-            kittyPanelLive[timer] = nil
-        end
+        if not hsUnpin(taskKey) then return end
+        hsCancel(timer)
         cb(ok, out, err)
     end
 
-    task = hs.task.new(bin, function(code, out, err)
+    local task = hs.task.new(bin, function(code, out, err)
         finish(code == 0, out or "", ((err or ""):gsub("%s+$", "")))
     end, argv)
+    if not task then return cb(false, "", "could not start " .. bin) end
 
-    if not (task and task:start()) then
+    taskKey = hsPin(task)
+    if not task:start() then
+        hsUnpin(taskKey)
         return cb(false, "", "could not start " .. bin)
     end
-    kittyPanelLive[task] = true
 
-    timer = kittyPanelAfter(timeout, function()
-        if task:isRunning() then task:terminate() end
+    timer = hsAfter(timeout, function()
+        local t = hsPinned(taskKey)
+        if t and t:isRunning() then t:terminate() end
         finish(false, "", bin .. " timed out after " .. timeout .. " s")
     end)
 end
@@ -289,13 +276,14 @@ local function kittyLaunch(cb)
         wait = 20
         gaveUp = "kitty did not come up within 20 seconds"
 
-        local opener
-        opener = hs.task.new("/usr/bin/open", function() kittyPanelLive[opener] = nil end,
-                             { "-b", kittyBundleID, "--args", "--start-as", "minimized" })
+        local openerKey
+        local opener = hs.task.new("/usr/bin/open", function() hsUnpin(openerKey) end,
+                                   { "-b", kittyBundleID, "--args", "--start-as", "minimized" })
+        openerKey = opener and hsPin(opener)
         if not (opener and opener:start()) then
+            if openerKey then hsUnpin(openerKey) end
             return cb(nil, "could not run open -b " .. kittyBundleID)
         end
-        kittyPanelLive[opener] = true
     end
 
     local deadline = hs.timer.secondsSinceEpoch() + wait
@@ -303,7 +291,7 @@ local function kittyLaunch(cb)
 
     local function retry()
         if hs.timer.secondsSinceEpoch() > deadline then return cb(nil, gaveUp) end
-        kittyPanelAfter(0.25, attempt)
+        hsAfter(0.25, attempt)
     end
 
     attempt = function()
@@ -314,7 +302,7 @@ local function kittyLaunch(cb)
         end)
     end
 
-    kittyPanelAfter(0.25, attempt)
+    hsAfter(0.25, attempt)
 end
 
 -- kitty running, with a panel OS window holding the tabs.
@@ -425,22 +413,17 @@ local function kittyRC(path, cmd, payload, cb, trace)
     local frame = "\27P@kitty-cmd" ..
                   hs.json.encode({ cmd = cmd, version = kittyRCVersion(), payload = payload }) ..
                   "\27\\"
-    local sock, timer
-    local fired = false
+    local sockKey, timer
 
     local function finish(ok, data)
-        if fired then return end
-        fired = true
-        if timer then
-            timer:stop()
-            kittyPanelLive[timer] = nil
-        end
-        kittyPanelLive[sock] = nil
+        local sock = hsUnpin(sockKey)
+        if not sock then return end
+        hsCancel(timer)
         pcall(function() sock:disconnect() end)
         cb(ok, data)
     end
 
-    sock = hs.socket.new(function(raw)
+    local sock = hs.socket.new(function(raw)
         if trace then trace(string.format("reply(%d B)", #raw)) end
         local body = raw:match("^\27P@kitty%-cmd(.*)\27\\$")
         local ok, reply = pcall(hs.json.decode, body or "")
@@ -449,16 +432,18 @@ local function kittyRC(path, cmd, payload, cb, trace)
         finish(true, reply.data)
     end)
     if not sock then return cb(false, "could not create a socket") end
-    kittyPanelLive[sock] = true
+    sockKey = hsPin(sock)
 
     -- hs.socket reports a failed connect only in its own log, so a call that
     -- never answers is caught here.
-    timer = kittyPanelAfter(2, function() finish(false, cmd .. ": no reply within 2 s") end)
+    timer = hsAfter(2, function() finish(false, cmd .. ": no reply within 2 s") end)
 
     sock:connect(path, function()
+        local s = hsPinned(sockKey)
+        if not s then return end
         if trace then trace("conn") end
-        sock:write(frame)
-        sock:read("\27\\")
+        s:write(frame)
+        s:read("\27\\")
     end)
 end
 
@@ -512,7 +497,7 @@ function kittyPanelShow(label)
     local function mark(name)
         steps[#steps + 1] = string.format("%s %.1f", name, (hs.timer.absoluteTime() - t0) / 1e6)
     end
-    local watchdog = kittyPanelAfter(30, function()
+    local watchdog = hsAfter(30, function()
         if kittyPanelShowBusy == token then
             kittyPanelShowBusy = nil
             kittyPanelFail(label .. ": show did not finish within 30 s")
@@ -522,8 +507,7 @@ function kittyPanelShow(label)
     local function done(err)
         if kittyPanelShowBusy ~= token then return end
         kittyPanelShowBusy = nil
-        watchdog:stop()
-        kittyPanelLive[watchdog] = nil
+        hsCancel(watchdog)
         if err then return kittyPanelFail(label .. ": " .. err) end
         print(string.format("kittyPanel: %s: shown in %.1f ms (%s%s)%s", label,
                             (hs.timer.absoluteTime() - t0) / 1e6, route,
