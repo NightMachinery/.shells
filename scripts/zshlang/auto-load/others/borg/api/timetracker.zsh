@@ -25,9 +25,22 @@ function borg-tt-mark {
 }
 
 function borg-tt-last() {
+    : "Usage: [count=6]"
+    : "Lists the newest activities. Times are local to each activity's zone (the tz column), shown after its name."
     local count="${1:-6}"
+    if ! [[ "$count" == <-> ]] ; then
+        ecerr "$0: count must be a non-negative integer: $(gquote-sq "$count")"
+        return 1
+    fi
 
-    catsql --table activity --order id- --limit "$count" "$timetracker_db" | gsed -n '4,$p' | sd -f m '^\d+,' '' | sdlit $'\n' $'\n\n' | sdlit , $'\n    '
+    local name start end tz
+    command sqlite3 -separator $'\t' "$timetracker_db" "SELECT name, start, \"end\", COALESCE(tz, '') FROM activity ORDER BY id DESC LIMIT ${count}" |
+        while IFS=$'\t' read -r name start end tz ; do
+            ec "${name}${tz:+  [${tz}]}"
+            ec "    ${start}"
+            ec "    ${end}"
+            ec
+        done
 }
 ##
 function borg-tt-cmdlog() {
