@@ -12,13 +12,29 @@ function popen3(path, ...)
     local r2, w2 = posix.pipe()
     local r3, w3 = posix.pipe()
 
-    assert((w1 ~= nil or r2 ~= nil or r3 ~= nil), "pipe() failed")
+    -- All six ends. This used to test `w1 or r2 or r3', which passed as long
+    -- as any one pipe had been made.
+    local function closeAll()
+        for _, fd in pairs({ r1, w1, r2, w2, r3, w3 }) do posix.close(fd) end
+    end
+    if not (r1 and w1 and r2 and w2 and r3 and w3) then
+        closeAll()
+        error("pipe() failed")
+    end
 
     local pid, err = posix.fork()
-    assert(pid ~= nil, "fork() failed")
+    if pid == nil then
+        closeAll()
+        error("fork() failed: " .. tostring(err))
+    end
     if pid == 0 then
+        -- The child. Nothing here may raise: an error would unwind into the
+        -- caller's Lua inside a forked copy of the whole process (Hammerspoon,
+        -- when this runs there), which would then carry on as a second copy.
+        -- So a failed exec says why on stderr and exits 127, as a shell does.
         posix.close(w1)
         posix.close(r2)
+        posix.close(r3)
         posix.dup2(r1, posix.fileno(io.stdin))
         posix.dup2(w2, posix.fileno(io.stdout))
         posix.dup2(w3, posix.fileno(io.stderr))
@@ -26,11 +42,9 @@ function popen3(path, ...)
         posix.close(w2)
         posix.close(w3)
 
-        local ret, err = posix.execp(path, table.unpack({...}))
-        assert(ret ~= nil, "execp() failed")
-
-        posix._exit(1)
-        return
+        local _, execErr = posix.execp(path, table.unpack({...}))
+        posix.write(2, "popen3: cannot run " .. tostring(path) .. ": " .. tostring(execErr) .. "\n")
+        posix._exit(127)
     end
 
     posix.close(r1)
