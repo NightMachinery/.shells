@@ -41,6 +41,7 @@ Ask the kernel instead:
 
 ```
 darwin-responsible-get <pid>     #: '<pid> <executable>'
+darwin-responsible-get-fz [q]    #: the same for processes picked with ffps
 tmux-server-doctor               #: says whom the running server answers to
 ```
 
@@ -125,6 +126,16 @@ tmux2kitty-focus BrishGarden     #: switch kitty to it (then hyper+z to show it)
 tmux2kitty-stop BrishGarden      #: stop it and close its window
 ```
 
+Each has an `-fz` variant that takes an optional fuzzy query instead of a
+name:
+
+- `tmux2kitty-fz` lists only the panes `tmux2kitty` would accept, and never
+  this shell's own pane. Each row shows the pane and what finally runs in it,
+  and dead panes are marked. It accepts several picks, and targets them by
+  pane id, which cannot go stale between the pick and the move.
+- `tmux2kitty-text-fz`, `tmux2kitty-focus-fz` and `tmux2kitty-stop-fz` pick
+  from `tmux2kitty-ls`. Focus takes a single pick.
+
 [agfi:tmux2kitty] re-runs a pane's `pane_start_command` in its
 `pane_start_path`, as a new kitty tab (`--keep-focus`, `--hold`), under
 `zsh -c` so that it gets the environment `.zshenv` builds. The job then answers
@@ -154,7 +165,7 @@ runs.
   Without a marker, the check is one `test -e`.
 - It refuses a pane whose loss would be more than a restart, because moving it
   would kill whatever runs in it and leave only a fresh prompt.
-  `tmux2kitty_force_p=y` overrides all of these:
+  `tmux2kitty_force_p=y` overrides all of these, in `tmux2kitty-fz` as well:
   - **An interactive shell.** `tmuxnewsh` wraps even interactive sessions as
     `zsh -c "cd DIR && ... zsh"`, so it peels the `<shell> -c` layers and
     looks at what finally runs. A bare shell counts, and so does a command
@@ -175,7 +186,8 @@ runs.
 
 Knobs: `tmux2kitty_type` (kitty's `--type`: `tab`, `os-window`,
 `background`...), `tmux2kitty_timeout`, `tmux2kitty_force_p`,
-`tmux2kitty_state_dir`.
+`tmux2kitty_state_dir`, and the extra fz options `tmux2kitty_fz_fz_opts` and
+`tmux2kitty_moved_fz_opts` (arrays).
 
 ## Repairing a server that went wrong
 

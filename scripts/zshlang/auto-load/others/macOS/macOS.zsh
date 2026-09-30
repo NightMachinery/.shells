@@ -232,4 +232,22 @@ n = libc.proc_pidpath(pid, buf, ctypes.sizeof(buf))
 print(pid, buf.value.decode(errors="replace") if n > 0 else "?")
 EOF
 }
+
+function darwin-responsible-get-fz {
+    : "usage: darwin-responsible-get-fz [query ...]; pick processes with ffps and print whom TCC holds responsible for each"
+    local pids
+    pids="$(ffps "$@")" @RET
+    test -n "${pids}" || return 1
+
+    local pid comm resp
+    for pid in ${(f)pids} ; do
+        test -n "${pid}" || continue
+        if ! comm="$(command ps -o comm= -p "${pid}")" ; then
+            ec "${pid} (exited since the pick)"
+            continue
+        fi
+        resp="$(darwin-responsible-get "${pid}")" || resp='unknown'
+        ec "${pid} ${comm:t} -> ${resp}"
+    done
+}
 ##

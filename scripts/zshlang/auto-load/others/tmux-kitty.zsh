@@ -524,3 +524,121 @@ function h-tmux2kitty-reclaim {
     tmux2kitty-stop "${1}"
 }
 ##
+#: ** Pickers
+function tmux2kitty-fz {
+    : "usage: tmux2kitty-fz [query ...]; pick tmux panes that run a job, and move them into kitty"
+    #: Lists what [agfi:tmux2kitty] would accept: panes whose start command is
+    #: a job rather than an interactive shell, leaving out this shell's own
+    #: pane. With `tmux2kitty_force_p' set, it lists every pane that has a
+    #: start command. Each row shows the pane and what finally runs in it (see
+    #: [agfi:h-tmux2kitty-peel]). Dead panes are marked; moving one restarts
+    #: it in kitty.
+    ##
+    local force_p="${tmux2kitty_force_p}"
+    ensure-array tmux2kitty_fz_fz_opts
+    local fz_opts=( "${tmux2kitty_fz_fz_opts[@]}" )
+
+    local query
+    query="$(fz-createquery "$@")"
+
+    local default_shell panes
+    default_shell="$(command tmux show-options -gv default-shell 2>/dev/null)"
+    panes="$(command tmux list-panes -a \
+        -F '#{pane_id}'$'\t''#{session_name}:#{window_index}.#{pane_index}'$'\t''#{pane_dead}'$'\t''#{?#{@agent_session},1,0}'$'\t''#{pane_start_command}')" @TRET
+
+    local row rows=''
+    local -a f
+    for row in ${(f)panes} ; do
+        f=( "${(@ps:\t:)row}" )
+        [[ "${f[1]}" == "${TMUX_PANE}" ]] && continue
+
+        h-tmux2kitty-cmdv "${f[5]}" "${default_shell}" || continue
+        if ! bool "${force_p}" ; then
+            [[ "${f[4]}" == 1 ]] && continue
+            h-tmux2kitty-interactive-p "${reply[@]}" && continue
+        fi
+
+        h-tmux2kitty-peel "${reply[@]}"
+        rows+="${f[1]}"$'\t'"${f[2]}${${f[3]:#0}:+ (dead)}"$'\t'"${${(j: :)reply}//$'\n'/ }"$'\n'
+    done
+
+    if test -z "${rows}" ; then
+        ecerr "$0: no tmux pane runs a job that could be moved"
+        return 1
+    fi
+
+    #: The pane id is field 1, hidden by `--with-nth' but printed back, as in
+    #: [agfi:fftmux]. Unlike a session name, it is a target that cannot go
+    #: stale between the pick and the move.
+    local picks
+    picks="$(ecn "${rows}" | fz --prompt='tmux2kitty> ' --query "${query}" \
+        --delimiter=$'\t' --with-nth=2.. "${fz_opts[@]}")" @RET
+
+    local pick ret=0
+    for pick in ${(f)picks} ; do
+        test -n "${pick}" || continue
+        tmux2kitty "${pick%%$'\t'*}" || ret=$?
+    done
+    return "${ret}"
+}
+
+function h-tmux2kitty-moved-fz {
+    : "usage: h-tmux2kitty-moved-fz <verb> [query ...]; sets reply to the names of the moved jobs picked"
+    #: `tmux2kitty_moved_fz_opts' reaches fz, e.g. `--no-multi' for a verb
+    #: that only makes sense once.
+    ##
+    ensure-array tmux2kitty_moved_fz_opts
+    local fz_opts=( "${tmux2kitty_moved_fz_opts[@]}" )
+
+    local verb="${1}"
+    shift
+    local query
+    query="$(fz-createquery "$@")"
+
+    local rows
+    rows="$(tmux2kitty-ls)" @RET
+    if test -z "${rows}" ; then
+        ecerr "$0: nothing has been moved into kitty"
+        return 1
+    fi
+
+    local picks
+    picks="$(ec "${rows}" | fz --prompt="tmux2kitty ${verb}> " --query "${query}" \
+        --delimiter=$'\t' "${fz_opts[@]}")" @RET
+
+    reply=( ${${(f)picks}%%$'\t'*} )
+    reply=( ${reply:#} )
+    (( ${#reply} ))
+}
+
+function tmux2kitty-text-fz {
+    : "usage: tmux2kitty-text-fz [query ...]; pick moved jobs and print their scrollback"
+    h-tmux2kitty-moved-fz text "$@" @RET
+    local -a names=( "${reply[@]}" )
+
+    local name
+    for name in "${names[@]}" ; do
+        (( ${#names} > 1 )) && ecgray "== ${name}"
+        tmux2kitty-text "${name}"
+    done
+}
+
+function tmux2kitty-focus-fz {
+    : "usage: tmux2kitty-focus-fz [query ...]; pick a moved job and switch kitty to it"
+    tmux2kitty_moved_fz_opts=( --no-multi ) h-tmux2kitty-moved-fz focus "$@" @RET
+
+    tmux2kitty-focus "${reply[1]}"
+}
+
+function tmux2kitty-stop-fz {
+    : "usage: tmux2kitty-stop-fz [query ...]; pick moved jobs, stop them and close their windows"
+    h-tmux2kitty-moved-fz stop "$@" @RET
+    local -a names=( "${reply[@]}" )
+
+    local name ret=0
+    for name in "${names[@]}" ; do
+        tmux2kitty-stop "${name}" || ret=$?
+    done
+    return "${ret}"
+}
+##
