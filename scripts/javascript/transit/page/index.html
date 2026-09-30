@@ -805,6 +805,15 @@
         text-overflow: ellipsis;
       }
 
+      /* On a row, the tag sits at the bottom rather than on the first line,
+         because the last column is the one the corner badge covers. A board
+         whose every row has a platform badge showed only the lower half of
+         every tag; sitting under the badge it loses nothing, and the tag is a
+         label for the row, not a word in its first line. */
+      .row > .stop-tag {
+        align-self: end;
+      }
+
       .slot-empty {
         display: block;
       }
