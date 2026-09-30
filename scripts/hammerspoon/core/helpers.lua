@@ -266,6 +266,10 @@ end
 -- `opts', for all three helpers:
 --   quiet     true: no console line for ordinary failures.
 --   timeout   seconds before a client call is killed (default 30).
+--   onFail    called as onFail(code, notSent) once when the call failed,
+--             after the band, for a caller with a native way to do the job
+--             or state to take back. notSent is true when the call provably
+--             never reached the garden, and false when it may have run.
 
 local gardenBrishz = "/usr/local/bin/brishz2.dash"
 local gardenBrishzq = "/usr/local/bin/brishzq.zsh"
@@ -421,16 +425,20 @@ local function gardenCall(bin, args, label, opts, onResult)
                 gardenUp = false
                 print(label .. ": BrishGarden down; not run")
                 gardenBand("BrishGarden down: " .. label .. " did not run; run ivy", 30)
-                return onResult(code, out, err)
+            else
+                if not opts.quiet then
+                    print(label .. ": " .. bin .. " exited " .. tostring(code) .. ": " .. err)
+                end
+                -- brishz2.dash fails only when the call itself did; a
+                -- brishzq.zsh failure is usually the command's own.
+                if bin == gardenBrishz then
+                    gardenBand("BrishGarden call failed: " .. label .. " (exit " .. tostring(code) .. ")")
+                end
             end
 
-            if not opts.quiet then
-                print(label .. ": " .. bin .. " exited " .. tostring(code) .. ": " .. err)
-            end
-            -- brishz2.dash fails only when the call itself did; a
-            -- brishzq.zsh failure is usually the command's own.
-            if bin == gardenBrishz then
-                gardenBand("BrishGarden call failed: " .. label .. " (exit " .. tostring(code) .. ")")
+            if opts.onFail then
+                local ok, e = pcall(opts.onFail, code, notSent)
+                if not ok then print(label .. ": onFail raised: " .. tostring(e)) end
             end
             onResult(code, out, err)
         end)

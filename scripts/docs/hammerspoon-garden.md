@@ -24,6 +24,13 @@ The code is the "BrishGarden calls that say when it is down" section of
 
 - `quiet`: `true` drops the console line for ordinary failures.
 - `timeout`: seconds before a client call is killed (default 30).
+- `onFail`: called as `onFail(code, notSent)` once when the call failed, after
+  the band, for a caller with a native way to do the job or state to take back.
+  `notSent` is true when the call provably never reached BrishGarden, and false
+  when it may have run. The blackout chords use it: a blackout that never
+  started gives the keyboard back, and one that cannot be ended through
+  BrishGarden is ended in Lua (see "Ending a blackout without BrishGarden" in
+  `hammerspoon/docs/hammerspoon.md`).
 
 ## When a call fails
 

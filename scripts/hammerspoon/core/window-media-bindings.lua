@@ -118,13 +118,18 @@ end
 -- presses F2 later may be a stranger.
 --
 -- hyper+cmd+F1 is the rung above that: it stops waiting for the ending and
--- locks the session now, through blackoutLockNow in core/blackout-lock.lua.
--- Fresh, it calls back into blackoutChordBegin below for the garden's half and
--- locks a fraction of a millisecond later, in the same run-loop turn; on a
--- blackout already up it locks and marks and leaves the garden alone. There is
+-- locks the session now, through blackoutLockNow in core/blackout-lock.lua:
+-- the blackout is released, the panel slept and the session locked. There is
 -- no chord back from it -- chords cannot reach the login screen, where Secure
 -- Input hides keystrokes from every tap -- so the way back is unlocking the
 -- session, which runs h-hook-unlock -> h-blackout-release in the garden.
+--
+-- When the garden call that starts a blackout provably never reached the
+-- garden, nothing went black, so the keyboard lock that went up with it is
+-- taken back and a band says so; otherwise it would be a locked keyboard in
+-- front of a lit screen. Only for a blackout this press started: one already
+-- up keeps its lock and its mark. Ending one without the garden is
+-- blackoutNativeRelease's job.
 --
 -- A blackout that starts may first be held back by a note for a few seconds;
 -- see "The blackout note" in core/blackout-lock.lua and alert-at-next-blackout
@@ -142,7 +147,16 @@ end
 -- no blackout, it sleeps the panel and locks, which is display-off-lock in the
 -- garden. See blackoutLockNow.
 function blackoutChordBegin(lockFirst)
-    brishz_eval_hs('awaysh-fast brightness-off-all-loop')
+    local fresh = not (blackoutLockState and blackoutLockState.since)
+    brishz_eval_hs('awaysh-fast brightness-off-all-loop', 'blackout', {
+        onFail = function(_, notSent)
+            if not (fresh and notSent) then return end
+            if blackoutLockOff then blackoutLockOff(true) end
+            if blackoutEnded then blackoutEnded() end
+            alert_gateway("No blackout: BrishGarden is down, so the keyboard is unlocked again; run ivy",
+                          { id = "garden-down", color = "crit", seconds = 15, screens = "all" })
+        end,
+    })
     if blackoutBegin then blackoutBegin(lockFirst) end
 end
 

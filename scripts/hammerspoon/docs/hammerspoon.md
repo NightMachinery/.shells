@@ -779,7 +779,8 @@ so the hyper modal can still be entered; F2 with shift while hyper mode is enter
 whatever else is down with it, since Sticky Keys is on and a modifier left
 stuck must not turn the one way out into a dropped press — which goes through
 `blackoutRestore`, releasing the lock synchronously before asking the garden to
-run `brightness-on-all-loop`, so the keyboard is back at once; F1 with shift
+run `brightness-on-all-loop` (falling back to `blackoutNativeRelease` when that
+call fails), so the keyboard is back at once; F1 with shift
 *and* cmd while hyper mode is entered, which marks the blackout lock-first and
 leaves it up; and F1 with cmd *alone* while hyper mode is entered, which locks
 the macOS session on the spot and leaves the blackout up as well. Those last
@@ -798,6 +799,53 @@ four; the chord tap below swallows the three chords itself, so none of them
 ever reaches an app. The `hyperEntered()` guard is what makes that safe — the
 chord tap runs exactly while hyper mode is entered, so nothing is let by that
 has no tap waiting to eat it.
+
+### Ending a blackout without BrishGarden
+
+F2, the expiry and rung three end the black through the garden, and on
+2026-09-30 a garden that was down meant the keyboard came back while the screen
+stayed black, with nothing on it to say why. On a DDC monitor in clamshell that
+is a trap. So each of those calls passes an `onFail` (see
+`docs/hammerspoon-garden.md` in the scripts root), and a failed call runs
+`blackoutNativeRelease` in `core/blackout-lock.lua`, which does the same with
+nothing but binaries:
+
+- It kills the keep-black loop: every process whose command line carries
+  `DBLACK_LOOP_MARKER`, with everything below it, matched in Lua against one
+  `ps` listing.
+- It runs `hs.screen.restoreGamma()`, and again 0.5 s and 1.5 s later, since a
+  killed iteration's gamma write travels over `hs -c` and may land after it.
+- It puts back the levels zsh saved in redis (`display_black_saved`), re-resolving
+  each display by its CGDirectDisplayID through `brightness -l` and `m1ddc
+  display list detailed`, since the saved local ids are positional. Built-in
+  panels go through `brightness -d`, DDC panels through `m1ddc ... set
+  luminance` and `set contrast`, one write at a time; unknown levels land on
+  the same fallbacks as zsh's (0.5 and 0.75).
+- When every row was restored it deletes the key, as `display-black-off` does,
+  and a band says the blackout ended without BrishGarden. A display that is not
+  attached, or a redis that is down, gets a crit band instead.
+
+It is a second implementation of `display-black-off`, kept to what brings a
+screen back: pending rows and the blackout's `caffeinate -d` are left to zsh,
+and the DDC writes skip zsh's per-panel lock, because the loop, the other
+writer, has just been killed. Running it after a call that did get through is
+harmless, since it writes the same saved levels. Both sides carry
+`@duplicateCode` tags (`736a48d0...` for the restore, `3c6fa387...` for the loop
+marker, `b8f04aad...` for rung three's order), so a change to one can find the
+other.
+
+Starting a blackout has the mirror problem: hyper+shift+F1 locks the keyboard at
+once and asks the garden for the black. When that call provably never reached
+the garden, nothing went black, so `blackoutChordBegin` takes the keyboard lock
+back and a crit band says "No blackout". Only for a blackout that press started:
+one already up keeps its lock and its lock-first mark.
+
+To test any of this without touching the screen, set `garden_port_override =
+7231`, swap `alert_gateway` and `redisGet` for stubs (a real
+`display_black_saved` row would be written to the monitor), and set
+`blackoutLockEnabled = false` and `blackoutLockScreenEnabled = false`. With the
+latter, rung three still runs its release and only prints the panel-off and the
+lock.
 
 ### Automation is not what the lock is for
 
@@ -897,10 +945,22 @@ restart the keep-blank loop on a screen that is already black; not
 press rather than from the start of the black.
 
 Rung three, hyper+cmd+F1, is not a blackout at all. It ends whatever blackout
-is up, turns the panel off and locks the session. That is `display-off-lock` in
-the garden: `h-blackout-release`, then `display-off`, then `os-lock`. The way
-back is whatever wakes a sleeping display, meaning any key or any click, and
-nothing of ours has to run for it to work.
+is up, turns the panel off and locks the session, in the order of zsh's
+`display-off-lock`: `h-blackout-release` in the garden, then `pmset
+displaysleepnow`, then `hs.caffeinate.lockScreen()`, and `pmset
+displaysleepnow` once more 0.7 s later, since locking can wake the panel. Only
+the release goes through the garden, since only zsh knows every display's
+levels. The lock waits for it at most 3 s, and a failed release falls back to
+`blackoutNativeRelease` (see "Ending a blackout without BrishGarden" below),
+which finishes behind the lock. The way back is whatever wakes a sleeping
+display, meaning any key or any click, and nothing of ours has to run for it to
+work.
+
+Until 2026-09-30 the whole rung was `display-off-lock` in the garden, whose
+`os-lock` runs `CGSession -suspend`. macOS 14 no longer ships that binary, so
+the rung slept the panel and never locked the session; with the garden down it
+did neither, and an escalated blackout left a black screen, a live keyboard and
+an unlocked session.
 
 It used to be a blackout, and that was a trap with no exit. `blackoutChordBegin`
 plus `lockScreen` left the keep-blank loop running across the lock. The loop
@@ -922,9 +982,7 @@ Rungs one and two keep the loop, because "stay dark while the machine keeps
 working" is what they are for, and they leave the session unlocked, so the chord
 that undoes them still arrives.
 
-`os-lock` ends with a `pmset displaysleepnow` of its own, after the
-`CGSession -suspend`, so a lock that woke the panel puts it straight back to
-sleep. `display-off` before it means the common case, a lit screen, goes dark at
+The panel-off before the lock means the common case, a lit screen, goes dark at
 once rather than flashing the lock screen first. Escalating from a live blackout
 does show the desktop for as long as the DDC restore takes, a second or two.
 That is accepted: the alternative is locking first and restoring behind the
@@ -1062,6 +1120,8 @@ hs -c 'blackoutRestore()'             # what hyper+shift+F2 does
 hs -c 'blackoutRestore(true)'         # lock the session first, always; shell only
 hs -c 'blackoutUpgrade()'             # mark a blackout already up as lock-first
 hs -c 'blackoutLockNow()'             # what hyper+cmd+F1 does, fresh or not
+hs -c 'blackoutNativeRelease("hand")' # end the black without the garden: loop,
+                                      # gamma, and the levels saved in redis
 hs -c 'blackoutChordRun("black")'     # the whole chord path, note gate and all;
                                       # also "black-lock-first", "black-lock-now",
                                       # "restore"

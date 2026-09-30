@@ -79,8 +79,9 @@ login screen the brightness keys can no longer fix."
 }
 
 function display-off-lock {
-    : "Ends any blackout, turns the display off and locks the session. The top
-blackout rung, hyper+cmd+F1; see hammerspoon/core/blackout-lock.lua.
+    : "Ends any blackout, turns the display off and locks the session. The same
+steps as the top blackout rung, hyper+cmd+F1, which does them in Lua; see
+blackoutLockNow in hammerspoon/core/blackout-lock.lua.
 
 The way back is whatever wakes a sleeping display, any key or any click, and
 nothing here has to run again for the screen to return."
@@ -119,6 +120,12 @@ nothing here has to run again for the screen to return."
     #: the desktop is lit while it does. Accepted: the alternative is locking
     #: first and restoring behind the login window, which trades a second of
     #: desktop for a second of lock screen and one more way to get stuck.
+    #:
+    #: @duplicateCode/b8f04aad78a1898dce1a3119da96bf67: hyper+cmd+F1 no longer
+    #: calls this. blackoutLockNow in hammerspoon/core/blackout-lock.lua does
+    #: the same three steps in the same order, asking the garden only for
+    #: [agfi:h-blackout-release], so the panel-off and the lock work with the
+    #: garden down.
     h-blackout-release
 
     display-off

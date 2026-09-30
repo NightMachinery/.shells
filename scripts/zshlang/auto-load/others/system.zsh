@@ -1329,6 +1329,7 @@ makes that true."
     ##
     local was="$1" now="$2" i="$3" b="$4" c="$5"
     assert-args was now i @RET
+    #: @duplicateCode/736a48d066f9273d3104c8dd2c69713b
 
     #: A gamma-only row floored nothing, so there is nothing to put back. The
     #: unconditional gamma restore in [agfi:display-black-off] has already
@@ -1476,6 +1477,10 @@ Undoes [agfi:display-black-on], restoring gamma and the remembered levels. With
 no selector it puts back everything that was blanked; with one, only the
 displays it matches. Selectors: see [agfi:h-brightness-select]."
     ##
+    #: @duplicateCode/736a48d066f9273d3104c8dd2c69713b: blackoutNativeRelease in
+    #: hammerspoon/core/blackout-lock.lua does the same in Lua when the garden
+    #: call that should reach this fails: the row format, the fallback levels,
+    #: and the re-resolving by display id. Change both together.
     local sel="$1"
 
     #: Unconditional, and before anything else, so running this bare is always
@@ -1622,6 +1627,9 @@ function display-black-toggle {
 #: @seeAlso the mark-me pattern in `PE/Zsh.org'.
 ##
 typeset -g DISPLAY_BLACK_LOOP_MARKER='DBLACK_LOOP_MARKER'
+#: @duplicateCode/3c6fa3878710efd02f27031fe1dba5a6: the marker is written out
+#: again in hammerspoon/core/blackout-lock.lua (kBlackLoopMarker), which kills
+#: the loop itself when the garden is down; see [agfi:display-black-off-loop].
 #: Short on purpose: [agfi:mark-me] rewrites argv in place, and outside brish
 #: there is only as much room as the shell reserved. @seeAlso the note in
 #: [agfi:fairgrad-paper-build].
@@ -1670,6 +1678,7 @@ function display-black-off-loop {
 Stops the keep-blank loop and restores the display(s). The selector only
 narrows the restore; the loop is global, so it always stops."
     ##
+    #: @duplicateCode/3c6fa3878710efd02f27031fe1dba5a6
     kill-marker "$DISPLAY_BLACK_LOOP_MARKER" || true
 
     #: [agfi:kill-marker] goes through [agfi:kill-withchildren], so the loop's

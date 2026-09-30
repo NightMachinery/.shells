@@ -650,6 +650,209 @@ function blackoutEnded()
     return true
 end
 
+--- ** Ending a blackout without the garden
+--- F2, the expiry and rung three end the black through the garden
+--- (brightness-on-all-loop, h-blackout-release), whose zsh knows every
+--- display's backend and how to put its levels back. When that call failed,
+--- the keyboard was back and the screen stayed black, with nothing on it to
+--- say why: on a DDC monitor in clamshell, a trap. So a failed call falls
+--- back to blackoutNativeRelease, which does the same with nothing but
+--- binaries: stop the keep-black loop, restore gamma, and put back the
+--- levels zsh saved in redis (display_black_saved).
+---
+--- A second implementation of display-black-off, kept to the parts that
+--- bring a screen back. Pending rows (displays unplugged while black) and
+--- the blackout's `caffeinate -d' are left to zsh, and the DDC writes skip
+--- zsh's per-panel lock (h-ddc-lock-do): the loop, the other writer, has
+--- just been killed. Running it after a call that did get through is
+--- harmless, since it writes the same saved levels.
+
+--- The keep-black loop's marker.
+--- @duplicateCode/3c6fa3878710efd02f27031fe1dba5a6: DISPLAY_BLACK_LOOP_MARKER
+--- and display-black-off-loop in zshlang/auto-load/others/system.zsh.
+local kBlackLoopMarker = "DBLACK_LOOP_MARKER"
+
+--- Kills every process whose command line carries the marker, with
+--- everything below it, so an iteration killed midway cannot re-black the
+--- screen after the restore (zsh's kill-marker kills children for the same
+--- reason). The marker is matched in Lua against one `ps' listing, never
+--- handed to pkill as a pattern. Synchronous: it runs only on this rare path.
+local function blackoutKillLoop(label)
+    local children, roots = {}, {}
+    local ps = io.popen("/bin/ps -Ao pid=,ppid=,command=")
+    if not ps then return end
+    for line in ps:lines() do
+        local pid, ppid, cmd = line:match("^%s*(%d+)%s+(%d+)%s+(.*)$")
+        if pid then
+            pid, ppid = tonumber(pid), tonumber(ppid)
+            children[ppid] = children[ppid] or {}
+            table.insert(children[ppid], pid)
+            if cmd:find(kBlackLoopMarker, 1, true) then roots[#roots + 1] = pid end
+        end
+    end
+    ps:close()
+    if #roots == 0 then return end
+
+    local pids, seen, queue = {}, {}, roots
+    while #queue > 0 do
+        local pid = table.remove(queue, 1)
+        if not seen[pid] then
+            seen[pid] = true
+            pids[#pids + 1] = pid
+            for _, c in ipairs(children[pid] or {}) do queue[#queue + 1] = c end
+        end
+    end
+    local list = table.concat(pids, " ")
+    print(label .. ": killing the keep-black loop: pids " .. list)
+    os.execute("/bin/kill -TERM " .. list .. " 2>/dev/null")
+end
+
+--- @duplicateCode/736a48d066f9273d3104c8dd2c69713b: display-black-off and
+--- h-display-black-restore-row in zshlang/auto-load/others/system.zsh. The
+--- row format (display-id, backend, backend-local id, brightness, contrast,
+--- gamma-applied; levels 0..1 or `-' for unknown), the fallback levels, and
+--- the re-resolving of each display by its CGDirectDisplayID, since the saved
+--- local ids are positional and a hotplug while black renumbers them.
+local kFallbackBrightness = 0.5
+local kFallbackContrast = 0.75
+local kM1ddc = "/opt/homebrew/bin/m1ddc"
+local kBrightnessBin = "/usr/local/bin/brightness"
+
+local function level100(v, fallback)
+    local x = tonumber(v) or fallback
+    return math.max(0, math.min(100, math.floor(x * 100 + 0.5)))
+end
+
+--- m1ddc display number by CGDirectDisplayID (both strings), from
+--- `m1ddc display list detailed'.
+local function m1ddcNumbers(text)
+    local map, n = {}, nil
+    for line in (text or ""):gmatch("[^\n]+") do
+        local num = line:match("^%[(%d+)%] ")
+        if num then
+            n = num
+        else
+            local id = line:match("^%s*%-%s*Display ID:%s+(%d+)")
+            if id and n then map[id] = n end
+        end
+    end
+    return map
+end
+
+--- `brightness' display index by CGDirectDisplayID, from `brightness -l'
+--- ("display 0: main, active, ..., built-in, ID 0x1").
+local function brightnessIndices(text)
+    local map = {}
+    for line in (text or ""):gmatch("[^\n]+") do
+        local idx, hex = line:match("^display (%d+): .*, ID 0x(%x+)$")
+        if idx then map[tostring(tonumber(hex, 16))] = idx end
+    end
+    return map
+end
+
+--- Runs { {bin, args}, ... } one after another (DDC writes must not
+--- overlap), then done(allOk).
+local function blackoutRunSteps(steps, label, done)
+    local i, allOk = 0, true
+    local function step()
+        i = i + 1
+        local s = steps[i]
+        if not s then return done(allOk) end
+        gardenTask(s[1], s[2], function(code, _, err)
+            if code ~= 0 then
+                allOk = false
+                print(string.format("%s: %s %s exited %s: %s", label, s[1], table.concat(s[2], " "),
+                                    tostring(code), err))
+            end
+            step()
+        end, 5, nil, label)
+    end
+    step()
+end
+
+local kNativeAlertId = "blackout-native"
+
+--- Ends a blackout in Lua alone; see the section comment. Does not touch the
+--- keyboard lock or the blackout state, which the callers have released.
+function blackoutNativeRelease(label)
+    label = (label or "blackout") .. " (native)"
+    blackoutKillLoop(label)
+    hs.screen.restoreGamma()
+    --- A killed iteration's own gamma write travels over `hs -c' and may
+    --- land after this; so twice more.
+    hsAfter(0.5, function() hs.screen.restoreGamma() end)
+    hsAfter(1.5, function() hs.screen.restoreGamma() end)
+
+    local saved, ok = nil, false
+    if redisGet then saved, ok = redisGet(kRedisBlackKey) end
+    if not ok then
+        print(label .. ": redis is down; gamma restored, display levels not")
+        alert("Blackout ended without BrishGarden; redis is down, so display levels were not restored", {
+            id = kNativeAlertId, color = "crit", seconds = 30, screens = "all",
+        })
+        return
+    end
+    if type(saved) ~= "string" or saved == "" then return end
+
+    local rows = {}
+    for line in saved:gmatch("[^\n]+") do
+        local f = {}
+        for field in (line .. "\t"):gmatch("([^\t]*)\t") do f[#f + 1] = field end
+        if f[2] == "internal" or f[2] == "ddc" then
+            rows[#rows + 1] = { id = f[1], backend = f[2], b = f[4], c = f[5] }
+        end
+    end
+    if #rows == 0 then
+        redisDel(kRedisBlackKey)
+        return
+    end
+
+    local function report(allOk, missing)
+        if allOk and missing == 0 then
+            redisDel(kRedisBlackKey)
+            print(label .. ": display levels restored")
+            alert("Blackout ended without BrishGarden; run ivy", {
+                id = kNativeAlertId, color = "warn", seconds = 15, screens = "all",
+            })
+        else
+            alert("Blackout ended without BrishGarden, but some display levels were not restored;"
+                  .. " run ivy, then display-black-off", {
+                id = kNativeAlertId, color = "crit", seconds = 60, screens = "all",
+            })
+        end
+    end
+
+    gardenTask(kBrightnessBin, { "-l" }, function(_, bout)
+        gardenTask(kM1ddc, { "display", "list", "detailed" }, function(_, dout)
+            local internal, ddc = brightnessIndices(bout), m1ddcNumbers(dout)
+            local steps, missing = {}, 0
+            for _, r in ipairs(rows) do
+                if r.backend == "internal" and internal[r.id] then
+                    steps[#steps + 1] = { kBrightnessBin, { "-d", internal[r.id],
+                        string.format("%.3f", level100(r.b, kFallbackBrightness) / 100) } }
+                elseif r.backend == "ddc" and ddc[r.id] then
+                    local n = ddc[r.id]
+                    steps[#steps + 1] = { kM1ddc, { "display", n, "set", "luminance",
+                                                    tostring(level100(r.b, kFallbackBrightness)) } }
+                    steps[#steps + 1] = { kM1ddc, { "display", n, "set", "contrast",
+                                                    tostring(level100(r.c, kFallbackContrast)) } }
+                else
+                    missing = missing + 1
+                    print(label .. ": display " .. tostring(r.id) .. " (" .. r.backend .. ") is not attached; left to zsh")
+                end
+            end
+            blackoutRunSteps(steps, label, function(allOk) report(allOk, missing) end)
+        end, 5, nil, label)
+    end, 5, nil, label)
+end
+
+--- `pmset displaysleepnow', without blocking.
+local function displaySleepNow(label)
+    gardenTask("/usr/bin/pmset", { "displaysleepnow" }, function(code, _, err)
+        if code ~= 0 then print(label .. ": pmset displaysleepnow exited " .. tostring(code) .. ": " .. err) end
+    end, 5, nil, label)
+end
+
 --- What hyper+shift+F1 calls, and hyper+shift+cmd+F1 with lockFirst=true.
 --- Not hyper+cmd+F1: rung three starts no blackout at all any more, it sleeps
 --- the panel and locks (see blackoutLockNow). Records when the black began,
@@ -743,12 +946,22 @@ end
 --- is stopped and the key goes with it, and because an assertion should not
 --- outlive its blackout across a lock of unknown length.
 ---
---- So the rung hands the job to macOS. The garden runs display-off-lock, which
---- is release the blackout, panel off, lock, in that order. Waking a slept
+--- So the rung hands the job to macOS: release the blackout, panel off, lock,
+--- in that order, the order of zsh's display-off-lock. Waking a slept
 --- display is something any key does, and nothing of ours has to run for it:
 --- no loop, no assertion, no watcher that can be dead when it matters. Rungs
 --- one and two keep the loop, because "stay dark while the machine works" is
 --- what they are for and they leave the session unlocked to undo it.
+---
+--- Only the release still goes through the garden, since only zsh knows
+--- every display's levels. The panel-off and the lock are done here. They
+--- used to be display-off-lock's too, whose os-lock ran a CGSession binary
+--- that macOS 14 no longer ships: the rung slept the panel and never locked
+--- the session, and with the garden down it did neither. The lock waits for
+--- the release at most three seconds; a release that fails falls back to
+--- blackoutNativeRelease, which then finishes behind the lock.
+--- @duplicateCode/b8f04aad78a1898dce1a3119da96bf67: display-off-lock in
+--- zshlang/auto-load/others/power.zsh, the same three steps in the same order.
 ---
 --- The Lua half is undone here rather than waited for. After this there is no
 --- blackout for hyper+shift+F2 to end, so the keyboard lock goes back and the
@@ -783,15 +996,31 @@ function blackoutLockNow()
     blackoutLockOff(true)
     blackoutEnded()
 
-    if not blackoutLockScreenEnabled then
-        print("blackout-lock: display-off-lock suppressed (blackoutLockScreenEnabled = false)")
-        return escalated
-    end
-
     --- Asynchronous, like every other garden call here: never block the main
-    --- thread. display-off-lock is a zsh function so the ordering lives in one
-    --- place, next to the blackout functions it has to undo.
-    brishz_eval_hs("awaysh-fast display-off-lock", "blackout-lock-now")
+    --- thread. Not awaysh-fast, so the reply says when the release is done.
+    --- With blackoutLockScreenEnabled false the release still runs, so a test
+    --- of this rung ends with the screen back, and only the panel-off and the
+    --- lock become a console line.
+    local label = "blackout-lock-now"
+    local locked, cap = false, nil
+    local function lockNow()
+        if locked then return end
+        locked = true
+        hsCancel(cap)
+        if not blackoutLockScreenEnabled then
+            print("blackout-lock: display sleep and lock suppressed (blackoutLockScreenEnabled = false)")
+            return
+        end
+        displaySleepNow(label)
+        lockSession()
+        --- Locking can wake the panel; put it back to sleep.
+        hsAfter(kLockSettleSeconds, function() displaySleepNow(label) end)
+    end
+    cap = hsAfter(3, lockNow)
+    brishz_eval_out_hs("h-blackout-release", function() lockNow() end, label, {
+        timeout = 10,
+        onFail = function() blackoutNativeRelease(label) end,
+    })
 
     return escalated
 end
@@ -826,7 +1055,12 @@ function blackoutRestore(forceLock)
         --- moment, exactly as before.
         blackoutLockOff(lockFirst)
         blackoutEnded()
-        brishz_eval_hs('awaysh-fast brightness-on-all-loop', 'blackout-restore')
+        --- Any failure, not only a provably unsent one: ending it twice
+        --- writes the same levels twice.
+        brishz_eval_hs('awaysh-fast brightness-on-all-loop', 'blackout-restore', {
+            timeout = 10,
+            onFail = function() blackoutNativeRelease("blackout-restore") end,
+        })
     end
 
     if lockFirst then
