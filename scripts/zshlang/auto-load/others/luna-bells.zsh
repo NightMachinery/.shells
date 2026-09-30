@@ -1293,6 +1293,8 @@ function bell-lm-MI {
 
 bell-lm-maker diary-search-fx 'flac/BenjaminDiarySearch.flac'
 bell-lm-maker lets-finish-this 'flac/25_40_MI_letsfinishthis.flac'
+#: @duplicateCode/ea5695ff25d1167de95f305e71f8aa52: Hammerspoon plays this
+#: file itself as its load bell, in hammerspoon/core/reload.lua.
 bell-lm-maker eternalhappiness 01_09_MI_eternalhappiness.flac
 bell-lm-maker whattimeisit 20_02_MI_whattimeisit.flac
 bell-lm-maker timetoparty flac/08_06_MI_timetocheckouttheparty..blue..flac

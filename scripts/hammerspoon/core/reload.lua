@@ -182,5 +182,21 @@ loadHammerspoonAutoLoad()
 printLocation()
 -- We need to call this here so that Hammerspoon appears in the System location permissions. The first call to it also sometimes doesn't work, and this solves that, too.
 ---
-brishz_eval_hs("bell-lm-eternalhappiness")
+--- The load bell, played with hs.sound rather than asked of BrishGarden:
+--- Hammerspoon starts at login, before ivy starts the garden, so the garden
+--- call failed on every fresh login. Kept in a global, since a sound that is
+--- collected mid-play stops.
+--- @duplicateCode/ea5695ff25d1167de95f305e71f8aa52: bell-lm-eternalhappiness
+--- in zshlang/auto-load/others/luna-bells.zsh, the same file under
+--- $GREENCASE_DIR/LittleMisfortune.
+do
+    local dir = os.getenv("GREENCASE_DIR") or (os.getenv("HOME") .. "/base/music/greencase")
+    local file = dir .. "/LittleMisfortune/01_09_MI_eternalhappiness.flac"
+    hsLoadBell = hs.sound.getByFile(file)
+    if hsLoadBell then
+        hsLoadBell:play()
+    else
+        print("reload: no load bell at " .. file)
+    end
+end
 --- @end
