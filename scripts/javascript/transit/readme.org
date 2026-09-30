@@ -189,7 +189,17 @@ far stop usually has none where it is boarded either, and then there is no delay
 to carry. It covers the moments the two disagree, and the far stops whose answer
 came from the timetable because the live feed did not reach that far.
 
-The far stop costs two requests on the page, its live departures and its
+A board with a =connection= as well follows the change: each row's arrival is
+that of the onward departure its connection slot names, the first one a rider
+leaving on that row could catch, matched at the far stop exactly as above. So a
+board of underground trains to an interchange carries the arrival of the tram
+each one connects to, and reads against a board of that tram from further back.
+
+Every board of a profile that ends at one far stop reads the same answer about
+it, fetched once per refresh. Two boards finishing their own stops a few seconds
+apart used to ask the live feed twice and could be told two forecasts a minute
+apart, so one tram arrived at one time on one board and a minute later on the
+next. The far stop costs two requests on the page, its live departures and its
 timetable. The boarding stops' timetables cost
 nothing where the live feed publishes no platform, which is the case for trams:
 the page asks for those timetables anyway to borrow the platform from, and this

@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test';
-import { ARRIVE_REACH_MINUTES, arriveLabel, attachArrivals, byArrival } from '../src/arrive.ts';
-import type { Departure } from '../src/model.ts';
+import { ARRIVE_REACH_MINUTES, arriveLabel, attachArrivals, attachArrivalsThrough, byArrival } from '../src/arrive.ts';
+import type { ConnectionConfig, Departure } from '../src/model.ts';
 
 const T0 = Date.parse('2026-01-01T08:00:00Z');
 const MIN = 60_000;
@@ -214,6 +214,36 @@ describe('an arrival estimated from the delay at the boarding stop', () => {
     const farTimetable = [dep({ at: T0 + 20 * MIN, tripId: 'trip-a', realtimeKnown: false, backend: 'transitous' })];
     attachArrivals(rows, { far: [], farTimetable, timetableAt }, { lines: ['16'] });
     expect(rows[0]?.arrival).toEqual({ at: T0 + 23 * MIN, realtimeKnown: false, estimated: true });
+  });
+});
+
+describe('arrivals through a connection', () => {
+  const connection: ConnectionConfig = { stop: 'de:00000:5', lines: ['16'], direction: 'H', rideMinutes: 3, transferMinutes: 4 };
+
+  test('each row takes the arrival of the onward departure it would catch', () => {
+    const rows = [
+      dep({ at: T0, line: 'U4', mode: 'UBAHN' }),
+      dep({ at: T0 + 5 * MIN, line: 'U5', mode: 'UBAHN' }),
+    ];
+    const onward = [
+      // Leaves before the first row could be there: 3 on board and 4 to walk.
+      dep({ at: T0 + 6 * MIN, stop: 'de:00000:5', arrival: { at: T0 + 10 * MIN, realtimeKnown: true } }),
+      dep({ at: T0 + 9 * MIN, stop: 'de:00000:5', arrival: { at: T0 + 13 * MIN, realtimeKnown: true } }),
+      dep({ at: T0 + 19 * MIN, stop: 'de:00000:5', arrival: { at: T0 + 23 * MIN, realtimeKnown: false, estimated: true } }),
+      // Right line, other way: never the one caught.
+      dep({ at: T0 + 12 * MIN, stop: 'de:00000:5', direction: 'R', arrival: { at: T0 + 16 * MIN, realtimeKnown: true } }),
+    ];
+    attachArrivalsThrough(rows, onward, connection);
+    expect(rows[0]?.arrival).toEqual({ at: T0 + 13 * MIN, realtimeKnown: true });
+    expect(rows[1]?.arrival).toEqual({ at: T0 + 23 * MIN, realtimeKnown: false, estimated: true });
+  });
+
+  test('nothing catchable, or a catchable one with no arrival, is a dash', () => {
+    const rows = [dep({ at: T0, line: 'U4' }), dep({ at: T0 + 30 * MIN, line: 'U4' })];
+    const onward = [dep({ at: T0 + 10 * MIN, stop: 'de:00000:5', arrival: null })];
+    attachArrivalsThrough(rows, onward, connection);
+    expect(rows[0]?.arrival).toBeNull();
+    expect(rows[1]?.arrival).toBeNull();
   });
 });
 

@@ -1,6 +1,7 @@
+import { catchableOnward, matchingOnward } from './connect.ts';
 import { normaliseLine } from './filter.ts';
 import { sameDestinationLabel } from './label.ts';
-import type { Arrival, ArriveAtConfig, Departure } from './model.ts';
+import type { Arrival, ArriveAtConfig, ConnectionConfig, Departure } from './model.ts';
 
 // Arrivals further down the line. A board may name one stop its vehicles go on
 // to, and every row then carries the time that same vehicle reaches it. That is
@@ -163,6 +164,20 @@ export function attachArrivals(rows: Departure[], sources: ArrivalSources, filte
     }
     row.arrival = arrivalFrom(row, sameScheduled(scheduled, far) ?? scheduled);
   }
+}
+
+/**
+ * The same, for a board whose rows change onto another service before the far
+ * stop: each row's arrival is that of the onward departure it would catch.
+ *
+ * `onward` is the interchange's rows with their own arrivals already attached,
+ * by `attachArrivals` on the connection's lines and letter. The onward
+ * departure is picked by the same rule the connection slot uses, so the time in
+ * the arrival column is always the arrival of the departure the slot names.
+ */
+export function attachArrivalsThrough(rows: Departure[], onward: readonly Departure[], connection: ConnectionConfig): void {
+  const candidates = matchingOnward([...onward], connection);
+  for (const row of rows) row.arrival = catchableOnward(row, candidates, connection)?.arrival ?? null;
 }
 
 /**

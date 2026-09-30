@@ -91,8 +91,9 @@ export interface Departure {
    */
   runId?: string;
   /**
-   * When this row's vehicle reaches the stop its board's `arriveAt` names,
-   * read off that stop's own departures for the same run. Absent means the board asks no such
+   * When this row's vehicle, or on a board with a connection the onward one it
+   * would catch, reaches the stop its board's `arriveAt` names, read off that
+   * stop's own departures for the same run. Absent means the board asks no such
    * question; null means it does and this run could not be found there.
    */
   arrival?: Arrival | null;

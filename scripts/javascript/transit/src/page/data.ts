@@ -6,7 +6,7 @@ import { recordBoard } from './timing.ts';
 import { createMvgBackend, MVG_DEFAULT_BASE_URL } from '../backends/mvg.ts';
 import { createTransitousBackend, TRANSITOUS_DEFAULT_BASE_URL } from '../backends/transitous.ts';
 import type { Backend } from '../backends/types.ts';
-import { ARRIVE_REACH_MINUTES, attachArrivals } from '../arrive.ts';
+import { attachArrivals, attachArrivalsThrough } from '../arrive.ts';
 import { attachConnections } from '../connect.ts';
 import { applyFilters, mergeBoards, normaliseLine } from '../filter.ts';
 import { applyVia, matchRows } from '../via.ts';
@@ -415,6 +415,31 @@ export async function fetchProfile(options: FetchProfileOptions): Promise<FetchP
 
   const used = new Set<string>();
 
+  // One answer per far stop per refresh, whichever boards end there. Not only
+  // to save the request: the in-flight sharing below only merges requests that
+  // overlap, and two boards that finish their own stops a few seconds apart
+  // asked the live feed twice and could get two forecasts a minute apart, so
+  // the same tram arrived at 16:46 on one board and 16:47 on the other.
+  const farAnswers = new Map<string, Promise<[Departure[], Departure[]]>>();
+  const farAnswer = (far: string): Promise<[Departure[], Departure[]]> => {
+    const known = farAnswers.get(far);
+    if (known !== undefined) return known;
+    // As far past the window as anything on the page looks, which covers the
+    // last row's vehicle, or the onward one it changes to, getting there. The
+    // live half stops where the live feed does; past that the far stop's
+    // timetable is the only answer there is, and it is asked anyway. Each half
+    // may fail alone, and a failed one is an empty one: a far stop that cannot
+    // be read is a board with dashes in one column, not a failed board.
+    const farWindow = { fromMs: window.fromMs, toMs: reachThroughMs };
+    const liveWindow = { fromMs: window.fromMs, toMs: Math.min(reachThroughMs, window.fromMs + REALTIME_HORIZON_MINUTES * 60_000) };
+    const answer = Promise.all([
+      stopDepartures(backends, far, liveWindow, { title: '', stops: [far], walkMinutes: 0 }).catch((): Departure[] => []),
+      timetableRows(backends.timetable, far, farWindow, undefined).catch((): Departure[] => []),
+    ]);
+    farAnswers.set(far, answer);
+    return answer;
+  };
+
   // Every board at once. They are independent questions and the reader is
   // waiting for the slowest one either way, so asking them in turn only added
   // the others' time to it. The concurrency cap lives one level down, around
@@ -446,6 +471,10 @@ export async function fetchProfile(options: FetchProfileOptions): Promise<FetchP
       }
       const departures = mergeBoards(perStop);
 
+      // The interchange's rows and the window they were asked for, kept for a
+      // far stop that is reached through it.
+      let onwardRows: Departure[] = [];
+      let onwardWindow = window;
       if (boardConfig.connection !== undefined) {
         const connection = boardConfig.connection;
         // The onward window has to start where the last catchable change would:
@@ -455,11 +484,12 @@ export async function fetchProfile(options: FetchProfileOptions): Promise<FetchP
         // the board still needs a real onward departure to point at, and the one
         // it needs leaves after the window the reader picked has closed.
         const reach = (connection.rideMinutes + connection.transferMinutes) * 60_000;
+        onwardWindow = { fromMs: window.fromMs + reach, toMs: reachThroughMs + reach };
         try {
           const onward = await stopDepartures(
             backends,
             connection.stop,
-            { fromMs: window.fromMs + reach, toMs: reachThroughMs + reach },
+            onwardWindow,
             {
               title: '',
               stops: [connection.stop],
@@ -469,6 +499,7 @@ export async function fetchProfile(options: FetchProfileOptions): Promise<FetchP
             },
           );
           attachConnections(departures, onward, connection);
+          onwardRows = onward;
         } catch {
           // No onward data is a board with empty connection slots, not a failed
           // board: the departures themselves are what the reader came for.
@@ -477,30 +508,32 @@ export async function fetchProfile(options: FetchProfileOptions): Promise<FetchP
       }
 
       if (boardConfig.arriveAt !== undefined) {
-        const far = boardConfig.arriveAt.stop;
-        // The same window as the board's own, reaching on by as long as a row's
-        // vehicle may take to get there, so the last row still has its arrival.
-        const farWindow = { fromMs: window.fromMs, toMs: window.toMs + ARRIVE_REACH_MINUTES * 60_000 };
-        // Each source may fail alone, and a failed one is an empty one: a far
-        // stop that cannot be read is a board with dashes in one column, not a
-        // failed board, exactly as for an interchange. The boarding stops'
-        // timetable is asked exactly as `borrowPlatforms` asked it, so it is
-        // that request's answer and not a second one.
-        const orEmpty = async (rows: Promise<Departure[]>): Promise<Departure[]> => rows.catch(() => []);
-        const [farRows, farTimetable, ...timetables] = await Promise.all([
-          orEmpty(
-            stopDepartures(backends, far, farWindow, {
-              title: '',
-              stops: [far],
-              walkMinutes: 0,
-              ...(boardConfig.modes === undefined ? {} : { modes: boardConfig.modes }),
-            }),
+        const connection = boardConfig.connection;
+        // Where the rows being matched are boarded: this board's own stops, or
+        // the interchange when the far stop is reached by changing there. For
+        // the board's own stops the timetable is asked exactly as
+        // `borrowPlatforms` asked it, so where the live feed has no platform it
+        // is that request's answer and not a second one. A timetable that fails
+        // is an empty one, as for the far stop.
+        const boarding = connection === undefined ? boardConfig.stops : [connection.stop];
+        const boardingWindow = connection === undefined ? window : onwardWindow;
+        const [[farRows, farTimetable], timetables] = await Promise.all([
+          farAnswer(boardConfig.arriveAt.stop),
+          Promise.all(
+            boarding.map((stop) => timetableRows(backends.timetable, stop, boardingWindow, undefined).catch((): Departure[] => [])),
           ),
-          orEmpty(timetableRows(backends.timetable, far, farWindow, undefined)),
-          ...boardConfig.stops.map((stop) => orEmpty(timetableRows(backends.timetable, stop, window, undefined))),
         ]);
-        const timetableAt = new Map(boardConfig.stops.map((stop, at) => [stop, timetables[at] ?? []]));
-        attachArrivals(departures, { far: farRows, farTimetable, timetableAt }, boardConfig);
+        const timetableAt = new Map(boarding.map((stop, at) => [stop, timetables[at] ?? []]));
+        const sources = { far: farRows, farTimetable, timetableAt };
+        if (connection === undefined) {
+          attachArrivals(departures, sources, boardConfig);
+        } else {
+          // Copies: the arrivals are written onto the rows, and the onward rows
+          // are the interchange's, which another board may be holding too.
+          const onward = onwardRows.map((row) => ({ ...row }));
+          attachArrivals(onward, sources, connection);
+          attachArrivalsThrough(departures, onward, connection);
+        }
       }
 
       const names = new Set<string>();

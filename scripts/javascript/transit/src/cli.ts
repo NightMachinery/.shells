@@ -17,7 +17,7 @@ import {
   ConfigError,
   type Place,
 } from './config.ts';
-import { ARRIVE_REACH_MINUTES, attachArrivals } from './arrive.ts';
+import { attachArrivals, attachArrivalsThrough } from './arrive.ts';
 import { attachConnections } from './connect.ts';
 import { applyFilters, mergeBoards } from './filter.ts';
 import { applyVia } from './via.ts';
@@ -342,18 +342,20 @@ async function buildBoard(runtime: Runtime, boardConfig: BoardConfig, now: numbe
   const departures = mergeBoards(perStop);
 
   const connection = boardConfig.connection;
+  // The interchange's rows and their window, kept for a far stop reached through it.
+  let onwardRows: Departure[] = [];
+  let onwardWindow: Window = window;
   if (connection !== undefined) {
     // The onward window is this board's window shifted by the whole journey to
     // the interchange: nothing leaving before that is reachable from any row
     // here. Its end reaches past the printed window, because the onward service
     // the last printed row needs leaves after that window has closed.
     const reach = (connection.rideMinutes + connection.transferMinutes) * 60_000;
+    onwardWindow = { fromMs: window.fromMs + reach, toMs: reachThroughMs + reach };
     try {
-      const onward = await runtime.backend.departures(connection.stop, {
-        fromMs: window.fromMs + reach,
-        toMs: reachThroughMs + reach,
-      });
+      const onward = await runtime.backend.departures(connection.stop, onwardWindow);
       attachConnections(departures, onward, connection);
+      onwardRows = onward;
     } catch {
       // An interchange that cannot be reached leaves the slot empty rather than
       // failing the board; the departures are what the caller asked for.
@@ -363,20 +365,31 @@ async function buildBoard(runtime: Runtime, boardConfig: BoardConfig, now: numbe
 
   const arriveAt = boardConfig.arriveAt;
   if (arriveAt !== undefined) {
-    // The board's window, reaching on by as long as a vehicle may take to get
-    // to the far stop, so the last row printed still has an arrival to find.
-    // Each source may fail alone, and a failed one is an empty one: dashes in
-    // one column, not a failed board. See `attachArrivals` for why the
-    // timetable is asked as well as the live feed.
-    const farWindow = { fromMs: window.fromMs, toMs: window.toMs + ARRIVE_REACH_MINUTES * 60_000 };
+    // As far past the window as anything here looks, which covers the last
+    // row's vehicle, or the onward one it changes to, getting there. Each
+    // source may fail alone, and a failed one is an empty one: dashes in one
+    // column, not a failed board. See `attachArrivals` for why the timetable is
+    // asked as well as the live feed, and the page's own pipeline for the rest.
+    const farWindow = { fromMs: window.fromMs, toMs: reachThroughMs };
+    const boarding = connection === undefined ? boardConfig.stops : [connection.stop];
+    const boardingWindow = connection === undefined ? window : onwardWindow;
+    // The board's modes describe its own rows, not the onward service's.
+    const boardingOptions = connection === undefined ? options : undefined;
     const orEmpty = async (rows: Promise<Departure[]>): Promise<Departure[]> => rows.catch(() => []);
     const [farRows, farTimetable, ...timetables] = await Promise.all([
-      orEmpty(runtime.backend.departures(arriveAt.stop, farWindow, options)),
-      orEmpty(runtime.aggregator().departures(arriveAt.stop, farWindow, options)),
-      ...boardConfig.stops.map((stop) => orEmpty(runtime.aggregator().departures(stop, window, options))),
+      orEmpty(runtime.backend.departures(arriveAt.stop, farWindow)),
+      orEmpty(runtime.aggregator().departures(arriveAt.stop, farWindow)),
+      ...boarding.map((stop) => orEmpty(runtime.aggregator().departures(stop, boardingWindow, boardingOptions))),
     ]);
-    const timetableAt = new Map(boardConfig.stops.map((stop, at) => [stop, timetables[at] ?? []]));
-    attachArrivals(departures, { far: farRows, farTimetable, timetableAt }, boardConfig);
+    const timetableAt = new Map(boarding.map((stop, at) => [stop, timetables[at] ?? []]));
+    const sources = { far: farRows, farTimetable, timetableAt };
+    if (connection === undefined) {
+      attachArrivals(departures, sources, boardConfig);
+    } else {
+      const onward = onwardRows.map((row) => ({ ...row }));
+      attachArrivals(onward, sources, connection);
+      attachArrivalsThrough(departures, onward, connection);
+    }
   }
 
   const board: Board = {

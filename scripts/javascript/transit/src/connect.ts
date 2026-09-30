@@ -38,8 +38,13 @@ export function matchingOnward(rows: Departure[], connection: ConnectionConfig):
 export function attachConnections(rows: Departure[], onward: Departure[], connection: ConnectionConfig): void {
   const candidates = matchingOnward(onward, connection);
   for (const row of rows) {
-    const earliest = earliestOnward(row, connection);
-    const hit = candidates.find((candidate) => candidate.realtime >= earliest);
+    const hit = catchableOnward(row, candidates, connection);
     row.connection = hit === undefined ? null : { line: hit.line, departure: hit.realtime };
   }
+}
+
+/** The first of `candidates`, as `matchingOnward` orders them, that a rider leaving on `row` could catch. */
+export function catchableOnward(row: Departure, candidates: readonly Departure[], connection: ConnectionConfig): Departure | undefined {
+  const earliest = earliestOnward(row, connection);
+  return candidates.find((candidate) => candidate.realtime >= earliest);
 }
