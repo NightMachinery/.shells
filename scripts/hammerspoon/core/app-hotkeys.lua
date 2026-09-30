@@ -108,12 +108,64 @@ function focusApp(appName)
     end
 end
 
+-- One console line per press, so a slow switch can be traced to where the
+-- time went: waiting for hyper mode to be entered (a key pressed right after
+-- hyper waits for all of it), the handler itself, or the target app, whose
+-- activation macOS reports after the handler returns. appSwitchWatcher
+-- finishes the line when the activation arrives, or a timer says it never
+-- did. Global, like kittyFocusWatcher, so it is not collected.
+local appSwitchPending = nil
+
+local function appSwitchMs(from, to)
+    return (to - from) / 1e6
+end
+
+-- "x 12.3 ms after hyper went down (entering took 4.5: keys 3.0, entered() 1.5)",
+-- or "" when hyper is not down.
+local function appSwitchHyperNote(t0)
+    local m = hyper_mode
+    if not (m and m.modality and m.modality.down_p and m.downAt) then return "" end
+    local note = string.format("; %.1f ms after hyper went down (entering took %.1f",
+                               appSwitchMs(m.downAt, t0), m.downMs or -1)
+    if m.enteredAt and m.enteredAt >= m.downAt then
+        note = note .. string.format(": keys %.1f, entered() %.1f", appSwitchMs(m.downAt, m.enteredAt),
+                                     (m.downMs or 0) - appSwitchMs(m.downAt, m.enteredAt))
+    end
+    return note .. ")"
+end
+
+appSwitchWatcher = hs.application.watcher.new(function(_, event, app)
+    local p = appSwitchPending
+    if not p or event ~= hs.application.watcher.activated or not app or app:pid() ~= p.pid then return end
+    appSwitchPending = nil
+    print(string.format("appHotkey: %s: activated %.1f ms after the handler started (handler %.1f ms%s)",
+                        p.name, appSwitchMs(p.t0, hs.timer.absoluteTime()), p.handlerMs, p.hyperNote))
+end)
+appSwitchWatcher:start()
+
 local function toggleFocusApp(app)
+    local t0 = hs.timer.absoluteTime()
+    local hyperNote = appSwitchHyperNote(t0)
+
     if app:isFrontmost() then
         app:hide()
-    else
-        app:activate()
+        print(string.format("appHotkey: %s: hidden (handler %.1f ms%s)", app:name() or "?",
+                            appSwitchMs(t0, hs.timer.absoluteTime()), hyperNote))
+        return
     end
+
+    app:activate()
+    local pending = { pid = app:pid(), name = app:name() or "?", t0 = t0,
+                      handlerMs = appSwitchMs(t0, hs.timer.absoluteTime()), hyperNote = hyperNote }
+    appSwitchPending = pending
+    -- Kept on `pending', which appSwitchPending holds, so it is not collected
+    -- before it fires.
+    pending.timer = hs.timer.doAfter(1, function()
+        if appSwitchPending ~= pending then return end
+        appSwitchPending = nil
+        print(string.format("appHotkey: %s: no activation within 1 s (handler %.1f ms%s)",
+                            pending.name, pending.handlerMs, pending.hyperNote))
+    end)
 end
 
 function toggleFocus(appName)

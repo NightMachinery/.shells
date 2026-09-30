@@ -90,6 +90,9 @@ end
 
 prevFocusedElement = nil
 function hyper_modality:entered()
+    -- When hs.hotkey.modal has finished enabling the mode's keys and hands
+    -- over to this; see the timing lines in core/app-hotkeys.lua.
+    hyper_mode.enteredAt = hs.timer.absoluteTime()
     hyper_modality.entered_p = true
 
     -- First, before the Secure Input dance below, which does synchronous AX

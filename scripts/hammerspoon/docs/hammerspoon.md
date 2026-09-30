@@ -47,6 +47,18 @@ Bundle IDs keep `getApp`'s direct `applicationsForBundleID` lookup, avoiding a
 walk through every running process. The Telegram binding prefers Purple
 Telegram and falls back to standard Telegram.
 
+Every press prints one console line, so a slow switch can be traced to where
+the time went: `appHotkey: <app>: activated N ms after the handler started
+(handler M ms; K ms after hyper went down (entering took E: keys A, entered()
+B))`, or `hidden` for a press that hides, or `no activation within 1 s`.
+`appSwitchWatcher`, an `hs.application.watcher`, finishes the line when macOS
+reports the activation; `mode.down` in `modal-mode.lua` and
+`hyper_modality:entered` record the hyper timestamps. Measured 2026-09-30:
+handlers take 4 to 10 ms, macOS reports the activation 4.5 to 12 ms after the
+handler starts, and entering hyper mode takes 10.5 ms (4.4 ms enabling its 71
+keys, 6.1 ms in `entered()`), which only delays a key pressed within that time
+of hyper.
+
 ## The ipc print recursion fix
 
 `hs -c` used to wedge whenever anything printed to the Hammerspoon console
