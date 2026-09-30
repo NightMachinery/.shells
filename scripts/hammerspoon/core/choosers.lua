@@ -250,8 +250,11 @@ function emojiChooser()
     local hotkeys = {
         shiftEnter = hs.hotkey.bind('shift', 'return', addCurrent),
         tab = hs.hotkey.bind('', 'tab', addCurrent),
+        -- Distinct keys: cleanup deletes what this table holds, and a second
+        -- `backspace' used to overwrite the first, which left shift+delete
+        -- bound, globally, after the first emoji chooser.
         backspace = hs.hotkey.bind('shift', 'delete', removeLast),
-        backspace = hs.hotkey.bind('', '\\', removeLast),
+        backslash = hs.hotkey.bind('', '\\', removeLast),
         shiftTab = hs.hotkey.bind('shift', 'tab', removeLast)
     }
 
