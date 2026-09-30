@@ -1331,33 +1331,72 @@ file that loads earlier can set it before this one runs.
 
 In panel mode every tab lives in a kitty *panel* OS window, which floats over
 whatever is in front, fullscreen apps included. The main kitty creates it for
-itself over remote control, with `kitty @ launch --type=os-panel --os-panel
+itself over remote control, with `kitten @ launch --type=os-panel --os-panel
 edge=center --os-panel layer=top --os-panel focus-policy=on-demand
 --os-window-class kitty-panel --dont-take-focus`; kitty recognises it by
-`wm_class` `kitty-panel` in `kitty @ ls`, and Hammerspoon as kitty's only
-non-standard window. The zsh side is `kitty-panel-ensure`, `kitty-panel-show`
-and `kitty-panel-hide` in `zshlang/auto-load/others/terminal
-emulators/kitty.zsh`, run in the garden so nothing in Hammerspoon blocks.
-`kitty-panel-ensure` launches kitty when it is not running (`open -b
-net.kovidgoyal.kitty --args --start-as minimized`, then polls the socket for
-up to 20 s), creates the panel if there is none, and hides it once: a fresh
-panel counts as shown for kitty while macOS has put it on the desktop space
-only, so without that its first show would be a no-op there. When it has just
-created the panel, which is every kitty launch, since kitty cannot start as a
-panel and the startup session always opens in a normal window first, it moves
-the tabs of every other OS window in with `detach-tab`, in order, and closes
-the shell tab the panel was born with, which was only scaffolding once real
-tabs have arrived. Windows that scripts open later are left alone unless the
-zsh variable `kitty_panel_fold_strays` is set to `y` (default `n`, settable in
-a private startup file), in which case every show folds them in. It never
+`wm_class` `kitty-panel` in `kitten @ ls`, and Hammerspoon as kitty's only
+non-standard window.
+
+The remote-control side lives in `core/kitty-panel.lua`, as
+`kittyPanelShow(label)` and `kittyPanelHide(label)`. Nothing there blocks,
+and nothing needs the garden or zsh. There are two paths:
+
+- The **fast path** speaks kitty's remote-control protocol straight to its
+  socket through `hs.socket`: one `ESC P @kitty-cmd <JSON> ESC \` message
+  each way, with the payload fields documented in `rc_protocol.html` inside
+  the kitty bundle. A show is three calls: `ls` with match `state:active and
+  state:parent_active`, which lists only the active window of each OS
+  window's active tab (the panel's entry is both the window to show and the
+  one to focus), then `resize-os-window` with `action=show`, then
+  `focus-window`. A hide is `ls` plus `resize-os-window` with `action=hide`.
+  A show takes 12 to 19 ms (measured 2026-09-30). About 4 ms of that is
+  kitty answering `ls`, and about 4 ms is `hs.json.decode`, which is slow on
+  kitty's many small nested objects. The protocol version sent is the
+  installed kitty's own (kitty refuses a newer client), cached per kitty
+  process, because reading it from the bundle takes 7 ms.
+- The **slow path** handles everything else: no kitty, no panel yet, stray
+  tabs to fold in, or any fast-path error. Each step is an async `hs.task` on
+  `/Applications/kitty.app/Contents/MacOS/kitten @ --to <socket>`, killed
+  after 10 s so a wedged kitty cannot pile tasks up. Its panel state comes
+  from the full `kitten @ ls`, piped through `jq` in a small `/bin/sh`
+  wrapper, which reduces it to about 50 bytes (`win`, `active`, `firstTab`,
+  `strays`). The full `ls` is 657 KB for 13 tabs, almost all of it
+  `foreground_processes`. `hs.task` cannot take that: it collects stdout
+  only after the child exits, so a child writing more than the 64 KiB pipe
+  buffer blocks forever (measured with Hammerspoon 1.1.1; the first version
+  of this file hung on every press). A show this way took about 120 ms,
+  mostly three launches of `kitten`, a 51 MB binary that takes 16 ms to
+  start.
+
+Every show prints `kittyPanel: <label>: shown in N ms (fast|kitten)` to the
+console, and every fast hide `hidden in N ms`, so a slowdown or a fall back
+to the slow path is visible there.
+
+`kittyPanelShow` first makes sure there is a panel. When kitty is not running
+it launches it (`open -b net.kovidgoyal.kitty --args --start-as minimized`)
+and polls the socket for up to 20 s. When kitty runs but its socket is gone,
+it says so in a band and stops: `listen_on` is read only at startup, so only a
+kitty restart brings the socket back. When there is no panel it creates one
+and hides it once: a fresh panel counts as shown for kitty while macOS has put
+it on the desktop space only, so without that its first show would be a no-op
+there. When it has just created the panel, which is every kitty launch, since
+kitty cannot start as a panel and the startup session always opens in a normal
+window first, it moves the tabs of every other OS window in with
+`detach-tab`, in order, and closes the shell tab the panel was born with,
+which was only scaffolding once real tabs have arrived. Windows that scripts
+open later are left alone unless the Lua global `kitty_panel_fold_strays` is
+true (default false; set it in a file that loads earlier, or from the
+console), in which case every show folds them in. Nothing before the show
 focuses anything: focusing a hidden panel activates kitty on the desktop space
-before `show` has joined the current one. `kitty-panel-show` calls it, shows
-the panel, and only then runs `focus-window` on the active window.
-`kitty-panel-hide` matches a window inside the panel by id, so it hides only
-the panel and a normal window is left alone. On the Hammerspoon side `kittyPanelToggle` decides show
-or hide by whether kitty is frontmost, nothing more, and calls the two through
-`brishz_eval_hs`; remember `brishz-restart` after editing the zsh, since the
-garden does not see edits on its own. The window level is
+before `show` has joined the current one. So it shows the panel with
+`resize-os-window --action=show`, and only then runs `focus-window` on the
+panel's active window. Only one show runs at a time, so two quick presses
+while kitty is starting cannot create two panels; a 30 s watchdog frees the
+key if a step never answers. `kittyPanelHide` matches a window inside the
+panel by id, so it hides only the panel and a normal window is left alone.
+Failures are shown in a warn band with id `kitty-panel` and printed to the
+console. On the window-media side, `kittyPanelToggle` decides show or hide by
+whether kitty is frontmost, nothing more. The window level is
 `macos_ns_window_layer NSFloatingWindowLevel + 1` in
 `configFiles/kitty/kitty.conf`, level 4: above every window in a space, below
 Spotlight at 23 and Handy at 25. 3 never came up over a fullscreen space. It
@@ -1404,10 +1443,15 @@ you switch to.
 Every press logs one line to the Hammerspoon console, `kittyHandler: press
 (<mode>); kitty <frontmost|running|not running>; frontmost=<app>; ->
 show|hide`, so a press that "did nothing" can be traced to which way it went
-and what was in front. In panel mode, `kitty-remote ls` piped through `jq -c
-'.[] | {id, wm_class, ntabs: (.tabs|length)}'` should show one OS window of
-`wm_class` `kitty-panel`; with the default `kitty_panel_fold_strays`, a second
-OS window of `wm_class` `kitty` is a script's window and is expected to stay.
+and what was in front. In panel mode, `kittyPanelInspect()` in the console prints the socket, the
+window the fast path would use, and what the slow path's full `ls` says about
+the panel (its window, active window, first tab, and how many tabs sit
+outside it), with timings, without changing anything on screen. The fast
+window must equal the slow `active`. From a
+shell, `kitty-remote ls` piped through `jq -c '.[] | {id, wm_class, ntabs:
+(.tabs|length)}'` should show one OS window of `wm_class` `kitty-panel`; with
+the default `kitty_panel_fold_strays`, a second OS window of `wm_class`
+`kitty` is a script's window and is expected to stay.
 In window mode, run
 `hs.inspect(hs.spaces.windowSpaces(<kitty window id>))` after a hide and check
 the result with `hs.spaces.spaceType`: it must name a user space.

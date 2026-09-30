@@ -87,6 +87,10 @@ local hammerspoonCoreFiles = {
     -- calls the garden through brishz_eval_out_hs. Before
     -- core/window-media-bindings.lua, which instantiates it twice.
     "core/level-stepper.lua",
+    -- After alert/ and core/app-hotkeys.lua: it uses alert_gateway and
+    -- getApp. Before core/window-media-bindings.lua, whose hyper+z calls
+    -- kittyPanelShow and kittyPanelHide.
+    "core/kitty-panel.lua",
     "core/window-media-bindings.lua",
     "core/stt.lua",
     -- After core/helpers.lua, alert/ and core/hyper-mode.lua: it uses

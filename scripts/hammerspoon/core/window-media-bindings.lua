@@ -284,10 +284,10 @@ end
 --   "panel"  (default) every tab lives in a kitty *panel* OS window that
 --            floats over whatever is in front, fullscreen apps included, and
 --            hides again on the next press. The main kitty creates it for
---            itself over remote control; the zsh side is
---            [agfi:kitty-panel-ensure] / [agfi:kitty-panel-show] /
---            [agfi:kitty-panel-hide], run in the garden so nothing here
---            blocks. kitty's own quick-access kitten was rejected because it
+--            itself over remote control, asked by kittyPanelShow and
+--            kittyPanelHide in core/kitty-panel.lua (async hs.task calls on
+--            `kitten @', so nothing here blocks and nothing needs the
+--            garden). kitty's own quick-access kitten was rejected because it
 --            runs as a second app bundle.
 --   "window" a normal OS window, shown maximized on the mouse's screen and
 --            hidden on the next press. From a fullscreen app this switches to
@@ -415,7 +415,7 @@ kittyFocusWatcher = hs.application.watcher.new(function(_, event, app)
     if kitty_hotkey_mode == "panel" then
         local kitty = getApp(kittyBundleID)
         if kitty and kittyPanelWindow(kitty) then
-            brishz_eval_hs("kitty-panel-hide", "kittyFocusWatcher")
+            kittyPanelHide("kittyFocusWatcher")
         end
     end
 end)
@@ -437,13 +437,13 @@ function kittyPanelToggle(app, front)
         -- Read now, not in the timer: the hide may activate something and
         -- the watcher would overwrite the memory before the timer fires.
         local back = kittyReturnTo
-        brishz_eval_hs("kitty-panel-hide", "kittyPanelToggle")
+        kittyPanelHide("kittyPanelToggle")
         hs.timer.doAfter(0.35, function() kittyFocusAfterHide(back) end)
         return
     end
 
     kittyRemember(front)
-    brishz_eval_hs("kitty-panel-show", "kittyPanelToggle")
+    kittyPanelShow("kittyPanelToggle")
 end
 
 --- ** Window mode
