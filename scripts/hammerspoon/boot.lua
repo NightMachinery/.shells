@@ -25,6 +25,11 @@ popclick = require "hs.noises"
 application = require "hs.application"
 window = require "hs.window"
 hotkey = require "hs.hotkey"
+-- hs.hotkey logs "Disabled previous hotkey" and "Re-enabled previous hotkey"
+-- at info level whenever one binding shadows another, and hyper mode does
+-- that on every press and release: four lines each time, burying everything
+-- else in the console. Warnings and errors still show.
+hotkey.setLogLevel("warning")
 keycodes = require "hs.keycodes"
 fnutils = require "hs.fnutils"
 -- Stock hs.alert, kept reachable by hand for the console. Named for what it is
