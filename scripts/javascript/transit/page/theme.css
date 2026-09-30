@@ -65,6 +65,8 @@
   --col-minutes: 1.7rem;
   --col-badge: 2.9rem;
   --col-connection: 4.6rem;
+  /* A clock time and a little room: the arrival at a board's far stop. */
+  --col-arrival: 3rem;
   --col-alarm: 1rem;
   --col-stop: 2.6rem;
   /* The journey slot is what grows here, so it is a fraction rather than a

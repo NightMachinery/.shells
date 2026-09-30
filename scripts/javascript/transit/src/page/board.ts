@@ -1,6 +1,7 @@
 import { icon } from './icons.ts';
 import { buildLabel } from './build.ts';
 import { describe, describeBoards, lastRun } from './timing.ts';
+import { arriveLabel, byArrival } from '../arrive.ts';
 import { catchableOnBoard, describeWalk, normaliseLine, walkMinutesFor } from '../filter.ts';
 import type { Board, Departure } from '../model.ts';
 import { handoffFor, routeUrl, type RouteHandoff } from '../route-link.ts';
@@ -124,7 +125,9 @@ export function viewOf(profileKey: string, board: Board, commuting = false): Boa
   // A board being planned opens as rows, because the answer the commute view
   // exists to give lives in a row's own slot and would be invisible in a strip.
   // A stored choice still wins: the reader asked for that one.
-  return readView(boardId(profileKey, board.title)) ?? (commuting ? 'full' : 'integrated');
+  // A board with a far stop likewise: its answer is the arrival on each row, and
+  // a strip of departure times has nowhere to put it.
+  return readView(boardId(profileKey, board.title)) ?? (commuting || board.arriveAt !== undefined ? 'full' : 'integrated');
 }
 
 /**
@@ -243,6 +246,8 @@ function departureTip(dep: Departure, context: BoardContext): HTMLElement {
 interface Columns {
   connection: boolean;
   route: boolean;
+  /** The time each row's vehicle reaches the board's far stop. */
+  arrival: boolean;
   /**
    * Whether the row's second line has to earn its place.
    *
@@ -281,6 +286,7 @@ function columnsOf(board: Board, routes: BoardRoutes | undefined): Columns {
     // question somebody asked for by name.
     connection: board.connection !== undefined && !(route && narrowViewport()),
     route,
+    arrival: board.arriveAt !== undefined,
     terseTimes: narrowViewport(),
     stop: board.stops.length > 1,
   };
@@ -309,6 +315,7 @@ function gridTemplate(columns: Columns): string {
   // naming a station at all, which is the whole reason the column exists.
   if (columns.route) parts.push('minmax(var(--col-route-min), var(--col-route))');
   if (columns.connection) parts.push('minmax(0, var(--col-connection))');
+  if (columns.arrival) parts.push('minmax(0, var(--col-arrival))');
   // Allowed to reach zero, unlike the alarm column beside it. A grid whose fixed
   // tracks add up to more than the row is wide does not wrap or ellipsise: it
   // runs the last column off the side of the card, where the reader sees nothing
@@ -568,7 +575,7 @@ function rowTipSignature(
   planning: boolean,
   calls: string,
 ): string {
-  const head = `${dep.realtime}|${dep.delayMin}|${dep.cancelled}|${platformOf(dep) ?? ''}|${dep.realtimeKnown}|${calls}`;
+  const head = `${dep.realtime}|${dep.delayMin}|${dep.cancelled}|${platformOf(dep) ?? ''}|${dep.realtimeKnown}|${dep.arrival?.at ?? ''}|${calls}`;
   if (planning && planned === undefined) return `${head}|planning`;
   const options = planned?.options ?? [];
   return `${head}|${options.map((option) => `${option.exitStop}:${option.arrival}:${option.transfers}:${option.tight}`).join(',')}`;
@@ -723,6 +730,15 @@ function rowSheet(dep: Departure, board: Board, context: BoardContext, usual: Ma
   const platform = platformOf(dep);
   if (platform !== null) row('platform', platform);
   row('stop', dep.stopTag ?? stopTagOf(dep.stop, board.stopLabels));
+  if (board.arriveAt !== undefined && dep.arrival !== undefined) {
+    const at = arriveLabel(board.arriveAt);
+    row(
+      `at ${at}`,
+      dep.arrival === null
+        ? 'not found'
+        : `${timeLabel(dep.arrival.at, context.now, context.timezone)}${dep.arrival.realtimeKnown ? ', live' : ', timetable'}`,
+    );
+  }
   row('times from', dep.realtimeKnown && !context.planned ? `${dep.backend}, live` : `${dep.backend}, timetable`);
   const exact = roundedAway(dep, context.now);
   if (exact !== null) row('in', exact);
@@ -829,6 +845,27 @@ function stateBadge(dep: Departure, context: BoardContext): HTMLElement {
   return node;
 }
 
+/**
+ * When this row's vehicle reaches the board's far stop.
+ *
+ * A dash rather than an empty slot when the run was not found there, unlike the
+ * onward connection: on a board that asks this, the arrival is the column the
+ * rows are ordered by, and a blank in it would read as a layout gap rather than
+ * as "this one does not say". Drawn softer when it is only the timetable's.
+ */
+function arrivalCell(dep: Departure, board: Board, context: BoardContext): HTMLElement {
+  const label = board.arriveAt === undefined ? '' : arriveLabel(board.arriveAt);
+  if (dep.arrival === undefined || dep.arrival === null) {
+    const node = el('span', 'arrival arrival-unknown', '-');
+    node.setAttribute('aria-label', `arrival at ${label} not found`);
+    return node;
+  }
+  const node = el('span', `arrival${dep.arrival.realtimeKnown ? '' : ' arrival-plan'}`);
+  node.append(timeNode(dep.arrival.at, context.now, context.timezone, 'arrival-time'));
+  node.setAttribute('aria-label', `arrives ${label} ${timeLabel(dep.arrival.at, context.now, context.timezone)}`);
+  return node;
+}
+
 function renderRow(dep: Departure, board: Board, columns: Columns, context: BoardContext, usual: Map<string, string>): HTMLElement {
   const reachable = catchableOnBoard(dep, board, context.now);
   const row = el('li', `row${reachable ? '' : ' unreachable'}${dep.cancelled ? ' row-cancelled' : ''}`);
@@ -919,6 +956,8 @@ function renderRow(dep: Departure, board: Board, columns: Columns, context: Boar
       row.append(onward);
     }
   }
+
+  if (columns.arrival) row.append(arrivalCell(dep, board, context));
 
   row.append(alarmMarker(dep) ?? slot('alarm'));
 
@@ -1391,6 +1430,11 @@ export function renderBoard(board: Board, context: BoardContext): HTMLElement {
   if (context.destinationFixed === true && context.destinationName !== '') {
     note.append(el('span', 'board-destination', `to ${context.destinationName}`));
   }
+  // The same for a board whose right-hand times are somewhere else's: without
+  // it a column of clock times beside the departures is a column of what.
+  if (board.arriveAt !== undefined) {
+    note.append(el('span', 'board-destination', `arrival at ${arriveLabel(board.arriveAt)}`));
+  }
   const collapsed = view === 'collapsed';
   if (collapsed) {
     // A collapsed board has nothing else to say, so the slot that would carry
@@ -1477,8 +1521,11 @@ export function renderBoard(board: Board, context: BoardContext): HTMLElement {
 
   const columns = columnsOf(board, context.routes);
   const usual = context.routes === undefined ? new Map<string, string>() : usualExits(context.routes.rows);
-  const ordered =
-    context.sortByArrival && columns.route
+  // A board with a far stop is always in arrival order: that order is the answer
+  // it exists to give, and the one tram's rows side by side are how it gives it.
+  const ordered = columns.arrival
+    ? byArrival(rows)
+    : context.sortByArrival && columns.route
       ? [...rows].sort((a, b) => arrivalOf(a, context.routes?.rows) - arrivalOf(b, context.routes?.rows) || a.realtime - b.realtime)
       : rows;
   const list = el('ul', 'rows');

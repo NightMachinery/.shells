@@ -1,3 +1,4 @@
+import { arriveLabel, byArrival } from '../arrive.ts';
 import { contrastText, resolveColor, rgb } from '../colors.ts';
 import { catchableOnBoard, describeWalk } from '../filter.ts';
 import { stopTag } from '../json.ts';
@@ -123,6 +124,12 @@ function nearRow(dep: Departure, options: TerminalOptions, board: Board, highlig
       dep.connection === null ? '→ -' : `→ ${dep.connection.line} ${clockTime(dep.connection.departure, options.timezone)}`;
     pieces.push(options.color ? dim(onward) : onward);
   }
+  if (dep.arrival !== undefined && board.arriveAt !== undefined) {
+    // Not dimmed like the onward slot: on a board that asks for it, this is the
+    // time the rows are ordered by.
+    const label = arriveLabel(board.arriveAt);
+    pieces.push(dep.arrival === null ? `→ ${label} -` : `→ ${label} ${clockTime(dep.arrival.at, options.timezone)}`);
+  }
   if (dep.stopTag !== undefined) pieces.push(options.color ? dim(`@${dep.stopTag}`) : `@${dep.stopTag}`);
 
   const row = pieces.join(' ').replace(/\s+$/, '');
@@ -192,7 +199,9 @@ export function renderBoard(board: Board, options: TerminalOptions): string {
   }
 
   const boundary = options.now + NEAR_WINDOW_MINUTES * 60_000;
-  const near = board.departures.filter((dep) => dep.realtime <= boundary);
+  // A board with a far stop reads in the order its vehicles get there; see `byArrival`.
+  const nearRows = board.departures.filter((dep) => dep.realtime <= boundary);
+  const near = board.arriveAt === undefined ? nearRows : byArrival(nearRows);
   const far = board.departures.filter((dep) => dep.realtime > boundary);
 
   const lineWidth = badgeWidth(board.departures);

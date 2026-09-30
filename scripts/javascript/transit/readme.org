@@ -144,6 +144,45 @@ static pair is right to within a minute or two.
 An empty slot on a row means the board has an interchange and nothing at it was
 catchable from that row, which is information rather than a gap.
 
+** Arrivals further down the line
+
+A board may name one stop its vehicles go on to:
+
+#+begin_src toml
+arrive_at = { stop = "de:00000:9", label = "Far" }
+#+end_src
+
+Every row then carries the time its own vehicle reaches that stop, and the board
+is ordered by it. This is for a board of several boarding points on one line: the
+same vehicle leaves each of them at a different time and reaches the one stop the
+reader is going to at a single time, so that time and not the departure is what
+says which boarding point is worth getting to. Ordered by it, one vehicle's rows
+sit side by side, in the order it calls at them. =arrive_at= may also be a bare
+stop id; the label is what the header and the sheet call the stop, and without
+one it is the id's last field.
+
+The time is read off the far stop's own departures rather than worked out, so it
+carries whatever the live feed expects of the delay by then. What takes work is
+knowing which row at the far stop is this row's vehicle. The live feed's own run
+identifier is the same at every stop, so where both rows carry one they are
+matched on it. It is only published for runs in about the next twenty-five
+minutes, though, and a tram twenty minutes from the far stop is mostly past
+that. So the rest go through the timetable: the row is matched to its
+aggregator run at its own stop, the run gives the timetabled minute at the far
+stop, and the far stop's live row for that line and minute is the arrival. Every
+link is "same line, same timetabled minute, same stop", split by the direction
+letter and then the headsign only when a line is timetabled to cross itself at a
+stop, and nothing looser: a late tram shares its expected minute with the next
+tram's timetabled one.
+
+A row the timetable places at the far stop but the live feed has no row for
+carries the timetabled time, drawn softer on the page as it is not live. A row
+nothing could place carries a dash. The far stop costs two requests on the page,
+its live departures and its timetable. The boarding stops' timetables cost
+nothing where the live feed publishes no platform, which is the case for trams:
+the page asks for those timetables anyway to borrow the platform from, and this
+is the same question with the same answer.
+
 ** Places
 
 =[places.<name>]= declares somewhere a journey can end, and there are two kinds.
@@ -819,7 +858,9 @@ catchable, the walking time used to decide that, its backend, its stop, and a
 short stop tag. The tag is non-null only on a board with more than one stop,
 where it is the only thing distinguishing two otherwise identical rows. Each
 board also carries =stop_labels=, the label map, or null when the board declares
-none.
+none. A board with a far stop carries it as =arrive_at= (null otherwise), and
+each of its departures an =arrival= with the ISO instant and whether it was a
+live figure, or null when the run was not found there.
 
 =config-export= emits =schema_version=, =defaults=, =backends= and =profiles=.
 It carries *no* timestamp. The page repository refreshes this file by re-running

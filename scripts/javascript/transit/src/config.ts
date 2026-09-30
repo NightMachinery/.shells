@@ -1,6 +1,7 @@
 import {
   ALL_MODES,
   isMode,
+  type ArriveAtConfig,
   type BoardConfig,
   type ConnectionConfig,
   type Direction,
@@ -563,7 +564,49 @@ function parseBoard(profileKey: string, index: number, raw: unknown, issues: str
     else board.connection = connection;
   }
 
+  if (raw.arrive_at !== undefined) {
+    const arriveAt = parseArriveAt(where, raw.arrive_at, issues);
+    if (arriveAt === null) failed = true;
+    else board.arriveAt = arriveAt;
+  }
+
   return failed ? null : board;
+}
+
+/**
+ * The far stop a board's rows carry an arrival time at, spelled the way a
+ * board's own stops are: a bare id, or a table with an id and a label. The
+ * table's key is `stop` rather than `id` because that is what `connection`
+ * calls the same thing.
+ */
+function parseArriveAt(where: string, raw: unknown, issues: string[]): ArriveAtConfig | null {
+  const at = `${where}.arrive_at`;
+  if (typeof raw === 'string') {
+    const stop = raw.trim();
+    if (stop.length > 0) return { stop };
+    issues.push(`${at}: must be a non-empty stop id`);
+    return null;
+  }
+  if (!isTable(raw)) {
+    issues.push(`${at}: must be a stop id, or a table with a stop and an optional label`);
+    return null;
+  }
+  let failed = false;
+  const stop = typeof raw.stop === 'string' ? raw.stop.trim() : '';
+  if (stop.length === 0) {
+    issues.push(`${at}.stop: must be a non-empty stop id`);
+    failed = true;
+  }
+  let label: string | undefined;
+  if (raw.label !== undefined) {
+    label = typeof raw.label === 'string' ? raw.label.trim() : '';
+    if (label.length === 0) {
+      issues.push(`${at}.label: must be a non-empty string`);
+      failed = true;
+    }
+  }
+  if (failed) return null;
+  return label === undefined ? { stop } : { stop, label };
 }
 
 /**

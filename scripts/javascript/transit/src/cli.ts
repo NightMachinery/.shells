@@ -17,6 +17,7 @@ import {
   ConfigError,
   type Place,
 } from './config.ts';
+import { ARRIVE_REACH_MINUTES, attachArrivals } from './arrive.ts';
 import { attachConnections } from './connect.ts';
 import { applyFilters, mergeBoards } from './filter.ts';
 import { applyVia } from './via.ts';
@@ -360,6 +361,24 @@ async function buildBoard(runtime: Runtime, boardConfig: BoardConfig, now: numbe
     }
   }
 
+  const arriveAt = boardConfig.arriveAt;
+  if (arriveAt !== undefined) {
+    // The board's window, reaching on by as long as a vehicle may take to get
+    // to the far stop, so the last row printed still has an arrival to find.
+    // Each source may fail alone, and a failed one is an empty one: dashes in
+    // one column, not a failed board. See `attachArrivals` for why the
+    // timetable is asked as well as the live feed.
+    const farWindow = { fromMs: window.fromMs, toMs: window.toMs + ARRIVE_REACH_MINUTES * 60_000 };
+    const orEmpty = async (rows: Promise<Departure[]>): Promise<Departure[]> => rows.catch(() => []);
+    const [farRows, farTimetable, ...timetables] = await Promise.all([
+      orEmpty(runtime.backend.departures(arriveAt.stop, farWindow, options)),
+      orEmpty(runtime.aggregator().departures(arriveAt.stop, farWindow, options)),
+      ...boardConfig.stops.map((stop) => orEmpty(runtime.aggregator().departures(stop, window, options))),
+    ]);
+    const timetableAt = new Map(boardConfig.stops.map((stop, at) => [stop, timetables[at] ?? []]));
+    attachArrivals(departures, { far: farRows, farTimetable, timetableAt }, boardConfig);
+  }
+
   const board: Board = {
     title: boardConfig.title,
     stops: boardConfig.stops,
@@ -371,6 +390,7 @@ async function buildBoard(runtime: Runtime, boardConfig: BoardConfig, now: numbe
   if (boardConfig.walkMinutesByStop !== undefined) board.walkMinutesByStop = boardConfig.walkMinutesByStop;
   if (boardConfig.stopLabels !== undefined) board.stopLabels = boardConfig.stopLabels;
   if (connection !== undefined) board.connection = connection;
+  if (arriveAt !== undefined) board.arriveAt = arriveAt;
   return board;
 }
 

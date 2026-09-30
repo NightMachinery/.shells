@@ -95,6 +95,34 @@ describe('aggregator normalisation', () => {
     expect(firstS8?.realtimeKnown).toBe(false);
   });
 
+  test('names the run twice: the trip id for lookups, the run id for matching', async () => {
+    const page = {
+      stopTimes: [
+        {
+          place: { stopId: 'de-DELFI_de:00000:1', departure: '2026-01-01T08:05:00Z', scheduledDeparture: '2026-01-01T08:05:00Z' },
+          mode: 'TRAM',
+          headsign: 'Synthetic East',
+          routeShortName: '16',
+          tripId: 'trip-16',
+        },
+        {
+          place: { stopId: 'de-DELFI_de:00000:1', departure: '2026-01-01T08:06:00Z', scheduledDeparture: '2026-01-01T08:06:00Z' },
+          mode: 'TRAM',
+          headsign: 'Synthetic East',
+          routeShortName: '17',
+        },
+      ],
+    };
+    const { fetchImpl } = mockFetch(() => page);
+    const backend = createTransitousBackend({ fetchImpl, baseUrl: BASE });
+
+    const rows = await backend.departures(SYNTHETIC_STOP, FIXTURE_WINDOW);
+    const byLine = new Map(rows.map((row) => [row.line, row]));
+    expect(byLine.get('16')?.tripId).toBe('trip-16');
+    expect(byLine.get('16')?.runId).toBe('transitous:trip-16');
+    expect(byLine.get('17')?.runId).toBeUndefined();
+  });
+
   test('follows the next-page cursor once and then stops', async () => {
     const [page1, page2] = await pages();
     const { fetchImpl, urls } = mockFetch((_url, call) => (call === 0 ? page1 : page2));

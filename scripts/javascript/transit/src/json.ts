@@ -1,6 +1,6 @@
 import type { Config } from './config.ts';
 import { catchable, walkMinutesFor, type WalkSource } from './filter.ts';
-import { SCHEMA_VERSION, type Board, type ConnectionConfig, type Departure } from './model.ts';
+import { SCHEMA_VERSION, type ArriveAtConfig, type Board, type ConnectionConfig, type Departure } from './model.ts';
 
 // The machine-readable surface of the package, in one file. Everything here is
 // snake_case, because these documents are consumed by shell pipelines and by
@@ -36,6 +36,12 @@ export function connectionJson(connection: ConnectionConfig | undefined): unknow
   };
 }
 
+/** The far stop a board declares, in the snake_case the page reads. */
+export function arriveAtJson(arriveAt: ArriveAtConfig | undefined): unknown {
+  if (arriveAt === undefined) return null;
+  return { stop: arriveAt.stop, label: arriveAt.label ?? null };
+}
+
 export function departureJson(dep: Departure, board: WalkSource, now: number, multiStop: boolean): unknown {
   const walkMinutes = walkMinutesFor(board, dep.stop);
   return {
@@ -65,6 +71,14 @@ export function departureJson(dep: Departure, board: WalkSource, now: number, mu
       dep.connection === undefined || dep.connection === null
         ? null
         : { line: dep.connection.line, departure: toIso(dep.connection.departure) },
+    // Only on a board with a far stop, like `connection`, and null there when
+    // this run was not found at it.
+    ...(dep.arrival === undefined
+      ? {}
+      : {
+          arrival:
+            dep.arrival === null ? null : { at: toIso(dep.arrival.at), realtime_known: dep.arrival.realtimeKnown },
+        }),
   };
 }
 
@@ -77,6 +91,7 @@ export function boardJson(board: Board, now: number): unknown {
     walk_minutes_by_stop: board.walkMinutesByStop ?? null,
     stop_labels: board.stopLabels ?? null,
     connection: connectionJson(board.connection),
+    arrive_at: arriveAtJson(board.arriveAt),
     backend: board.backend,
     departures: board.departures.map((dep) => departureJson(dep, board, now, multiStop)),
   };
@@ -163,6 +178,7 @@ export function configExportDocument(config: Config, options: ConfigExportOption
         destination: board.destinationPlace ?? null,
         plan_stop: board.planStop ?? null,
         connection: connectionJson(board.connection),
+        arrive_at: arriveAtJson(board.arriveAt),
       })),
     })),
   };

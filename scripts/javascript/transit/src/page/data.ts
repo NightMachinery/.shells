@@ -6,6 +6,7 @@ import { recordBoard } from './timing.ts';
 import { createMvgBackend, MVG_DEFAULT_BASE_URL } from '../backends/mvg.ts';
 import { createTransitousBackend, TRANSITOUS_DEFAULT_BASE_URL } from '../backends/transitous.ts';
 import type { Backend } from '../backends/types.ts';
+import { ARRIVE_REACH_MINUTES, attachArrivals } from '../arrive.ts';
 import { attachConnections } from '../connect.ts';
 import { applyFilters, mergeBoards, normaliseLine } from '../filter.ts';
 import { applyVia, matchRows } from '../via.ts';
@@ -118,6 +119,10 @@ export function toBoardConfig(board: ExportedBoard): BoardConfig {
     };
     if (board.connection.direction !== null) connection.direction = board.connection.direction;
     config.connection = connection;
+  }
+  if (board.arrive_at !== null && board.arrive_at !== undefined) {
+    config.arriveAt =
+      board.arrive_at.label === null ? { stop: board.arrive_at.stop } : { stop: board.arrive_at.stop, label: board.arrive_at.label };
   }
   return config;
 }
@@ -391,6 +396,9 @@ export async function fetchProfile(options: FetchProfileOptions): Promise<FetchP
     // after it had finished, and nothing said it was finished a second time.
     const via = exported?.connection?.stop;
     if (via !== undefined && !boardOfStop.has(via)) boardOfStop.set(via, index);
+    // And so does the far stop a board reads its arrivals off, for the same reason.
+    const far = exported?.arrive_at?.stop;
+    if (far !== undefined && !boardOfStop.has(far)) boardOfStop.set(far, index);
   }
   const report = settling(onStatus);
   const pages = new Map<number, number>();
@@ -468,6 +476,33 @@ export async function fetchProfile(options: FetchProfileOptions): Promise<FetchP
         }
       }
 
+      if (boardConfig.arriveAt !== undefined) {
+        const far = boardConfig.arriveAt.stop;
+        // The same window as the board's own, reaching on by as long as a row's
+        // vehicle may take to get there, so the last row still has its arrival.
+        const farWindow = { fromMs: window.fromMs, toMs: window.toMs + ARRIVE_REACH_MINUTES * 60_000 };
+        // Each source may fail alone, and a failed one is an empty one: a far
+        // stop that cannot be read is a board with dashes in one column, not a
+        // failed board, exactly as for an interchange. The boarding stops'
+        // timetable is asked exactly as `borrowPlatforms` asked it, so it is
+        // that request's answer and not a second one.
+        const orEmpty = async (rows: Promise<Departure[]>): Promise<Departure[]> => rows.catch(() => []);
+        const [farRows, farTimetable, ...timetables] = await Promise.all([
+          orEmpty(
+            stopDepartures(backends, far, farWindow, {
+              title: '',
+              stops: [far],
+              walkMinutes: 0,
+              ...(boardConfig.modes === undefined ? {} : { modes: boardConfig.modes }),
+            }),
+          ),
+          orEmpty(timetableRows(backends.timetable, far, farWindow, undefined)),
+          ...boardConfig.stops.map((stop) => orEmpty(timetableRows(backends.timetable, stop, window, undefined))),
+        ]);
+        const timetableAt = new Map(boardConfig.stops.map((stop, at) => [stop, timetables[at] ?? []]));
+        attachArrivals(departures, { far: farRows, farTimetable, timetableAt }, boardConfig);
+      }
+
       const names = new Set<string>();
       for (const stop of boardConfig.stops) names.add(backends.outcomes.get(stop)?.backend ?? config.defaults.backend);
       for (const name of names) used.add(name);
@@ -482,6 +517,7 @@ export async function fetchProfile(options: FetchProfileOptions): Promise<FetchP
       if (boardConfig.walkMinutesByStop !== undefined) board.walkMinutesByStop = boardConfig.walkMinutesByStop;
       if (boardConfig.stopLabels !== undefined) board.stopLabels = boardConfig.stopLabels;
       if (boardConfig.connection !== undefined) board.connection = boardConfig.connection;
+      if (boardConfig.arriveAt !== undefined) board.arriveAt = boardConfig.arriveAt;
       report(index, { kind: 'ready' });
       recordBoard(profile.key, {
         title: boardConfig.title,

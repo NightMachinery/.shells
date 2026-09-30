@@ -39,6 +39,8 @@ interface RawDeparture {
   lineId?: string;
   realtime?: boolean;
   stopPointGlobalId?: string;
+  /** The run's own identifier, the same at every stop it calls at. */
+  tripId?: string | number;
 }
 
 /**
@@ -87,7 +89,19 @@ function toDeparture(row: RawDeparture, stop: string): Departure | null {
     backend: MVG_BACKEND_NAME,
     stop,
     realtimeKnown: row.realtime === true,
+    ...runIdOf(row.tripId),
   };
+}
+
+/**
+ * The run's identifier as `Departure.runId` wants it. Not the aggregator's
+ * `tripId`, though this feed calls it the same thing: the two are different
+ * numbering schemes, and a run's stops can only be looked up by the other one.
+ */
+function runIdOf(value: RawDeparture['tripId']): { runId?: string } {
+  if (typeof value !== 'string' && typeof value !== 'number') return {};
+  const text = String(value).trim();
+  return text.length > 0 ? { runId: `${MVG_BACKEND_NAME}:${text}` } : {};
 }
 
 function dedupeKey(row: RawDeparture): string {

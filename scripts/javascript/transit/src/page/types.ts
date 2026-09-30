@@ -13,6 +13,11 @@ export interface ExportedConnection {
   transfer_minutes: number;
 }
 
+export interface ExportedArriveAt {
+  stop: string;
+  label: string | null;
+}
+
 export interface ExportedBoard {
   title: string;
   stops: string[];
@@ -31,6 +36,8 @@ export interface ExportedBoard {
   /** The identifier the planner is given for this board's stop, when it differs. */
   plan_stop?: string | null;
   connection: ExportedConnection | null;
+  /** The stop every row carries an arrival time at; absent from an older export. */
+  arrive_at?: ExportedArriveAt | null;
 }
 
 /**

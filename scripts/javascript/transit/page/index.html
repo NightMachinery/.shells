@@ -694,6 +694,27 @@
         text-overflow: ellipsis;
       }
 
+      /* The arrival at the board's far stop. Heavier than the onward slot,
+         because on a board that has it this is the time the rows are ordered
+         by. A timetable figure is drawn softer, as the corner badge draws a
+         timetable departure. */
+      .arrival {
+        font-size: 12px;
+        font-weight: 600;
+        font-variant-numeric: tabular-nums;
+        color: var(--accent);
+        text-align: right;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      .arrival-plan,
+      .arrival-unknown {
+        color: var(--ink-soft);
+        font-weight: 400;
+      }
+
       /* The platform and the live state, as one mark in the row's corner.
          Both used to be grid tracks. The platform's two characters cost the
          destination a quarter of its width, and the live mark overflowed on the
@@ -1434,6 +1455,7 @@
           --col-minutes: 1.6rem;
           --col-badge: 2.5rem;
           --col-connection: 4rem;
+          --col-arrival: 2.6rem;
           --col-alarm: 0.9rem;
           --col-stop: 1.8rem;
           /* Pinned to its own floor here rather than given a range. A track

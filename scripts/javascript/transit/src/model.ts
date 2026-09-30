@@ -80,6 +80,24 @@ export interface Departure {
    */
   tripId?: string;
   /**
+   * The producing backend's own name for the vehicle's run, prefixed with that
+   * backend's name so two namespaces can never compare equal.
+   *
+   * Not `tripId`, which is the aggregator's identifier and is what a run's
+   * stops are looked up by. This one is only ever compared with itself: the
+   * same run carries the same value at every stop it calls at, which is how a
+   * row at one stop finds the same vehicle on another stop's board. Absent when
+   * the backend published none.
+   */
+  runId?: string;
+  /**
+   * When this row's vehicle reaches the stop its board's `arriveAt` names,
+   * read off that stop's own departures for the same run. Absent means the
+   * board asks no such question; null means it does and this run could not be
+   * found there.
+   */
+  arrival?: { at: number; realtimeKnown: boolean } | null;
+  /**
    * Set when a board filtered by a place the vehicle must call at and this row
    * could not be checked against it.
    *
@@ -121,6 +139,8 @@ export interface Board {
   stopLabels?: Record<string, string>;
   /** The onward service this board's rows point at, when one is configured. */
   connection?: ConnectionConfig;
+  /** The stop this board's rows carry an arrival time at, when one is configured. */
+  arriveAt?: ArriveAtConfig;
   /** Whether this board takes part in the commute view. */
   commute?: boolean;
 }
@@ -162,6 +182,16 @@ export interface BoardConfig {
   stopLabels?: Record<string, string>;
   /** An onward service to show alongside every row of this board. */
   connection?: ConnectionConfig;
+  /**
+   * A stop further down the line, and every row then carries the time its own
+   * vehicle gets there.
+   *
+   * For a board of several boarding points on one line: the same vehicle
+   * leaves each of them at a different time and reaches the one stop the reader
+   * is going to at a single time, so that time, and not the departure, is what
+   * says which boarding point is worth going to. Such a board is ordered by it.
+   */
+  arriveAt?: ArriveAtConfig;
   /**
    * Whether this board takes part in the commute view. A board opts in because
    * the journey planner is a much heavier question than a departure board, one
@@ -223,6 +253,14 @@ export interface ConnectionConfig {
   direction?: Exclude<Direction, null>;
   rideMinutes: number;
   transferMinutes: number;
+}
+
+/** The far stop of `BoardConfig.arriveAt`. */
+export interface ArriveAtConfig {
+  /** Stop id the board's vehicles go on to. */
+  stop: string;
+  /** What the far stop is called on screen; the id's last field when absent. */
+  label?: string;
 }
 
 export interface Profile {

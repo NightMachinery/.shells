@@ -448,3 +448,58 @@ describe('the glyph a profile and a place may carry', () => {
     expect(config.profiles.map((profile) => profile.emoji)).toEqual(['🇩🇪', '👩‍👩‍👧']);
   });
 });
+
+describe('a board that reads arrivals at a far stop', () => {
+  const board = { title: 'b', stops: ['de:00000:1', 'de:00000:2'], lines: ['16'], direction: 'H' };
+
+  test('takes a bare id or a table, and exports both the same way', () => {
+    const config = parseConfig(
+      {
+        profiles: {
+          line: {
+            title: 'Line',
+            boards: [
+              { ...board, arrive_at: 'de:00000:9' },
+              { ...board, title: 'c', arrive_at: { stop: 'de:00000:9', label: 'Far' } },
+              { ...board, title: 'd' },
+            ],
+          },
+        },
+      },
+      PATH,
+    );
+    const boards = config.profiles[0]?.boards ?? [];
+    expect(boards[0]?.arriveAt).toEqual({ stop: 'de:00000:9' });
+    expect(boards[1]?.arriveAt).toEqual({ stop: 'de:00000:9', label: 'Far' });
+    expect(boards[2]?.arriveAt).toBeUndefined();
+
+    const document = configExportDocument(config, { mvgBaseUrl: 'a', transitousBaseUrl: 'b' }) as {
+      profiles: Array<{ boards: Array<{ arrive_at: { stop: string; label: string | null } | null }> }>;
+    };
+    const exported = document.profiles[0]?.boards ?? [];
+    expect(exported[0]?.arrive_at).toEqual({ stop: 'de:00000:9', label: null });
+    expect(exported[1]?.arrive_at).toEqual({ stop: 'de:00000:9', label: 'Far' });
+    expect(exported[2]?.arrive_at).toBeNull();
+  });
+
+  test('rejects a missing stop, an empty label and a value of the wrong kind', () => {
+    const issues = issuesOf({
+      profiles: {
+        line: {
+          title: 'Line',
+          boards: [
+            { ...board, arrive_at: { label: 'Far' } },
+            { ...board, title: 'c', arrive_at: { stop: 'de:00000:9', label: '' } },
+            { ...board, title: 'd', arrive_at: 7 },
+            { ...board, title: 'e', arrive_at: '  ' },
+          ],
+        },
+      },
+    });
+    const joined = issues.join('\n');
+    expect(joined).toContain('profiles.line.boards[0].arrive_at.stop');
+    expect(joined).toContain('profiles.line.boards[1].arrive_at.label');
+    expect(joined).toContain('profiles.line.boards[2].arrive_at');
+    expect(joined).toContain('profiles.line.boards[3].arrive_at');
+  });
+});

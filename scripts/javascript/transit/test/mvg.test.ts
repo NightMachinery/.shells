@@ -340,3 +340,31 @@ describe('service message text', () => {
     expect(stripMarkup('')).toBe('');
   });
 });
+
+describe('the run identifier', () => {
+  test('is kept, namespaced, and never taken for the aggregator trip id', async () => {
+    const base = {
+      transportType: 'TRAM',
+      label: '16',
+      destination: 'Synthetic East',
+      plannedDepartureTime: FIXTURE_NOW + 5 * 60_000,
+      realtimeDepartureTime: FIXTURE_NOW + 5 * 60_000,
+      lineId: 'swm:00016:G:H:016',
+      realtime: true,
+    };
+    const rows = [
+      { ...base, tripId: '1234' },
+      { ...base, label: '17', tripId: 5678 },
+      { ...base, label: '18' },
+    ];
+    const { fetchImpl } = mockFetch(() => rows);
+    const backend = createMvgBackend({ fetchImpl, baseUrl: 'https://example.invalid/api', now: clock });
+
+    const departures = await backend.departures(SYNTHETIC_STOP, FIXTURE_WINDOW);
+    const byLine = new Map(departures.map((row) => [row.line, row]));
+    expect(byLine.get('16')?.runId).toBe('mvg:1234');
+    expect(byLine.get('17')?.runId).toBe('mvg:5678');
+    expect(byLine.get('18')?.runId).toBeUndefined();
+    for (const row of departures) expect(row.tripId).toBeUndefined();
+  });
+});

@@ -225,7 +225,9 @@ export function createTransitousBackend(options: TransitousOptions = {}): Backen
       // Carried because it is the only handle on the rest of this vehicle's
       // run. Everything a board wants to say about where a train goes after it
       // leaves has to start here.
-      ...(typeof row.tripId === 'string' && row.tripId.length > 0 ? { tripId: row.tripId } : {}),
+      ...(typeof row.tripId === 'string' && row.tripId.length > 0
+        ? { tripId: row.tripId, runId: `${TRANSITOUS_BACKEND_NAME}:${row.tripId}` }
+        : {}),
     };
   }
 
