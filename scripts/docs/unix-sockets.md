@@ -82,8 +82,14 @@ socket, and guessing wrong costs a running kitty its remote control with no way
 back. Nothing deletes sockets now. Filtering by pid makes a stale one cost a
 `pgrep` lookup instead.
 
-Use `pgrep -x kitty`, never `-f`: `-f` matches whole command lines, including
-the command doing the matching.
+Find kitty's pids with [agfi:kitty-pids]. It uses `pgrep -x kitty`, never
+`-f`, since `-f` matches whole command lines, including the command doing the
+matching. On macOS it also passes `-a`, because BSD `pgrep` leaves out its own
+ancestors by default and kitty is an ancestor of every shell it runs. Without
+`-a`, `kitty-socket-get` in a shell in a kitty tab (not in tmux) reported
+"kitty is not running". Under tmux it worked, because kitty is no ancestor of
+a tmux pane: the server's parent is launchd. On Linux `-a` means "print the
+command line", so it is macOS only.
 
 `kitty-socket-get` distinguishes its failures, because they want different
 responses and only one of them needs an instruction:

@@ -9,9 +9,6 @@ function kitty-sockets-list {
     #: lookup, whereas deleting one you misjudged costs a running kitty its
     #: remote control until it is restarted, unrecoverably.
     #:
-    #: `pgrep -x', never `-f': `-f' matches whole command lines, including our
-    #: own.
-    #:
     #: See docs/unix-sockets.md.
     ##
     local dir="${NIGHT_SOCKETS_DIR:-${HOME}/.local/state}"
@@ -23,7 +20,7 @@ function kitty-sockets-list {
     (( ${#socks} )) || return 0
 
     local -a live
-    live=( ${(f)"$(command pgrep -x kitty)"} )
+    live=( ${(f)"$(kitty-pids)"} )
 
     local s pid
     for s in "${socks[@]}" ; do
@@ -35,6 +32,22 @@ function kitty-sockets-list {
             ec "${s}"
         fi
     done
+}
+
+function kitty-pids {
+    #: The pid of every running kitty, one per line.
+    #:
+    #: `pgrep -x', never `-f': `-f' matches whole command lines, including our
+    #: own. `-a' on macOS, because BSD pgrep leaves out its own ancestors unless
+    #: told otherwise, and kitty is an ancestor of every shell it runs: without
+    #: it, a shell in a kitty tab concludes that kitty is not running. procps
+    #: pgrep leaves out only itself, and its `-a' prints command lines instead.
+    ##
+    if isDarwin ; then
+        command pgrep -a -x kitty
+    else
+        command pgrep -x kitty
+    fi
 }
 
 function kitty-socket-pid {
@@ -93,7 +106,7 @@ function kitty-socket-get {
 
     if (( ${#socks} == 0 )) ; then
         local -a live
-        live=( ${(f)"$(command pgrep -x kitty)"} )
+        live=( ${(f)"$(kitty-pids)"} )
         live=( ${live:#} )
 
         if (( ${#live} == 0 )) ; then
