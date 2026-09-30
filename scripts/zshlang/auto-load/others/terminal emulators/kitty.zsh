@@ -273,6 +273,242 @@ function kitty-tab-codex-p {
     ' >/dev/null
 }
 ##
+#: * Hiding tabs
+#: kitty can hide an OS window but not a tab, so hiding a tab detaches it into
+#: an OS window of its own and hides that. See =docs/kitty-tab-hide.md=.
+#:
+#: A tab is named by its first window's id (`window_id:<id>' as a tab match),
+#: because a tab id does not survive `detach-tab': kitty moves the windows into
+#: a new tab. kitty reports no visibility, so a hidden tab is one that carries
+#: the user variable `kitty_tab_hidden' and sits outside the main OS window.
+#: The main OS window is the hyper+z panel (`wm_class' `kitty-panel'), or else
+#: the first one holding an unmarked tab. A marked tab that something else put
+#: back into the main window, such as the panel folding strays, counts as
+#: shown.
+typeset -g kitty_tab_jq_defs='
+def kitty_tab_marked_p: any(.windows[]; .user_vars.kitty_tab_hidden != null);
+def kitty_main_os:
+  [ .[] | select(.wm_class == "kitty-panel") | .id ][0]
+  // [ .[] | select(any(.tabs[]; kitty_tab_marked_p | not)) | .id ][0];
+def kitty_tab_state($main; $os):
+  if $os != $main and kitty_tab_marked_p then "hidden" else "shown" end;
+'
+
+function h-kitty-tabs-tsv {
+    : "usage: h-kitty-tabs-tsv <socket> [<tab match>]; prints '<first window id> TAB shown|hidden TAB <title> TAB <window ids>' per tab, every tab by default"
+    local sock="${1}" match="${2}"
+    assert-args sock @RET
+    ensure-cmd jq @RET
+
+    local all matched
+    all="$(kitty @ --to "${sock}" ls)" @TRET
+    if test -n "${match}" ; then
+        #: Fails with kitty's own "No matching tabs" when nothing matches.
+        matched="$(kitty @ --to "${sock}" ls --match-tab "${match}")" @TRET
+    else
+        matched="${all}"
+    fi
+
+    #: Slurped rather than passed with `--argjson', which would put the whole
+    #: listing on the command line.
+    { ec "${all}" ; ec "${matched}" } | command jq -rs "${kitty_tab_jq_defs}"'
+        .[0] as $all | [ .[1][].tabs[].id ] as $ids
+        | ($all | kitty_main_os) as $main
+        | $all[] | .id as $os
+        | .tabs[] | select(.id as $t | any($ids[]; . == $t))
+        | [ .windows[0].id, kitty_tab_state($main; $os), .title,
+            ([ .windows[].id | tostring ] | join(",")) ]
+        | @tsv'
+}
+
+function h-kitty-tab-main-tab {
+    : "usage: h-kitty-tab-main-tab <socket>; sets REPLY to the id of the active tab in the main OS window"
+    local sock="${1}"
+    assert-args sock @RET
+
+    REPLY="$(kitty @ --to "${sock}" ls | command jq -r "${kitty_tab_jq_defs}"'
+        kitty_main_os as $main
+        | [ .[] | select(.id == $main) | .tabs[] | select(.is_active) | .id ][0] // empty')" @TRET
+    test -n "${REPLY}"
+}
+
+function h-kitty-tab-each {
+    : "usage: h-kitty-tab-each <hide|show|toggle> <tab match>; applies the verb to every matching tab"
+    local verb="${1}" match="${2}"
+    assert-args verb match @RET
+
+    local sock
+    sock="$(kitty-socket-get)" @RET
+    local rows
+    rows="$(h-kitty-tabs-tsv "${sock}" "${match}")" @RET
+
+    local row ret=0 wid state title wmatch action
+    local -a f
+    for row in ${(f)rows} ; do
+        f=( "${(@ps:\t:)row}" )
+        wid="${f[1]}" state="${f[2]}" title="${f[3]}"
+        #: `set-user-vars' takes a window match, so name every window in it.
+        wmatch="id:${(j: or id:)${(s:,:)f[4]}}"
+
+        action="${verb}"
+        if [[ "${action}" == toggle ]] ; then
+            if [[ "${state}" == hidden ]] ; then
+                action=show
+            else
+                action=hide
+            fi
+        fi
+
+        if [[ "${action}" == hide ]] ; then
+            if [[ "${state}" == hidden ]] ; then
+                ecgray "kitty-tab-hide: ${title} is already hidden"
+                continue
+            fi
+            #: The mark goes first: should the detach fail, a marked tab still
+            #: in the main window counts as shown.
+            {
+                kitty @ --to "${sock}" set-user-vars --match "${wmatch}" kitty_tab_hidden=1 &&
+                    kitty @ --to "${sock}" detach-tab --match "window_id:${wid}" &&
+                    kitty @ --to "${sock}" resize-os-window --match "id:${wid}" --action hide &&
+                    ecgray "kitty-tab-hide: ${title} is hidden; kitty-tab-show window_id:${wid} brings it back"
+            } || ret=$?
+        else
+            if [[ "${state}" == shown ]] ; then
+                ecgray "kitty-tab-show: ${title} is already shown"
+                continue
+            fi
+            {
+                if h-kitty-tab-main-tab "${sock}" ; then
+                    #: kitty makes an arriving tab the active one, and closes
+                    #: the emptied OS window by itself.
+                    kitty @ --to "${sock}" detach-tab --match "window_id:${wid}" --target-tab "id:${REPLY}"
+                else
+                    #: Nothing to return to, only hidden windows: show its own.
+                    kitty @ --to "${sock}" resize-os-window --match "id:${wid}" --action show
+                fi &&
+                    kitty @ --to "${sock}" set-user-vars --match "${wmatch}" kitty_tab_hidden &&
+                    ecgray "kitty-tab-show: ${title} is back as the active tab"
+            } || ret=$?
+        fi
+    done
+    return "${ret}"
+}
+
+function kitty-tab-hide {
+    : "usage: kitty-tab-hide <tab match>; takes the matching tabs out of the tab bar, each into a hidden OS window of its own, e.g. kitty-tab-hide title:htop"
+    #: What runs in the tab keeps running. Measured: well under a second, and
+    #: neither focus nor the main window's active tab moves.
+    ##
+    h-kitty-tab-each hide "$@"
+}
+
+function kitty-tab-show {
+    : "usage: kitty-tab-show <tab match>; moves hidden tabs back into the main kitty window, where each becomes the active tab"
+    #: The tab moves back rather than its window being shown: a shown window
+    #: lands on whichever space macOS picks, which is what the panel exists to
+    #: avoid. Nothing here focuses kitty, since focusing a hidden panel
+    #: activates it on the wrong space; the tab is there at the next hyper+z.
+    ##
+    h-kitty-tab-each show "$@"
+}
+
+function kitty-tab-toggle {
+    : "usage: kitty-tab-toggle <tab match>; hides the matching tabs that are shown, and shows those that are hidden"
+    h-kitty-tab-each toggle "$@"
+}
+
+function kitty-tab-state {
+    : "usage: kitty-tab-state <tab match>; sets REPLY to shown or hidden, failing unless exactly one tab matches"
+    local match="${1}"
+    assert-args match @RET
+
+    local sock rows
+    sock="$(kitty-socket-get)" @RET
+    rows="$(h-kitty-tabs-tsv "${sock}" "${match}")" @RET
+
+    local -a lines=( ${(f)rows} )
+    if (( ${#lines} != 1 )) ; then
+        ecerr "$0: ${#lines} tabs match ${match}, not one"
+        return 1
+    fi
+    local -a f=( "${(@ps:\t:)lines[1]}" )
+    REPLY="${f[2]}"
+}
+
+function kitty-tab-ls {
+    : "usage: kitty-tab-ls [<tab match>]; lists kitty's tabs: the match that names each one, shown or hidden, and its title"
+    local sock rows
+    sock="$(kitty-socket-get)" @RET
+    rows="$(h-kitty-tabs-tsv "${sock}" "${1}")" @RET
+
+    local row
+    local -a f
+    for row in ${(f)rows} ; do
+        f=( "${(@ps:\t:)row}" )
+        ec "window_id:${f[1]}"$'\t'"${f[2]}"$'\t'"${f[3]}"
+    done
+}
+
+function h-kitty-tab-fz {
+    : "usage: h-kitty-tab-fz <verb> <shown|hidden|''> [query ...]; sets reply to the tab matches picked"
+    #: `kitty_tab_fz_opts' reaches fz, e.g. `--no-multi' for a verb that only
+    #: makes sense once.
+    ##
+    ensure-array kitty_tab_fz_opts
+    local fz_opts=( "${kitty_tab_fz_opts[@]}" )
+
+    local verb="${1}" state="${2}"
+    shift 2
+    local query
+    query="$(fz-createquery "$@")"
+
+    local rows
+    rows="$(kitty-tab-ls)" @RET
+    if test -n "${state}" ; then
+        rows="${(F)${(@M)${(@f)rows}:#window_id:<->$'\t'${state}$'\t'*}}"
+    fi
+    if test -z "${rows}" ; then
+        ecerr "$0: no ${state:+${state} }kitty tabs"
+        return 1
+    fi
+
+    local picks
+    picks="$(ec "${rows}" | fz --prompt="kitty-tab ${verb}> " --query "${query}" \
+        --delimiter=$'\t' --with-nth=2.. "${fz_opts[@]}")" @RET
+
+    reply=( ${${(f)picks}%%$'\t'*} )
+    reply=( ${reply:#} )
+    (( ${#reply} ))
+}
+
+function kitty-tab-hide-fz {
+    : "usage: kitty-tab-hide-fz [query ...]; pick shown tabs and hide them"
+    h-kitty-tab-fz hide shown "$@" @RET
+    local -a picks=( "${reply[@]}" )
+
+    local pick ret=0
+    for pick in "${picks[@]}" ; do
+        kitty-tab-hide "${pick}" || ret=$?
+    done
+    return "${ret}"
+}
+
+function kitty-tab-show-fz {
+    : "usage: kitty-tab-show-fz [query ...]; pick a hidden tab and bring it back"
+    #: One pick, since each shown tab becomes the active one.
+    ##
+    kitty_tab_fz_opts=( --no-multi ) h-kitty-tab-fz show hidden "$@" @RET
+
+    kitty-tab-show "${reply[1]}"
+}
+
+function kitty-tab-toggle-fz {
+    : "usage: kitty-tab-toggle-fz [query ...]; pick a tab and hide or show it"
+    kitty_tab_fz_opts=( --no-multi ) h-kitty-tab-fz toggle '' "$@" @RET
+
+    kitty-tab-toggle "${reply[1]}"
+}
+##
 # redis-defvar kitty_focused
 function kitty-is-focused {
     ##

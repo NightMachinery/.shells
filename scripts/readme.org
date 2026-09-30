@@ -93,6 +93,10 @@ ssh daemon. =tmuxnew= has kitty start the server instead; =tmux-server-doctor=
 says whom the running one answers to, and =tmux2kitty= moves a single job out
 of a bad server into a kitty tab. See =./docs/tmux-kitty-tcc.md=.
 
+=kitty-tab-hide= takes any kitty tab out of the tab bar, into a hidden OS
+window of its own, and =kitty-tab-show= brings it back into the panel. See
+=./docs/kitty-tab-hide.md=.
+
 =./zshlang/basic/conditions.zsh= keeps only the general predicates, so the
 public =basic.plugin.zsh= can expose them; host identity and personal
 infrastructure live in =./zshlang/basic/conditions-personal.zsh=, which only

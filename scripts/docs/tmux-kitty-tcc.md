@@ -122,28 +122,29 @@ Not covered:
 tmux2kitty BrishGarden           #: any pane target: a session name, %28, ...
 tmux2kitty-ls                    #: what was moved: name, shown/hidden, kitty window, pid
 tmux2kitty-text BrishGarden      #: its whole scrollback, through kitty's socket
-tmux2kitty-focus BrishGarden     #: switch kitty to it (then hyper+z to show it)
+tmux2kitty-focus BrishGarden     #: switch kitty to it, showing it first if hidden
+tmux2kitty-show BrishGarden      #: bring its hidden tab back, as the active tab
 tmux2kitty-hide BrishGarden      #: take its tab out of the tab bar; it keeps running
-tmux2kitty-show BrishGarden      #: bring the tab back, as the active tab
 tmux2kitty-toggle BrishGarden    #: whichever of the two applies
 tmux2kitty-stop BrishGarden      #: stop it and close its window
 ```
 
-Each has an `-fz` variant that takes an optional fuzzy query instead of a
-name:
+Pickers take an optional fuzzy query instead of a name:
 
 - `tmux2kitty-fz` lists only the panes `tmux2kitty` would accept, and never
   this shell's own pane. Each row shows the pane and what finally runs in it,
   and dead panes are marked. It accepts several picks, and targets them by
   pane id, which cannot go stale between the pick and the move.
-- `tmux2kitty-text-fz`, `tmux2kitty-focus-fz`, `tmux2kitty-hide-fz`,
-  `tmux2kitty-show-fz`, `tmux2kitty-toggle-fz` and `tmux2kitty-stop-fz` pick
-  from `tmux2kitty-ls`. Hide lists only shown jobs, and show only hidden ones.
-  Focus, show and toggle take a single pick, since each of them can change
-  the active tab.
+- `tmux2kitty-text-fz`, `tmux2kitty-focus-fz` and `tmux2kitty-stop-fz` pick
+  from `tmux2kitty-ls`. Focus takes a single pick.
+- Hiding and showing are not specific to moved jobs, so their pickers are the
+  generic `kitty-tab-hide-fz`, `kitty-tab-show-fz` and `kitty-tab-toggle-fz`,
+  which list every kitty tab. A moved job's tab is titled
+  `tmux2kitty: <name>`.
 
 [agfi:tmux2kitty] re-runs a pane's `pane_start_command` in its
-`pane_start_path`, as a new kitty tab (`--keep-focus`, `--hold`), under
+`pane_start_path`, as a new kitty tab (`--keep-focus`, `--hold`) that is
+hidden or shown according to `tmux2kitty_type`, under
 `zsh -c` so that it gets the environment `.zshenv` builds. The job then answers
 to kitty, and nothing else in the server is touched. This is the stopgap for a
 bad server whose other sessions you cannot afford to lose yet. BrishGarden is
@@ -192,33 +193,12 @@ runs.
 
 ### Hiding a moved job's tab
 
-kitty can hide an OS window, but not a single tab. So [agfi:tmux2kitty-hide]
-detaches the job's tab into a new OS window of its own and hides that window
-(`kitty @ detach-tab`, then `kitty @ resize-os-window --action hide`). The job
-keeps running, and `tmux2kitty-text` still reads it. Measured: well under a
-second, and neither focus nor the panel's active tab moves.
-
-[agfi:tmux2kitty-show] moves the tab back with `detach-tab --target-tab`,
-next to the panel's active tab. kitty makes an arriving tab the active one,
-and closes the emptied hidden window by itself. It does not show the hidden
-window in place: that would put a normal kitty window on whichever space macOS
-picks, which is what the panel exists to avoid. If the panel is down, the tab
-is there at the next hyper+z. [agfi:tmux2kitty-focus] shows a hidden job
-first.
-
-- kitty reports no visibility, so "hidden" in `tmux2kitty-ls` means "not in
-  the main OS window". That is the panel (`wm_class` `kitty-panel`), or,
-  without one, the first OS window holding a tab that is not a moved job.
-- Each hidden job has its own hidden OS window. kitty gives a window created
-  by `detach-tab` no name to find it by later, so there is nothing to gather
-  them under.
-- The panel folds stray OS windows into itself whenever it is created (any
-  hyper+z that finds no panel window, as after kitty's launch), and on every
-  hyper+z when Hammerspoon's `kitty_panel_fold_strays` is on
-  (`hammerspoon/core/kitty-panel.lua`). A fold brings the hidden jobs back as
-  ordinary tabs.
-- **Untested:** showing a job when kitty has no main OS window at all, only
-  hidden ones. It then shows the job's own window instead.
+`tmux2kitty-hide`, `tmux2kitty-show` and `tmux2kitty-toggle` pass the job's
+kitty window to [agfi:kitty-tab-hide], [agfi:kitty-tab-show] and
+[agfi:kitty-tab-toggle], which work on any kitty tab. See
+[kitty-tab-hide.md](kitty-tab-hide.md) for how hiding works and what can bring
+a hidden tab back. `tmux2kitty-ls` reports each job as shown or hidden by the
+same rule.
 
 Knobs: `tmux2kitty_type` (kitty's `--type`: `tab`, `os-window`,
 `background`..., plus `hidden`, a tab that is hidden at once),
