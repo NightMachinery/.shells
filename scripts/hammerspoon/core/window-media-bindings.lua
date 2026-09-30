@@ -359,6 +359,13 @@ local function kittyPanelWindow(app)
     return nil
 end
 
+-- Whether the panel is on screen: one Accessibility query to kitty alone,
+-- 1.6 ms. isVisible as well, in case a hidden panel is ever still listed.
+local function kittyPanelShown(app)
+    local w = app and kittyPanelWindow(app)
+    return (w and w:isVisible()) and true or false
+end
+
 local function kittyStandardWindow(app)
     for _, w in ipairs(app:allWindows()) do
         if w:isStandard() then return w end
@@ -379,19 +386,50 @@ end
 -- dictation overlay (cmd+'), Hammerspoon itself for choosers and the Secure
 -- Input webview on hyper.
 local kittyReturnTo = nil
+
+-- The apps before it, newest first, so that a return target which has quit
+-- since hands over to the one before: a password dialog (sudo's askpass, say)
+-- becomes the return target when it takes focus, and is gone by the time you
+-- hide kitty again.
+local kittyReturnHistory = {}
+local kittyReturnHistoryMax = 6
+
+local function kittyReturnPush(app)
+    kittyReturnTo = app
+    local pid = app:pid()
+    for i = #kittyReturnHistory, 1, -1 do
+        local ok, same = pcall(function() return kittyReturnHistory[i]:pid() == pid end)
+        if not ok or same then table.remove(kittyReturnHistory, i) end
+    end
+    table.insert(kittyReturnHistory, 1, app)
+    kittyReturnHistory[kittyReturnHistoryMax + 1] = nil
+end
+
+-- Where a hide should return to, read at press time (see kittyPanelToggle):
+-- kittyReturnTo first, then the history.
+local function kittyReturnCandidates()
+    local list = { kittyReturnTo }
+    for _, a in ipairs(kittyReturnHistory) do list[#list + 1] = a end
+    return list
+end
 local kittyTransientBundles = {
     ["org.hammerspoon.Hammerspoon"] = true,
     ["org.p0deje.Maccy"] = true,
     ["com.pais.handy"] = true,
 }
 
-local function kittyFocusAfterHide(back)
-    if not back then return end
-    -- The app may have quit since; a dead hs.application answers nil.
-    pcall(function()
-        local win = back:focusedWindow()
-        if win then win:focus() else back:activate() end
-    end)
+-- Focuses the first candidate that is still running. A dead
+-- hs.application raises or answers nil, hence the pcall.
+local function kittyFocusAfterHide(candidates)
+    for _, back in ipairs(candidates or {}) do
+        local ok, done = pcall(function()
+            if not back:isRunning() then return false end
+            local win = back:focusedWindow()
+            if win then win:focus() else back:activate() end
+            return true
+        end)
+        if ok and done then return end
+    end
 end
 
 -- In panel mode the watcher also hides the panel when kitty is left by any
@@ -410,7 +448,7 @@ kittyFocusWatcher = hs.application.watcher.new(function(_, event, app)
     local bid = app:bundleID()
     if bid == kittyBundleID or kittyTransientBundles[bid] then return end
 
-    kittyReturnTo = app
+    kittyReturnPush(app)
 
     if kitty_hotkey_mode == "panel" then
         local kitty = getApp(kittyBundleID)
@@ -423,20 +461,26 @@ kittyFocusWatcher:start()
 
 local function kittyRemember(front)
     if front and front:bundleID() ~= kittyBundleID and not kittyTransientBundles[front:bundleID()] then
-        kittyReturnTo = front
+        kittyReturnPush(front)
     end
 end
 
 --- ** Panel mode
 
--- Show or hide is decided here, by whether kitty is frontmost; the panel
--- itself is kitty's business. When kitty had to be launched, the show can
--- take a few seconds while the session's tabs start; nothing waits.
-function kittyPanelToggle(app, front)
-    if app and app:isFrontmost() then
+-- Show or hide is decided here, by whether kitty is frontmost *and* its panel
+-- is on screen; the panel itself is kitty's business. Frontmost alone is not
+-- enough: when a dialog (a sudo password prompt, say) takes focus, the
+-- watcher hides the panel, and when the dialog closes macOS hands focus back
+-- to kitty with nothing on screen. Deciding by frontmost, every press then
+-- "hid" the hidden panel, and it came back only after another app had been
+-- focused by hand. When kitty had to be launched, the show can take a few
+-- seconds while the session's tabs start; nothing waits.
+function kittyPanelToggle(app, front, shown)
+    if shown == nil then shown = app and app:isFrontmost() and kittyPanelShown(app) end
+    if shown then
         -- Read now, not in the timer: the hide may activate something and
         -- the watcher would overwrite the memory before the timer fires.
-        local back = kittyReturnTo
+        local back = kittyReturnCandidates()
         kittyPanelHide("kittyPanelToggle")
         hs.timer.doAfter(0.35, function() kittyFocusAfterHide(back) end)
         return
@@ -462,7 +506,7 @@ function kittyWindowToggle(app, front)
 
     if app:isFrontmost() then
         -- Read before hide(): the activation hide() causes updates the memory.
-        local back = kittyReturnTo
+        local back = kittyReturnCandidates()
         kittyEvictFromFullscreen(win)
         app:hide()
         kittyFocusAfterHide(back)
@@ -497,21 +541,29 @@ end
 --- ** The key
 
 function kittyHandler()
+    -- For the "since press" figure that core/kitty-panel.lua prints.
+    kittyPressAt = hs.timer.absoluteTime()
+
     -- getApp (core/app-hotkeys.lua) is a bundle-ID lookup that never
     -- enumerates every running process.
     local app = getApp(kittyBundleID)
     local front = hs.application.frontmostApplication()
+    local frontmost = app and app:isFrontmost()
+    local panel = kitty_hotkey_mode == "panel"
+    local shown = panel and frontmost and kittyPanelShown(app)
 
     -- One line per press in the console, so "it did nothing" can be traced:
-    -- the mode, what was in front, and which way this press went.
-    print(string.format("kittyHandler: press (%s); kitty %s; frontmost=%s; -> %s",
+    -- the mode, what was in front, whether the panel was on screen, and which
+    -- way this press went.
+    print(string.format("kittyHandler: press (%s); kitty %s%s; frontmost=%s; -> %s",
                         kitty_hotkey_mode,
-                        app and (app:isFrontmost() and "frontmost" or "running") or "not running",
+                        app and (frontmost and "frontmost" or "running") or "not running",
+                        (panel and frontmost) and (shown and ", panel shown" or ", panel hidden") or "",
                         front and front:name() or "?",
-                        (app and app:isFrontmost()) and "hide" or "show"))
+                        (panel and shown or (not panel and frontmost)) and "hide" or "show"))
 
-    if kitty_hotkey_mode == "panel" then
-        kittyPanelToggle(app, front)
+    if panel then
+        kittyPanelToggle(app, front, shown)
     else
         kittyWindowToggle(app, front)
     end

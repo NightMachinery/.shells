@@ -1404,8 +1404,14 @@ while kitty is starting cannot create two panels; a 30 s watchdog frees the
 key if a step never answers. `kittyPanelHide` matches a window inside the
 panel by id, so it hides only the panel and a normal window is left alone.
 Failures are shown in a warn band with id `kitty-panel` and printed to the
-console. On the window-media side, `kittyPanelToggle` decides show or hide by
-whether kitty is frontmost, nothing more. The window level is
+console. On the window-media side, `kittyPanelToggle` hides only when kitty is
+frontmost *and* its panel is on screen (`kittyPanelShown`: kitty's
+non-standard window is present and visible, one Accessibility query to kitty
+alone, 1.6 ms), and shows otherwise. Frontmost alone was not enough: when a
+dialog such as sudo's password prompt takes focus, the focus watcher hides
+the panel, and when the dialog closes macOS hands focus back to kitty with
+nothing on screen, so every press "hid" the hidden panel until another app
+was focused by hand. The window level is
 `macos_ns_window_layer NSFloatingWindowLevel + 1` in
 `configFiles/kitty/kitty.conf`, level 4: above every window in a space, below
 Spotlight at 23 and Handy at 25. 3 never came up over a fullscreen space. It
@@ -1440,8 +1446,13 @@ dictation overlay is cmd+'. It is kept by `kittyFocusWatcher`, an
 `hs.application.watcher`, so the memory is refreshed by every switch you make
 and is never stale. The handler reads it at press time, before the hide,
 because the activation the hide causes would overwrite it; then
-`kittyFocusAfterHide` focuses that app's focused window, falling back to
-`activate()`, inside `pcall` in case the app has quit since. Nothing in the
+`kittyFocusAfterHide` focuses the first of those candidates that is still
+running (its focused window, falling back to `activate()`, inside `pcall`).
+The candidates are `kittyReturnTo` and then `kittyReturnHistory`, the last
+six apps, newest first: a password dialog becomes the return target when it
+takes focus and has quit by the time kitty is hidden again, so the hide
+falls back to the app before it instead of leaving focus in an invisible
+kitty. Nothing in the
 kitty path enumerates windows: `hs.window.orderedWindows` asks every process
 through Accessibility, and the "Handy Web Content" processes take 1.5 s each
 to answer (see `axLatencyReport` in `core/app-hotkeys.lua`). In panel mode the
