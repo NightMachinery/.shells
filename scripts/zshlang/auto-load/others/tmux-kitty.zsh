@@ -247,27 +247,71 @@ function h-tmux2kitty-kill-tree {
     return 0
 }
 
-function h-tmux2kitty-interactive-p {
-    : "usage: h-tmux2kitty-interactive-p <command...>; true when that command ends in an interactive shell, not a job"
-    #: [agfi:tmuxnewsh] wraps even an interactive session in `zsh -c', as
-    #: `zsh -c "cd DIR && ... zsh"', so peel `<shell> -c <string>' layers
-    #: and look at what finally runs. Moving such a session would kill
-    #: whatever you were doing in it and leave a fresh shell in kitty.
+typeset -ga tmux2kitty_shells=( zsh bash dash sh fish )
+
+function h-tmux2kitty-cmdv {
+    : "usage: h-tmux2kitty-cmdv <pane_start_command> [<default shell>]; sets reply to the argv the pane was started with"
+    #: tmux prints the start command in its own quoting; zsh's lexer takes it
+    #: off, as in =agent-session.zsh=. One word is a string tmux ran through
+    #: `default-shell -c'; several are an argv it executed directly. Fails,
+    #: with reply empty, when the pane was started with no command.
+    #:
+    #: Limitation: tmux escapes a literal newline or tab as `\n', `\t', and
+    #: those come back as two characters.
     ##
-    local -a cmdv=( "$@" ) shells=( zsh bash dash sh fish )
+    local start="${1}" default_shell="${2:-/bin/sh}"
+
+    local -a words
+    words=( ${(z)start} )
+    if (( ${#words} == 0 )) ; then
+        reply=()
+        return 1
+    elif (( ${#words} == 1 )) ; then
+        reply=( "${default_shell}" -c "${(Q)words[1]}" )
+    else
+        reply=( "${(@Q)words}" )
+    fi
+}
+
+function h-tmux2kitty-peel {
+    : "usage: h-tmux2kitty-peel <command...>; sets reply to what finally runs once the '<shell> -c <string>' layers are peeled off"
+    #: [agfi:tmuxnewsh] wraps every session in `zsh -c "cd DIR && ... cmd"',
+    #: and a one-word start command adds tmux's own `default-shell -c'.
+    ##
+    local -a cmdv=( "$@" )
     local depth
 
     for (( depth = 0 ; depth < 4 ; depth++ )) ; do
-        (( ${#cmdv} )) || return 0
-        (( ${shells[(Ie)${cmdv[1]:t}]} )) || return 1
-        [[ "${cmdv[2]}" == -*c ]] || return 0 #: a shell with no script: interactive
+        (( ${tmux2kitty_shells[(Ie)${cmdv[1]:t}]} )) || break
+        [[ "${cmdv[2]}" == -*c ]] || break
 
         cmdv=( ${(Q)${(z)cmdv[3]}} )
-        (( ${#cmdv} )) || return 0
-        #: A compound `cd DIR && VAR=x cmd': what runs is its last word.
-        (( ${shells[(Ie)${cmdv[-1]:t}]} )) && return 0
-        (( ${shells[(Ie)${cmdv[1]:t}]} )) || return 1
     done
+
+    reply=( "${cmdv[@]}" )
+}
+
+function h-tmux2kitty-interactive-p {
+    : "usage: h-tmux2kitty-interactive-p <command...>; true when that command is an interactive shell or REPL, not a job"
+    #: Moving such a pane would kill whatever you were doing in it and leave
+    #: a fresh prompt in kitty.
+    ##
+    local repl_pat='(ipython*|python*|julia*|node|irb|ghci|R|sqlite3|psql|clojure|lein)'
+
+    h-tmux2kitty-peel "$@"
+
+    (( ${#reply} )) || return 0
+    #: A bare shell, possibly with flags such as `-l'.
+    (( ${tmux2kitty_shells[(Ie)${reply[1]:t}]} )) && return 0
+    #: A REPL given only flags: `ipython', `python3 -i'.
+    local -a nonflags=( ${reply[2,-1]:#-*} )
+    if [[ "${reply[1]:t}" == ${~repl_pat} ]] && (( ${#nonflags} == 0 )) ; then
+        return 0
+    fi
+    #: What runs is the last word of a compound `cd DIR && VAR=x zsh', of
+    #: `env VAR=x julia', of `mosh host -- zsh'.
+    (( ${tmux2kitty_shells[(Ie)${reply[-1]:t}]} )) && return 0
+    [[ "${reply[-1]:t}" == ${~repl_pat} ]] && return 0
     return 1
 }
 
@@ -300,10 +344,10 @@ function tmux2kitty {
 
     local info
     info="$(command tmux display-message -p -t "${target}" \
-        '#{pane_id}'$'\t''#{pane_pid}'$'\t''#{session_name}'$'\t''#{session_windows}'$'\t''#{window_panes}'$'\t''#{window_index}.#{pane_index}'$'\t''#{pane_start_path}'$'\t''#{pane_start_command}')" @TRET
+        '#{pane_id}'$'\t''#{pane_pid}'$'\t''#{session_name}'$'\t''#{session_windows}'$'\t''#{window_panes}'$'\t''#{window_index}.#{pane_index}'$'\t''#{pane_start_path}'$'\t''#{pane_dead}'$'\t''#{?#{@agent_session},1,0}'$'\t''#{pane_start_command}')" @TRET
 
     local -a f=( "${(@ps:\t:)info}" )
-    local pane="${f[1]}" pid="${f[2]}" session="${f[3]}" cwd="${f[7]}" start="${f[8]}"
+    local pane="${f[1]}" pid="${f[2]}" session="${f[3]}" cwd="${f[7]}" dead="${f[8]}" agent="${f[9]}" start="${f[10]}"
     if [[ "${pane}" != %<-> ]] || [[ "${pid}" != <-> ]] ; then
         ecerr "$0: no such pane: ${1}"
         return 1
@@ -318,27 +362,25 @@ function tmux2kitty {
     h-tmux2kitty-id "${name}"
     local id="${REPLY}"
 
-    #: tmux prints the start command in its own quoting; zsh's lexer takes it
-    #: off, as in =agent-session.zsh=. One word is a string tmux ran through
-    #: `default-shell -c'; several are an argv it executed directly.
-    #: Limitation: tmux escapes a literal newline or tab as `\n', `\t', and
-    #: those come back as two characters.
-    local -a words cmdv
-    words=( ${(z)start} )
-    if (( ${#words} == 0 )) ; then
+    local default_shell
+    default_shell="$(command tmux show-options -gv default-shell 2>/dev/null)"
+    if ! h-tmux2kitty-cmdv "${start}" "${default_shell}" ; then
         ecerr "$0: ${name} was started with no command, i.e. as an interactive shell; nothing to re-run"
         return 1
-    elif (( ${#words} == 1 )) ; then
-        local default_shell
-        default_shell="$(command tmux show-options -gv default-shell 2>/dev/null)"
-        cmdv=( "${default_shell:-/bin/sh}" -c "${(Q)words[1]}" )
-    else
-        cmdv=( "${(@Q)words}" )
     fi
+    local -a cmdv=( "${reply[@]}" )
 
-    if ! bool "${force_p}" && h-tmux2kitty-interactive-p "${cmdv[@]}" ; then
-        ecerr "$0: ${name} runs an interactive shell, not a job: moving it would kill what runs in it and leave a fresh shell. Set tmux2kitty_force_p=y to do it anyway."
-        return 1
+    if ! bool "${force_p}" ; then
+        #: `@agent_session' is what =agent-tmux.zsh= marks an agent's session
+        #: with; its pane wrapper looks like any other job.
+        if [[ "${agent}" == 1 ]] ; then
+            ecerr "$0: ${name} runs a coding agent: moving it would kill the agent mid-conversation. Set tmux2kitty_force_p=y to do it anyway."
+            return 1
+        fi
+        if h-tmux2kitty-interactive-p "${cmdv[@]}" ; then
+            ecerr "$0: ${name} runs an interactive shell or REPL, not a job: moving it would kill what runs in it and leave a fresh prompt. Set tmux2kitty_force_p=y to do it anyway."
+            return 1
+        fi
     fi
 
     #: Everything that can fail before the kill, so a failure leaves the job
@@ -350,9 +392,14 @@ function tmux2kitty {
     #: A held window from an earlier move of the same job.
     tmux2kitty-stop "${name}" || true
 
-    ecgray "$0: stopping ${name} (pane ${pane}, pid ${pid})"
-    h-tmux2kitty-kill-tree "${pid}" @RET
-    #: A dead pane lingers under `remain-on-exit'.
+    #: A dead pane, kept by `remain-on-exit', still reports the pid its process
+    #: had, and that number may since belong to something else entirely.
+    if [[ "${dead}" == 1 ]] ; then
+        ecgray "$0: ${name} (pane ${pane}) is already dead; restarting it in kitty"
+    else
+        ecgray "$0: stopping ${name} (pane ${pane}, pid ${pid})"
+        h-tmux2kitty-kill-tree "${pid}" @RET
+    fi
     command tmux kill-pane -t "${pane}" &>/dev/null || true
 
     local -a opts=( --type="${type}" --cwd="${cwd:-${HOME}}"

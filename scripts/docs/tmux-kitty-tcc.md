@@ -152,11 +152,23 @@ runs.
   session of the same name, for instance when `brishgarden-boot` is re-run, it
   stops the kitty copy first. Otherwise the two would fight over the port.
   Without a marker, the check is one `test -e`.
-- It refuses a pane that runs an interactive shell rather than a job, since
-  moving it would kill whatever runs in it and leave a fresh shell.
-  `tmuxnewsh` wraps even interactive sessions as
-  `zsh -c "cd DIR && ... zsh"`, so it peels the `<shell> -c` layers and looks
-  at what finally runs. `tmux2kitty_force_p=y` overrides it.
+- It refuses a pane whose loss would be more than a restart, because moving it
+  would kill whatever runs in it and leave only a fresh prompt.
+  `tmux2kitty_force_p=y` overrides all of these:
+  - **An interactive shell.** `tmuxnewsh` wraps even interactive sessions as
+    `zsh -c "cd DIR && ... zsh"`, so it peels the `<shell> -c` layers and
+    looks at what finally runs. A bare shell counts, and so does a command
+    whose last word is one, like `mosh host -- zsh`. That rule also catches an
+    ssh tunnel that ends in a remote shell.
+  - **A REPL.** This means `ipython` or `python3 -i` given only flags, or a
+    REPL as the last word, as in `env VAR=x julia`. `python3 -m http.server`
+    and `julia script.jl` are jobs.
+  - **A coding agent,** i.e. a session carrying `@agent_session`. The agent
+    pane wrapper looks like any other job, so the tmux option is the only
+    reliable sign.
+- A dead pane (kept by `remain-on-exit`) is restarted in kitty without a kill.
+  Its `pane_pid` is the pid its process had, and that number may since belong
+  to an unrelated process.
 - tmux prints the start command in its own quoting, and zsh's lexer takes it
   off, as in `agent-session.zsh`. A literal newline or tab in a start command
   comes back as the two characters `\n` or `\t`.
