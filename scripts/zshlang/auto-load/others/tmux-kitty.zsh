@@ -321,7 +321,7 @@ function h-tmux2kitty-interactive-p {
 }
 
 function tmux2kitty {
-    : "usage: tmux2kitty <tmux target>; kills that pane and re-runs its start command in a new kitty tab"
+    : "usage: tmux2kitty <tmux target>; kills that pane and re-runs its start command in a new kitty tab, hidden by default"
     #: For a job in a tmux server whose macOS permissions come from the wrong
     #: process (see [agfi:tmux-server-doctor]); nothing else in the server is
     #: touched. Inspect it later with [agfi:tmux2kitty-ls],
@@ -341,7 +341,7 @@ function tmux2kitty {
     #: straight into the background, see [agfi:kitty-tab-hide]. Bring it back
     #: with [agfi:tmux2kitty-show].
     ##
-    local type="${tmux2kitty_type:-tab}" hide_p=''
+    local type="${tmux2kitty_type:-hidden}" hide_p=''
     if [[ "${type}" == hidden ]] ; then
         type=tab
         hide_p=y
