@@ -15,6 +15,19 @@
 -- watcher is collected and stops firing. Same reason as audio-watcher.lua.
 powerWatcher = nil
 
+-- When the garden call fails, the blackout is ended in Lua instead
+-- (blackoutNativeRelease, core/blackout-lock.lua): a wake or an unlock ends a
+-- blackout by definition, and with the garden down it used to give the
+-- keyboard back and leave the screen black. Looked up at call time, since
+-- that module loads after this one.
+local function releaseOpts(label)
+    return {
+        onFail = function()
+            if blackoutNativeRelease then blackoutNativeRelease(label) end
+        end,
+    }
+end
+
 local function onPowerEvent(event)
     -- macOS emits several of these per wake, and both of ours can fire for the
     -- same one. h-hook-wake is idempotent and returns immediately when there is
@@ -24,7 +37,7 @@ local function onPowerEvent(event)
         hs.caffeinate.watcher.screensDidWake then
         -- Asynchronous: never block Hammerspoon's main thread on the garden.
         -- See brishz_eval_hs in core/helpers.lua.
-        brishz_eval_hs("h-hook-wake", "power-watcher")
+        brishz_eval_hs("h-hook-wake", "power-watcher", releaseOpts("power-watcher"))
 
         -- A wake ends the blackout, so it ends the keyboard lock that came with
         -- it (core/blackout-lock.lua). Done here as well as from
@@ -59,11 +72,12 @@ local function onPowerEvent(event)
     -- idempotent in the way the blackout release is, and duplicating it here
     -- would double-fire it whenever the swift watcher is alive.
     if event == hs.caffeinate.watcher.screensDidUnlock then
-        brishz_eval_hs("h-blackout-release", "power-watcher-unlock")
+        brishz_eval_hs("h-blackout-release", "power-watcher-unlock", releaseOpts("power-watcher-unlock"))
 
-        -- The Lua half, as above: the garden restores the display, these give
-        -- the keyboard back and forget the blackout. Done here as well so the
-        -- keys come back even if the garden is slow or down.
+        -- The Lua half, as above: the garden restores the display (or
+        -- blackoutNativeRelease, when it cannot), these give the keyboard back
+        -- and forget the blackout. Done here as well so the keys come back
+        -- even if the garden is slow or down.
         if blackoutLockOff then blackoutLockOff(true) end
         if blackoutEnded then blackoutEnded() end
     end

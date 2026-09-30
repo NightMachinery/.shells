@@ -817,10 +817,11 @@ has no tap waiting to eat it.
 
 ### Ending a blackout without BrishGarden
 
-F2, the expiry and rung three end the black through the garden, and on
-2026-09-30 a garden that was down meant the keyboard came back while the screen
-stayed black, with nothing on it to say why. On a DDC monitor in clamshell that
-is a trap. So each of those calls passes an `onFail` (see
+F2, the expiry, rung three, and the wake and unlock branches of
+`core/power-watcher.lua` end the black through the garden, and on 2026-09-30 a
+garden that was down meant the keyboard came back while the screen stayed
+black, with nothing on it to say why. On a DDC monitor in clamshell that is a
+trap. So each of those calls passes an `onFail` (see
 `docs/hammerspoon-garden.md` in the scripts root), and a failed call runs
 `blackoutNativeRelease` in `core/blackout-lock.lua`, which does the same with
 nothing but binaries:
