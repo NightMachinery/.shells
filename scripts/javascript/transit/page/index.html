@@ -1381,14 +1381,15 @@
         /*
          * Tighter tabs on a phone.
          *
-         * Four profiles have to fit across the bar beside the refresh control,
+         * Five profiles have to fit across the bar beside the refresh control,
          * and the glyph in front of each label costs about a character. The
          * padding is what pays for it: at this width the tab is a target for a
-         * thumb, and a thumb is not more accurate for the three pixels either
-         * side that come off here.
+         * thumb, and a thumb is not more accurate for the five pixels either
+         * side that come off here. The fifth tab was two pixels short at seven,
+         * measured by the smoke check at 390 pixels.
          */
         .tab {
-          padding: 5px 7px;
+          padding: 5px 6px;
         }
 
         .tabs {
