@@ -1824,6 +1824,15 @@ cosmetic either: the two upstreams wrap a notice at different widths and disagre
 about the non-breaking space, and without it a feed that gained a trailing
 newline overnight would invalidate every translation anybody had paid for.
 
+A notice is two texts, its body and its title, and each is translated, stored
+and shared under its own hash. For a while only the body was, and every reader
+saw a German headline over an English paragraph. Separately rather than as one
+block, because the body's hash is what every existing translation and every
+acknowledgement is keyed by, and a hash of the two together would have started
+all of them again; and because the operator posts one title over a dozen
+notices, so one title translated is translated for all of them. The panel's
+"original" switch flips both.
+
 The flow on the page is in =src/page/messages.ts=. When the notices arrive, and
 again whenever the boards on screen change, the notices the panel shows are asked
 of the server, never more than forty hashes to a request, and whatever comes back

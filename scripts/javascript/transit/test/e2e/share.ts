@@ -147,6 +147,8 @@ interface RunCounts {
   credit: string;
   /** The translated body as the reader sees it. */
   text: string;
+  /** The notice's title as the reader sees it, which is translated on its own. */
+  title: string;
   /** How many hashes each lookup the page sent to the store asked about. */
   lookups: number[];
 }
@@ -429,6 +431,7 @@ async function main(): Promise<void> {
           availability: window.__translatorAvailability,
           credit: credit ? credit.textContent : '',
           text: box ? box.childNodes[0].textContent : '',
+          title: document.querySelector('.disruption-title')?.textContent ?? '',
         };
       })()`);
       const lookups = seen
@@ -449,10 +452,17 @@ async function main(): Promise<void> {
       first.calls > 0 && first.credit === 'translated on this device',
       `${first.calls} call(s) into the translator, and the panel credits "${first.credit}"`,
     );
+    // Two texts for the one notice: its body and its title, which are
+    // translated and shared separately.
     record(
       'of a feed of 251 notices, the page asks about and translates only the one it shows',
-      first.calls === 1 && first.lookups.length >= 1 && first.lookups.every((count) => count === 1),
+      first.calls === 2 && first.lookups.length >= 1 && first.lookups.every((count) => count === 2),
       `${first.calls} translate call(s); lookups of ${first.lookups.join(', ') || 'no'} hash(es)`,
+    );
+    record(
+      'the title is translated as well as the body',
+      first.title.startsWith('ON-DEVICE: ') && first.title.includes(NOTICE.title.slice(0, 20)),
+      `the title reads "${first.title.slice(0, 50)}"`,
     );
 
     // What the planning server was told, asked of the server directly rather
@@ -516,6 +526,11 @@ async function main(): Promise<void> {
       'and the panel says the text came from the server',
       served.credit === 'translated by server',
       `the panel credits "${served.credit}"`,
+    );
+    record(
+      'and the server translated the title for it too',
+      served.title.startsWith(SERVER_PREFIX),
+      `the title reads "${served.title.slice(0, 50)}"`,
     );
     // Counted for the one notice on screen. The server also translates the
     // rest of the feed on its warming cycle, in batches, which is its own

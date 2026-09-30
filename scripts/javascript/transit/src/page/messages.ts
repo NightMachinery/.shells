@@ -253,6 +253,26 @@ export function noticesFor(messages: Message[], configuredLines: ReadonlySet<str
   return relevantMessages(messages, wanted).filter((message) => message.text.trim().length > 0);
 }
 
+/**
+ * The texts of a notice that get translated, each on its own: the body, and
+ * the title when there is one.
+ *
+ * Separately rather than as one block, for two reasons. A notice is keyed
+ * everywhere by the hash of its body, the acknowledgements and every stored
+ * translation included, and a hash of title and body together would have
+ * started all of them from nothing. And the operator reuses one title across a
+ * dozen notices, so a title translated once is translated for all of them.
+ * The body comes first because it is the substance, and a slow pass on a
+ * phone should spend its first seconds there.
+ */
+export function translatableTexts(message: Message): string[] {
+  const out: string[] = [];
+  for (const text of [message.text, message.title]) {
+    if (typeof text === 'string' && text.trim().length > 0 && !out.includes(text)) out.push(text);
+  }
+  return out;
+}
+
 /** The lines the relevant messages are about, normalised key to the operator's spelling. */
 function affectedLines(messages: Message[], wanted: ReadonlySet<string>): Map<string, string> {
   const affected = new Map<string, string>();
@@ -347,7 +367,7 @@ async function copyAll(messages: Message[], node: HTMLButtonElement): Promise<vo
   }, COPY_NOTICE_MS);
 }
 
-async function translateAll(messages: Message[], onChange: () => void): Promise<void> {
+async function translateAll(texts: string[], onChange: () => void): Promise<void> {
   translating += 1;
   onChange();
   try {
@@ -355,14 +375,14 @@ async function translateAll(messages: Message[], onChange: () => void): Promise<
     // they land rather than all at the end of a run that may take a while over
     // a phone connection.
     let produced = 0;
-    for (const message of messages) {
-      const translation = await translate(message.text);
+    for (const text of texts) {
+      const translation = await translate(text);
       if (translation !== null) produced += 1;
       onChange();
-      offerTranslation(message, translation);
+      offerTranslation(text, translation);
     }
     // eslint-disable-next-line no-console
-    console.info(`[transit] notices: translated ${produced} of ${messages.length} on this device`);
+    console.info(`[transit] notices: translated ${produced} of ${texts.length} texts on this device`);
   } finally {
     translating -= 1;
     onChange();
@@ -382,9 +402,9 @@ async function translateAll(messages: Message[], onChange: () => void): Promise<
  * browser translation this page received get re-asserted under this page's own
  * name, which is exactly what the store's precedence rule exists to prevent.
  */
-function offerTranslation(message: Message, translation: Translation | null): void {
+function offerTranslation(original: string, translation: Translation | null): void {
   if (translation === null || translation.from !== undefined || sharing === null || offersRefused) return;
-  const hash = hashes.get(message.text);
+  const hash = hashes.get(original);
   if (hash === undefined || offered.has(hash)) return;
   offered.add(hash);
   const share = sharing;
@@ -393,7 +413,7 @@ function offerTranslation(message: Message, translation: Translation | null): vo
     lang: TARGET_LANGUAGE,
     source: sourceOfProvider(translation.provider),
     text: translation.text,
-    original_length: message.text.length,
+    original_length: original.length,
   };
   offerQueue = offerQueue
     .then(async () => {
@@ -594,9 +614,9 @@ export function renderMessages(
   actions.append(copy);
 
   const providers = translationProviders();
-  const untranslated = visible.filter((message) => {
-    if (message.text.trim().length === 0) return false;
-    const hash = hashes.get(message.text);
+  // Once each: one title is posted over a dozen notices.
+  const untranslated = [...new Set(visible.flatMap(translatableTexts))].filter((text) => {
+    const hash = hashes.get(text);
     return hash === undefined || rememberedTranslation(hash) === null;
   });
   const primary = providers[0];
@@ -634,7 +654,16 @@ export function renderMessages(
     const hash = hashes.get(message.text);
     const acknowledged = isAcknowledged(hash);
     const item = el('div', `disruption${acknowledged ? ' disruption-acknowledged' : ''}`);
-    item.append(el('strong', 'disruption-title', message.title));
+    // The title's own translation, when there is one. It flips back with the
+    // body under the same toggle, because a reader checking a notice against
+    // the operator's words wants the whole notice in them, not half.
+    const titleHash = hashes.get(message.title);
+    const titleTranslation = titleHash === undefined ? null : rememberedTranslation(titleHash);
+    const toggleKey = hash ?? titleHash;
+    const showingOriginal = toggleKey !== undefined && showOriginal.has(toggleKey);
+    item.append(
+      el('strong', 'disruption-title', titleTranslation === null || showingOriginal ? message.title : titleTranslation.text),
+    );
     if (message.lines.length > 0) item.append(el('span', 'disruption-lines', message.lines.join(' ')));
     const when = describeValidity(message);
     if (when !== null) item.append(el('span', 'disruption-when', when));
@@ -647,7 +676,7 @@ export function renderMessages(
       // away. A reader who wanted the German would be reading the operator's own
       // site; a reader here has already said, by the language their browser
       // speaks, which one they want first.
-      const original = showOriginal.has(hash);
+      const original = showingOriginal;
       const box = el('p', 'disruption-translation', original ? message.text : translation.text);
       const credit = el('span', 'disruption-provider', original ? 'original' : creditFor(translation));
       // Which provider actually produced it stays available without spending a
@@ -660,14 +689,17 @@ export function renderMessages(
       }
       box.append(credit);
       item.append(box);
+    }
+    if (toggleKey !== undefined && (translation !== null || titleTranslation !== null)) {
+      const original = showingOriginal;
       const toggle = button('disruption-original', original ? 'show translation' : 'original');
       toggle.setAttribute(
         'aria-label',
         `${original ? 'show translation' : 'original'}: ${original ? 'show the translated text again' : 'show the operator’s own words'}`,
       );
       toggle.addEventListener('click', () => {
-        if (original) showOriginal.delete(hash);
-        else showOriginal.add(hash);
+        if (original) showOriginal.delete(toggleKey);
+        else showOriginal.add(toggleKey);
         onChange();
       });
       item.append(toggle);
@@ -710,7 +742,9 @@ export function resetMessageFilters(): void {
  */
 export async function primeMessageState(messages: Message[], share: TranslationShare): Promise<void> {
   sharing = share;
-  const pending = [...new Set(messages.map((message) => message.text))].filter((text) => !hashes.has(text));
+  const pending = [...new Set(messages.flatMap((message) => [message.text, ...translatableTexts(message)]))].filter(
+    (text) => !hashes.has(text),
+  );
   const resolved = await Promise.all(pending.map(async (text) => [text, await messageHash(text)] as const));
   for (const [text, hash] of resolved) hashes.set(text, hash);
 
@@ -750,9 +784,8 @@ export async function primeMessageState(messages: Message[], share: TranslationS
 export async function adoptSharedTranslations(notices: Message[]): Promise<void> {
   if (sharing === null || notices.length === 0) return;
   const wanted = new Set<string>();
-  for (const message of notices) {
-    if (message.text.trim().length === 0) continue;
-    const hash = hashes.get(message.text);
+  for (const text of notices.flatMap(translatableTexts)) {
+    const hash = hashes.get(text);
     if (hash === undefined || askedStore.has(hash) || rememberedTranslation(hash) !== null) continue;
     wanted.add(hash);
   }
@@ -800,15 +833,14 @@ export async function autoTranslate(notices: Message[], onChange: () => void): P
   if (!uiLanguageDiffers()) return;
   await probeTranslationProviders();
   if (!chromeTranslationReady()) return;
-  const pending: Message[] = [];
-  for (const message of notices) {
-    if (message.text.trim().length === 0) continue;
-    const hash = hashes.get(message.text);
+  const pending: string[] = [];
+  for (const text of notices.flatMap(translatableTexts)) {
+    const hash = hashes.get(text);
     if (hash === undefined || autoHandled.has(hash) || rememberedTranslation(hash) !== null) continue;
     // Claimed before anything is awaited, so two runs started a moment apart
-    // cannot both take the same notice.
+    // cannot both take the same text.
     autoHandled.add(hash);
-    pending.push(message);
+    pending.push(text);
   }
   if (pending.length === 0) return;
   await translateAll(pending, onChange);

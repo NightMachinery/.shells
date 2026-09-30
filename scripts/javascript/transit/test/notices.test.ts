@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import { noticesFor } from '../src/page/messages.ts';
+import { noticesFor, translatableTexts } from '../src/page/messages.ts';
 import type { Message } from '../src/model.ts';
 
 // Which notices the page looks up and translates. The operator's feed carries
@@ -35,5 +35,18 @@ describe('noticesFor', () => {
   test('a profile that names no lines sees every notice, as the panel does', () => {
     const feed = [notice('a', ['U6']), notice('b', ['X99'])];
     expect(noticesFor(feed, new Set())).toHaveLength(2);
+  });
+});
+
+describe('translatableTexts', () => {
+  test('the body and then the title, each translated on its own', () => {
+    const message = notice('Umleitung wegen Marathon', ['16'], 'Wegen des Marathons entfällt der Halt.');
+    expect(translatableTexts(message)).toEqual(['Wegen des Marathons entfällt der Halt.', 'Umleitung wegen Marathon']);
+  });
+
+  test('a title that is the body, or empty, is not a second text', () => {
+    expect(translatableTexts(notice('Same', ['16'], 'Same'))).toEqual(['Same']);
+    expect(translatableTexts(notice('  ', ['16'], 'Body.'))).toEqual(['Body.']);
+    expect(translatableTexts(notice('Title', ['16'], ''))).toEqual(['Title']);
   });
 });
