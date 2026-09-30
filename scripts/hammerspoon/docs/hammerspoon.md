@@ -161,6 +161,21 @@ whatever was running — which reads as a bug in the callee. Seen while stubbing
 `blackoutChordBegin` from the shell for a test. Define such stubs without
 `print`, or write to the console through `hs.printf`.
 
+Stuck clients look like the cause of another intermittent fault. On 2026-09-30
+about one `hs -c` in five hung until its timeout, for hours. Two `hs -q -c`
+clients from 40 hours earlier were still waiting for replies, orphaned (their
+parent zsh had been reparented to launchd). Once they were killed by PID, 60
+calls in a row went through. So when `hs -c` starts stalling, list the clients
+first:
+
+```sh
+ps -Ao pid,ppid,lstart,command | grep '[h]s -q -c'
+```
+
+An old one whose parent is gone, or is pid 1, is safe to kill. Wrap every
+scripted call in a timeout (`gtimeout 4 hs -q -c ...`), so that a client of
+yours cannot become the stuck one.
+
 ## Running zsh in the garden
 
 `lua/pipe.lua` holds the clients, named `brishz_eval[_q][_bg]`. `_q` takes an
