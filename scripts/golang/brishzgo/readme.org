@@ -32,7 +32,9 @@ The unit tests need no garden. They check the quoters against zsh itself
 =zsh -f= =print -rn --=, and the text must match zsh's =(qq)= and =typeset -p=),
 the command assembly, the request shapes, and the replies, fallback and
 transport failures against fake gardens built on =net/http/httptest=. The
-zsh tests are skipped where zsh is missing.
+zsh tests are skipped where zsh is missing. Run them with =-race= as well:
+=TestFallbackKeepsStdinOrder= has the HTTP transport's goroutine and ours
+reading stdin at the same time.
 
 Two more are skipped unless pointed at something:
 

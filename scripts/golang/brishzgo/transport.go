@@ -30,6 +30,10 @@ const noBinaryMessage = "brishzgo: garden lacks binary support (no X-Brish-Binar
 // maxRedirects is curl's default for --location.
 const maxRedirects = 50
 
+// expectContinueTimeout is how long a raw request that streams stdin waits
+// for the garden's 100 Continue before it sends the body anyway.
+var expectContinueTimeout = 2 * time.Second
+
 type client struct {
 	cfg            config
 	hc             *http.Client
@@ -43,7 +47,7 @@ func newClient(cfg config, stdout, stderr io.Writer) *client {
 		Proxy: http.ProxyFromEnvironment,
 		// curl's default connect timeout; there is no overall one.
 		DialContext:           (&net.Dialer{Timeout: 300 * time.Second}).DialContext,
-		ExpectContinueTimeout: 2 * time.Second,
+		ExpectContinueTimeout: expectContinueTimeout,
 		ForceAttemptHTTP2:     true,
 		TLSHandshakeTimeout:   300 * time.Second,
 	}
@@ -209,7 +213,10 @@ func (c *client) raw(in *stdinSource) (code int, fallback bool) {
 	if in.magic {
 		// So that a garden without the raw API answers before we send
 		// any of stdin, which the fallback then still has; see replayLimit.
+		// Go's transport sends the body after a final reply such as that
+		// 404 unless the connection is to close, so it is.
 		req.Header.Set("Expect", "100-continue")
+		req.Close = true
 	}
 	c.debugf("command (%d bytes): %q", len(cmd), cmd)
 
@@ -368,7 +375,7 @@ func (c *client) json(in *stdinSource) int {
 		return 1
 	}
 	if in.magic {
-		c.debugf("stdin: %d bytes, %d of them already read by the raw request", len(stdin), in.seen.Len())
+		c.debugf("stdin: %d bytes, %d of them already read by the raw request", len(stdin), in.alreadyRead())
 	}
 	sub := ""
 	if c.cfg.nolog != "" {

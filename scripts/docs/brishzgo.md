@@ -87,12 +87,16 @@ our stderr. The exit status is `X-Brish-Retcode`.
 A garden older than the raw API answers 404 (or 405) and runs nothing; then
 `brishzgo` sends the same command to the JSON API (`json_output: 1`, `cmd`
 and `stdin` as strings, or `cmd_b64` and `stdin_b64` when either is not valid
-UTF-8). The raw request carries `Expect: 100-continue` when it streams stdin,
-so such a garden answers before any of stdin is sent, and the fallback still
-has all of it. For a server that reads the body before answering 404 anyway
-(a buffering proxy), up to 16 MiB of stdin is also kept for the fallback;
-beyond that the fallback fails with exit status 1 and nothing runs. The
-fallback costs one extra round trip, about 3 ms on this machine.
+UTF-8). The raw request carries `Expect: 100-continue` and `Connection: close`
+when it streams stdin. So such a garden answers before any of stdin is sent,
+and Go's transport sends none of it afterwards (to keep a connection open, it
+would send the body after the 404). Some of stdin can still go out first: to
+a server that asks for the body before answering 404 (a buffering proxy), or
+past the transport's 2 s wait for a 100 Continue. The fallback then resends
+it from a copy, in order, and the transport stops reading our stdin the
+moment the fallback starts. Up to 16 MiB is kept that way; beyond that the
+fallback fails with exit status 1 and nothing runs. The fallback costs one
+extra round trip, about 3 ms on this machine.
 
 `brishz_binary=y` goes straight to the JSON API's binary transport (`cmd_b64`,
 `stdin_b64`, `binary: 1`, and `b64_only: 1` for the smaller reply), as
