@@ -95,8 +95,19 @@ func TestRawRoundTrip(t *testing.T) {
 		t.Errorf("got %+v", got)
 	}
 	r := g.reqs[0]
-	if r.path != "/zsh/raw/nolog/" || r.query != "failure_expected=1&nolog=y&session=s+1" {
+	if r.path != "/zsh/raw/nolog/" || r.query != "failure_expected=1&nolog=1&session=s+1" {
 		t.Errorf("request %s?%s", r.path, r.query)
+	}
+	// Any non-empty value is true, as on the JSON API, whose request
+	// carries the value as it is.
+	runWith(t, g, "", []string{"true"}, "brishz_nolog", "n", "brishz_failure_expected", "0")
+	if r := g.reqs[1]; r.path != "/zsh/raw/nolog/" || r.query != "failure_expected=1&nolog=1" {
+		t.Errorf("n and 0: request %s?%s", r.path, r.query)
+	}
+	g.reqs = nil
+	runWith(t, g, "", []string{"true"}, "brishz_nolog", "n", "brishz_failure_expected", "0", "brishz_raw", "n")
+	if f := requestField(t, g.reqs[0].body, "failure_expected"); g.reqs[0].path != "/zsh/nolog/" || f != "0" {
+		t.Errorf("JSON: %s, failure_expected %q", g.reqs[0].path, f)
 	}
 	if r.header.Get("Expect") != "100-continue" {
 		t.Errorf("streamed stdin without Expect: 100-continue")

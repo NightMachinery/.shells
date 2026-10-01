@@ -60,6 +60,9 @@ only joined by spaces, with no wrapping and no forwarding.
   into the request; any other value is the stdin itself; unset means empty.
 - `brishz_session`, `brishz_nolog`, `brishz_failure_expected`: as in
   `brishzq.zsh`. A non-empty `brishz_nolog` also picks the `nolog/` route.
+  Any non-empty value of the last two is true, even `n` or `0`: the JSON API
+  gets the value as it is and takes any non-empty string as true, and the
+  raw request sends `1`, as `brishzq.zsh` does.
 - `brishz_noquote`: see above.
 - `brishz_binary`: the exact-bytes opt-in of [brishz-binary](brishz-binary.md),
   parsed like the scripts' `bool`. See "Transport" for what it changes here.

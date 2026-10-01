@@ -180,13 +180,17 @@ func (c *client) raw(in *stdinSource) (code int, fallback bool) {
 		sub += "nolog/"
 	}
 	q := url.Values{}
+	if c.cfg.session != "" {
+		q.Set("session", c.cfg.session)
+	}
+	// The JSON API takes any non-empty string here as true, and the raw
+	// API reads n, no, 0 and false as false; so 1, as brishzq.zsh sends.
 	for _, kv := range [][2]string{
-		{"session", c.cfg.session},
 		{"nolog", c.cfg.nolog},
 		{"failure_expected", c.cfg.failureExpected},
 	} {
 		if kv[1] != "" {
-			q.Set(kv[0], kv[1])
+			q.Set(kv[0], "1")
 		}
 	}
 	u := endpointURL(c.cfg.endpoint, sub)
