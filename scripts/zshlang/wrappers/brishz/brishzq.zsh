@@ -126,6 +126,32 @@ Succeeds when the headers curl dumped there include X-Brish-Binary: 1."
     done
     return 1
 }
+
+typeset -ga brishzq_tmp_files=()
+function h-brishzq-cleanup {
+    : "Removes the temp files this run created (brishzq_tmp_files)."
+    if (( ${#brishzq_tmp_files} )) ; then
+        command rm -f -- "${brishzq_tmp_files[@]}" || true
+    fi
+}
+
+function h-brishzq-tmp {
+    : "usage: h-brishzq-tmp
+Sets REPLY to a new temp file, which is removed when the script exits."
+    #: The EXIT trap is set at the top level, since one set inside a
+    #: function fires when that function returns. The signal traps are set
+    #: here, at the first temp file, so a run without temp files (the raw
+    #: path) keeps the default signal handling. A signal removes the files
+    #: and then kills us with that same signal, so our parent still sees it.
+    if (( ${#brishzq_tmp_files} == 0 )) ; then
+        local sig
+        for sig in HUP INT TERM ; do
+            trap "h-brishzq-cleanup ; brishzq_tmp_files=() ; trap - $sig EXIT ; kill -$sig \$\$" "$sig"
+        done
+    fi
+    REPLY="$(command mktemp)" || return $?
+    brishzq_tmp_files+=( "$REPLY" )
+}
 ##
 # typeset -a gray=( 170 170 170 )
 # ecgray () {
@@ -165,10 +191,13 @@ local binary_p="${brishz_binary}"
 local out_from_file_p="${brishz_out_file_p}"
 local eval_from_file_p="${brishz_eval_file_p}"
 
+trap 'h-brishzq-cleanup' EXIT
+
 local input_cmd_raw=("$@")
 local input_cmd=() out_file='' eval_file=''
 if bool "$out_from_file_p" ; then
-    out_file="$(mktemp)" || return $?
+    h-brishzq-tmp || exit $?
+    out_file="$REPLY"
     input_cmd=(reval-out-to "$out_file")
 fi
 input_cmd+=( "${input_cmd_raw[@]}" )
@@ -181,7 +210,8 @@ if test -z "$brishz_noquote" ; then
     input_cmd_lines=(${(@f)input_cmd_lines})
 
     if bool "$eval_from_file_p" ; then
-        eval_file="$(mktemp)" || return $?
+        h-brishzq-tmp || exit $?
+        eval_file="$REPLY"
         local input_cmd_orig="$input_cmd"
         print -r -- "$input_cmd_orig" > "$eval_file" || return $?
         input_cmd=(source "$eval_file")
@@ -291,10 +321,11 @@ if bool "$binary_p" ; then
     }
 elif test -n "${stdin_file_p}" ; then
     local stdin_f
-    stdin_f="$(mktemp)" || {
+    h-brishzq-tmp || {
         ec "Failed to create temporary file for stdin." >&2
-        return 1
+        exit 1
     }
+    stdin_f="$REPLY"
     ecn "$stdin" > "$stdin_f"
 req="$(jq --null-input --compact-output \
     --arg nolog "$nolog" \
@@ -320,7 +351,8 @@ if bool "$binary_p" ; then
     #: header we fail rather than print its reply as the command's output.
     #: Every reply is HTTP 200, so `--fail` cannot tell.
     local header_file
-    header_file="$(command mktemp)" || exit $?
+    h-brishzq-tmp || exit $?
+    header_file="$REPLY"
     local curl_cmd=( command curl $opts[@] --fail --silent --location --dump-header "$header_file" --header "Content-Type: application/json" --request POST --data-binary '@-' $endpoint )
 
     test -n "${debug_p}" && ec "brishzq.zsh: req: ${req}"
