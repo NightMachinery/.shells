@@ -2,10 +2,11 @@
 
 `brishzgo` runs one zsh command in a BrishGarden and passes on its stdout,
 stderr and exit status. It takes the same argv and environment variables as
-`brishzq.zsh` and exits with the same statuses, but it is one static binary:
-no `zsh -f` start, no `jq`, no `base64`, no `curl`. It talks to the garden's
-**raw API** (`POST /zsh/raw/`, bytes as bytes), and falls back to the JSON API
-for a garden that has none.
+`brishzq.zsh` and, except for the cases under "Where it differs", exits with
+the same statuses, but it is one static binary: no `zsh -f` start, no `jq`,
+no `base64`, no `curl`. It talks to the garden's **raw API**
+(`POST /zsh/raw/`, bytes as bytes), and falls back to the JSON API for a
+garden that has none or refuses the request.
 
 The source is `golang/brishzgo/`; its `readme.org` covers building and the
 tests. Nothing calls it yet: Hammerspoon, `lua/pipe.lua`, the agent hooks and
@@ -35,12 +36,14 @@ A leading `-c` is dropped, as `brishzq.zsh` does.
 
 ### The command text
 
-The words become one command line, quoted as `brishzq.zsh`'s `gquote` does:
+The words become one command line, byte for byte the one `brishzq.zsh`'s
+`gquote` builds (the parity test in `readme.org` compares them):
 
 - the first word stays bare when it is made only of ASCII letters, digits
   and `_ . / , : @ % + -`, so aliases, functions and reserved words still work
   in command position, and when it is exactly `!`, so `brishzgo ! cmd`
-  negates `cmd`'s status; otherwise it is single-quoted;
+  negates `cmd`'s status (a `brishzq.zsh` from before that rule quotes it);
+  otherwise it is single-quoted;
 - every other word is single-quoted, as zsh's `${(qq)...}` does;
 - no words at all give `''`.
 
@@ -126,7 +129,7 @@ sent, and Go's transport sends none afterwards (to keep a connection open,
 it would send the body after the 404). Some can still go out first, to a
 server that asks for the body before answering 404 (a buffering proxy), or
 past the transport's 2 s wait for a 100 Continue. The fallback costs one
-extra round trip, about 3 ms on this machine.
+extra round trip, 1 to 2 ms at p50 on this machine (see "Measurements").
 
 `brishz_binary=y` goes straight to the JSON API's binary transport (`cmd_b64`,
 `stdin_b64`, `binary: 1`, and `b64_only: 1` for the smaller reply), as
@@ -161,15 +164,15 @@ As `brishzq.zsh`'s, except where "Where it differs" below says otherwise:
 
 ## Where it differs from `brishzq.zsh`
 
-- The first word: `brishzq.zsh` quotes it with zsh's `(q+)`, which also leaves
-  `!` and printable non-ASCII bare and writes `$'...'` for control
-  characters. `brishzgo` uses the rule above. Both quote correctly; only the
-  text differs, for first words like `x!y`, `é` or one with a newline.
-- Forwarded variables: a value with a character outside ASCII that is not
-  printable is written with one `\M-` escape per byte, where zsh's `typeset -p`
-  writes `\uXXXX` (refused by a shell in the C locale) or a single `\M-` byte
-  for U+0080 to U+00FF (which loses a byte). The value arrives intact either
-  way; zsh's own text does not always give it back.
+- Forwarded variables: `brishzgo` quotes a value as zsh's `typeset -p` does in
+  a UTF-8 locale, whatever our own locale is. In the C locale, zsh escapes
+  the non-ASCII bytes that locale calls unprintable (on macOS 0x80 to 0x9F,
+  so most of U+3000 and of an emoji, but not `é`), where `brishzgo` writes
+  every printable character bare. A character outside ASCII that is not
+  printable `brishzgo` writes with one `\M-` escape per byte, where zsh writes
+  `\uXXXX` (refused by a shell in the C locale) or a single `\M-` byte for
+  U+0080 to U+00FF (which loses a byte). The value arrives intact either way;
+  zsh's own text does not always give it back.
 - `brishz_out_file_p`, `brishz_eval_file_p`, `brishz_copy` and
   `brishz_summary_p` are ignored. The first two work around the legacy
   transport's losses, which the raw API does not have.
@@ -196,22 +199,31 @@ As `brishzq.zsh`'s, except where "Where it differs" below says otherwise:
 
 ## Measurements
 
-On 2026-10-01, against a smoke garden from BrishGarden's `raw-endpoint`
-branch (binary mode, 4 workers) on a loaded laptop (load average 22 to 28),
-wall time per call including process start, 200 interleaved rounds of
-`print -r -- ok` after 10 warm-ups:
+On 2026-10-01, on a laptop at load average 7 to 9, against smoke gardens
+with 4 workers: wall time per call including process start, 200
+interleaved rounds of `print -r -- ok` after 10 warm-ups.
 
-- `brishzgo`: p50 36 ms, p90 65 ms;
-- `brishzgo` with `brishz_raw=n` (JSON API): p50 35 ms, p90 77 ms;
-- `brishzq.zsh`: p50 169 ms, p90 245 ms;
-- `brishz2.dash`: p50 58 ms, p90 110 ms (it has no `mark-me` wrapper).
+A binary-mode garden with the raw API (BrishGarden's `raw-refused` branch):
 
-Most of `brishzgo`'s 36 ms is the garden's side and the local wrapper: the
-same call through `localhost` (no wrapper) took p50 16 ms, the same as
-`curl` straight to the raw API, and a call to a closed port, which measures
-only the client, p50 10 ms (`/usr/bin/true` takes 3 ms to spawn here).
+- `brishzgo`: p50 24 ms, p90 50 ms;
+- `brishzgo` with `brishz_raw=n` (JSON API): p50 24 ms, p90 47 ms;
+- `brishzq.zsh`: p50 107 ms, p90 193 ms;
+- `brishzgo` through `localhost`, so without the `mark-me` wrapper: p50
+  16 ms, p90 37 ms.
 
-1 MiB of random bytes through `cat`, 20 rounds, every one exact:
+A garden without the raw API (`42ddc9d`), where every call falls back:
+
+- `brishzgo`: p50 30 ms, p90 51 ms, against p50 28 ms, p90 51 ms with
+  `brishz_raw=n`;
+- through `localhost`: p50 20 ms, p90 37 ms, against p50 17 ms, p90 30 ms.
+
+Most of `brishzgo`'s time is the garden's side and the local wrapper: a
+call to a closed port, which measures only the client, took p50 6 ms, and
+`/usr/bin/true` takes 2 ms to spawn here.
+
+An earlier run (against BrishGarden's `raw-endpoint` branch, at load
+average 22 to 28, 20 rounds) sent 1 MiB of random bytes through `cat`,
+every one exact:
 
 - `brishzgo` (raw API): p50 731 ms, p90 1058 ms;
 - `brishzgo` with `brishz_binary=y` (JSON binary): p50 1040 ms, p90 1470 ms;
