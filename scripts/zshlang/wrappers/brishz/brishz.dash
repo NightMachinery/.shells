@@ -11,7 +11,8 @@ cmd="$*"
 stdin="$brishz_in"
 #: brishz_binary=y: exact bytes both ways, over the garden's binary transport
 #: (cmd_b64, stdin_b64, binary: 1); see docs/brishz-binary.md. It needs a
-#: garden process started with BRISH_BINARY=1. Parsed like brishzq.zsh's bool.
+#: garden in binary mode, which is the garden's default (BRISH_BINARY=0
+#: turns it off). Parsed like brishzq.zsh's bool.
 binary_p=''
 case "$brishz_binary" in
    ''|[nN]|[nN][oO]|0) ;;
@@ -95,7 +96,7 @@ if test -n "$binary_p" ; then
          cat "$tmp/body"
          r=$?
       else
-         echo "brishz.dash: garden lacks binary support (no X-Brish-Binary header); restart the garden process with BRISH_BINARY=1" >&2
+         echo "brishz.dash: garden lacks binary support (no X-Brish-Binary header); it predates binary mode or runs with BRISH_BINARY=0" >&2
          r=201
       fi
    fi

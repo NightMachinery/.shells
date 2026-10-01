@@ -14,10 +14,11 @@ Hammerspoon, `lua/pipe.lua` and the agent hooks never set it.
 ## What the garden needs
 
 A BrishGarden with the binary request fields (`cmd_b64`, `stdin_b64` and
-`binary`), whose process was started with `BRISH_BINARY=1`. See "Binary data
-(opt-in)" in BrishGarden's readme. The mode belongs to the garden process:
-`brishz-restart` restarts the zsh workers but keeps the process's mode, so
-switching needs a restart of the garden process itself.
+`binary`), running in binary mode. That is the garden's default; a garden
+process started with `BRISH_BINARY=0` runs in legacy mode instead. See
+"Binary data (opt-in)" in BrishGarden's readme. The mode belongs to the
+garden process: `brishz-restart` restarts the zsh workers but keeps the
+process's mode, so switching needs a restart of the garden process itself.
 
 ## Using it
 
@@ -69,7 +70,7 @@ that header instead. When it is missing, they print this on stderr, print
 nothing on stdout, and exit with status 201:
 
 ```
-brishzq.zsh: garden lacks binary support (no X-Brish-Binary header); restart the garden process with BRISH_BINARY=1
+brishzq.zsh: garden lacks binary support (no X-Brish-Binary header); it predates binary mode or runs with BRISH_BINARY=0
 ```
 
 A garden without binary support has run nothing:

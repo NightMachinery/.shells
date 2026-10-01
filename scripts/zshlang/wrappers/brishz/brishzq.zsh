@@ -581,7 +581,7 @@ if bool "$binary_p" ; then
         exit "$ret"
     fi
     if test -z "$header_p" ; then
-        ec "brishzq.zsh: garden lacks binary support (no X-Brish-Binary header); restart the garden process with BRISH_BINARY=1" >&2
+        ec "brishzq.zsh: garden lacks binary support (no X-Brish-Binary header); it predates binary mode or runs with BRISH_BINARY=0" >&2
         exit 201
     fi
 
