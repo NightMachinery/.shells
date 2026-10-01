@@ -188,7 +188,8 @@ function h-brishzq-raw {
     : "usage: h-brishzq-raw <cmd> <stdin>
 Runs <cmd> with <stdin> through the garden's raw API (POST .../zsh/raw/),
 prints its stdout and stderr exactly, and exits with its status. Returns (0)
-only when the garden has no raw API (HTTP 404 or 405), which then ran nothing."
+only when the garden ran nothing and the JSON API may get the request: it has
+no raw API (HTTP 404 or 405), or it refused the request (X-Brish-Refused: 1)."
     #: Reads the script's locals: raw_endpoint, session, nolog,
     #: failure_expected, opts, copy_cmd, debug_p.
     #:
@@ -259,11 +260,11 @@ only when the garden has no raw API (HTTP 404 or 405), which then ran nothing."
     fi
 
     local headers="${reply[1,size_header]}" body="${reply[size_header+1,-1]}"
-    local line name value retcode='' out_length='' notice_p='' binary_mode=''
+    local line name value retcode='' out_length='' notice_p='' refused_p=''
     for line in "${(@ps:\r\n:)headers}" ; do
         if [[ "$line" == HTTP/* ]] ; then
             #: A new response (after a 100 Continue or a redirect).
-            retcode='' out_length='' notice_p='' binary_mode=''
+            retcode='' out_length='' notice_p='' refused_p=''
             continue
         fi
         name="${${line%%:*}:l}"
@@ -274,9 +275,19 @@ only when the garden has no raw API (HTTP 404 or 405), which then ran nothing."
             (x-brish-retcode) retcode="$value" ;;
             (x-brish-out-length) out_length="$value" ;;
             (x-brish-notice) [[ "$value" == 1 ]] && notice_p=y ;;
-            (x-brish-binary) binary_mode="$value" ;;
+            (x-brish-refused) [[ "$value" == 1 ]] && refused_p=y ;;
         esac
     done
+
+    if test -n "$refused_p" ; then
+        #: The garden ran nothing, and says so: a malformed request, or, in
+        #: legacy (text) mode, a command or stdin that is not valid UTF-8 or
+        #: holds a NUL. The JSON path runs those as it always has (stdin from
+        #: a temp file arrives exact). A reply without this header never
+        #: falls back, whatever its retcode and stderr: that command ran.
+        test -n "${debug_p}" && ec "brishzq.zsh: raw: refused (X-Brish-Refused), falling back to the JSON API"
+        return 0
+    fi
 
     if test -n "$notice_p" ; then
         #: A notice (a magic command's log, an empty command): printed and
@@ -289,17 +300,6 @@ only when the garden has no raw API (HTTP 404 or 405), which then ran nothing."
         #: not a command's result and exits 200.
         h-brishzq-print-notice "$body"
         exit 200
-    fi
-
-    if [[ "$binary_mode" == 0 && "$retcode" == 9000 && "$out_length" == 0 ]] \
-        && [[ "$body" == ('brishgarden: '|'Illegal input: ')* ]] \
-        && [[ "$cmd$stdin" == *[$'\0'$'\x80'-$'\xff']* ]] ; then
-        #: A garden in legacy (text) mode refuses a command or stdin that is
-        #: not valid UTF-8 or holds a NUL, before running anything. The JSON
-        #: path runs those as it always has (stdin from a temp file arrives
-        #: exact), so send the request there.
-        test -n "${debug_p}" && ec "brishzq.zsh: raw: refused by a legacy-mode garden, falling back to the JSON API"
-        return 0
     fi
 
     print -rn -- "${body[1,out_length]}"
@@ -350,8 +350,9 @@ local eval_from_file_p="${brishz_eval_file_p}"
 #: /zsh/raw/), which carries the command, stdin, stdout and stderr as exact
 #: bytes, with no JSON, and about halves the client's time per call. A
 #: garden without it answers 404 and runs nothing; we then send the same
-#: request to the JSON API, which costs about 25 ms more per call. So it
-#: stays opt-in until the running garden has the raw API; see
+#: request to the JSON API, which costs about 25 ms more per call. (So does
+#: a request the garden marks X-Brish-Refused: 1, which also ran nothing.)
+#: So it stays opt-in until the running garden has the raw API; see
 #: docs/brishz-raw.md. The options above that need the JSON API
 #: (brishz_binary, brishz_out_file_p, brishz_eval_file_p) always use it.
 local raw_p="${brishz_raw:-n}"

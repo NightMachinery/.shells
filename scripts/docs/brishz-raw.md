@@ -60,11 +60,13 @@ changing `brishz_raw:-n` to `brishz_raw:-y` in `brishzq.zsh`.
 - A transport failure: curl's own exit status, so a refused connection is
   still 7, which Hammerspoon reads as "not sent" (see
   [hammerspoon-garden](hammerspoon-garden.md)).
-- A garden in legacy mode (`BRISH_BINARY=0`) refuses a command or stdin that
-  is not valid UTF-8 or holds a NUL, before running anything. `brishzq.zsh`
-  recognizes that refusal (retcode 9000, `X-Brish-Binary: 0`, a payload with
-  such bytes, the garden's or Brish's refusal message) and sends the request
-  to the JSON API, which runs it as it always has.
+- A refusal (`X-Brish-Refused: 1`): the garden ran nothing, because the
+  request was malformed, or because it runs in legacy mode (`BRISH_BINARY=0`)
+  and the command or stdin is not valid UTF-8 or holds a NUL, which legacy
+  mode cannot carry. The request goes to the JSON API, which runs it as it
+  always has. Only that header sends a request there: a reply without it is
+  a command's result, even with retcode 9000 and a stderr that reads like a
+  refusal, so no command runs twice.
 
 Three options need the JSON API and always use it: `brishz_binary=y`
 ([brishz-binary](brishz-binary.md)), `brishz_out_file_p` and
