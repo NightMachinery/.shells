@@ -126,7 +126,13 @@ noisy; the ratios held across runs.
   `~`; otherwise it is single-quoted like the other words. It was quoted with
   `(q+)`, which mis-escapes some bytes and code points (an ideographic space
   stayed bare), so a crafted first word could inject code. Ordinary command
-  names are emitted exactly as before.
+  names are emitted exactly as before. A first word that is exactly `!`
+  stays bare as well, as `(q+)` left it, so `brishzq.zsh ! cmd` still
+  negates `cmd`'s status. Of the printable ASCII characters, `!` was the only
+  one `(q+)` left bare that the rule above quotes. A first word with
+  non-ASCII characters is now quoted, which changes only a non-ASCII alias
+  (zshlang defines none), and in the C locale (Hammerspoon's) it now arrives
+  exact, where `(q+)` corrupted an ideographic space.
 - Temp files (stdin for the JSON path, `brishz_out_file_p`,
   `brishz_eval_file_p`, the header dump of `brishz_binary=y`) are removed on
   exit and on HUP, INT and TERM; after INT or TERM the script still dies of

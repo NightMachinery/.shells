@@ -37,10 +37,12 @@ function gquote() {
     #: or `~`), so a command name reads as itself. Anything else is
     #: single-quoted like the other words. It used `(q+)`, which mis-escapes
     #: some bytes and code points (an ideographic space, for one, stayed
-    #: bare), so a crafted first word could inject code.
+    #: bare), so a crafted first word could inject code. A first word that
+    #: is exactly `!` stays bare too, as `(q+)` left it, so
+    #: `brishzq.zsh ! cmd` still negates `cmd`'s status.
     if (( $# == 0 )) ; then
         ec "''"
-    elif h-brishzq-safe-word-p "$1" ; then
+    elif [[ "$1" == '!' ]] || h-brishzq-safe-word-p "$1" ; then
         ec "$1" "${(qq@)@[2,-1]}"
     else
         ec "${(qq)1}" "${(qq@)@[2,-1]}"
