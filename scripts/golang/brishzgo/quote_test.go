@@ -112,6 +112,8 @@ func TestGquote(t *testing.T) {
 		{[]string{"a b", "it's", ""}, "'a b' 'it'\\''s' ''"},
 		{[]string{"~x", "a\nb"}, "'~x' 'a\nb'"},
 		{[]string{"ec"}, "ec"},
+		{[]string{"!", "false"}, "! 'false'"},
+		{[]string{"!!", "!"}, "'!!' '!'"},
 	}
 	for _, c := range cases {
 		if got := gquote(c.in); got != c.want {

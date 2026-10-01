@@ -39,7 +39,8 @@ The words become one command line, quoted as `brishzq.zsh`'s `gquote` does:
 
 - the first word stays bare when it is made only of ASCII letters, digits
   and `_ . / , : @ % + -`, so aliases, functions and reserved words still work
-  in command position; otherwise it is single-quoted;
+  in command position, and when it is exactly `!`, so `brishzgo ! cmd`
+  negates `cmd`'s status; otherwise it is single-quoted;
 - every other word is single-quoted, as zsh's `${(qq)...}` does;
 - no words at all give `''`.
 

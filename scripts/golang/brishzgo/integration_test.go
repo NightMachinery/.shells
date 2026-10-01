@@ -204,6 +204,12 @@ func TestITStreamsAndRetcodes(t *testing.T) {
 			t.Errorf("(exit %d): exit %d, err %q", rc, got.code, got.errOut)
 		}
 	}
+	// A first word of ! negates.
+	for cmd, rc := range map[string]int{"false": 0, "true": 1} {
+		if got := e.run(t, nil, []string{"!", cmd}); got.code != rc {
+			t.Errorf("! %s: exit %d, err %q", cmd, got.code, got.errOut)
+		}
+	}
 	// A literal brishz_in, and the arguments quoted.
 	got = e.run(t, nil, []string{"print", "-rn", "--", "it's", "$HOME", "a b"}, "brishz_in", "ignored")
 	if got.code != 0 || string(got.out) != "it's $HOME a b" {

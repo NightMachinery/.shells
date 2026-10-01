@@ -38,8 +38,11 @@ func quoteSingle(w string) string {
 	return "'" + strings.ReplaceAll(w, "'", `'\''`) + "'"
 }
 
+// quoteFirstWord quotes the first word: bare when bareFirstWordP says so,
+// and also when it is exactly `!`, so that `brishzgo ! cmd` negates cmd's
+// status, as it does in zsh; otherwise single-quoted.
 func quoteFirstWord(w string) string {
-	if bareFirstWordP(w) {
+	if bareFirstWordP(w) || w == "!" {
 		return w
 	}
 	return quoteSingle(w)
