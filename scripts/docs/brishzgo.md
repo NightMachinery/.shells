@@ -84,25 +84,36 @@ The raw request's body is the command's bytes, then stdin's, with
 first, and the reply's stdout part is streamed to our stdout and the rest to
 our stderr. The exit status is `X-Brish-Retcode`.
 
-A garden older than the raw API answers 404 (or 405) and runs nothing; then
-`brishzgo` sends the JSON API the request `brishzq.zsh` sends there, so a
-garden of any version runs what it runs for `brishzq.zsh`: `json_output: 1`,
-the command as `cmd`, and stdin as `stdin`, or for `MAGIC_READ_STDIN` in a
-temp file that the command reads with `< file { ... }`. The temp file
-carries any bytes, NUL and invalid UTF-8 included, to a garden on this
-machine, and is removed when `brishzgo` exits, also on SIGHUP, SIGINT and
-SIGTERM. Invalid UTF-8 in `cmd` or `stdin` becomes U+FFFD, the way jq
-replaces it.
+Two replies to the raw request mean that nothing ran, and send the
+request to the JSON API instead (the **fallback**):
 
-The raw request carries `Expect: 100-continue` and `Connection: close` when it
-streams stdin. So a garden without the raw API answers before any of stdin is sent,
-and Go's transport sends none of it afterwards (to keep a connection open, it
-would send the body after the 404). Some of stdin can still go out first: to
-a server that asks for the body before answering 404 (a buffering proxy), or
-past the transport's 2 s wait for a 100 Continue. The fallback then resends
-it from a copy, in order, and the transport stops reading our stdin the
-moment the fallback starts. Up to 16 MiB is kept that way; beyond that the
-fallback fails with exit status 1 and nothing runs. The fallback costs one
+- HTTP 404 or 405, from a garden older than the raw API;
+- `X-Brish-Refused: 1`, which the garden sets only on a request it refused
+  before running anything: a malformed one, or, in legacy mode
+  (`BRISH_BINARY=0`), a command or stdin that is not valid UTF-8 or holds a
+  NUL. A reply without the header is the command's own, even with status
+  9000 and an error on stderr, so a command that ran is never sent twice.
+
+The fallback sends the JSON API the request `brishzq.zsh` sends there, so a
+garden of any version and mode runs what it runs for `brishzq.zsh`:
+`json_output: 1`, the command as `cmd`, and stdin as `stdin`, or for
+`MAGIC_READ_STDIN` in a temp file that the command reads with
+`< file { ... }`. The temp file carries any bytes, NUL and invalid UTF-8
+included, to a garden on this machine, and is removed when `brishzgo` exits,
+also on SIGHUP, SIGINT and SIGTERM. Invalid UTF-8 in `cmd` or `stdin`
+becomes U+FFFD, the way jq replaces it.
+
+The fallback has all of stdin even though the raw request streamed it. A
+refusing garden read all of it, and the raw request keeps a copy of what it
+sent, in memory up to 16 MiB and in a temp file beyond that, which the
+fallback resends first, in order; the transport stops reading our stdin the
+moment the fallback starts. A garden without the raw API normally gets none
+of it: the raw request carries `Expect: 100-continue` and
+`Connection: close`, so that garden answers 404 before any of stdin is
+sent, and Go's transport sends none afterwards (to keep a connection open,
+it would send the body after the 404). Some can still go out first, to a
+server that asks for the body before answering 404 (a buffering proxy), or
+past the transport's 2 s wait for a 100 Continue. The fallback costs one
 extra round trip, about 3 ms on this machine.
 
 `brishz_binary=y` goes straight to the JSON API's binary transport (`cmd_b64`,

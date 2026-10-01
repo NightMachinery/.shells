@@ -39,7 +39,7 @@ type client struct {
 	hc             *http.Client
 	stdout, stderr io.Writer
 	keyHeaders     [][2]string // never printed
-	lastStatus     int
+	fallbackWhy    string      // why raw fell back, for debug output
 }
 
 func newClient(cfg config, stdout, stderr io.Writer) *client {
@@ -160,7 +160,6 @@ func (c *client) do(req *http.Request) (*http.Response, int) {
 		c.debugf("request failed: %v", err)
 		return nil, curlExitCode(err, false)
 	}
-	c.lastStatus = resp.StatusCode
 	c.debugResponse(resp)
 	return resp, 0
 }
@@ -173,7 +172,8 @@ func (c *client) printNotice(body []byte) int {
 }
 
 // raw runs the command through POST /zsh/raw/. fallback is true when the
-// garden has no raw API (HTTP 404 or 405); then nothing ran.
+// garden has no raw API (HTTP 404 or 405) or refused the request
+// (X-Brish-Refused: 1); then nothing ran.
 func (c *client) raw(in *stdinSource) (code int, fallback bool) {
 	sub := "raw/"
 	if c.cfg.nolog != "" {
@@ -228,15 +228,27 @@ func (c *client) raw(in *stdinSource) (code int, fallback bool) {
 
 	switch {
 	case resp.StatusCode == http.StatusNotFound || resp.StatusCode == http.StatusMethodNotAllowed:
+		c.fallbackWhy = fmt.Sprintf("no raw API (HTTP %d)", resp.StatusCode)
 		return 0, true
 	case resp.StatusCode >= 400:
 		return exitHTTPError, false
 	}
 
+	h := resp.Header
+	if strings.TrimSpace(h.Get("X-Brish-Refused")) == "1" {
+		// The garden ran nothing: a legacy-mode garden refuses a command
+		// or stdin that is not valid UTF-8 or holds a NUL, which the JSON
+		// API's request carries (stdin in a temp file), and any garden
+		// refuses a malformed request. Only a refusal has this header, so
+		// a command that ran and returned 9000 is never run again.
+		msg, _ := io.ReadAll(io.LimitReader(resp.Body, 4096))
+		c.fallbackWhy = fmt.Sprintf("the raw request was refused (%q)", msg)
+		return 0, true
+	}
+
 	// X-Brish-Binary: 0 means a legacy-mode garden, whose bytes went
 	// through text; the reply is printed all the same, as brishzq.zsh's
 	// text path does. brishz_binary=y never comes here; see run.
-	h := resp.Header
 	retcode, errRet := strconv.Atoi(strings.TrimSpace(h.Get("X-Brish-Retcode")))
 	outLen, errLen := strconv.ParseInt(strings.TrimSpace(h.Get("X-Brish-Out-Length")), 10, 64)
 	if h.Get("X-Brish-Notice") == "1" || errRet != nil || errLen != nil || outLen < 0 {
@@ -408,7 +420,8 @@ func (c *client) json(in *stdinSource) int {
 		if path, size, err = in.toFile(); err == nil {
 			kind = jsonStdinFile
 			cmd = stdinRedirect(path, cmd)
-			c.debugf("stdin: %d bytes, %d of them already read by the raw request; in %s", size, in.alreadyRead(), path)
+			read, _ := in.alreadyRead()
+			c.debugf("stdin: %d bytes, %d of them already read by the raw request; in %s", size, read, path)
 		}
 	default:
 		stdin, err = in.all()
@@ -420,7 +433,8 @@ func (c *client) json(in *stdinSource) int {
 				// garden that predates these fields runs nothing.
 				kind = jsonB64
 			}
-			c.debugf("stdin: %d bytes, %d of them already read by the raw request", len(stdin), in.alreadyRead())
+			read, _ := in.alreadyRead()
+			c.debugf("stdin: %d bytes, %d of them already read by the raw request", len(stdin), read)
 		}
 	}
 	if err != nil {

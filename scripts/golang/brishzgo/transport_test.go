@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net"
 	"net/http"
@@ -286,9 +287,12 @@ func trunc(s string) string {
 }
 
 // TestFallbackReplay: a server that reads the raw body before answering
-// 404 still leaves the fallback all of stdin, from the replay copy; past
-// replayLimit, the fallback refuses.
+// 404 still leaves the fallback all of stdin, from the replay copy, in
+// memory or, past replayLimit, in a temp file, removed afterwards. With the
+// JSON API's remote shape too, which reads the copy back.
 func TestFallbackReplay(t *testing.T) {
+	tmp := t.TempDir()
+	t.Setenv("TMPDIR", tmp)
 	g := newFakeGarden(t, func(w http.ResponseWriter, r *http.Request, body []byte) {
 		if strings.HasPrefix(r.URL.Path, "/zsh/raw/") {
 			io.ReadAll(r.Body)
@@ -300,17 +304,69 @@ func TestFallbackReplay(t *testing.T) {
 		_, d := echoReply(req)
 		io.WriteString(w, d)
 	})
-	stdin := strings.Repeat("x", 100000)
-	if got := runWith(t, g, stdin, []string{"cat"}, "brishz_in", "MAGIC_READ_STDIN"); got.code != 4 || got.out != stdin {
-		t.Errorf("replay: got %d %q", got.code, trunc(got.out))
+	stdin := strings.Repeat("0123456789", 10000)
+	check := func(name string) {
+		t.Helper()
+		got := runWith(t, g, stdin, []string{"cat"}, "brishz_in", "MAGIC_READ_STDIN", "brishz_debug", "y")
+		if got.code != 4 || got.out != stdin {
+			t.Errorf("%s: got %d %q", name, got.code, trunc(got.out))
+		}
+		if !strings.Contains(got.errOut, fmt.Sprintf("stdin: %d bytes, %d of them already read", len(stdin), len(stdin))) {
+			t.Errorf("%s: the raw request did not read all of stdin:\n%s", name, got.errOut)
+		}
+		if names, _ := os.ReadDir(tmp); len(names) != 0 {
+			t.Errorf("%s: temp files left: %v", name, names)
+		}
 	}
-
+	check("in memory")
 	old := replayLimit
 	replayLimit = 1000
 	defer func() { replayLimit = old }()
+	check("in a temp file")
+
+	// all(), for a garden on another machine, reads the spilled copy.
+	src := newStdinSource(config{stdinMagic: true}, strings.NewReader(stdin))
+	if _, err := io.Copy(io.Discard, io.LimitReader(src, 5000)); err != nil {
+		t.Fatal(err)
+	}
+	if read, spilled := src.alreadyRead(); read != 5000 || !spilled {
+		t.Errorf("read %d, spilled %v", read, spilled)
+	}
+	if data, err := src.all(); err != nil || string(data) != stdin {
+		t.Errorf("all: %v, %d bytes", err, len(data))
+	}
+	temps.removeAll()
+}
+
+// TestRawRefused: a garden that refuses the raw request
+// (X-Brish-Refused: 1) ran nothing, so the JSON API gets it, with all of
+// stdin. A reply without the header is the command's, even with 9000 and
+// a refusal's text, and is never sent again.
+func TestRawRefused(t *testing.T) {
+	refuse := true
+	g := newFakeGarden(t, func(w http.ResponseWriter, r *http.Request, body []byte) {
+		if strings.HasPrefix(r.URL.Path, "/zsh/raw/") {
+			if refuse {
+				w.Header().Set("X-Brish-Refused", "1")
+			}
+			rawReply(w, "", "brishgarden: stdin is not valid utf-8 ...\n", 9000, "0")
+			return
+		}
+		var req map[string]any
+		json.Unmarshal(body, &req)
+		_, d := echoReply(req)
+		io.WriteString(w, d)
+	})
+	stdin := "a\x00b\xff"
 	got := runWith(t, g, stdin, []string{"cat"}, "brishz_in", "MAGIC_READ_STDIN")
-	if got.code != 1 || got.out != "" || !strings.Contains(got.errOut, "nothing ran") {
-		t.Errorf("overflow: got %d %q %q", got.code, trunc(got.out), got.errOut)
+	if got.code != 4 || got.out != "a\x00b\ufffd" || got.errOut != "e" || len(g.reqs) != 2 {
+		t.Errorf("refused: got %+v after %d requests", got, len(g.reqs))
+	}
+	refuse = false
+	g.reqs = nil
+	got = runWith(t, g, stdin, []string{"cat"}, "brishz_in", "MAGIC_READ_STDIN")
+	if got.code != 9000 || got.out != "" || !strings.HasPrefix(got.errOut, "brishgarden: ") || len(g.reqs) != 1 {
+		t.Errorf("not refused: got %+v after %d requests", got, len(g.reqs))
 	}
 }
 

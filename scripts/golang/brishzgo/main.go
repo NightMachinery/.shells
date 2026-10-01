@@ -122,7 +122,7 @@ func run(args []string, env lookupEnv, pwd, home string, stdin io.Reader, stdout
 		if code, fallback := cl.raw(in); !fallback {
 			return code
 		}
-		cl.debugf("no raw API (HTTP %d); falling back to the JSON API", cl.lastStatus)
+		cl.debugf("%s; falling back to the JSON API", cl.fallbackWhy)
 	}
 	return cl.json(in)
 }
