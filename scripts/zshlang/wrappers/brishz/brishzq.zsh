@@ -166,6 +166,23 @@ function h-brishzq-cleanup {
     fi
 }
 
+function h-brishzq-ignored-signals {
+    : "usage: h-brishzq-ignored-signals
+Sets reply to those of INT and TERM that this process ignores. Fails when it
+cannot tell."
+    #: zsh cannot read a signal's disposition, and `ps` on macOS has no
+    #: sigignore column, so a child reports its own: a non-interactive zsh
+    #: leaves INT and TERM as it found them, and a command it forks in a
+    #: pipeline inherits an ignored one. (A command substitution would not
+    #: do: zsh resets INT and TERM to the default there.) Perl's %SIG says
+    #: IGNORE for a signal it inherited ignored. This costs about 3 ms.
+    local names
+    reply=()
+    command perl -e 'print join(q( ), grep { ($SIG{$_} // q()) eq q(IGNORE) } qw(INT TERM)), qq(\n)' \
+        </dev/null 2>/dev/null | read -r names || return 1
+    reply=( ${=names} )
+}
+
 function h-brishzq-tmp {
     : "usage: h-brishzq-tmp
 Sets REPLY to a new temp file, which is removed when the script exits."
@@ -174,11 +191,24 @@ Sets REPLY to a new temp file, which is removed when the script exits."
     #: here, at the first temp file, so a run without temp files (the raw
     #: path) keeps the default signal handling. A signal removes the files
     #: and then kills us with that same signal, so our parent still sees it.
+    #:
+    #: A signal our parent ignored (nohup ignores HUP; a non-interactive
+    #: shell's `cmd &` ignores INT; `trap '' TERM`) must stay ignored, or
+    #: we would die of it and lose the reply of a command that still runs.
+    #: zsh lets a script trap such a signal, so we trap only INT and TERM
+    #: that are not ignored, and set no trap at all when we cannot tell
+    #: (a signal then leaves the files behind, as it always did). HUP needs
+    #: no trap: zsh's own HUP handler runs the EXIT trap, and zsh installs
+    #: it only when HUP was not ignored on entry.
     if (( ${#brishzq_tmp_files} == 0 )) ; then
         local sig
-        for sig in HUP INT TERM ; do
-            trap "h-brishzq-cleanup ; brishzq_tmp_files=() ; trap - $sig EXIT ; kill -$sig \$\$" "$sig"
-        done
+        if h-brishzq-ignored-signals ; then
+            for sig in INT TERM ; do
+                if (( ! ${reply[(Ie)$sig]} )) ; then
+                    trap "h-brishzq-cleanup ; brishzq_tmp_files=() ; trap - $sig EXIT ; kill -$sig \$\$" "$sig"
+                fi
+            done
+        fi
     fi
     REPLY="$(command mktemp)" || return $?
     brishzq_tmp_files+=( "$REPLY" )

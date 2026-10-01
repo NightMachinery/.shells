@@ -129,9 +129,20 @@ noisy; the ratios held across runs.
   names are emitted exactly as before.
 - Temp files (stdin for the JSON path, `brishz_out_file_p`,
   `brishz_eval_file_p`, the header dump of `brishz_binary=y`) are removed on
-  exit, and on HUP, INT and TERM, after which the script still dies of that
-  signal. All but the header dump used to be left behind. The raw path
-  creates none.
+  exit and on HUP, INT and TERM; after INT or TERM the script still dies of
+  that signal, and HUP exits 1 as it always did. All but the header dump used
+  to be left behind. The raw path creates none, and neither do Hammerspoon's
+  calls.
+- A signal the parent ignored stays ignored, as it always was: `nohup`'s
+  HUP, the INT that a non-interactive shell's `cmd &` ignores, a
+  `trap '' TERM`. The client then survives it and prints the command's
+  result. zsh lets a script trap a signal that was ignored on entry, so the
+  client traps INT and TERM only when a child process reports them not
+  ignored: one `perl` run, which costs about 4 ms (10 ms on a busy machine),
+  on the paths that make a temp file. Without `perl` it sets no INT or TERM
+  trap, and those signals leave the files behind. HUP needs no trap: zsh's
+  own HUP handler runs the exit cleanup, and zsh installs it only when HUP
+  was not ignored.
 - `brishz_binary=y` requests carry `b64_only: 1`, so a garden that knows the
   field leaves the text fields `out` and `err` out of its reply; `brishzq.zsh`
   reads only `out_b64`, `err_b64` and `retcode` there. Older gardens ignore
