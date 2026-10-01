@@ -402,7 +402,8 @@ func TestJSONBinaryWithoutHeader(t *testing.T) {
 		}
 		io.WriteString(w, `{"retcode":0,"out":"","err":"Empty command received."}`)
 	})
-	if got := runWith(t, g, "", []string{"true"}, "brishz_binary", "y"); got.code != 201 || got.out != "" {
+	want := "brishzgo: garden lacks binary support (no X-Brish-Binary header); it predates binary mode or runs with BRISH_BINARY=0\n"
+	if got := runWith(t, g, "", []string{"true"}, "brishz_binary", "y"); got.code != 201 || got.out != "" || got.errOut != want {
 		t.Errorf("got %+v", got)
 	}
 }

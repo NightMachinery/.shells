@@ -25,7 +25,7 @@ const (
 	exitHTTPError = 22  // curl --fail on an HTTP status of 400 or more
 )
 
-const noBinaryMessage = "brishzgo: garden lacks binary support (no X-Brish-Binary header); restart the garden process with BRISH_BINARY=1"
+const noBinaryMessage = "brishzgo: garden lacks binary support (no X-Brish-Binary header); it predates binary mode or runs with BRISH_BINARY=0"
 
 // maxRedirects is curl's default for --location.
 const maxRedirects = 50
