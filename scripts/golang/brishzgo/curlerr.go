@@ -17,6 +17,7 @@ const (
 	curlMalformedURL        = 3
 	curlResolve             = 6
 	curlConnect             = 7
+	curlWeirdServerReply    = 8
 	curlPartial             = 18
 	curlTimeout             = 28
 	curlSSLConnect          = 35
@@ -73,6 +74,14 @@ func curlExitCode(err error, readingBody bool) int {
 	case strings.Contains(msg, "socks connect"):
 		// The SOCKS proxy answered but could not connect us.
 		return curlProxyError
+	case strings.Contains(msg, "server gave HTTP response to HTTPS client"):
+		// curl fails the TLS handshake on the plain HTTP reply.
+		return curlSSLConnect
+	case strings.Contains(msg, "malformed HTTP response"), strings.Contains(msg, "malformed HTTP status code"):
+		// A reply that is not HTTP: curl refuses it as HTTP/0.9.
+		return curlUnsupportedProtocol
+	case strings.Contains(msg, "malformed MIME header"), strings.Contains(msg, "bad Content-Length"):
+		return curlWeirdServerReply
 	case strings.Contains(msg, "unsupported protocol scheme"):
 		return curlUnsupportedProtocol
 	case strings.Contains(msg, "invalid URL"), strings.Contains(msg, "missing protocol scheme"),

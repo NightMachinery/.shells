@@ -137,7 +137,7 @@ binary-mode garden (the default) is exact anyway.
 
 ## Exit statuses
 
-The same as `brishzq.zsh` for every outcome:
+As `brishzq.zsh`'s, except where "Where it differs" below says otherwise:
 
 - the command's own status, from the garden (9000, a refused request, exits
   as 40, as `exit 9000` does in zsh);
@@ -147,12 +147,16 @@ The same as `brishzq.zsh` for every outcome:
 - 201: `brishz_binary=y` and no `X-Brish-Binary: 1` in the reply, with the
   same message on stderr; nothing ran;
 - curl's exit codes for a failed request, which `brishzq.zsh` passes on:
-  7 connection refused, 6 host not resolved, 28 timeout (curl's default
-  connect timeout of 300 s, no overall one), 22 an HTTP status of 400 or more
-  (a missing key gets 401 or 403), 52 an empty reply, 18 a reply shorter than
-  announced, 35 and 60 TLS failures, 47 too many redirects, 1 an unsupported
-  scheme. Like `curl --silent`, these print nothing; `brishz_debug=y` shows
-  the error.
+  7 connection refused (and an unsupported proxy scheme), 6 host not
+  resolved, 28 timeout (curl's default connect timeout of 300 s, no overall
+  one), 22 an HTTP status of 400 or more (a missing key gets 401 or 403),
+  52 an empty reply, 18 a reply shorter than announced, 1 a reply that is
+  not HTTP or an unsupported scheme, 8 a malformed reply header, 35 and 60
+  TLS failures (35 also for an https endpoint that answers in plain HTTP),
+  47 too many redirects, 97 a SOCKS proxy that could not connect us. Any
+  other transport failure exits 56, curl's code for a failed receive, which
+  for some broken servers is not the code curl itself would give. Like
+  `curl --silent`, these print nothing; `brishz_debug=y` shows the error.
 
 ## Where it differs from `brishzq.zsh`
 
@@ -172,6 +176,10 @@ The same as `brishzq.zsh` for every outcome:
   `~/.privateShell`, as `brishzq.zsh` does. A remote endpoint through the proxy
   needs it exported.
 - Debug output goes to stderr, never stdout.
+- A raw reply cut short exits 18, as in `brishzq.zsh`, but `brishzgo` has
+  already passed on the part of stdout that arrived, since it streams the
+  reply; `brishzq.zsh`, which holds the whole reply in memory, prints
+  nothing.
 - For `MAGIC_READ_STDIN` to an endpoint that is not on this machine (one that
   does not match `^https?://(127\.0\.0\.1|localhost)`), the JSON request
   carries stdin itself, where `brishzq.zsh` names a temp file that such a

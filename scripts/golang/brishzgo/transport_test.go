@@ -611,3 +611,62 @@ func TestPartialReply(t *testing.T) {
 		t.Errorf("got %+v", got)
 	}
 }
+
+// replyServer answers every request with reply, whatever it is, and closes
+// the connection.
+func replyServer(t *testing.T, reply string) string {
+	t.Helper()
+	l, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { l.Close() })
+	go func() {
+		for {
+			conn, err := l.Accept()
+			if err != nil {
+				return
+			}
+			go func() {
+				defer conn.Close()
+				var req []byte
+				buf := make([]byte, 4096)
+				for !bytes.Contains(req, []byte("\r\n\r\n")) {
+					n, err := conn.Read(buf)
+					if err != nil {
+						return
+					}
+					req = append(req, buf[:n]...)
+				}
+				io.WriteString(conn, reply)
+			}()
+		}
+	}()
+	return l.Addr().String()
+}
+
+// TestBrokenReplies: replies that are not HTTP, or not well-formed, exit
+// with curl's codes; so does an https endpoint answered in plain HTTP.
+func TestBrokenReplies(t *testing.T) {
+	for _, c := range []struct {
+		reply string
+		code  int
+	}{
+		{"NOT HTTP AT ALL\r\n\r\n", 1},
+		{"HTTP/1.1 abc OK\r\nContent-Length: 0\r\n\r\n", 1},
+		{"HTTP/1.1 200 OK\r\nbad header line\r\nContent-Length: 0\r\n\r\n", 8},
+		{"HTTP/1.1 200 OK\r\nContent-Length: zz\r\n\r\n", 8},
+	} {
+		var out, errb bytes.Buffer
+		ep := "http://" + replyServer(t, c.reply)
+		if got := run([]string{"true"}, envOf("bshEndpoint", ep), "/x", "", strings.NewReader(""), &out, &errb); got != c.code {
+			t.Errorf("%q: exit %d, want %d", c.reply, got, c.code)
+		}
+	}
+	g := newFakeGarden(t, nil)
+	var out, errb bytes.Buffer
+	ep := strings.Replace(g.URL, "http://", "https://", 1)
+	if got := run([]string{"true"}, envOf("bshEndpoint", ep), "/x", "", strings.NewReader(""), &out, &errb); got != 35 {
+		t.Errorf("https to an http garden: exit %d, want 35", got)
+	}
+}
