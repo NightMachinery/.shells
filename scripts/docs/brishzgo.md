@@ -72,6 +72,14 @@ only joined by spaces, with no wrapping and no forwarding.
   command text to stderr. The values of the API key file's headers and of
   `Authorization` are printed as `<redacted>`.
 - `DISABLE_BRISH=y`: exit 1 at once, as `brishzq.zsh` does.
+- The proxy variables, read as curl reads them: `http_proxy` for an http
+  endpoint (never `HTTP_PROXY`, which curl ignores), `https_proxy` or
+  `HTTPS_PROXY` for https, else `all_proxy` or `ALL_PROXY`, and none for a
+  host that `no_proxy` (or `NO_PROXY`) lists. An empty one counts as unset. A
+  loopback endpoint is proxied too unless `no_proxy` lists it, which the
+  scripts' `no_proxy` (`127.0.0.1,localhost`) does. Go speaks http, https,
+  socks5 and socks5h proxies, and resolves names at a socks5 proxy, which
+  curl does only for socks5h; a socks4 proxy fails with exit status 7.
 
 Authentication follows `brishzq.zsh`: for an endpoint matching
 `^https?://(127\.0\.0\.1|localhost)`, the header lines of

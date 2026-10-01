@@ -25,6 +25,7 @@ const (
 	curlSend                = 55
 	curlRecv                = 56
 	curlPeerCert            = 60
+	curlProxyError          = 97
 )
 
 var errTooManyRedirects = errors.New("too many redirects")
@@ -45,6 +46,9 @@ func curlExitCode(err error, readingBody bool) int {
 	switch {
 	case errors.Is(err, errTooManyRedirects):
 		return curlTooManyRedirects
+	case errors.Is(err, errUnsupportedProxy):
+		// curl: "Unsupported proxy scheme", CURLE_COULDNT_CONNECT.
+		return curlConnect
 	case errors.As(err, &dnsErr):
 		return curlResolve
 	case errors.Is(err, syscall.ECONNREFUSED),
@@ -66,6 +70,9 @@ func curlExitCode(err error, readingBody bool) int {
 	}
 	msg := err.Error()
 	switch {
+	case strings.Contains(msg, "socks connect"):
+		// The SOCKS proxy answered but could not connect us.
+		return curlProxyError
 	case strings.Contains(msg, "unsupported protocol scheme"):
 		return curlUnsupportedProtocol
 	case strings.Contains(msg, "invalid URL"), strings.Contains(msg, "missing protocol scheme"),

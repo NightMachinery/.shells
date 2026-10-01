@@ -24,6 +24,7 @@ That puts =brishzgo= in =~/go/bin=. It is registered in =setup/setup_go=.
 - =transport.go=: the raw API, the JSON fallback and the replies.
 - =jqtext.go=: invalid UTF-8 replaced the way jq replaces it, for the JSON
   API's strings.
+- =proxy.go=: the proxy from the environment, as curl picks it.
 - =curlerr.go=: Go's transport errors as curl's exit codes.
 
 * Test
@@ -34,7 +35,8 @@ cd "${NIGHTDIR}/golang/brishzgo" && go test ./...
 The unit tests need no garden. They check the quoters against zsh itself
 (random byte strings, quoted, must come back exactly through
 =zsh -f= =print -rn --=, and the text must match zsh's =(qq)= and =typeset -p=),
-the U+FFFD replacement against jq itself, the command assembly, the request
+the U+FFFD replacement against jq itself, the proxy choice against curl
+itself, the command assembly, the request
 shapes, the temp file's removal on SIGTERM, and the replies, fallback and
 transport failures against fake gardens built on =net/http/httptest=. The
 zsh tests are skipped where zsh is missing. Run them with =-race= as well:

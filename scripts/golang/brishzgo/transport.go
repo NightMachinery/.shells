@@ -44,7 +44,7 @@ type client struct {
 
 func newClient(cfg config, stdout, stderr io.Writer) *client {
 	tr := &http.Transport{
-		Proxy: http.ProxyFromEnvironment,
+		Proxy: proxyFromEnv(cfg.env),
 		// curl's default connect timeout; there is no overall one.
 		DialContext:           (&net.Dialer{Timeout: 300 * time.Second}).DialContext,
 		ExpectContinueTimeout: expectContinueTimeout,

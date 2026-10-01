@@ -26,6 +26,7 @@ func boolP(s string) bool {
 }
 
 type config struct {
+	env      lookupEnv // for the proxy variables
 	args     []string
 	endpoint string // ends in /zsh/, as brishzq.zsh's does
 	command  []byte
@@ -57,7 +58,7 @@ func newConfig(args []string, env lookupEnv, pwd, home string) config {
 	if len(args) > 0 && args[0] == "-c" {
 		args = args[1:]
 	}
-	c := config{args: args}
+	c := config{env: env, args: args}
 
 	base := env.get("bshEndpoint")
 	if base == "" {
