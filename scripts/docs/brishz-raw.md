@@ -23,8 +23,11 @@ anything, and `brishzq.zsh` then sends the same request to the JSON API. That
 second request costs about 25 ms per call (measured below). The running
 garden on port 7230 has no raw API until it is restarted on a BrishGarden
 that has one, so a raw default today would make every Hammerspoon and hook
-call slower. Once the running garden has the raw API, make it the default by
-changing `brishz_raw:-n` to `brishz_raw:-y` in `brishzq.zsh`.
+call slower. Such a garden also writes an access-log line for the `404` of a
+`brishz_nolog` request (`POST /zsh/raw/nolog/?session=...&nolog=1`, session
+name included), since its silent routes cover only `/zsh/nolog/`; the JSON
+retry stays silent. Once the running garden has the raw API, make it the
+default by changing `brishz_raw:-n` to `brishz_raw:-y` in `brishzq.zsh`.
 
 ## What it sends
 
@@ -38,7 +41,15 @@ changing `brishz_raw:-n` to `brishz_raw:-y` in `brishzq.zsh`.
   true. `brishz_nolog` also selects `/zsh/raw/nolog/`.
 - The command text is the same as on the JSON path: the local wrapper (the
   `mark-me` subshell that `cd`s to `$PWD`), `brishz_noquote`, and the
-  variables forwarded from Emacs all apply.
+  variables forwarded from Emacs all apply. Stdin is the one difference.
+  With `brishz_in=MAGIC_READ_STDIN` the JSON path writes stdin to a temp file
+  and wraps the command as `< 'file' {`, a newline, the command, a newline
+  and `}`. So there the command's stdin is a regular file, which can be
+  seeked, and the command starts on line 2. On the raw path stdin travels in
+  the body and the garden pipes it in: `[[ -f /dev/stdin ]]` is false, a
+  reader cannot seek back or leave an exact offset for the next reader, and
+  with `brishz_noquote` `$LINENO` is 1, not 2. No byte is lost either way.
+  Nothing in zshlang tests what kind of file its stdin is.
 - `bshEndpoint`, `GARDEN_PORT`, the API key header and the remote basic auth
   work as on the JSON path. Stdin travels in the request, so a remote garden
   gets it too. (The remote proxy's route was not tested; it forwards
@@ -77,30 +88,38 @@ through text.
 
 ## How it compares with the JSON path
 
-A corpus of 50 calls (the earlier 29-call comparison's `brishzq.zsh` cases,
-extended with stdin, stderr, sessions, `nolog`, failing commands, notices,
-special characters, Unicode, invalid UTF-8, NUL, CR and 1 MiB payloads) ran
-through both paths against test gardens, under a terminal-like environment
-and under Hammerspoon's (launchd `PATH`, no `LANG`). Stdout, stderr and the
-exit status were compared byte for byte.
+Two corpora ran through both paths against test gardens. The first has 50
+calls: the earlier 29-call comparison's `brishzq.zsh` cases, extended with
+stdin, stderr, sessions, `nolog`, failing commands, notices, special
+characters, Unicode, invalid UTF-8, NUL, CR and 1 MiB payloads. The second
+has 66: argument lists as Hammerspoon sends them, unusual first words, stdin
+as a file, long multibyte commands, sessions with odd names and the
+options. Both ran under a terminal-like environment and under Hammerspoon's
+(launchd `PATH`, no `LANG`). Stdout, stderr and the exit status were
+compared byte for byte with the client from before this work.
 
-- Against a binary-mode garden, 45 calls are identical and 5 differ, each
-  where the JSON path loses information and the raw path is exact:
-  - a command with invalid UTF-8 in it (2 calls): `jq` turns those bytes into
-    U+FFFD before the garden sees them, so the JSON path ran a different
-    command;
+- Against a binary-mode garden, the raw path differs only where the JSON
+  path loses information, and in stdin's file type:
+  - a command with invalid UTF-8 in it (3 calls): `jq` turns those bytes
+    into U+FFFD before the garden sees them, so the JSON path ran a
+    different command;
   - a literal `brishz_in` with invalid UTF-8: the same, for stdin;
   - output with invalid UTF-8 (all 256 bytes, and 1 MiB of random bytes):
-    the JSON reply's text field shows those bytes as `\xHH` text.
-- Against a legacy-mode garden: all 50 identical (with the refusal fallback
-  above).
-- Against a garden older than the raw API: all 50 identical, through the
+    the JSON reply's text field shows those bytes as `\xHH` text;
+  - `[[ -f /dev/stdin ]]` under `brishz_in=MAGIC_READ_STDIN`: true on the
+    JSON path, false on the raw path (see "What it sends").
+- Against a legacy-mode garden, the same apart from the stdin file type. A
+  NUL or invalid UTF-8 in the command or stdin is refused with
+  `X-Brish-Refused: 1` and goes to the JSON API. Sentinel files showed each
+  such command running exactly once, and a command that ran and returned
+  9000 with a `brishgarden: ` stderr running once, not twice.
+- Against a garden older than the raw API: identical, through the 404
   fallback.
-- HTTP 401, 404, 405 and 500 give exit 22 on both paths, and a closed port
-  gives 7 on both.
-- Without `brishz_raw=y`, all 50 calls and the requests they send are
-  identical to the old client's, except that `brishz_binary=y` requests now
-  carry `b64_only: 1` (below).
+- HTTP 401, 404, 405 and 500 give exit 22 on both paths, a closed port gives
+  7, and a connection the server drops gives 52.
+- Without `brishz_raw=y`, every call and the request it sends is identical
+  to the old client's, except that `brishz_binary=y` requests now carry
+  `b64_only: 1`, and the changes listed at the end of this page.
 
 ## Speed
 
