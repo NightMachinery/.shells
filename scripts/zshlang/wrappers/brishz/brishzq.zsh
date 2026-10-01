@@ -127,6 +127,37 @@ Succeeds when the headers curl dumped there include X-Brish-Binary: 1."
     return 1
 }
 
+function h-brishzq-urlencode {
+    : "usage: h-brishzq-urlencode <string>
+Sets REPLY to <string> percent-encoded byte by byte, for a URL's query."
+    setopt localoptions nomultibyte
+    local s="$1" c out=''
+    integer i
+
+    for (( i = 1 ; i <= ${#s} ; i++ )) ; do
+        c="${s[i]}"
+        if [[ "$c" == [A-Za-z0-9._~-] ]] ; then
+            out+="$c"
+        else
+            printf -v c '%%%02X' "$(( #c ))"
+            out+="$c"
+        fi
+    done
+    REPLY="$out"
+}
+
+function h-brishzq-print-notice {
+    : "usage: h-brishzq-print-notice <text>
+Prints a reply that is not a command's result, as the JSON path always has:
+without its trailing newlines, plus one newline."
+    local text="$1"
+
+    while [[ "$text" == *$'\n' ]] ; do
+        text="${text%$'\n'}"
+    done
+    ec "$text"
+}
+
 typeset -ga brishzq_tmp_files=()
 function h-brishzq-cleanup {
     : "Removes the temp files this run created (brishzq_tmp_files)."
@@ -151,6 +182,129 @@ Sets REPLY to a new temp file, which is removed when the script exits."
     fi
     REPLY="$(command mktemp)" || return $?
     brishzq_tmp_files+=( "$REPLY" )
+}
+
+function h-brishzq-raw {
+    : "usage: h-brishzq-raw <cmd> <stdin>
+Runs <cmd> with <stdin> through the garden's raw API (POST .../zsh/raw/),
+prints its stdout and stderr exactly, and exits with its status. Returns (0)
+only when the garden has no raw API (HTTP 404 or 405), which then ran nothing."
+    #: Reads the script's locals: raw_endpoint, session, nolog,
+    #: failure_expected, opts, copy_cmd, debug_p.
+    #:
+    #: Byte semantics throughout: X-Brish-Cmd-Length counts bytes, and the
+    #: reply is split at byte offsets.
+    setopt localoptions nomultibyte
+    local cmd="$1" stdin="$2"
+    local url="$raw_endpoint"
+    local -a query=()
+
+    if test -n "$session" ; then
+        h-brishzq-urlencode "$session"
+        query+=( "session=${REPLY}" )
+    fi
+    #: The JSON path sends these as strings, and the garden takes any
+    #: non-empty string there as true.
+    if test -n "$nolog" ; then
+        query+=( nolog=1 )
+    fi
+    if test -n "$failure_expected" ; then
+        query+=( failure_expected=1 )
+    fi
+    if (( ${#query} )) ; then
+        url+="?${(j:&:)query}"
+    fi
+
+    #: No `--fail`: the HTTP status tells an old garden (404) from an error.
+    #: `--dump-header -` puts every response's headers (a 100 Continue's
+    #: too) before the body on stdout, and `size_header` counts them, so the
+    #: body is split off by length, whatever bytes it holds. `Expect:` stops
+    #: curl from waiting for a 100 Continue on large bodies.
+    local -a curl_cmd=( command curl "${opts[@]}" --silent --location
+        --header 'Content-Type: application/octet-stream' --header 'Expect:'
+        --header "X-Brish-Cmd-Length: ${#cmd}"
+        --data-binary '@-' --dump-header - --write-out $'\n%{size_header} %{http_code}'
+        "$url" )
+
+    test -n "${debug_p}" && ec "brishzq.zsh: raw: ${url}, command bytes: ${#cmd}, stdin bytes: ${#stdin}"
+    if test -n "$copy_cmd" && ((${+commands[pbcopy]})) ; then
+        <<<"$(gq print -rn -- "$cmd$stdin") | $(gq "${curl_cmd[@]}")" pbcopy
+    fi
+
+    local reply
+    reply="$(print -rn -- "$cmd$stdin" | "${curl_cmd[@]}")"
+    local ret=$?
+    if (( ret != 0 )) ; then
+        #: A transport failure: curl's own code, as on the JSON path
+        #: (Hammerspoon reads 7 as "not sent").
+        exit "$ret"
+    fi
+
+    local wo="${reply[-40,-1]}"
+    wo="${wo##*$'\n'}"
+    local size_header="${wo% *}" http_code="${wo##* }"
+    if ! [[ "$size_header" == <-> && "$http_code" == <-> ]] ; then
+        ec "brishzq.zsh: could not parse curl's reply" >&2
+        exit 1
+    fi
+    reply="${reply[1,-$(( ${#wo} + 2 ))]}"
+
+    if (( http_code == 404 || http_code == 405 )) ; then
+        test -n "${debug_p}" && ec "brishzq.zsh: raw: HTTP ${http_code}, falling back to the JSON API"
+        return 0
+    fi
+    if (( http_code >= 400 )) ; then
+        #: The JSON path's `curl --fail`: exit 22, print nothing.
+        exit 22
+    fi
+
+    local headers="${reply[1,size_header]}" body="${reply[size_header+1,-1]}"
+    local line name value retcode='' out_length='' notice_p='' binary_mode=''
+    for line in "${(@ps:\r\n:)headers}" ; do
+        if [[ "$line" == HTTP/* ]] ; then
+            #: A new response (after a 100 Continue or a redirect).
+            retcode='' out_length='' notice_p='' binary_mode=''
+            continue
+        fi
+        name="${${line%%:*}:l}"
+        value="${line#*:}"
+        while [[ "$value" == [[:blank:]]* ]] ; do value="${value#?}" ; done
+        while [[ "$value" == *[[:blank:]] ]] ; do value="${value%?}" ; done
+        case "$name" in
+            (x-brish-retcode) retcode="$value" ;;
+            (x-brish-out-length) out_length="$value" ;;
+            (x-brish-notice) [[ "$value" == 1 ]] && notice_p=y ;;
+            (x-brish-binary) binary_mode="$value" ;;
+        esac
+    done
+
+    if test -n "$notice_p" ; then
+        #: A notice (a magic command's log, an empty command): printed and
+        #: exit 200, as the JSON path does.
+        h-brishzq-print-notice "${body[1,${out_length:-${#body}}]}"
+        exit 200
+    fi
+    if ! [[ "$retcode" == (-|)<-> && "$out_length" == <-> ]] || (( out_length > ${#body} )) ; then
+        #: Not the garden's raw reply. The JSON path prints a reply that is
+        #: not a command's result and exits 200.
+        h-brishzq-print-notice "$body"
+        exit 200
+    fi
+
+    if [[ "$binary_mode" == 0 && "$retcode" == 9000 && "$out_length" == 0 ]] \
+        && [[ "$body" == ('brishgarden: '|'Illegal input: ')* ]] \
+        && [[ "$cmd$stdin" == *[$'\0'$'\x80'-$'\xff']* ]] ; then
+        #: A garden in legacy (text) mode refuses a command or stdin that is
+        #: not valid UTF-8 or holds a NUL, before running anything. The JSON
+        #: path runs those as it always has (stdin from a temp file arrives
+        #: exact), so send the request there.
+        test -n "${debug_p}" && ec "brishzq.zsh: raw: refused by a legacy-mode garden, falling back to the JSON API"
+        return 0
+    fi
+
+    print -rn -- "${body[1,out_length]}"
+    print -rn -- "${body[out_length+1,-1]}" >&2
+    exit "$retcode"
 }
 ##
 # typeset -a gray=( 170 170 170 )
@@ -180,16 +334,30 @@ local session="${brishz_session}"
 local failure_expected="${brishz_failure_expected}"
 local nolog="${brishz_nolog}"
 local summary_p="${brishz_summary_p:-y}"
-local endpoint="${bshEndpoint:-http://127.0.0.1:${GARDEN_PORT:-7230}}/zsh/"
-#: brishz_binary=y: exact bytes both ways, over the garden's binary
-#: transport (cmd_b64, stdin_b64, binary: 1); see docs/brishz-binary.md.
-#: It needs a garden process started with BRISH_BINARY=1.
+local endpoint_base="${bshEndpoint:-http://127.0.0.1:${GARDEN_PORT:-7230}}"
+local endpoint="${endpoint_base}/zsh/"
+#: brishz_binary=y: exact bytes both ways or nothing runs, over the JSON
+#: API's binary transport (cmd_b64, stdin_b64, binary: 1); see
+#: docs/brishz-binary.md. It needs a garden in binary mode.
 local binary_p="${brishz_binary}"
 
 #: @safety features that work around the upstream brish bug of not supporting binary IO and corrupting text
-#: brishz_binary=y supersedes them; they stay for gardens without binary support.
+#: The raw API and brishz_binary=y supersede them; they stay for gardens without binary support.
 local out_from_file_p="${brishz_out_file_p}"
 local eval_from_file_p="${brishz_eval_file_p}"
+
+#: brishz_raw=y: send the request to the garden's raw API (POST
+#: /zsh/raw/), which carries the command, stdin, stdout and stderr as exact
+#: bytes, with no JSON, and about halves the client's time per call. A
+#: garden without it answers 404 and runs nothing; we then send the same
+#: request to the JSON API, which costs about 25 ms more per call. So it
+#: stays opt-in until the running garden has the raw API; see
+#: docs/brishz-raw.md. The options above that need the JSON API
+#: (brishz_binary, brishz_out_file_p, brishz_eval_file_p) always use it.
+local raw_p="${brishz_raw:-n}"
+if bool "$binary_p" || bool "$out_from_file_p" || bool "$eval_from_file_p" ; then
+    raw_p=n
+fi
 
 trap 'h-brishzq-cleanup' EXIT
 
@@ -301,6 +469,15 @@ local apikey_file="$HOME/.keys/brishgarden"
 if [[ "$endpoint" =~ '^https?://(127\.0\.0\.1|localhost)' ]] && [[ -r "$apikey_file" ]] ; then
     opts+=(--header "@${apikey_file}")
 fi
+if bool "$raw_p" ; then
+    local raw_endpoint="${endpoint_base}/zsh/raw/"
+    if test -n "$nolog" ; then
+        raw_endpoint+="nolog/"
+    fi
+    #: Exits, except when the garden has no raw API.
+    h-brishzq-raw "$input_cmd[*]" "$stdin"
+fi
+
 local v=1
 local req
 

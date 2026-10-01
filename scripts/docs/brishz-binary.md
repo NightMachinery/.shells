@@ -87,6 +87,13 @@ legacy transport's losses. The opt-in supersedes them. They stay for gardens
 without binary support, and they still work under the opt-in, but only
 against a local garden, since they rely on files on this machine.
 
+## Exact bytes without base64: `brishz_raw=y`
+
+`brishz_raw=y` makes `brishzq.zsh` use the garden's raw API, which carries
+the command, stdin, stdout and stderr as bytes, with no JSON, no base64 and
+no `jq`. It is exact on a binary-mode garden and falls back to the JSON API
+on a garden without the raw API. See [brishz-raw](brishz-raw.md).
+
 ## A faster client
 
 `brishzgo` (in `golang/brishzgo/`) is a Go drop-in for `brishzq.zsh` with the
