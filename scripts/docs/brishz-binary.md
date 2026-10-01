@@ -34,7 +34,12 @@ empty string mean off, anything else means on.
 - `brishzq.zsh` sends the command in `cmd_b64` and stdin in `stdin_b64`.
   With `brishz_in=MAGIC_READ_STDIN`, stdin is streamed into `base64`, never
   held in memory as text. It writes the decoded `out_b64` to stdout and
-  `err_b64` to stderr, and exits with the command's `retcode`.
+  `err_b64` to stderr, and exits with the command's `retcode`. It also sends
+  `b64_only: 1`, so a garden that knows that field leaves the duplicate text
+  fields `out` and `err` out of its reply; an older garden ignores it.
+  `brishz_binary=y` keeps `brishzq.zsh` on this JSON path even with
+  `brishz_raw=y`, since only this path guarantees that nothing runs on a
+  garden without binary support.
 - `brishz.dash` sends the same fields plus `binary: 1`. On the plain reply
   path (the default, `brishz_json_output=0`) it prints the exact bytes of
   stdout followed by stderr. With `brishz_json_output=1` it prints the JSON

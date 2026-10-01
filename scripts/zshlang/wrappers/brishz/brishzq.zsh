@@ -337,8 +337,8 @@ local summary_p="${brishz_summary_p:-y}"
 local endpoint_base="${bshEndpoint:-http://127.0.0.1:${GARDEN_PORT:-7230}}"
 local endpoint="${endpoint_base}/zsh/"
 #: brishz_binary=y: exact bytes both ways or nothing runs, over the JSON
-#: API's binary transport (cmd_b64, stdin_b64, binary: 1); see
-#: docs/brishz-binary.md. It needs a garden in binary mode.
+#: API's binary transport (cmd_b64, stdin_b64, binary: 1, b64_only: 1);
+#: see docs/brishz-binary.md. It needs a garden in binary mode.
 local binary_p="${brishz_binary}"
 
 #: @safety features that work around the upstream brish bug of not supporting binary IO and corrupting text
@@ -492,7 +492,7 @@ if bool "$binary_p" ; then
             --arg failure_expected "$failure_expected" \
             --arg s "$session" \
             --arg v $v \
-            'split(".") as $p | {"cmd_b64": $p[0], "stdin_b64": $p[1], "binary": 1, "session": $s, "json_output": $v, "nolog": $nolog, "failure_expected": $failure_expected}')" || {
+            'split(".") as $p | {"cmd_b64": $p[0], "stdin_b64": $p[1], "binary": 1, "b64_only": 1, "session": $s, "json_output": $v, "nolog": $nolog, "failure_expected": $failure_expected}')" || {
         ec "brishzq.zsh: could not encode the binary request" >&2
         exit 1
     }
