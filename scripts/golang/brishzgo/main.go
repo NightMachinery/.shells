@@ -39,6 +39,10 @@ type config struct {
 	raw    bool // brishz_raw, on unless set to a false value
 	debug  bool // brishz_debug
 
+	// The endpoint is on this machine (apikeyEndpointRe), so the garden
+	// can read our temp files.
+	sameMachine bool
+
 	apikeyFile string // sent as headers when non-empty
 	basicPass  string
 	basicAuth  bool
@@ -84,7 +88,8 @@ func newConfig(args []string, env lookupEnv, pwd, home string) config {
 	// As in brishzq.zsh: local requests send the API key file's header
 	// lines; an endpoint whose URL names a garden goes through a proxy
 	// with basic auth.
-	if apikeyEndpointRe.MatchString(c.endpoint) && home != "" {
+	c.sameMachine = apikeyEndpointRe.MatchString(c.endpoint)
+	if c.sameMachine && home != "" {
 		f := home + "/.keys/brishgarden"
 		if fh, err := os.Open(f); err == nil {
 			fh.Close()
@@ -105,6 +110,7 @@ func run(args []string, env lookupEnv, pwd, home string, stdin io.Reader, stdout
 		return 1
 	}
 	cfg := newConfig(args, env, pwd, home)
+	defer temps.removeAll()
 	cl := newClient(cfg, stdout, stderr)
 	in := newStdinSource(cfg, stdin)
 	// brishz_binary=y promises that nothing ran on a garden without binary

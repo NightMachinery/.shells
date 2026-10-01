@@ -10,6 +10,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 	"sync"
@@ -209,17 +210,36 @@ func jsonGarden(t *testing.T, reply func(req map[string]any) (string, string)) *
 	})
 }
 
+// stdinFileRe is the start of a command that reads stdin from a file.
+var stdinFileRe = regexp.MustCompile(`^< '([^']*)' \{\n`)
+
+// requestStdin is the stdin of a JSON request: its stdin_b64 or stdin
+// field, or the temp file its command reads with `< file { ... }`, which
+// is read now, while the request is in flight.
+func requestStdin(req map[string]any) string {
+	if s, ok := req["stdin_b64"].(string); ok {
+		d, _ := base64.StdEncoding.DecodeString(s)
+		return string(d)
+	}
+	if cmd, ok := req["cmd"].(string); ok {
+		if m := stdinFileRe.FindStringSubmatch(cmd); m != nil {
+			d, err := os.ReadFile(m[1])
+			if err != nil {
+				return "<" + err.Error() + ">"
+			}
+			return string(d)
+		}
+	}
+	s, _ := req["stdin"].(string)
+	return s
+}
+
 func echoReply(req map[string]any) (string, string) {
 	b64 := base64.StdEncoding
+	stdin := requestStdin(req)
 	if req["binary"] != nil {
-		stdin, _ := b64.DecodeString(req["stdin_b64"].(string))
-		d, _ := json.Marshal(map[string]any{"retcode": 3, "out_b64": b64.EncodeToString(stdin), "err_b64": b64.EncodeToString([]byte("e\xff"))})
+		d, _ := json.Marshal(map[string]any{"retcode": 3, "out_b64": b64.EncodeToString([]byte(stdin)), "err_b64": b64.EncodeToString([]byte("e\xff"))})
 		return "application/json", string(d)
-	}
-	stdin, _ := req["stdin"].(string)
-	if s, ok := req["stdin_b64"].(string); ok {
-		d, _ := b64.DecodeString(s)
-		stdin = string(d)
 	}
 	d, _ := json.Marshal(map[string]any{"retcode": 4, "out": stdin, "err": "e", "cmd": "x"})
 	return "application/json", string(d)
@@ -236,7 +256,8 @@ func TestFallbackToJSON(t *testing.T) {
 	}{
 		{"text", "", []string{"brishz_in", "a\nb\n"}, 4, "a\nb\n", "e"},
 		{"magic", big, []string{"brishz_in", "MAGIC_READ_STDIN"}, 4, big, "e"},
-		// The request carries stdin_b64; a JSON reply turns \xff into U+FFFD.
+		// Stdin arrives exact through the temp file; a JSON reply turns
+		// \xff into U+FFFD.
 		{"magic invalid utf-8", "\xff\x00", []string{"brishz_in", "MAGIC_READ_STDIN"}, 4, "\ufffd\x00", "e"},
 		{"binary", "\xff\x00\r", []string{"brishz_in", "MAGIC_READ_STDIN", "brishz_binary", "y"}, 3, "\xff\x00\r", "e\xff"},
 	} {
@@ -320,16 +341,107 @@ func TestJSONBinaryWithoutHeader(t *testing.T) {
 }
 
 func TestJSONRequestShapes(t *testing.T) {
-	cfg := config{command: []byte("cmd"), session: "s", nolog: "", failureExpected: "y"}
-	if got := string(jsonRequest(cfg, []byte("<in>&"))); got != `{"cmd":"cmd","session":"s","stdin":"<in>&","json_output":"1","nolog":"","failure_expected":"y"}` {
-		t.Errorf("text: %s", got)
+	cfg := config{session: "s", nolog: "", failureExpected: "y"}
+	cmd := []byte("cmd")
+	for _, c := range []struct {
+		kind       jsonBody
+		cmd, stdin string
+		want       string
+	}{
+		{jsonText, "cmd", "<in>&", `{"cmd":"cmd","session":"s","stdin":"<in>&","json_output":"1","nolog":"","failure_expected":"y"}`},
+		// Invalid UTF-8 becomes U+FFFD, as jq makes it.
+		{jsonText, "c\xff", "\xe2\x82", "{\"cmd\":\"c\ufffd\",\"session\":\"s\",\"stdin\":\"\ufffd\",\"json_output\":\"1\",\"nolog\":\"\",\"failure_expected\":\"y\"}"},
+		{jsonStdinFile, "< '/f' {\ncmd\xff\n}", "", "{\"cmd\":\"< '/f' {\\ncmd\ufffd\\n}\",\"session\":\"s\",\"json_output\":\"1\",\"nolog\":\"\",\"failure_expected\":\"y\"}"},
+		{jsonB64, "cmd", "\xff", `{"cmd_b64":"Y21k","stdin_b64":"/w==","session":"s","json_output":"1","nolog":"","failure_expected":"y"}`},
+		{jsonBinary, "cmd", "", `{"cmd_b64":"Y21k","stdin_b64":"","binary":1,"b64_only":1,"session":"s","json_output":"1","nolog":"","failure_expected":"y"}`},
+	} {
+		if got := string(jsonRequest(cfg, c.kind, []byte(c.cmd), []byte(c.stdin))); got != c.want {
+			t.Errorf("%d %q %q:\n got %s\nwant %s", c.kind, c.cmd, c.stdin, got, c.want)
+		}
 	}
-	if got := string(jsonRequest(cfg, []byte{0xff})); got != `{"cmd_b64":"Y21k","stdin_b64":"/w==","session":"s","json_output":"1","nolog":"","failure_expected":"y"}` {
-		t.Errorf("b64: %s", got)
+	if got := string(stdinRedirect("/t/it's", cmd)); got != "< '/t/it'\\''s' {\ncmd\n}" {
+		t.Errorf("stdinRedirect: %q", got)
 	}
-	cfg.binary = true
-	if got := string(jsonRequest(cfg, nil)); got != `{"cmd_b64":"Y21k","stdin_b64":"","binary":1,"b64_only":1,"session":"s","json_output":"1","nolog":"","failure_expected":"y"}` {
-		t.Errorf("binary: %s", got)
+}
+
+// TestJSONStdinFile: with MAGIC_READ_STDIN, the JSON API gets brishzq.zsh's
+// request, the command reading stdin from a temp file, which is removed
+// afterwards; a garden on another machine gets stdin in the request.
+func TestJSONStdinFile(t *testing.T) {
+	var path string
+	g := jsonGarden(t, func(req map[string]any) (string, string) {
+		cmd, _ := req["cmd"].(string)
+		if m := stdinFileRe.FindStringSubmatch(cmd); m != nil {
+			path = m[1]
+			if _, ok := req["stdin"]; ok {
+				t.Errorf("stdin sent along with the file")
+			}
+		}
+		return echoReply(req)
+	})
+	stdin := "a\x00b\xff\r\n"
+	got := runWith(t, g, stdin, []string{"cat"}, "brishz_in", "MAGIC_READ_STDIN", "brishz_raw", "n")
+	if got.code != 4 || got.out != "a\x00b\ufffd\r\n" {
+		t.Errorf("got %+v", got)
+	}
+	if path == "" {
+		t.Fatalf("no temp file in %q", g.reqs[0].body)
+	}
+	if _, err := os.Stat(path); !os.IsNotExist(err) {
+		t.Errorf("temp file %s left behind: %v", path, err)
+	}
+	cmd := requestField(t, g.reqs[0].body, "cmd")
+	if want := "< " + quoteSingle(path) + " {\n( mark-me 'BRISHZQ_MARKER' cat\n"; !strings.HasPrefix(cmd, want) || !strings.HasSuffix(cmd, "\n}") {
+		t.Errorf("command %q", cmd)
+	}
+}
+
+func requestField(t *testing.T, body []byte, name string) string {
+	t.Helper()
+	var req map[string]any
+	if err := json.Unmarshal(body, &req); err != nil {
+		t.Fatalf("request %q: %v", body, err)
+	}
+	s, _ := req[name].(string)
+	return s
+}
+
+// TestJSONRemoteStdin: a garden on another machine cannot read our temp
+// files, so MAGIC_READ_STDIN input goes in the request: as text when it is
+// valid UTF-8, else as stdin_b64 with cmd_b64.
+func TestJSONRemoteStdin(t *testing.T) {
+	l, err := net.Listen("tcp", "[::1]:0")
+	if err != nil {
+		t.Skip("no IPv6 loopback")
+	}
+	g := &fakeGarden{}
+	g.Server = httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		b, _ := io.ReadAll(r.Body)
+		g.mu.Lock()
+		g.reqs = append(g.reqs, recorded{r.URL.Path, r.URL.RawQuery, r.Header.Clone(), b})
+		g.mu.Unlock()
+		if strings.HasPrefix(r.URL.Path, "/zsh/raw/") {
+			http.NotFound(w, r)
+			return
+		}
+		var req map[string]any
+		json.Unmarshal(b, &req)
+		_, d := echoReply(req)
+		io.WriteString(w, d)
+	}))
+	g.Listener.Close()
+	g.Listener = l
+	g.Start()
+	defer g.Close()
+	for _, c := range []struct{ stdin, field string }{{"text\n", "stdin"}, {"\xff\x00", "stdin_b64"}} {
+		g.reqs = nil
+		got := runWith(t, g, c.stdin, []string{"cat"}, "brishz_in", "MAGIC_READ_STDIN")
+		if got.code != 4 || requestStdin(map[string]any{c.field: requestField(t, g.reqs[1].body, c.field)}) != c.stdin {
+			t.Errorf("%q: got %+v, request %s", c.stdin, got, g.reqs[1].body)
+		}
+		if strings.HasPrefix(requestField(t, g.reqs[1].body, "cmd"), "< ") {
+			t.Errorf("%q: a temp file for a remote garden", c.stdin)
+		}
 	}
 }
 

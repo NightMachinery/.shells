@@ -288,11 +288,27 @@ func encodeObject(fields []jsonField) []byte {
 	return b.Bytes()
 }
 
-// jsonRequest is the body brishzq.zsh would send: with brishz_binary,
-// cmd_b64 and stdin_b64 plus binary: 1 (and b64_only: 1, which an older
-// garden ignores); otherwise cmd and stdin as strings, or as _b64 fields
-// when either is not valid UTF-8, which JSON strings cannot carry.
-func jsonRequest(cfg config, stdin []byte) []byte {
+// jsonBody is the shape of a JSON request's body.
+type jsonBody int
+
+const (
+	// cmd and stdin as strings: brishzq.zsh's request for a literal
+	// brishz_in.
+	jsonText jsonBody = iota
+	// cmd alone, which reads stdin from a temp file: brishzq.zsh's
+	// request for MAGIC_READ_STDIN.
+	jsonStdinFile
+	// cmd_b64 and stdin_b64, for MAGIC_READ_STDIN to a garden that cannot
+	// read our temp files, when stdin is not valid UTF-8.
+	jsonB64
+	// brishz_binary: cmd_b64, stdin_b64, binary: 1 and b64_only: 1.
+	jsonBinary
+)
+
+// jsonRequest is the body of a JSON request, with the fields in
+// brishzq.zsh's order. Strings hold the bytes as jq makes a string of them
+// (see jqText), since that is how brishzq.zsh builds them.
+func jsonRequest(cfg config, kind jsonBody, cmd, stdin []byte) []byte {
 	tail := []jsonField{
 		{"session", cfg.session},
 		{"json_output", "1"},
@@ -301,30 +317,36 @@ func jsonRequest(cfg config, stdin []byte) []byte {
 	}
 	b64 := base64.StdEncoding.EncodeToString
 	var fields []jsonField
-	switch {
-	case cfg.binary:
+	switch kind {
+	case jsonBinary:
 		fields = []jsonField{
-			{"cmd_b64", b64(cfg.command)},
+			{"cmd_b64", b64(cmd)},
 			{"stdin_b64", b64(stdin)},
 			{"binary", 1},
 			{"b64_only", 1},
 		}
-		fields = append(fields, tail...)
-	case utf8.Valid(cfg.command) && utf8.Valid(stdin):
+	case jsonB64:
 		fields = []jsonField{
-			{"cmd", string(cfg.command)},
-			{"session", cfg.session},
-			{"stdin", string(stdin)},
-		}
-		fields = append(fields, tail[1:]...)
-	default:
-		fields = []jsonField{
-			{"cmd_b64", b64(cfg.command)},
+			{"cmd_b64", b64(cmd)},
 			{"stdin_b64", b64(stdin)},
 		}
-		fields = append(fields, tail...)
+	case jsonStdinFile:
+		fields = []jsonField{{"cmd", jqText(cmd)}}
+	default:
+		fields = []jsonField{
+			{"cmd", jqText(cmd)},
+			{"session", cfg.session},
+			{"stdin", jqText(stdin)},
+		}
+		tail = tail[1:]
 	}
-	return encodeObject(fields)
+	return encodeObject(append(fields, tail...))
+}
+
+// stdinRedirect is brishzq.zsh's command for stdin in a file: the command
+// in a brace group that reads it.
+func stdinRedirect(path string, cmd []byte) []byte {
+	return []byte("< " + quoteSingle(path) + " {\n" + string(cmd) + "\n}")
 }
 
 // cmdResult is the part of a JSON reply the client reads.
@@ -367,26 +389,54 @@ func parseJSONReply(data []byte, binary bool) (out, errOut []byte, retcode int, 
 	return []byte(*r.Out), []byte(*r.Err), retcode, true
 }
 
-// json runs the command through the JSON API, POST /zsh/.
+// json runs the command through the JSON API, POST /zsh/, with the request
+// brishzq.zsh sends.
 func (c *client) json(in *stdinSource) int {
-	stdin, err := in.all()
+	cmd, stdin := c.cfg.command, []byte(nil)
+	kind := jsonText
+	var err error
+	switch {
+	case c.cfg.binary:
+		kind = jsonBinary
+		stdin, err = in.all()
+	case in.magic && c.cfg.sameMachine:
+		// Stdin goes in a temp file that the command reads, as brishzq.zsh
+		// sends it, so it arrives exact whatever the garden's version and
+		// mode, NUL and invalid UTF-8 included.
+		var path string
+		var size int64
+		if path, size, err = in.toFile(); err == nil {
+			kind = jsonStdinFile
+			cmd = stdinRedirect(path, cmd)
+			c.debugf("stdin: %d bytes, %d of them already read by the raw request; in %s", size, in.alreadyRead(), path)
+		}
+	default:
+		stdin, err = in.all()
+		if in.magic && err == nil {
+			// brishzq.zsh sends a temp file here too, which a garden on
+			// another machine cannot read; so stdin goes in the request.
+			if !utf8.Valid(stdin) {
+				// JSON strings carry text only. With cmd_b64 along, a
+				// garden that predates these fields runs nothing.
+				kind = jsonB64
+			}
+			c.debugf("stdin: %d bytes, %d of them already read by the raw request", len(stdin), in.alreadyRead())
+		}
+	}
 	if err != nil {
 		fmt.Fprintf(c.stderr, "brishzgo: %v; nothing ran\n", err)
 		return 1
-	}
-	if in.magic {
-		c.debugf("stdin: %d bytes, %d of them already read by the raw request", len(stdin), in.alreadyRead())
 	}
 	sub := ""
 	if c.cfg.nolog != "" {
 		sub = "nolog/"
 	}
-	body := jsonRequest(c.cfg, stdin)
+	body := jsonRequest(c.cfg, kind, cmd, stdin)
 	req, err := c.newRequest(endpointURL(c.cfg.endpoint, sub), bytes.NewReader(body), int64(len(body)), "application/json")
 	if err != nil {
 		return curlExitCode(err, false)
 	}
-	c.debugf("command (%d bytes): %q", len(c.cfg.command), c.cfg.command)
+	c.debugf("command (%d bytes): %q", len(cmd), cmd)
 
 	resp, code := c.do(req)
 	if resp == nil {

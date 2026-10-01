@@ -4,19 +4,28 @@ import (
 	"bytes"
 	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"os"
 	"os/exec"
+	"reflect"
 	"strconv"
 	"strings"
+	"sync"
 	"testing"
 )
 
 // TestParityWithBrishzq sends a corpus of argv lists through brishzq.zsh and
-// through brishzgo to a recording fake garden, and compares the command
-// text each one sent. brishzq.zsh runs with brishz_binary=y, so its
-// cmd_b64 holds the command's exact bytes. Point BRISHZGO_TEST_BRISHZQ at
-// brishzq.zsh to run it:
+// through brishzgo to a recording fake garden, and compares what each sent:
+//
+//   - the command's exact bytes: brishzq.zsh with brishz_binary=y (its
+//     cmd_b64), against brishzgo's raw request and its brishz_binary=y one;
+//   - brishzq.zsh's JSON text request, against brishzgo's with brishz_raw=n:
+//     every field and their order, so invalid UTF-8 must become the same
+//     U+FFFD; with MAGIC_READ_STDIN, the temp file's path aside, and the
+//     file must hold stdin exactly.
+//
+// Point BRISHZGO_TEST_BRISHZQ at brishzq.zsh to run it:
 //
 //	BRISHZGO_TEST_BRISHZQ=$NIGHTDIR/zshlang/wrappers/brishz/brishzq.zsh go test -run Parity
 func TestParityWithBrishzq(t *testing.T) {
@@ -26,14 +35,41 @@ func TestParityWithBrishzq(t *testing.T) {
 	}
 	zsh := needZsh(t)
 
+	type parityReq struct {
+		path   string
+		header http.Header
+		body   []byte
+		stdin  []byte // the temp file the command reads, if any
+	}
+	var mu sync.Mutex
+	var reqs []parityReq
 	g := newFakeGarden(t, func(w http.ResponseWriter, r *http.Request, body []byte) {
+		pr := parityReq{r.URL.Path, r.Header.Clone(), body, nil}
+		var req map[string]any
+		json.Unmarshal(body, &req)
+		if cmd, ok := req["cmd"].(string); ok {
+			if m := stdinFileRe.FindStringSubmatch(cmd); m != nil {
+				pr.stdin, _ = os.ReadFile(m[1])
+			}
+		}
+		mu.Lock()
+		reqs = append(reqs, pr)
+		mu.Unlock()
 		w.Header().Set("X-Brish-Binary", "1")
 		if strings.HasPrefix(r.URL.Path, "/zsh/raw/") {
 			rawReply(w, "", "", 0, "1")
 			return
 		}
-		w.Write([]byte(`{"retcode":0,"out_b64":"","err_b64":""}`))
+		w.Write([]byte(`{"retcode":0,"out":"","err":"","out_b64":"","err_b64":""}`))
 	})
+	last := func() parityReq {
+		mu.Lock()
+		defer mu.Unlock()
+		if len(reqs) == 0 {
+			t.Fatalf("no request recorded")
+		}
+		return reqs[len(reqs)-1]
+	}
 	port := g.URL[strings.LastIndex(g.URL, ":")+1:]
 
 	corpus := [][]string{
@@ -46,9 +82,11 @@ func TestParityWithBrishzq(t *testing.T) {
 		{"~x"},
 		{"=print"},
 		{"x!y"},
+		{"!", "false"},
 		{"é"},
 		{"line\nbreak"},
 		{"\xff\xfe", "\x01\x7f"},
+		{"print", "--", "a\xe2\x82b", "\xed\xa0\x80", "\xc0\xaf"},
 		{},
 		{""},
 		{"print", "--", strings.Repeat("long ", 2000)},
@@ -58,90 +96,146 @@ func TestParityWithBrishzq(t *testing.T) {
 		{"NIGHT_EMACS_P", "y", "emacs_night_server_name", "srv name's"},
 		{"NIGHT_EMACS_P", "1", "EMACS_SOCKET_NAME", "/tmp/s"},
 		{"brishz_noquote", "y"},
+		{"brishz_session", "s 1", "brishz_nolog", "y", "brishz_failure_expected", "n", "brishz_in", "lit\xffin"},
 	}
 	endpoints := map[string]string{
 		"local":     "http://127.0.0.1:" + port,
 		"localhost": "http://localhost:" + port,
 	}
+	magicStdin := []byte("a\x00b\xff\r\n\n")
 
 	dir := t.TempDir()
 	home := t.TempDir()
-	n := 0
-	firstWords := map[string]bool{}
+	runZq := func(args []string, stdin []byte, kv ...string) parityReq {
+		cmd := exec.Command(zsh, append([]string{"-f", brishzq}, args...)...)
+		cmd.Dir = dir
+		cmd.Env = []string{"PATH=" + os.Getenv("PATH"), "HOME=" + home, "PWD=" + dir, "LC_ALL=en_US.UTF-8"}
+		for i := 0; i+1 < len(kv); i += 2 {
+			cmd.Env = append(cmd.Env, kv[i]+"="+kv[i+1])
+		}
+		cmd.Stdin = bytes.NewReader(stdin)
+		mu.Lock()
+		reqs = nil
+		mu.Unlock()
+		cmd.Run()
+		mu.Lock()
+		n := len(reqs)
+		mu.Unlock()
+		if n != 1 {
+			t.Fatalf("brishzq.zsh %q %q sent %d requests", kv, args, n)
+		}
+		return last()
+	}
+	runGo := func(args []string, stdin []byte, kv ...string) parityReq {
+		var out, errb bytes.Buffer
+		run(args, envOf(kv...), dir, home, bytes.NewReader(stdin), &out, &errb)
+		return last()
+	}
+
+	n, pending := 0, 0
 	for epName, ep := range endpoints {
 		for _, extra := range envs {
 			for _, args := range corpus {
-				n++
-				kv := append([]string{"bshEndpoint", ep, "brishz_binary", "y"}, extra...)
+				kv := append([]string{"bshEndpoint", ep}, extra...)
 
-				// brishzq.zsh
-				g.mu.Lock()
-				g.reqs = nil
-				g.mu.Unlock()
-				cmd := exec.Command(zsh, append([]string{"-f", brishzq}, args...)...)
-				cmd.Dir = dir
-				cmd.Env = []string{"PATH=" + os.Getenv("PATH"), "HOME=" + home, "PWD=" + dir, "LC_ALL=en_US.UTF-8"}
-				for i := 0; i+1 < len(kv); i += 2 {
-					cmd.Env = append(cmd.Env, kv[i]+"="+kv[i+1])
-				}
-				cmd.Stdin = strings.NewReader("")
-				cmd.Run()
-				if len(g.reqs) != 1 {
-					t.Fatalf("brishzq.zsh sent %d requests", len(g.reqs))
-				}
-				var req struct {
-					CmdB64 string `json:"cmd_b64"`
-				}
-				if err := json.Unmarshal(g.reqs[0].body, &req); err != nil {
-					t.Fatalf("brishzq.zsh request: %v", err)
-				}
-				want, _ := base64.StdEncoding.DecodeString(strings.Join(strings.Fields(req.CmdB64), ""))
-
+				// The command's exact bytes.
+				zq := runZq(args, nil, append(kv, "brishz_binary", "y")...)
+				want := b64Field(t, zq.body, "cmd_b64")
 				for _, raw := range []string{"n", "y"} {
-					g.reqs = nil
-					var out, errb bytes.Buffer
-					// raw=n: brishz_binary=y, so the JSON request has cmd_b64.
-					// raw=y: without it, since brishz_binary=y never uses the
-					// raw API.
-					goKV := append([]string{"bshEndpoint", ep, "brishz_raw", raw}, extra...)
-					if raw == "n" {
-						goKV = append(goKV, "brishz_binary", "y")
-					}
-					env := envOf(goKV...)
-					run(args, env, dir, home, strings.NewReader(""), &out, &errb)
+					n++
 					var got []byte
-					r := g.reqs[len(g.reqs)-1]
 					if raw == "y" {
+						r := runGo(args, nil, append(kv, "brishz_raw", "y")...)
 						l, _ := strconv.Atoi(r.header.Get("X-Brish-Cmd-Length"))
 						got = r.body[:l]
 					} else {
-						json.Unmarshal(r.body, &req)
-						got, _ = base64.StdEncoding.DecodeString(req.CmdB64)
+						got = b64Field(t, runGo(args, nil, append(kv, "brishz_binary", "y")...).body, "cmd_b64")
 					}
 					if bytes.Equal(got, want) {
 						continue
 					}
-					if len(args) > 0 && firstWordDiffers(t, zsh, args[0]) {
-						firstWords[args[0]] = true
+					if bangPending(args, got, want) {
+						pending++
 						continue
 					}
 					t.Errorf("%s %q %q raw=%s:\n got %q\nwant %q", epName, extra, args, raw, got, want)
+				}
+
+				// The JSON text request, with and without MAGIC_READ_STDIN.
+				for _, magic := range []bool{false, true} {
+					if magic && (len(args) == 0 || (args[0] != "cat" && args[0] != "print")) {
+						continue
+					}
+					var stdin []byte
+					kv2 := kv
+					if magic {
+						stdin = magicStdin
+						kv2 = append(append([]string{}, kv...), "brishz_in", "MAGIC_READ_STDIN")
+					}
+					n++
+					zq := runZq(args, stdin, kv2...)
+					gr := runGo(args, stdin, append(kv2, "brishz_raw", "n")...)
+					zf, zk := jsonFields(t, zq.body)
+					gf, gk := jsonFields(t, gr.body)
+					if magic {
+						for _, f := range []map[string]any{zf, gf} {
+							if c, ok := f["cmd"].(string); ok {
+								f["cmd"] = stdinFileRe.ReplaceAllString(c, "< 'FILE' {\n")
+							}
+						}
+						if !bytes.Equal(zq.stdin, magicStdin) || !bytes.Equal(gr.stdin, magicStdin) {
+							t.Errorf("%s %q %q: stdin files: brishzq.zsh %q, brishzgo %q", epName, extra, args, zq.stdin, gr.stdin)
+						}
+					}
+					if reflect.DeepEqual(zf, gf) && reflect.DeepEqual(zk, gk) {
+						continue
+					}
+					if bangPending(args, []byte(fmt.Sprint(gf["cmd"])), []byte(fmt.Sprint(zf["cmd"]))) {
+						pending++
+						continue
+					}
+					t.Errorf("%s %q %q magic=%v:\n got %v %q\nwant %v %q", epName, extra, args, magic, gk, gf, zk, zf)
 				}
 			}
 		}
 	}
 	t.Logf("%d cases compared", n)
-	if len(firstWords) > 0 {
-		t.Logf("first words that brishzq.zsh quotes with (q+), so otherwise: %v", firstWords)
+	if pending > 0 {
+		t.Logf("%d cases differ only in keeping a first word of ! bare, which this brishzq.zsh does not do yet", pending)
 	}
 }
 
-// firstWordDiffers reports whether zsh's ${(q+)w}, which brishzq.zsh uses
-// for the first word, quotes w otherwise than quoteFirstWord.
-func firstWordDiffers(t *testing.T, zsh, w string) bool {
-	out, err := exec.Command(zsh, "-fc", `print -rn -- "${(q+)1}"`, "zsh", w).Output()
+// bangPending reports whether got and want differ only in that brishzgo
+// keeps a first word of `!` bare and brishzq.zsh quotes it.
+func bangPending(args []string, got, want []byte) bool {
+	return len(args) > 0 && args[0] == "!" && bytes.Equal(got, bytes.ReplaceAll(want, []byte("'!'"), []byte("!")))
+}
+
+func b64Field(t *testing.T, body []byte, name string) []byte {
+	t.Helper()
+	s := requestField(t, body, name)
+	b, err := base64.StdEncoding.DecodeString(strings.Join(strings.Fields(s), ""))
 	if err != nil {
-		t.Fatalf("zsh: %v", err)
+		t.Fatalf("%s: %v", name, err)
 	}
-	return string(out) != quoteFirstWord(w)
+	return b
+}
+
+// jsonFields decodes a JSON object, and also returns its keys in order.
+func jsonFields(t *testing.T, body []byte) (map[string]any, []string) {
+	t.Helper()
+	var m map[string]any
+	if err := json.Unmarshal(body, &m); err != nil {
+		t.Fatalf("request %q: %v", body, err)
+	}
+	dec := json.NewDecoder(bytes.NewReader(body))
+	dec.Token() // {
+	var keys []string
+	for dec.More() {
+		k, _ := dec.Token()
+		keys = append(keys, k.(string))
+		var v any
+		dec.Decode(&v)
+	}
+	return m, keys
 }

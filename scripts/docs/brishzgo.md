@@ -85,10 +85,17 @@ first, and the reply's stdout part is streamed to our stdout and the rest to
 our stderr. The exit status is `X-Brish-Retcode`.
 
 A garden older than the raw API answers 404 (or 405) and runs nothing; then
-`brishzgo` sends the same command to the JSON API (`json_output: 1`, `cmd`
-and `stdin` as strings, or `cmd_b64` and `stdin_b64` when either is not valid
-UTF-8). The raw request carries `Expect: 100-continue` and `Connection: close`
-when it streams stdin. So such a garden answers before any of stdin is sent,
+`brishzgo` sends the JSON API the request `brishzq.zsh` sends there, so a
+garden of any version runs what it runs for `brishzq.zsh`: `json_output: 1`,
+the command as `cmd`, and stdin as `stdin`, or for `MAGIC_READ_STDIN` in a
+temp file that the command reads with `< file { ... }`. The temp file
+carries any bytes, NUL and invalid UTF-8 included, to a garden on this
+machine, and is removed when `brishzgo` exits, also on SIGHUP, SIGINT and
+SIGTERM. Invalid UTF-8 in `cmd` or `stdin` becomes U+FFFD, the way jq
+replaces it.
+
+The raw request carries `Expect: 100-continue` and `Connection: close` when it
+streams stdin. So a garden without the raw API answers before any of stdin is sent,
 and Go's transport sends none of it afterwards (to keep a connection open, it
 would send the body after the 404). Some of stdin can still go out first: to
 a server that asks for the body before answering 404 (a buffering proxy), or
@@ -143,8 +150,16 @@ The same as `brishzq.zsh` for every outcome:
   `~/.privateShell`, as `brishzq.zsh` does. A remote endpoint through the proxy
   needs it exported.
 - Debug output goes to stderr, never stdout.
-- The JSON fallback sends `MAGIC_READ_STDIN` input in the request rather than
-  in a temp file, so it also works against a remote garden.
+- For `MAGIC_READ_STDIN` to an endpoint that is not on this machine (one that
+  does not match `^https?://(127\.0\.0\.1|localhost)`), the JSON request
+  carries stdin itself, where `brishzq.zsh` names a temp file that such a
+  garden cannot read: as `stdin` when it is valid UTF-8, else as `stdin_b64`
+  with the command as `cmd_b64`, so that a garden older than those fields
+  runs nothing.
+- `brishzq.zsh`'s jq (1.6) reads a literal `brishz_in` line by line: invalid
+  UTF-8 cut short by a newline takes the newline with it, and a character
+  that straddles a 4095-byte boundary of a long line becomes two U+FFFD.
+  `brishzgo` decodes it whole.
 - A JSON reply that is valid JSON but not a command's result is a notice
   (exit 200); `brishzq.zsh` would print its `.out` as `null`.
 

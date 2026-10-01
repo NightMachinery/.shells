@@ -92,6 +92,34 @@ func (s *stdinSource) all() ([]byte, error) {
 	return append(append(data, s.seen.Bytes()...), rest...), nil
 }
 
+// toFile writes the whole of stdin to a new temp file, for the JSON API's
+// `< file { ... }`: what the raw request read, then the rest, streamed. It
+// ends the raw request's reading, and returns the file's path and size.
+func (s *stdinSource) toFile() (string, int64, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.stopped = true
+	if s.overflow {
+		return "", 0, errStdinGone
+	}
+	f, err := temps.create("brishzgo-stdin.")
+	if err != nil {
+		return "", 0, err
+	}
+	n, err := f.Write(s.seen.Bytes())
+	size := int64(n)
+	if err == nil && !s.eof {
+		var m int64
+		m, err = io.Copy(f, s.r)
+		size += m
+		s.eof = err == nil
+	}
+	if cerr := f.Close(); err == nil {
+		err = cerr
+	}
+	return f.Name(), size, err
+}
+
 // alreadyRead is how much of stdin the raw request read, for debug output.
 func (s *stdinSource) alreadyRead() int {
 	s.mu.Lock()

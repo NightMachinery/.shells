@@ -2,7 +2,6 @@ package main
 
 import (
 	"bytes"
-	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -52,12 +51,7 @@ func TestFallbackKeepsStdinOrder(t *testing.T) {
 		}
 		var req map[string]any
 		json.Unmarshal(body(), &req)
-		stdin, _ := req["stdin"].(string)
-		if s, ok := req["stdin_b64"].(string); ok {
-			d, _ := base64.StdEncoding.DecodeString(s)
-			stdin = string(d)
-		}
-		d, _ := json.Marshal(map[string]any{"retcode": 0, "out": stdin, "err": ""})
+		d, _ := json.Marshal(map[string]any{"retcode": 0, "out": requestStdin(req), "err": ""})
 		w.Write(d)
 	})
 	for i := 0; i < 5; i++ {

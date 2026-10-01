@@ -49,6 +49,14 @@ func integration(t *testing.T) itEnv {
 	if e.endpoint == "" || e.kind == "" || e.home == "" {
 		t.Skip("BRISHZGO_IT_ENDPOINT, BRISHZGO_IT_KIND and BRISHZGO_IT_HOME are not all set")
 	}
+	e.bin = builtBinary(t)
+	return e
+}
+
+// builtBinary builds brishzgo once per test run, into a temp dir that
+// TestMain removes.
+func builtBinary(t *testing.T) string {
+	t.Helper()
 	buildOnce.Do(func() {
 		dir, err := os.MkdirTemp("", "brishzgo-it")
 		if err != nil {
@@ -64,8 +72,7 @@ func integration(t *testing.T) itEnv {
 	if buildErr != nil {
 		t.Fatal(buildErr)
 	}
-	e.bin = builtBin
-	return e
+	return builtBin
 }
 
 func (e itEnv) binaryP() bool { return e.kind == "binary" || e.kind == "old-binary" }

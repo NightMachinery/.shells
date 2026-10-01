@@ -19,7 +19,11 @@ That puts =brishzgo= in =~/go/bin=. It is registered in =setup/setup_go=.
 - =main.go=: the environment, the configuration and the dispatch.
 - =command.go= and =quote.go=: the command text, as =brishzq.zsh= builds it.
 - =stdin.go=: streamed stdin, with the copy a fallback needs.
+- =tempfile.go=: the temp file that carries stdin to the JSON API, removed on
+  exit and on signals.
 - =transport.go=: the raw API, the JSON fallback and the replies.
+- =jqtext.go=: invalid UTF-8 replaced the way jq replaces it, for the JSON
+  API's strings.
 - =curlerr.go=: Go's transport errors as curl's exit codes.
 
 * Test
@@ -30,7 +34,8 @@ cd "${NIGHTDIR}/golang/brishzgo" && go test ./...
 The unit tests need no garden. They check the quoters against zsh itself
 (random byte strings, quoted, must come back exactly through
 =zsh -f= =print -rn --=, and the text must match zsh's =(qq)= and =typeset -p=),
-the command assembly, the request shapes, and the replies, fallback and
+the U+FFFD replacement against jq itself, the command assembly, the request
+shapes, the temp file's removal on SIGTERM, and the replies, fallback and
 transport failures against fake gardens built on =net/http/httptest=. The
 zsh tests are skipped where zsh is missing. Run them with =-race= as well:
 =TestFallbackKeepsStdinOrder= has the HTTP transport's goroutine and ours
@@ -39,7 +44,9 @@ reading stdin at the same time.
 Two more are skipped unless pointed at something:
 
 - the parity test runs =brishzq.zsh= and =brishzgo= on a corpus of argv lists
-  against a recording fake garden and compares the command bytes each sent:
+  and environments against a recording fake garden, and compares the command
+  bytes each sent, and their JSON text requests field by field (with
+  =MAGIC_READ_STDIN=, also the temp file each one's command reads):
   #+begin_src zsh :eval never
   BRISHZGO_TEST_BRISHZQ="${NIGHTDIR}/zshlang/wrappers/brishz/brishzq.zsh" go test -run Parity
   #+end_src
