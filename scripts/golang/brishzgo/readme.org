@@ -54,8 +54,11 @@ Two more are skipped unless pointed at something:
   #+end_src
 - the integration tests run the built binary against a real garden, never
   the one Hammerspoon uses: a smoke garden on its own port, with a throwaway
-  key. =BRISHZGO_IT_KIND= is =binary=, =legacy= (=BRISH_BINARY=0=), or
-  =old-binary= / =old-legacy= for a garden without the raw API:
+  key. =BRISHZGO_IT_KIND= says what the garden is: =binary= (the raw API,
+  binary mode), =legacy= (the raw API, =BRISH_BINARY=0=), =old-binary= /
+  =old-legacy= (no raw API, such as =42ddc9d=), or =pre-binary= (no binary
+  mode at all, such as =cc390bc=). Every kind runs every command; the
+  output is compared exactly where that garden can carry it:
   #+begin_src zsh :eval never
   BRISHZGO_IT_ENDPOINT=http://127.0.0.1:<port> BRISHZGO_IT_KIND=binary \
       BRISHZGO_IT_HOME=<a HOME whose .keys/brishgarden is that garden's key> \

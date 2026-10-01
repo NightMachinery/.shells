@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"crypto/rand"
+	"crypto/sha256"
 	"fmt"
 	"net"
 	"os"
@@ -17,13 +18,16 @@ import (
 // The integration tests run the built binary against a real garden. They
 // are skipped unless pointed at one:
 //
-//	BRISHZGO_IT_ENDPOINT  the garden, such as http://127.0.0.1:7292
-//	BRISHZGO_IT_KIND      binary, legacy (BRISH_BINARY=0), old-binary or
-//	                      old-legacy (a garden without the raw API, started
-//	                      with and without BRISH_BINARY=1)
+//	BRISHZGO_IT_ENDPOINT  the garden, such as http://127.0.0.1:7288
+//	BRISHZGO_IT_KIND      what the garden is:
+//	                      binary      the raw API, in binary mode (the default)
+//	                      legacy      the raw API, with BRISH_BINARY=0
+//	                      old-binary  no raw API (such as 42ddc9d), binary mode
+//	                      old-legacy  the same with BRISH_BINARY=0
+//	                      pre-binary  no binary mode at all (such as cc390bc)
 //	BRISHZGO_IT_HOME      a HOME whose .keys/brishgarden is the garden's key
 //
-// Every command is inert: cat, print, true, typeset.
+// Every command is inert: cat, print, true, typeset, od, shasum.
 
 type itEnv struct {
 	endpoint, kind, home, bin string
@@ -76,7 +80,19 @@ func builtBinary(t *testing.T) string {
 }
 
 func (e itEnv) binaryP() bool { return e.kind == "binary" || e.kind == "old-binary" }
-func (e itEnv) oldP() bool    { return strings.HasPrefix(e.kind, "old") }
+
+// oldP: a garden without the raw API.
+func (e itEnv) oldP() bool { return strings.HasPrefix(e.kind, "old") || e.kind == "pre-binary" }
+
+// legacyModeP: a garden whose workers use brish's legacy transport.
+func (e itEnv) legacyModeP() bool {
+	return e.kind == "legacy" || e.kind == "old-legacy" || e.kind == "pre-binary"
+}
+
+// exactP: whether output bytes come back exact. Only the raw API of a
+// binary-mode garden carries them all; elsewhere, either the garden's
+// text or the JSON API's text reply escapes invalid UTF-8.
+func (e itEnv) exactP(data []byte) bool { return e.kind == "binary" || utf8.Valid(data) }
 
 type itResult struct {
 	code        int
@@ -114,9 +130,9 @@ func allBytes() []byte {
 	return b
 }
 
-func TestITRoundTrips(t *testing.T) {
-	e := integration(t)
-	cases := map[string][]byte{
+// itData are the inputs of the round trips.
+func itData() map[string][]byte {
+	return map[string][]byte{
 		"all 256 bytes":     allBytes(),
 		"NUL":               {0},
 		"NULs":              []byte("a\x00b\x00"),
@@ -126,19 +142,23 @@ func TestITRoundTrips(t *testing.T) {
 		"newline":           []byte("\n"),
 		"empty":             {},
 		"text":              []byte("héllo wörld\n"),
+		"invalid UTF-8":     []byte("\xff\xfe\n"),
 	}
-	for name, data := range cases {
-		// Legacy mode loses NUL (refused), CR and invalid UTF-8. A garden
-		// without the raw API gets the JSON API's text reply, which loses
-		// invalid UTF-8 even in binary mode (brishz_binary=y keeps it).
-		hasNUL := bytes.IndexByte(data, 0) >= 0 || bytes.IndexByte(data, '\r') >= 0
-		invalid := !utf8.Valid(data)
-		lossy := false
-		switch e.kind {
-		case "legacy", "old-legacy":
-			lossy = hasNUL || invalid
-		case "old-binary":
-			lossy = invalid
+}
+
+// TestITRoundTrips: stdin through cat to stdout or stderr. Every garden
+// runs it; the output is exact where the garden can carry it (exactP).
+//
+// Output with a NUL is not sent to a legacy-mode garden: brish's legacy
+// transport ends each reply with "\0\n", so a stdout of "\0" fails with
+// status 9000, and a stderr that ends in a NUL leaves the worker's stderr
+// one reply behind for every later command, whichever client sent it.
+func TestITRoundTrips(t *testing.T) {
+	e := integration(t)
+	for name, data := range itData() {
+		if e.legacyModeP() && bytes.IndexByte(data, 0) >= 0 {
+			t.Logf("%s: not sent to a legacy-mode garden, which cannot carry a NUL in output", name)
+			continue
 		}
 		for _, stream := range []string{"stdout", "stderr"} {
 			args := []string{"cat"}
@@ -150,27 +170,52 @@ func TestITRoundTrips(t *testing.T) {
 			if stream == "stderr" {
 				gotData = got.errOut
 			}
-			if lossy {
-				// Refused with nothing run (9000, which exits as 40), or
-				// passed through text.
-				t.Logf("%s via %s (%s, lossy): exit %d, %d bytes", name, stream, e.kind, got.code, len(gotData))
+			if got.code != 0 {
+				t.Errorf("%s via %s: exit %d, err %q", name, stream, got.code, got.errOut)
 				continue
 			}
-			if got.code != 0 || !bytes.Equal(gotData, data) {
-				t.Errorf("%s via %s: exit %d, got %q", name, stream, got.code, gotData)
+			if !e.exactP(data) {
+				t.Logf("%s via %s (%s): %q", name, stream, e.kind, gotData)
+				continue
+			}
+			if !bytes.Equal(gotData, data) {
+				t.Errorf("%s via %s: got %q", name, stream, gotData)
 			}
 		}
 	}
 }
 
-func TestITLegacyRefusesNUL(t *testing.T) {
+// TestITStdinExact: stdin reaches the command exact on every garden, NUL
+// and invalid UTF-8 included: through the raw API, or through the JSON
+// API's temp file after a 404 or a legacy-mode refusal. shasum's output is
+// ASCII, so it comes back exact everywhere.
+func TestITStdinExact(t *testing.T) {
 	e := integration(t)
-	if e.kind != "legacy" {
-		t.Skip("legacy only")
+	data := itData()
+	mib := make([]byte, 1<<20)
+	rand.Read(mib)
+	data["1 MiB of random bytes"] = mib
+	for name, d := range data {
+		got := e.run(t, d, []string{"shasum", "-a", "256"}, "brishz_in", "MAGIC_READ_STDIN")
+		want := fmt.Sprintf("%x  -\n", sha256.Sum256(d))
+		if got.code != 0 || string(got.out) != want {
+			t.Errorf("%s: exit %d, got %q, want %q, err %q", name, got.code, got.out, want, got.errOut)
+		}
 	}
-	got := e.run(t, []byte("a\x00b"), []string{"cat"}, "brishz_in", "MAGIC_READ_STDIN")
-	if got.code != 9000%256 || len(got.out) != 0 {
-		t.Errorf("exit %d, out %q, err %q", got.code, got.out, got.errOut)
+}
+
+// TestITCommandBytes: a command that is not valid UTF-8 runs everywhere:
+// exact on the raw API of a binary-mode garden, else with each invalid
+// sequence as U+FFFD, as brishzq.zsh's JSON request has it.
+func TestITCommandBytes(t *testing.T) {
+	e := integration(t)
+	got := e.run(t, nil, []string{"print", "-rn", "--", "\xff\xfe"})
+	want := "\xff\xfe"
+	if e.kind != "binary" {
+		want = "\ufffd\ufffd"
+	}
+	if got.code != 0 || string(got.out) != want {
+		t.Errorf("exit %d, got %q, want %q, err %q", got.code, got.out, want, got.errOut)
 	}
 }
 
@@ -290,6 +335,17 @@ func TestITFallback(t *testing.T) {
 	got = e.run(t, nil, []string{"true"}, "brishz_raw", "n", "brishz_debug", "y")
 	if got.code != 0 || strings.Contains(string(got.errOut), "/zsh/raw/") {
 		t.Errorf("brishz_raw=n: exit %d, %s", got.code, got.errOut)
+	}
+
+	// A legacy-mode garden refuses a NUL, with X-Brish-Refused: 1 and
+	// nothing run; the JSON API then runs it, with all of stdin.
+	got = e.run(t, []byte("a\x00b"), []string{"od", "-An", "-c"}, "brishz_in", "MAGIC_READ_STDIN", "brishz_debug", "y")
+	refused := strings.Contains(string(got.errOut), "the raw request was refused")
+	if refused != (e.kind == "legacy") || got.code != 0 || !strings.Contains(string(got.out), `a  \0   b`) {
+		t.Errorf("NUL stdin: refused %v, exit %d, out %q\n%s", refused, got.code, got.out, got.errOut)
+	}
+	if refused && !strings.Contains(string(got.errOut), "stdin: 3 bytes, 3 of them already read") {
+		t.Errorf("the fallback did not resend what the raw request read:\n%s", got.errOut)
 	}
 }
 
