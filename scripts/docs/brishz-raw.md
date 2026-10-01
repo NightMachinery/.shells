@@ -1,4 +1,4 @@
-# `brishzq.zsh` over the raw API: `brishz_raw=y`
+# `brishzq.zsh` over the raw API
 
 BrishGarden's **raw API** (`POST /zsh/raw/`, see "Raw API" in BrishGarden's
 readme) carries a request as bytes: the body is the command followed by its
@@ -6,28 +6,29 @@ stdin, and the reply body is stdout followed by stderr, with the exit status
 and the split point in headers. There is no JSON and no base64, so nothing is
 lost on the way, and the client runs no `jq` at all.
 
-`brishzq.zsh` uses it when `brishz_raw=y` is set. Without it, `brishzq.zsh`
-uses the JSON API (`POST /zsh/`) exactly as before. `brishz_raw` is parsed
-like the scripts' `bool`: `n`, `no`, `0` and the empty string mean off.
+`brishzq.zsh` uses it by default. `brishz_raw=n` makes it use the JSON API
+(`POST /zsh/`) exactly as before. `brishz_raw` is parsed like the scripts'
+`bool`: `n`, `no`, `0` and the empty string mean off; unset means on.
 
 ```zsh
-brishz_raw=y brishzq.zsh print -r -- ok
+brishzq.zsh print -r -- ok
 head -c 4096 /dev/urandom > x.bin
-brishz_raw=y brishz_in=MAGIC_READ_STDIN brishzq.zsh cat < x.bin | cmp - x.bin
+brishz_in=MAGIC_READ_STDIN brishzq.zsh cat < x.bin | cmp - x.bin
 ```
 
-## Why it is not the default yet
+## The default since 2026-10-01
+
+The raw API became the default once the running garden on port 7230 had it.
+On that garden a small call took 41 ms at p50 (49 ms at p90) over the raw
+API, against 97 ms (121 ms) over the JSON API, 30 interleaved calls each.
 
 A garden older than the raw API answers `404` for `/zsh/raw/` without running
 anything, and `brishzq.zsh` then sends the same request to the JSON API. That
-second request costs about 25 ms per call (measured below). The running
-garden on port 7230 has no raw API until it is restarted on a BrishGarden
-that has one, so a raw default today would make every Hammerspoon and hook
-call slower. Such a garden also writes an access-log line for the `404` of a
-`brishz_nolog` request (`POST /zsh/raw/nolog/?session=...&nolog=1`, session
-name included), since its silent routes cover only `/zsh/nolog/`; the JSON
-retry stays silent. Once the running garden has the raw API, make it the
-default by changing `brishz_raw:-n` to `brishz_raw:-y` in `brishzq.zsh`.
+second request costs about 25 ms per call (measured below), so against such a
+garden (a remote one, say) `brishz_raw=n` is faster. Such a garden also
+writes an access-log line for the `404` of a `brishz_nolog` request
+(`POST /zsh/raw/nolog/?session=...&nolog=1`, session name included), since
+its silent routes cover only `/zsh/nolog/`; the JSON retry stays silent.
 
 ## What it sends
 
@@ -117,7 +118,7 @@ compared byte for byte with the client from before this work.
   fallback.
 - HTTP 401, 404, 405 and 500 give exit 22 on both paths, a closed port gives
   7, and a connection the server drops gives 52.
-- Without `brishz_raw=y`, every call and the request it sends is identical
+- With `brishz_raw=n`, every call and the request it sends is identical
   to the old client's, except that `brishz_binary=y` requests now carry
   `b64_only: 1`, and the changes listed at the end of this page.
 

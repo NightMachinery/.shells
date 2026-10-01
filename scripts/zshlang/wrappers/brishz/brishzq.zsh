@@ -378,16 +378,16 @@ local binary_p="${brishz_binary}"
 local out_from_file_p="${brishz_out_file_p}"
 local eval_from_file_p="${brishz_eval_file_p}"
 
-#: brishz_raw=y: send the request to the garden's raw API (POST
-#: /zsh/raw/), which carries the command, stdin, stdout and stderr as exact
-#: bytes, with no JSON, and about halves the client's time per call. A
-#: garden without it answers 404 and runs nothing; we then send the same
-#: request to the JSON API, which costs about 25 ms more per call. (So does
-#: a request the garden marks X-Brish-Refused: 1, which also ran nothing.)
-#: So it stays opt-in until the running garden has the raw API; see
-#: docs/brishz-raw.md. The options above that need the JSON API
-#: (brishz_binary, brishz_out_file_p, brishz_eval_file_p) always use it.
-local raw_p="${brishz_raw:-n}"
+#: The garden's raw API (POST /zsh/raw/), the default since 2026-10-01,
+#: carries the command, stdin, stdout and stderr as exact bytes, with no
+#: JSON, and about halves the client's time per call. brishz_raw=n sends the
+#: request to the JSON API instead. A garden without the raw API answers 404
+#: and runs nothing; we then send the same request to the JSON API, which
+#: costs about 25 ms more per call. (So does a request the garden marks
+#: X-Brish-Refused: 1, which also ran nothing.) See docs/brishz-raw.md. The
+#: options above that need the JSON API (brishz_binary, brishz_out_file_p,
+#: brishz_eval_file_p) always use it.
+local raw_p="${brishz_raw:-y}"
 if bool "$binary_p" || bool "$out_from_file_p" || bool "$eval_from_file_p" ; then
     raw_p=n
 fi

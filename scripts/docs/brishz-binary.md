@@ -38,9 +38,9 @@ empty string mean off, anything else means on.
   `err_b64` to stderr, and exits with the command's `retcode`. It also sends
   `b64_only: 1`, so a garden that knows that field leaves the duplicate text
   fields `out` and `err` out of its reply; an older garden ignores it.
-  `brishz_binary=y` keeps `brishzq.zsh` on this JSON path even with
-  `brishz_raw=y`, since only this path guarantees that nothing runs on a
-  garden without binary support.
+  `brishz_binary=y` keeps `brishzq.zsh` on this JSON path, although the raw
+  API is otherwise its default, since only this path guarantees that nothing
+  runs on a garden without binary support.
 - `brishz.dash` sends the same fields plus `binary: 1`. On the plain reply
   path (the default, `brishz_json_output=0`) it prints the exact bytes of
   stdout followed by stderr. With `brishz_json_output=1` it prints the JSON
@@ -93,12 +93,13 @@ legacy transport's losses. The opt-in supersedes them. They stay for gardens
 without binary support, and they still work under the opt-in, but only
 against a local garden, since they rely on files on this machine.
 
-## Exact bytes without base64: `brishz_raw=y`
+## Exact bytes without base64: the raw API
 
-`brishz_raw=y` makes `brishzq.zsh` use the garden's raw API, which carries
-the command, stdin, stdout and stderr as bytes, with no JSON, no base64 and
-no `jq`. It is exact on a binary-mode garden and falls back to the JSON API
-on a garden without the raw API. See [brishz-raw](brishz-raw.md).
+By default `brishzq.zsh` uses the garden's raw API, which carries the
+command, stdin, stdout and stderr as bytes, with no JSON, no base64 and no
+`jq` (`brishz_raw=n` turns it off). It is exact on a binary-mode garden and
+falls back to the JSON API on a garden without the raw API. See
+[brishz-raw](brishz-raw.md).
 
 ## A faster client
 
