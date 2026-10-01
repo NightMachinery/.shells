@@ -32,7 +32,27 @@ local debug_p=''
 test -n "${debug_p}" && ec 'brishzq.zsh: started'
 
 function gquote() {
-    ec "${(q+@)@[1]}" "${(qq@)@[2,-1]}"
+    #: The first word stays bare when it is made of safe characters only
+    #: (ASCII letters, digits and `_ . / , : @ % + -`, not starting with `=`
+    #: or `~`), so a command name reads as itself. Anything else is
+    #: single-quoted like the other words. It used `(q+)`, which mis-escapes
+    #: some bytes and code points (an ideographic space, for one, stayed
+    #: bare), so a crafted first word could inject code.
+    if (( $# == 0 )) ; then
+        ec "''"
+    elif h-brishzq-safe-word-p "$1" ; then
+        ec "$1" "${(qq@)@[2,-1]}"
+    else
+        ec "${(qq)1}" "${(qq@)@[2,-1]}"
+    fi
+}
+
+function h-brishzq-safe-word-p {
+    : "usage: h-brishzq-safe-word-p <word>
+Succeeds when <word> needs no quoting as the first word of a command."
+    #: Byte by byte, so no locale's idea of a letter or a range can widen it.
+    setopt localoptions nomultibyte
+    [[ -n "$1" && "$1" != *[^A-Za-z0-9_./,:@%+-]* && "$1" != [=~]* ]]
 }
 alias gq=gquote
 
