@@ -86,3 +86,9 @@ with 200, as it does without the opt-in.
 legacy transport's losses. The opt-in supersedes them. They stay for gardens
 without binary support, and they still work under the opt-in, but only
 against a local garden, since they rely on files on this machine.
+
+## A faster client
+
+`brishzgo` (in `golang/brishzgo/`) is a Go drop-in for `brishzq.zsh` with the
+same argv, variables and exit statuses, over the garden's raw API. It honors
+`brishz_binary=y` the same way. See [brishzgo](brishzgo.md).
