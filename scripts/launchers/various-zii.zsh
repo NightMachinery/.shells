@@ -16,7 +16,8 @@ tmuxnew julia_aeirya "dash -c 'cd $(gq $borgdir) && borg_session=session_aeirya 
 
 tmuxnew julia "dash -c 'cd $(gq $borgdir) && borg_admins=${aeirya} $(gq "$(realpath2 python3)") $(gq $borgdir/stdborg.py)'"
 
-tmuxnew julia_inline "dash -c 'cd $(gq $borgdir) && borg_admins=${aeirya} TELEGRAM_TOKEN=$(gq $TELEGRAM_TOKEN) $(gq "$(realpath2 python3)") $(gq $borgdir/inline.py)'"
+#: Deprecated: guest mode (@<bot> .a CMD, betterborg's docs/guest_mode.md) replaces inline.py, which no longer imports on python-telegram-bot 20.
+# tmuxnew julia_inline "dash -c 'cd $(gq $borgdir) && borg_admins=${aeirya} TELEGRAM_TOKEN=$(gq $TELEGRAM_TOKEN) $(gq "$(realpath2 python3)") $(gq $borgdir/inline.py)'"
 
 tmuxnew wirehole "cd ~/code/misc/wirehole && docker-compose up"
 

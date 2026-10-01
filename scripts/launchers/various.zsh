@@ -54,7 +54,8 @@ tmuxnew julia_jlib "dash -c 'cd $(gq $borgdir) && borg_session=session_jlib borg
 tmuxnew betterborg_stt "dash -c 'cd $(gq $borgdir) && GEMINI_SPECIAL_HTTP_PROXY=http://127.0.0.1:2080 borg_session=session_stt borg_plugin_path=stt_plugins borg_brish_count=1 $(gq "$(realpath2 python3)") $(gq $borgdir/stdborg.py)'"
 tmuxnew betterborg_tts "dash -c 'cd $(gq $borgdir) && GEMINI_SPECIAL_HTTP_PROXY=http://127.0.0.1:2080 borg_session=session_tts borg_plugin_path=tts_plugins borg_brish_count=1 $(gq "$(realpath2 python3)") $(gq $borgdir/stdborg.py)'"
 tmuxnew betterborg_llm_chat "dash -c 'cd $(gq $borgdir) && GEMINI_SPECIAL_HTTP_PROXY=http://127.0.0.1:2080 borg_session=session_llm_chat borg_plugin_path=llm_chat_plugins borg_brish_count=1 $(gq "$(realpath2 python3)") $(gq $borgdir/stdborg.py)'"
-tmuxnew julia_inline "dash -c 'cd $(gq $borgdir) && TELEGRAM_TOKEN=$(gq $TELEGRAM_TOKEN) $(gq "$(realpath2 python3)") $(gq $borgdir/inline.py)'"
+#: Deprecated: guest mode (@<bot> .a CMD, betterborg's docs/guest_mode.md) replaces inline.py, which no longer imports on python-telegram-bot 20.
+# tmuxnew julia_inline "dash -c 'cd $(gq $borgdir) && TELEGRAM_TOKEN=$(gq $TELEGRAM_TOKEN) $(gq "$(realpath2 python3)") $(gq $borgdir/inline.py)'"
 ##
 # @see 'lnc-epub' for non-interactive usage
 tmuxnewsh2 lightnovel-crawler PUBLIC_DATA_PATH=$HOME/Downloads/tmp PUBLIC_ADDRESS=https://files.lilf.ir/tmp/  BOT=telegram TELEGRAM_TOKEN=$TELEGRAM_TOKEN_OCEAN lightnovel-crawler
