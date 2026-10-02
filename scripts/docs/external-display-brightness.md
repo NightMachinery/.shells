@@ -55,13 +55,14 @@ login window where the brightness keys cannot win and no chord is delivered at
 all. See "Blackout keyboard lock" in `hammerspoon/docs/hammerspoon.md`.
 
 `brightness-displays` prints TSV — index, backend, backend-local id, `main`,
-built-in/external, name, CGDirectDisplayID:
+built-in/external, name, CGDirectDisplayID, display UUID:
 
-    0	internal	0	-	built-in	Built-in	1
-    1	ddc		1	main	external	ACME X270Q	2
+    0	internal	0	-	built-in	Built-in	1	<UUID>
+    1	ddc		1	main	external	ACME X270Q	2	<UUID>
 
-That last field is what `hs.screen:id()` returns, which is how blanking finds
-the right screen to gamma out.
+The CGDirectDisplayID is what `hs.screen:id()` returns, which is how blanking
+finds the right screen to gamma out, and the UUID is what
+`hs.screen:getUUID()` returns.
 
 ## Contrast
 
@@ -143,8 +144,14 @@ Environment variables, overridable per call.
     brightness_ddc_max       100    denominator for the 0..1 <-> luminance conversion
     brightness_ddc_retries   3      re-reads allowed for a corrupt DDC reading
 
-    display_black_fallback_brightness   0.5    where an unknown level lands on restore
-    display_black_fallback_contrast     0.75
+    display_black_fallback_brightness       where a level lands on restore when
+    display_black_fallback_contrast         neither its reading nor a last-good one is known
+    display_black_restore_floor_brightness  the lowest level a restore writes, and the
+    display_black_restore_floor_contrast    lowest fresh reading a blackout believes
+    display_level_last_good_prefix          redis key prefix of the last-good levels
+    ddc_log_file, ddc_log_max_kb            the DDC log; see "The DDC log"
+
+The values live in `system.zsh`, next to each knob.
 
 `m1ddc` can report a panel's own ceiling, but that is an extra DDC round trip on
 every call and virtually every monitor answers 100. `brightness-ddc-max` asks,
@@ -226,13 +233,22 @@ of the operation. Rows for displays outside the selector are kept rather than
 overwritten, so blanking the internal panel after the external one does not
 forget how to restore the external one.
 
-### Restoring resolves by display id, not by the number in the row
+### Restoring resolves by display UUID, not by the number in the row
 
-A saved row carries two ids: the CGDirectDisplayID it is keyed on, and the
-backend-local id the write goes through (the `m1ddc` display number, or the
-`brightness -l` index). Only the first is stable. The second is *positional*, so
-unplugging one of two monitors, docking, or opening the lid while the screen is
-black renumbers it underneath the rows that were written before.
+A saved row carries three ids: the display UUID it is matched on, the
+CGDirectDisplayID, and the backend-local id the write goes through (the `m1ddc`
+display number, or the `brightness -l` index). The backend-local id is
+*positional*, so unplugging one of two monitors, docking, or opening the lid
+while the screen is black renumbers it underneath the rows that were written
+before. The CGDirectDisplayID was the key until the UUID was added. It is not
+guaranteed stable across a hotplug either, and this machine had parked rows
+under ids that no attached display used.
+
+So a row is matched on its UUID (`h-display-black-row-key`), and only a row
+written before rows carried one, six fields instead of seven, falls back to
+its CGDirectDisplayID. A row with a UUID never falls back to the id, because
+another display may have inherited it; the one exception is a display whose
+UUID cannot be read right now (no `m1ddc`), when the id is all there is.
 
 `display-black-off` therefore re-resolves every row through
 `h-display-black-attached`, a projection of `brightness-displays` down to
@@ -250,6 +266,15 @@ does not come back on its own: DDC levels live in the monitor's own firmware, so
 it is still floored when it is plugged back in. So the row is *parked* rather
 than dropped: moved to `display_black_pending`, with a line on stderr naming
 the display and the levels it could not set.
+
+The same goes for a display that is attached but cannot be driven right now,
+because one `m1ddc display list` that fails is enough to make every external
+panel look like backend `none`. That row used to be dropped, which left the
+panel floored with no record, and the next blackout then read the floor as the
+level to come back to. For the same reason, `display-black-on` never lets one
+such pass overwrite the backend a row was blanked under. Gamma-only rows,
+saved with backend `none`, floored nothing and are owed nothing, so they are
+never parked and are dropped from the pending list on its next drain.
 
     display_black_pending_get          # what is still owed, same TSV
 
@@ -309,8 +334,12 @@ go quiet rather than trusting the kill. A kill that worked leaves on the first
 check.
 See the mark-me pattern in `PE/Zsh.org`. To check on it or kill it by hand:
 
-    pgrep -fl DBLACK_LOOP_MARKER
+    pgrep -f DBLACK_LOOP_MARKER     # pids only
     kill-marker DBLACK_LOOP_MARKER
+
+Not `pgrep -fl`. `mark-me` rewrites the loop's argv in place, and what `-l`
+then prints for it runs on into the process's environment, credentials
+included.
 
 The loop body is just `display-black-on`, so a display plugged in while the loop
 is running gets blanked on the next tick, and raising the brightness by hand is
@@ -330,7 +359,22 @@ while the restore it just issued has not landed, because DDC writes are slow.
 Pressing F1 again right after F2 hits that window exactly, and each round of
 on-off ratchets the level down a little further. That was a real bug, and it is
 why `h-display-black-level-usable` refuses to remember a reading of zero in any
-of its spellings, recording `-` (unknown) instead.
+of its spellings.
+
+Two more things close the same window from either side. A reading just above
+zero is the same restore caught a moment later, so a fresh reading below
+`display_black_restore_floor_*` is refused too. And `display-black-on` now reads
+every level of every display it is about to blank *before* flooring any of
+them. Floored first, the contrast read came straight after the luminance write,
+inside m1ddc's wait for the panel, where it fails or reads 0.
+
+A refused or failed reading falls back to the display's **last-good level**:
+the latest reading `h-display-level-dispatch` handed back while nothing was
+blanked, which is every hyper+F1/F2 and hyper+ctrl+F1/F2 press, plus every
+level a restore put back from a remembered one. It is one redis key per display
+and family, `display_level_last_good:<UUID>:<brightness|contrast>`, holding the
+level and when it was read. Only when there is no last-good level either does
+the row record `-` (unknown).
 
 ### An unknown level is not "leave it alone"
 
@@ -349,10 +393,16 @@ axis that moved. This was observed in the wild, not theorised: a blackout ended
 leaving contrast pinned at `0.000000`, and the F1-straight-after-F2 window above
 is enough to produce it.
 
-So an unknown level lands on a configured fallback instead:
+So an unknown level lands, in order, on the display's last-good level, then on
+a configured fallback (`display_black_fallback_brightness`,
+`display_black_fallback_contrast`). Whatever it lands on is raised to at least
+`display_black_restore_floor_*`, so a restore can never leave a panel looking
+as if the blackout had not ended.
 
-    display_black_fallback_brightness   0.5
-    display_black_fallback_contrast     0.75
+The fixed fallback used to be the whole story, and it is what "contrast comes
+back high" was: anything that lost the pre-blank reading put contrast back at
+the fallback rather than where it had been. The DDC log names the path when it
+happens again.
 
 Two guards keep that safe. It applies only when the *saved* backend is not
 `none` — a gamma-only row floored nothing, so it is left strictly alone — and

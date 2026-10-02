@@ -836,11 +836,22 @@ a \`contrast-set-internal' exists it starts working with no change here."
     local lines
     lines="$(h-brightness-select "$sel")" @TRET
 
-    local line fn ret=0
+    #: Every reading handed back while nothing is blanked is also remembered as
+    #: that display's last-good level, which is what a blackout restore falls
+    #: back to when its own reading was lost. "Nothing is blanked" is checked
+    #: once, and coarsely: during any blackout no reading is remembered at all,
+    #: since a floored panel reads back as its floor.
+    local note_p=''
+    if [[ "$op" == get ]] && ! display-black-p 2>/dev/null ; then
+        note_p=y
+    fi
+
+    local line fn out ret=0
     local -a f
     for line in "${(@f)lines}" ; do
         [[ -n "$line" ]] || continue
         f=("${(@ps:\t:)line}")
+        #: f: 1 index  2 backend  3 local-id  4 main|-  5 built-in|external  6 name  7 display-id  8 uuid
 
         if [[ "$f[2]" == none ]] ; then
             ecerr "$0: display $f[1] ($f[6]) has no brightness backend; for an external panel on Apple Silicon, run: ensure-dep-m1ddc"
@@ -858,7 +869,13 @@ a \`contrast-set-internal' exists it starts working with no change here."
         fi
 
         #: get takes just the id; set and inc take a value first.
-        "$fn" "$@" "$f[3]" || ret=$?
+        if test -n "$note_p" ; then
+            out="$("$fn" "$@" "$f[3]")" || { ret=$? ; continue }
+            ec "$out"
+            h-display-level-last-good-note "$f[8]" "$family" "$out"
+        else
+            "$fn" "$@" "$f[3]" || ret=$?
+        fi
     done
 
     return $ret
@@ -1375,13 +1392,30 @@ function contrast-dec {
 display_black_fallback_brightness="${display_black_fallback_brightness:-0.5}"
 display_black_fallback_contrast="${display_black_fallback_contrast:-0.75}"
 #: Where [agfi:display-black-off] lands a display whose remembered level is
-#: unknown. See [agfi:h-display-black-restore-row] for why an unknown level is
-#: never "leave it alone".
+#: unknown and which has no last-good level either. See
+#: [agfi:h-display-black-restore-row] for why an unknown level is never "leave
+#: it alone", and [agfi:h-display-level-last-good] for what is tried first.
+
+typeset -g display_black_restore_floor_brightness="${display_black_restore_floor_brightness:-0.1}"
+typeset -g display_black_restore_floor_contrast="${display_black_restore_floor_contrast:-0.1}"
+#: The lowest level a blackout restore puts back, and the lowest fresh reading
+#: [agfi:display-black-on] believes. A restore that lands below these looks
+#: exactly like a blackout that did not end. And a reading below them, taken
+#: just before blanking, is far more often a restore that has not landed yet
+#: than a real setting; a real one that low is still on record as the last-good
+#: level, and comes back raised to the floor.
+
+typeset -g display_level_last_good_prefix="${display_level_last_good_prefix:-display_level_last_good}"
+#: Redis key prefix for the last-good levels: one plain key per display and
+#: family, `<prefix>:<UUID>:<brightness|contrast>', holding "<level> <epoch>".
+#: Plain keys rather than one shared value, so every write is atomic and
+#: hammerspoon/core/blackout-lock.lua can read one with a bare GET.
 
 redis-defvar display_black_saved
 #: TSV lines: display-id, backend, backend-local id, brightness, contrast,
-#: gamma-applied. Doubles as the "is anything blanked" flag for
-#: [agfi:display-black-p].
+#: gamma-applied, display UUID. Doubles as the "is anything blanked" flag for
+#: [agfi:display-black-p]. Rows written before the UUID existed have six
+#: fields, and still restore: see [agfi:h-display-black-row-key].
 
 redis-defvar display_black_pending
 #: The same TSV, for a display that was not attached when its blackout ended:
@@ -1396,11 +1430,48 @@ redis-defvar display_black_pending
 #: a lit screen. Nothing is blanked on a display that is not there, so pending
 #: rows must not count.
 
-function h-display-black-attached {
-    : "TSV: display-id, backend, backend-local id, for every attached display.
+function h-display-black-row-key {
+    : "usage: h-display-black-row-key <display-id> [<uuid>]
+Sets REPLY to the key a saved row is matched on: u:<UUID> when the UUID is
+known, else c:<display-id>."
+    #: @duplicateCode/736a48d066f9273d3104c8dd2c69713b
+    #: The CGDirectDisplayID is not guaranteed stable across a hotplug, and
+    #: this machine has had parked rows under ids (34, 36) that no attached
+    #: display uses. The UUID is the identity both sides report for the same
+    #: panel, so a row is matched on it, falling back to the id only for a row
+    #: written before rows carried one. A current display is looked up under
+    #: both of its keys, UUID first, which is what lets such a legacy row still
+    #: find its display.
+    ##
+    local id="$1" uuid="$2"
 
-A projection of [agfi:brightness-displays], so the join key stays the
-CGDirectDisplayID that both backends agree on. The saved rows carry a
+    if [[ -n "$uuid" && "$uuid" != '-' ]] ; then
+        REPLY="u:${(U)uuid}"
+    else
+        REPLY="c:${id}"
+    fi
+}
+
+function h-display-black-row-resolve {
+    : "usage: h-display-black-row-resolve <row-display-id> [<row-uuid>]
+Sets REPLY to the key under which a saved row's display is attached now, as
+built by [agfi:display-black-off] in \$cur_backend and \$cur_uuid; or to the
+row's own key when it is not attached."
+    #: A row with a UUID resolves by UUID only -- another display may have
+    #: inherited its id -- except against a display whose UUID cannot be
+    #: read now (no m1ddc), where the id is all there is to go on.
+    ##
+    h-display-black-row-key "$1" "$2"
+    if [[ "$REPLY" == u:* ]] && (( ! ${+cur_backend[$REPLY]} )) && [[ "${cur_uuid[c:$1]}" == '-' ]] ; then
+        REPLY="c:$1"
+    fi
+}
+
+function h-display-black-attached {
+    : "TSV: display-id, backend, backend-local id, display UUID, for every
+attached display.
+
+A projection of [agfi:brightness-displays]. The saved rows carry a
 backend-local id too, but that one is *positional* -- the m1ddc display number,
 or the \`brightness -l\` index -- so a display set that changed while the screen
 was black renumbers it underneath them. Restoring re-resolves through here
@@ -1412,9 +1483,9 @@ B."
     for line in "${(@f)$(brightness-displays)}" ; do
         [[ -n "$line" ]] || continue
         f=("${(@ps:\t:)line}")
-        #: f: 1 index  2 backend  3 local-id  4 main|-  5 built-in|external  6 name  7 display-id
+        #: f: 1 index  2 backend  3 local-id  4 main|-  5 built-in|external  6 name  7 display-id  8 uuid
 
-        printf '%s\t%s\t%s\n' "$f[7]" "$f[2]" "$f[3]"
+        printf '%s\t%s\t%s\t%s\n' "$f[7]" "$f[2]" "$f[3]" "${f[8]:--}"
     done
 }
 
@@ -1439,27 +1510,84 @@ exactly what \`hs.screen:id()\` returns."
 }
 
 function h-display-black-level-usable {
-    : "usage: h-display-black-level-usable <level>
-Whether a freshly read level is worth remembering as a pre-blank one.
+    : "usage: h-display-black-level-usable <level> [<floor>]
+Whether a level is worth trusting: a number above zero, and not below <floor>
+when one is given.
 
 Zero is not. It is either a display we have already blanked, or -- the case
 that actually bit -- a restore that has not landed yet: DDC writes are slow,
 and pressing F1 again right after F2 catches exactly that window. Remembering
 a zero makes the next [agfi:display-black-off] \"restore\" the screen to black,
-and a few rounds of on-off ratchet the level down for good. Treating it as
-unknown instead means the worst case is a level left alone."
+and a few rounds of on-off ratchet the level down for good. A reading just
+above zero is the same window caught a moment later, which is what the floor
+is for."
     ##
-    local level="$1"
+    local level="$1" floor="${2:-0}"
 
     [[ -n "$level" && "$level" != '-' ]] || return 1
-    #: 0, 00, 0.0, .0, 0. and the comma-decimal forms of each.
-    [[ "$level" =~ '^0*[.,]?0*$' ]] && return 1
+    #: A number, with either decimal mark.
+    [[ "$level" =~ '^([0-9]+([.,][0-9]*)?|[.,][0-9]+)$' ]] || return 1
+    level="${level/,/.}"
+    [[ "$level" == .* ]] && level="0${level}"
 
-    return 0
+    (( level > 0 && level >= floor ))
+}
+
+function h-display-level-last-good-note {
+    : "usage: h-display-level-last-good-note <uuid> <family> <level>
+Records a trusted reading as that display's last-good level."
+    #: Called by [agfi:h-display-level-dispatch] for every reading it hands
+    #: back while nothing is blanked, which covers every hyper+F1/F2 and
+    #: hyper+ctrl+F1/F2 press: the stepper reads the level after each step.
+    #: That is what a blackout restore falls back to when the pre-blank reading
+    #: was lost, instead of a fixed constant.
+    ##
+    local prefix="${display_level_last_good_prefix:-display_level_last_good}"
+    local uuid="$1" family="$2" level="$3"
+
+    [[ -n "$uuid" && "$uuid" != '-' ]] || return 0
+    h-display-black-level-usable "$level" || return 0
+
+    zmodload zsh/datetime 2>/dev/null
+    silent redism set "${prefix}:${(U)uuid}:${family}" "${level} ${EPOCHSECONDS}" || true
+}
+
+function h-display-level-last-good {
+    : "usage: h-display-level-last-good <uuid> <family>
+Prints that display's last-good level, or fails when there is none."
+    ##
+    local prefix="${display_level_last_good_prefix:-display_level_last_good}"
+    local uuid="$1" family="$2"
+
+    [[ -n "$uuid" && "$uuid" != '-' ]] || return 1
+
+    local v
+    v="$(redism get "${prefix}:${(U)uuid}:${family}" 2>/dev/null)" || return 1
+    v="${v%% *}"
+    h-display-black-level-usable "$v" || return 1
+
+    ec "$v"
+}
+
+function h-display-black-restore-level {
+    : "usage: h-display-black-restore-level <saved> <uuid> <family> <fallback> <floor>
+The level a restore writes: the saved one, else the last-good one, else the
+fallback, and never below the floor."
+    #: @duplicateCode/736a48d066f9273d3104c8dd2c69713b
+    ##
+    local level="$1" uuid="$2" family="$3" fallback="$4" floor="$5"
+
+    if ! h-display-black-level-usable "$level" ; then
+        level="$(h-display-level-last-good "$uuid" "$family")" || level="$fallback"
+    fi
+    level="${level/,/.}"
+    (( level < floor )) && level="$floor"
+
+    ec "$level"
 }
 
 function h-display-black-restore-row {
-    : "usage: h-display-black-restore-row <saved-backend> <current-backend> <local-id> <brightness> <contrast>
+    : "usage: h-display-black-restore-row <saved-backend> <current-backend> <local-id> <brightness> <contrast> [<uuid>]
 Puts one display's levels back. Shared by the saved walk and the pending drain
 in [agfi:display-black-off] so the two cannot drift apart.
 
@@ -1476,12 +1604,19 @@ An unknown level is not \"leave it alone\". A row exists only because
 lost the reading\": leaving it alone leaves a built-in backlight off, or an
 external panel at DDC luminance 0 with contrast 0, washed out with nothing on
 screen to say why -- and \`brightness-set 1' does not fix that one, because
-brightness is not the axis that moved. Landing on \$display_black_fallback_*
-is always closer to right than staying floored, and the \`none' guard is what
-makes that true."
+brightness is not the axis that moved. So it lands on the display's last-good
+level, or failing that on \$display_black_fallback_*, and in every case no
+lower than \$display_black_restore_floor_*. The \`none' guard is what makes
+that safe."
     ##
-    local was="$1" now="$2" i="$3" b="$4" c="$5"
+    local floor_b="${display_black_restore_floor_brightness:-0.1}"
+    local floor_c="${display_black_restore_floor_contrast:-0.1}"
+    local fallback_b="${display_black_fallback_brightness:-0.5}"
+    local fallback_c="${display_black_fallback_contrast:-0.75}"
+    local was="$1" now="$2" i="$3" b="$4" c="$5" uuid="${6:--}"
     assert-args was now i @RET
+    #: `uuid' is the attached display's, not the row's, so a row written
+    #: before rows carried one still finds its last-good level.
     #: @duplicateCode/736a48d066f9273d3104c8dd2c69713b
 
     #: A gamma-only row floored nothing, so there is nothing to put back. The
@@ -1489,20 +1624,35 @@ makes that true."
     #: un-blacked it.
     [[ "$was" == none ]] && return 0
 
+    #: [agfi:display-black-off] parks such a row before it gets here; this is
+    #: the guard for any other caller.
     if [[ "$now" == none ]] ; then
         ecerr "$0: display can no longer be driven (was ${was}, now none); levels ${b} / ${c} left unset. For an external panel on Apple Silicon, run: ensure-dep-m1ddc"
         return 1
     fi
 
-    local ret=0
+    local ret=0 level
 
-    [[ "$b" == '-' ]] && b="$display_black_fallback_brightness"
-    brightness-set-$now "$b" "$i" || ret=$?
+    #: A remembered pre-blank level that was written back is also the
+    #: display's last-good level from here on. That is what saves a blackout
+    #: started straight after this one: its own reading catches the panel
+    #: before this write lands, and is refused, and this is what it falls back
+    #: to. A fallback or a floor is a guess, and is not remembered.
+    level="$(h-display-black-restore-level "$b" "$uuid" brightness "$fallback_b" "$floor_b")"
+    if brightness-set-$now "$level" "$i" ; then
+        [[ "$level" == "${b/,/.}" ]] && h-display-level-last-good-note "$uuid" brightness "$level"
+    else
+        ret=$?
+    fi
 
     #: Contrast is DDC-only, and [agfi:display-black-on] only floors it there.
     if [[ "$was" == ddc && "$now" == ddc ]] ; then
-        [[ "$c" == '-' ]] && c="$display_black_fallback_contrast"
-        contrast-set-ddc "$c" "$i" || ret=$?
+        level="$(h-display-black-restore-level "$c" "$uuid" contrast "$fallback_c" "$floor_c")"
+        if contrast-set-ddc "$level" "$i" ; then
+            [[ "$level" == "${c/,/.}" ]] && h-display-level-last-good-note "$uuid" contrast "$level"
+        else
+            ret=$?
+        fi
     fi
 
     return $ret
@@ -1516,81 +1666,96 @@ already-blanked display it re-asserts the blackout and keeps the levels it
 remembered the first time, which is what makes [agfi:display-black-on-loop]
 possible. Selectors: see [agfi:h-brightness-select]."
     ##
+    local floor_b="${display_black_restore_floor_brightness:-0.1}"
+    local floor_c="${display_black_restore_floor_contrast:-0.1}"
     local sel="${1:-${brightness_display:-main}}"
 
     local lines
     lines="$(h-brightness-select "$sel")" @TRET
 
-    #: What we already remember, keyed by display-id. A remembered level always
-    #: wins over a fresh reading, because it is by definition a pre-blank one:
-    #: a blanked display reads back as 0, and remembering *that* would make
-    #: [agfi:display-black-off] "restore" the screen to black. Skipping the
-    #: getter also keeps a slow, flaky DDC read out of every loop iteration.
-    local prev line
+    #: What we already remember, by row key (see [agfi:h-display-black-row-key]).
+    #: A remembered level always wins over a fresh reading, because it is by
+    #: definition a pre-blank one: a blanked display reads back as 0, and
+    #: remembering *that* would make [agfi:display-black-off] "restore" the
+    #: screen to black. Skipping the getter also keeps a slow, flaky DDC read
+    #: out of every loop iteration.
+    local prev line key
     prev="$(display_black_saved_get)" || prev=''
-    local -A prev_b prev_c
+    local -A prev_b prev_c prev_be
     local -a pf
     for line in "${(@f)prev}" ; do
         [[ -n "$line" ]] || continue
         pf=("${(@ps:\t:)line}")
-        prev_b[$pf[1]]="$pf[4]"
-        prev_c[$pf[1]]="$pf[5]"
+        #: pf: 1 display-id  2 backend  3 local-id  4 brightness  5 contrast  6 gamma  7 uuid (absent in older rows)
+        h-display-black-row-key "$pf[1]" "$pf[7]"
+        prev_b[$REPLY]="$pf[4]" prev_c[$REPLY]="$pf[5]" prev_be[$REPLY]="$pf[2]"
     done
 
     #: A parked row is a pre-blank level too, and the better one: the display it
     #: belongs to has been unplugged and brought back, so it is still floored
     #: and a fresh reading would be the zero this whole dance exists to refuse.
-    #: A saved row wins where both exist, being the more recent blanking.
+    #: A saved row wins where both exist, being the more recent blanking. A
+    #: gamma-only (`none') row floored nothing, so it vouches for nothing: it
+    #: must not make a display that later turns up under its id "known" with
+    #: no levels.
     local pending
     pending="$(display_black_pending_get)" || pending=''
     for line in "${(@f)pending}" ; do
         [[ -n "$line" ]] || continue
         pf=("${(@ps:\t:)line}")
-        (( ${+prev_b[$pf[1]]} )) && continue
-        prev_b[$pf[1]]="$pf[4]"
-        prev_c[$pf[1]]="$pf[5]"
+        [[ "$pf[2]" == none ]] && continue
+        h-display-black-row-key "$pf[1]" "$pf[7]"
+        (( ${+prev_b[$REPLY]} )) && continue
+        prev_b[$REPLY]="$pf[4]" prev_c[$REPLY]="$pf[5]" prev_be[$REPLY]="$pf[2]"
     done
 
-    local b c g known ret=0
-    local -a f saved=() seen=()
+    #: Read everything first, then floor. Floored first, the contrast read
+    #: landed straight after the luminance write, inside m1ddc's wait for the
+    #: panel, where it fails or reads 0 -- and that lost reading is what
+    #: restored contrast to the fixed fallback.
+    local b c be g known
+    local -a f saved=() seen=() todo=()
     for line in "${(@f)lines}" ; do
         [[ -n "$line" ]] || continue
         f=("${(@ps:\t:)line}")
-        #: f: 1 index  2 backend  3 local-id  4 main|-  5 built-in|external  6 name  7 display-id
+        #: f: 1 index  2 backend  3 local-id  4 main|-  5 built-in|external  6 name  7 display-id  8 uuid
 
-        b='-' c='-' g=n known=''
-        if (( ${+prev_b[$f[7]]} )) ; then
-            known=y
-            b="$prev_b[$f[7]]"
-            c="$prev_c[$f[7]]"
-        fi
+        b='-' c='-' be="$f[2]" g=n known=''
+        for key in "u:${(U)f[8]}" "c:$f[7]" ; do
+            (( ${+prev_b[$key]} )) && { known=y ; break }
+        done
 
-        if [[ "$f[2]" != none ]] ; then
-            if test -z "$known" ; then
+        if test -n "$known" ; then
+            b="$prev_b[$key]" c="$prev_c[$key]"
+            #: A display that cannot be driven this time round -- m1ddc's
+            #: listing failed once -- keeps the backend it was blanked under.
+            #: Recording `none' would tell the restore that nothing was floored,
+            #: and it would skip a panel still at luminance 0, contrast 0.
+            [[ "$be" == none ]] && be="$prev_be[$key]"
+        else
+            if [[ "$f[2]" != none ]] ; then
                 b="$(brightness-get-$f[2] "$f[3]" 2>/dev/null)" || b='-'
-                h-display-black-level-usable "$b" || b='-'
+                if ! h-display-black-level-usable "$b" "$floor_b" ; then
+                    b="$(h-display-level-last-good "$f[8]" brightness)" || b='-'
+                fi
             fi
-            brightness-set-$f[2] 0 "$f[3]" || ret=$?
-        fi
-
-        if [[ "$f[2]" == ddc ]] ; then
-            if test -z "$known" ; then
+            if [[ "$f[2]" == ddc ]] ; then
                 c="$(contrast-get-ddc "$f[3]" 2>/dev/null)" || c='-'
-                h-display-black-level-usable "$c" || c='-'
+                if ! h-display-black-level-usable "$c" "$floor_c" ; then
+                    c="$(h-display-level-last-good "$f[8]" contrast)" || c='-'
+                fi
             fi
-            contrast-set-ddc 0 "$f[3]" || ret=$?
+            h-ddc-log "${f[7]}/black-on" "display-black-on: id=${f[7]} uuid=${f[8]} backend=${f[2]} remembered brightness=${b} contrast=${c}"
         fi
 
         #: Only external panels need the software blackout; a built-in one is
         #: already dark from the backlight being off, and leaving its gamma
         #: alone keeps the working display's colour untouched.
-        if [[ "$f[5]" == external ]] ; then
-            h-display-black-gamma "$f[7]" on || ret=$?
-            g=y
-        fi
+        [[ "$f[5]" == external ]] && g=y
 
-        saved+=("$f[7]"$'\t'"$f[2]"$'\t'"$f[3]"$'\t'"$b"$'\t'"$c"$'\t'"$g")
-        seen+=("$f[7]")
+        saved+=("$f[7]"$'\t'"$be"$'\t'"$f[3]"$'\t'"$b"$'\t'"$c"$'\t'"$g"$'\t'"${f[8]:--}")
+        seen+=("u:${(U)f[8]}" "c:$f[7]")
+        todo+=("$line")
     done
 
     #: Displays this selector did not touch keep their rows; otherwise blanking
@@ -1599,19 +1764,29 @@ possible. Selectors: see [agfi:h-brightness-select]."
     for line in "${(@f)prev}" ; do
         [[ -n "$line" ]] || continue
         pf=("${(@ps:\t:)line}")
-        (( $seen[(Ie)$pf[1]] )) || saved+=("$line")
+        #: Matched on the row's own key only: a row with a UUID must not be
+        #: taken for whichever display has since inherited its id.
+        h-display-black-row-key "$pf[1]" "$pf[7]"
+        (( $seen[(Ie)$REPLY] )) || saved+=("$line")
     done
 
+    #: Remembered before anything is floored, so a run killed halfway leaves
+    #: at worst a row for a display that is not floored yet -- whose restore
+    #: writes back the level it already has -- and never a floored display
+    #: with no row.
     (( $#saved )) && display_black_saved_set "${(pj:\n:)saved}"
 
     #: Anything blanked just now is tracked in display_black_saved again, so its
-    #: debt is settled; the rest stays parked.
+    #: debt is settled; the rest stays parked, except gamma-only rows, which
+    #: are owed nothing.
     if [[ -n "$pending" ]] ; then
         local -a park=()
         for line in "${(@f)pending}" ; do
             [[ -n "$line" ]] || continue
             pf=("${(@ps:\t:)line}")
-            (( $seen[(Ie)$pf[1]] )) || park+=("$line")
+            [[ "$pf[2]" == none ]] && continue
+            h-display-black-row-key "$pf[1]" "$pf[7]"
+            (( $seen[(Ie)$REPLY] )) || park+=("$line")
         done
 
         if (( $#park )) ; then
@@ -1620,6 +1795,21 @@ possible. Selectors: see [agfi:h-brightness-select]."
             display_black_pending_del
         fi
     fi
+
+    local ret=0
+    for line in "${todo[@]}" ; do
+        f=("${(@ps:\t:)line}")
+
+        if [[ "$f[2]" != none ]] ; then
+            brightness-set-$f[2] 0 "$f[3]" || ret=$?
+        fi
+        if [[ "$f[2]" == ddc ]] ; then
+            contrast-set-ddc 0 "$f[3]" || ret=$?
+        fi
+        if [[ "$f[5]" == external ]] ; then
+            h-display-black-gamma "$f[7]" on || ret=$?
+        fi
+    done
 
     return $ret
 }
@@ -1633,7 +1823,8 @@ displays it matches. Selectors: see [agfi:h-brightness-select]."
     #: @duplicateCode/736a48d066f9273d3104c8dd2c69713b: blackoutNativeRelease in
     #: hammerspoon/core/blackout-lock.lua does the same in Lua when the garden
     #: call that should reach this fails: the row format, the fallback levels,
-    #: and the re-resolving by display id. Change both together.
+    #: the floors, the last-good keys, and the re-resolving by display UUID
+    #: then id. Change both together.
     local sel="$1"
 
     #: Unconditional, and before anything else, so running this bare is always
@@ -1664,21 +1855,25 @@ displays it matches. Selectors: see [agfi:h-brightness-select]."
         return 0
     fi
 
-    #: Which displays are here *now*, and under which backend-local id. The
-    #: saved rows' own ids are positional and may have been renumbered by a
-    #: hotplug while the screen was black; see [agfi:h-display-black-attached].
-    local aline
+    #: Which displays are here *now*, and under which backend-local id, keyed
+    #: both ways (see [agfi:h-display-black-row-key]). The saved rows' own ids
+    #: are positional and may have been renumbered by a hotplug while the
+    #: screen was black; see [agfi:h-display-black-attached].
+    local aline key
     local -a af
-    local -A cur_backend cur_local
+    local -A cur_backend cur_local cur_id cur_uuid
     for aline in "${(@f)$(h-display-black-attached)}" ; do
         [[ -n "$aline" ]] || continue
         af=("${(@ps:\t:)aline}")
-        cur_backend[$af[1]]="$af[2]"
-        cur_local[$af[1]]="$af[3]"
+        #: af: 1 display-id  2 backend  3 local-id  4 uuid
+        for key in "c:$af[1]" "u:${(U)af[4]}" ; do
+            [[ "$key" == 'u:-' ]] && continue
+            cur_backend[$key]="$af[2]" cur_local[$key]="$af[3]" cur_id[$key]="$af[1]" cur_uuid[$key]="$af[4]"
+        done
     done
 
-    #: No selector means everything. Otherwise collect the display ids it
-    #: resolves to, and put back only those.
+    #: No selector means everything. Otherwise collect the keys it resolves
+    #: to, and put back only those.
     local -a wanted=()
     if [[ -n "$sel" ]] ; then
         local sline
@@ -1686,11 +1881,11 @@ displays it matches. Selectors: see [agfi:h-brightness-select]."
         for sline in "${(@f)$(h-brightness-select "$sel")}" ; do
             [[ -n "$sline" ]] || continue
             sf=("${(@ps:\t:)sline}")
-            wanted+=("$sf[7]")
+            wanted+=("c:$sf[7]" "u:${(U)sf[8]}")
         done
     fi
 
-    local line ret=0
+    local line k ret=0
     local -a f keep=() park=()
 
     #: Pending rows first: a display that has come back since its blackout
@@ -1698,32 +1893,39 @@ displays it matches. Selectors: see [agfi:h-brightness-select]."
     #: Deliberately not filtered by the selector -- a pending row is an unpaid
     #: debt rather than part of the blackout being ended, and `display-black-off
     #: internal' should still settle the monitor's if the monitor is back.
+    #: Gamma-only rows are owed nothing and are dropped.
     for line in "${(@f)pending}" ; do
         [[ -n "$line" ]] || continue
         f=("${(@ps:\t:)line}")
+        [[ "$f[2]" == none ]] && continue
 
-        if (( ! ${+cur_backend[$f[1]]} )) ; then
+        h-display-black-row-resolve "$f[1]" "$f[7]"
+        k="$REPLY"
+        if (( ! ${+cur_backend[$k]} )) || [[ "$cur_backend[$k]" == none ]] ; then
             park+=("$line")
             continue
         fi
 
-        h-display-black-restore-row "$f[2]" "$cur_backend[$f[1]]" "$cur_local[$f[1]]" "$f[4]" "$f[5]" || ret=$?
+        h-display-black-restore-row "$f[2]" "$cur_backend[$k]" "$cur_local[$k]" "$f[4]" "$f[5]" "${cur_uuid[$k]:-${f[7]:--}}" || ret=$?
     done
 
     for line in "${(@f)saved}" ; do
         [[ -n "$line" ]] || continue
         f=("${(@ps:\t:)line}")
-        #: f: 1 display-id  2 backend  3 local-id  4 brightness  5 contrast  6 gamma-applied
+        #: f: 1 display-id  2 backend  3 local-id  4 brightness  5 contrast  6 gamma-applied  7 uuid
 
-        if (( $#wanted )) && (( ! $wanted[(Ie)$f[1]] )) ; then
+        h-display-black-row-resolve "$f[1]" "$f[7]"
+        k="$REPLY"
+
+        if (( $#wanted )) && (( ! $wanted[(Ie)$k] )) ; then
             #: Not selected, so it stays blanked — but the gamma restore above
             #: was global, so put its blackout back.
             keep+=("$line")
-            [[ "$f[6]" == y ]] && h-display-black-gamma "$f[1]" on
+            [[ "$f[6]" == y ]] && h-display-black-gamma "${cur_id[$k]:-$f[1]}" on
             continue
         fi
 
-        if (( ! ${+cur_backend[$f[1]]} )) ; then
+        if (( ! ${+cur_backend[$k]} )) ; then
             #: Unplugged while black. There is nothing to write to, and the
             #: level lives in the monitor's own firmware, so it will still be
             #: floored when it comes back. Park it rather than drop it, and say
@@ -1734,7 +1936,17 @@ displays it matches. Selectors: see [agfi:h-brightness-select]."
             continue
         fi
 
-        h-display-black-restore-row "$f[2]" "$cur_backend[$f[1]]" "$cur_local[$f[1]]" "$f[4]" "$f[5]" || ret=$?
+        if [[ "$f[2]" != none && "$cur_backend[$k]" == none ]] ; then
+            #: Attached but not drivable right now -- m1ddc's listing failing
+            #: once is enough. Dropping the row here used to leave the panel
+            #: floored with no record, and the next blackout then read that
+            #: floor as the level to come back to. Park it like an absent one.
+            ecerr "$0: display $f[1] cannot be driven right now (was $f[2], now none); parking its levels (brightness $f[4], contrast $f[5])"
+            park+=("$line")
+            continue
+        fi
+
+        h-display-black-restore-row "$f[2]" "$cur_backend[$k]" "$cur_local[$k]" "$f[4]" "$f[5]" "${cur_uuid[$k]:-${f[7]:--}}" || ret=$?
     done
 
     if (( $#keep )) ; then
