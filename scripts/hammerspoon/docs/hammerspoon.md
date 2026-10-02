@@ -316,7 +316,9 @@ and one screen by `uuid:<U>`, `id:<n>` or `role:<name>`. The full list, and why
 `main` here is not zsh's `main`, is in `docs/multi-monitor.md`. Specs that
 match no screen (e.g. `external` with no external attached, or `internal` in
 clamshell mode) fall back to the primary screen so the overlay is never
-invisible. App-scoped modes default to `primary`; pass `overlayScreens` in the
+invisible. App-scoped modes default to `active`, the screen of the app's own
+focused window (it was `primary`, which drew a qView overlay on the laptop
+while qView was on the monitor); pass `overlayScreens` in the
 mode's `overlay` table to change it. The Hyper banner defaults to `all` via the
 `hyper_overlay_screens` global in `core/hyper-mode.lua`, and the Purple banner
 via `purple_overlay_screens` in `purple-mode.lua`.

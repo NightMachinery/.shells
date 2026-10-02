@@ -251,7 +251,11 @@ function ModalMode.defaultStyle(o)
         textYOffset = o.textYOffset,
         overlayPosition = o.overlayPosition or o.position,
         overlayMargin = o.overlayMargin,
-        overlayScreens = o.overlayScreens or o.screens or "primary",
+        -- The focused window's screen: an app-focus mode belongs to the app
+        -- that is frontmost, and its overlay to the screen it is on. It was
+        -- `primary', which put a qView overlay on the laptop while qView was
+        -- on the monitor. Hyper and Purple set their own (`all').
+        overlayScreens = o.overlayScreens or o.screens or "active",
     }
 end
 

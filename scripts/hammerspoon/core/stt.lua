@@ -319,7 +319,10 @@ function createIndicator()
     }
 
     local textBoxSize = indicator:minimumTextSize(2, "🔇")
-    local screenFrame = hs.screen.primaryScreen():fullFrame()
+    -- Where the dictated text will go: the typing screen (core/screens.lua),
+    -- not the primary one, so dictating into a window on the other monitor
+    -- shows the indicator there.
+    local screenFrame = Screens.target("typing")[1]:fullFrame()
     local frame = {}
     frame.w = textBoxSize.w + style.strokeWidth*2 + style.textSize
     frame.h = textBoxSize.h + style.strokeWidth*2 + style.textSize
@@ -338,7 +341,7 @@ function createIndicator()
     return indicator
 end
 
-ModalMode.onScreenChange(function()
+local function rebuildIndicator()
     if whisper.indicator then
         whisper.indicator:delete()
         whisper.indicator = nil
@@ -346,7 +349,12 @@ ModalMode.onScreenChange(function()
             updateIndicator()
         end
     end
-end)
+end
+
+ModalMode.onScreenChange(rebuildIndicator)
+-- Rebuilt rather than moved: the frame is computed once, at creation, against
+-- the typing screen of that moment.
+Screens.on("active", rebuildIndicator)
 
 -- Function to toggle between recorder modes
 function whisper.toggleRecorderMode()

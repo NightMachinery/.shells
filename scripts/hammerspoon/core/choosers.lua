@@ -186,7 +186,10 @@ function emojiChooser()
                 -- The chooser clears this itself; the engine's own 4h ceiling is
                 -- only a backstop against a crash leaving it on screen.
                 seconds = math.huge,
-                screens = "primary",
+                -- Next to the chooser, which opens on the focused screen. It
+                -- was mainScreen() before the alertV2 migration made it
+                -- "primary" by accident.
+                screens = "typing",
             })
         else
             alert_gateway_dismiss(kEmojiAlertId)
