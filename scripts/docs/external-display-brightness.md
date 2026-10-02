@@ -106,12 +106,24 @@ moved.
 Everything defaults to `main`, matching what the hardware brightness keys do.
 Nothing touches a second monitor unless asked to.
 
-    main        (default)  the display macOS considers main
+    main        (default)  the display macOS considers main: the menu-bar one
+    primary                the same, under Hammerspoon's name for it
     all                    every display
     internal, built-in     built-in panel(s)
     external, ddc          external panel(s)
+    id:<n>                 by CGDirectDisplayID, what hs.screen:id() returns
+    uuid:<U>               by display UUID, what hs.screen:getUUID() returns
     <integer>              index, as listed by brightness-displays
     <anything else>        regex, matched against the display name
+
+Beware the name clash. zsh's `main` is the display with the menu bar, which
+Hammerspoon calls *primary*, while Hammerspoon's `hs.screen.mainScreen()` is
+the screen of the focused window. So Hammerspoon never sends `main`: it
+resolves the screen it means itself and sends `id:<n>`. The UUID is the
+stable identity. The CGDirectDisplayID can change when a display is
+unplugged and replugged, but `brightness-displays` reports the UUID (from
+m1ddc's listing, which covers the built-in panel too) as its 8th field, and
+it is the same value Hammerspoon sees.
 
 So:
 

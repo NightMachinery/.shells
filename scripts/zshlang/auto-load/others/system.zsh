@@ -676,7 +676,8 @@ Output (TSV): index, main|-, built-in|external, CGDirectDisplayID (decimal)"
 
 function brightness-displays-ddc {
     : "DDC/CI-capable displays.
-Output (TSV): m1ddc display number, CGDirectDisplayID (decimal), product name"
+Output (TSV): m1ddc display number, CGDirectDisplayID (decimal), product name,
+display UUID"
     # @darwinOnly @appleSiliconOnly
     ##
     assert isAppleSilicon @MRET
@@ -688,18 +689,24 @@ Output (TSV): m1ddc display number, CGDirectDisplayID (decimal), product name"
     local out
     out="$(command m1ddc display list detailed 2>/dev/null)" @TRET
 
-    local line n='' name='' id=''
+    #: The UUID is the one identity that survives a renumbering: the
+    #: CGDirectDisplayID is not stable across hotplug here, while "System
+    #: UUID" is CGDisplayCreateUUIDFromDisplayID, the same value
+    #: `hs.screen:getUUID()' returns, so both sides can key on it.
+    local line n='' name='' id='' uuid=''
     for line in "${(@f)out}" ; do
         if [[ "$line" =~ '^\[([0-9]+)\] (.*) \(' ]] ; then
             #: A new record starts; flush the previous one.
-            [[ -n "$n" && -n "$id" ]] && printf '%s\t%s\t%s\n' "$n" "$id" "$name"
+            [[ -n "$n" && -n "$id" ]] && printf '%s\t%s\t%s\t%s\n' "$n" "$id" "$name" "${uuid:--}"
 
-            n="$match[1]" name="$match[2]" id=''
+            n="$match[1]" name="$match[2]" id='' uuid=''
         elif [[ "$line" =~ '^[[:space:]]*-[[:space:]]*Display ID:[[:space:]]+([0-9]+)' ]] ; then
             id="$match[1]"
+        elif [[ "$line" =~ '^[[:space:]]*-[[:space:]]*System UUID:[[:space:]]+([-0-9A-Fa-f]+)' ]] ; then
+            uuid="$match[1]"
         fi
     done
-    [[ -n "$n" && -n "$id" ]] && printf '%s\t%s\t%s\n' "$n" "$id" "$name"
+    [[ -n "$n" && -n "$id" ]] && printf '%s\t%s\t%s\t%s\n' "$n" "$id" "$name" "${uuid:--}"
 
     return 0
 }
@@ -707,11 +714,12 @@ Output (TSV): m1ddc display number, CGDirectDisplayID (decimal), product name"
 function brightness-displays {
     : "Every display with the backend that can drive its brightness.
 Output (TSV): index, backend (internal|ddc|none), backend-local id, main|-,
-built-in|external, name, CGDirectDisplayID
+built-in|external, name, CGDirectDisplayID, display UUID (\`-' if unknown)
 
 The two backends number displays differently, so they are joined on the
 CGDirectDisplayID: \`brightness -l\` prints it as 'ID 0x2', m1ddc as
-'Display ID: 2'."
+'Display ID: 2'. The UUID comes from m1ddc's listing, which covers the
+built-in panel too, so it is \`-' only without m1ddc."
     # @darwinOnly
     ##
     assert isDarwin @MRET
@@ -724,34 +732,39 @@ CGDirectDisplayID: \`brightness -l\` prints it as 'ID 0x2', m1ddc as
     local ddc
     ddc="$(brightness-displays-ddc 2>/dev/null)" || ddc=''
 
-    local line dline backend local_id name
+    local line dline backend local_id name uuid
     local -a f d
     for line in "${(@f)internal}" ; do
         [[ -n "$line" ]] || continue
         f=("${(@ps:\t:)line}")
         #: f: 1 index  2 main|-  3 built-in|external  4 display-id
 
-        backend=none local_id='' name=''
+        backend=none local_id='' name='' uuid='-'
+        for dline in "${(@f)ddc}" ; do
+            [[ -n "$dline" ]] || continue
+            d=("${(@ps:\t:)dline}")
+            #: d: 1 m1ddc number  2 display-id  3 name  4 uuid
+
+            if [[ "$d[2]" == "$f[4]" ]] ; then
+                uuid="${d[4]:--}"
+                #: m1ddc lists the built-in panel as well, but cannot drive
+                #: it; only an external one gets the ddc backend.
+                [[ "$f[3]" == built-in ]] || backend=ddc local_id="$d[1]" name="$d[3]"
+                break
+            fi
+        done
+
         if [[ "$f[3]" == built-in ]] ; then
             backend=internal local_id="$f[1]" name='Built-in'
         else
-            for dline in "${(@f)ddc}" ; do
-                [[ -n "$dline" ]] || continue
-                d=("${(@ps:\t:)dline}")
-                #: d: 1 m1ddc number  2 display-id  3 name
-
-                if [[ "$d[2]" == "$f[4]" ]] ; then
-                    backend=ddc local_id="$d[1]" name="$d[3]"
-                    break
-                fi
-            done
             : ${name:='External'}
         fi
 
-        #: The display id is carried through as the last field: it is what
+        #: The display id is carried through as field 7: it is what
         #: `hs.screen:id()` returns, so [agfi:h-display-black-gamma] can find
-        #: the same screen without re-deriving anything.
-        printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "$f[1]" "$backend" "$local_id" "$f[2]" "$f[3]" "$name" "$f[4]"
+        #: the same screen without re-deriving anything. The UUID goes last,
+        #: so every consumer indexing fields 1-7 is unaffected.
+        printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "$f[1]" "$backend" "$local_id" "$f[2]" "$f[3]" "$name" "$f[4]" "$uuid"
     done
 }
 
@@ -759,10 +772,13 @@ function h-brightness-select {
     : "usage: h-brightness-select [<selector>]
 Resolves a selector to the matching [agfi:brightness-displays] lines.
 
-  main       (default)  the display macOS considers main
+  main       (default)  the display macOS considers main: the menu-bar one
+  primary               the same; Hammerspoon's name for it
   all                   every display
   internal, built-in    built-in panel(s)
   external, ddc         external panel(s)
+  id:<n>                by CGDirectDisplayID, i.e. \`hs.screen:id()\`
+  uuid:<U>              by display UUID, i.e. \`hs.screen:getUUID()\`
   <integer>             index, as listed by [agfi:brightness-displays]
   <anything else>       regex, matched against the display name"
     ##
@@ -776,11 +792,17 @@ Resolves a selector to the matching [agfi:brightness-displays] lines.
     for line in "${(@f)all}" ; do
         [[ -n "$line" ]] || continue
         f=("${(@ps:\t:)line}")
-        #: f: 1 index  2 backend  3 local-id  4 main|-  5 built-in|external  6 name  7 display-id
+        #: f: 1 index  2 backend  3 local-id  4 main|-  5 built-in|external  6 name  7 display-id  8 uuid
 
+        #: Mind the name clash: zsh's `main' is the menu-bar display, which
+        #: Hammerspoon calls *primary*; Hammerspoon's `mainScreen()' is the
+        #: focused window's screen. Hammerspoon therefore never sends `main':
+        #: it resolves the screen it means and sends `id:<n>'.
         case "$sel" in
             all) out+=("$line") ;;
-            main) [[ "$f[4]" == main ]] && out+=("$line") ;;
+            main|primary) [[ "$f[4]" == main ]] && out+=("$line") ;;
+            id:<->) [[ "$f[7]" == "${sel#id:}" ]] && out+=("$line") ;;
+            uuid:?*) [[ "${(U)f[8]}" == "${(U)sel#uuid:}" ]] && out+=("$line") ;;
             internal|built-in) [[ "$f[5]" == built-in ]] && out+=("$line") ;;
             external|ddc) [[ "$f[5]" == external ]] && out+=("$line") ;;
             #: A bare integer is an index; anything else is a name regex.
