@@ -24,6 +24,69 @@ It was =claude_session= until it grew a second agent's worth of structure. The
 old name survives as a zsh =aliasfn= for =agent_session claude=, so anything
 still spelling it keeps working.
 
+* Session handoff
+
+The backend prepares the selected source for the zsh resume commands:
+
+#+begin_src zsh :eval never
+agent_session claude handoff -mode native -cwd "$PWD" source.jsonl -- --model gpt-6.1-sol
+agent_session claude handoff -mode compact -cwd "$PWD" source.jsonl -- --config 'model_reasoning_effort="high"'
+agent_session claude compact-result compact-stream.jsonl expected-session-id
+agent_session codex handoff-export source-rollout.jsonl
+#+end_src
+
+=handoff= writes only the exact destination thread UUID to stdout after success;
+progress and recovery instructions go to stderr. =-timeout= defaults to =10m=,
+and =-codex= defaults to =codex=. Only =--model= and =--config= arguments are
+accepted after the separator. Model selection becomes a Codex configuration
+override, so the app-server applies the same configuration layers as the CLI.
+
+Native mode asks =externalAgentConfig/import= for one =SESSIONS= item only.
+The source must be discoverable by Codex's Claude session detector; arbitrary
+JSONL paths and undetected profile roots can be rejected by the importer.
+It correlates the completion's =importId= and the success's exact source path,
+then checks the target with =thread/read=. A local rollout target is identified
+by its own =session_meta= UUID. An unsupported or remote target fails explicitly;
+there is no newest-session lookup or automatic conversion fallback.
+
+Compact mode strictly reads the entire Claude JSONL file. Historical messages
+retain their original author labels and order, but become assistant text items
+so native compaction can summarize them without retaining an enormous user
+message. Tools and results are inert historical text. Source instruction and
+environment wrappers are removed while an ordinary task in the same message is
+preserved. A fresh persistent Codex thread loads destination instructions and
+keeps the configured model. The supported 1.05m models are =gpt-6-astra=,
+=gpt-6.1-sol=, =gpt-6-sol= and =gpt-6-luna=; other models fail before a thread is
+created. Preparation sets =model_context_window= to =1050000=, and the launcher
+must keep that override on the final resume.
+
+After =thread/inject_items=, the backend calls =thread/compact/start= and
+requires both a completed =contextCompaction= item and a successful matching
+=turn/completed=. It opens a second app-server and resumes the same UUID to
+verify that compaction persisted. Preparation never starts an ordinary model
+turn. Once a destination UUID exists, any later error prints its recovery
+resume command. Source files stay unchanged.
+
+=compact-result= validates Claude's exact =session_id=, successful terminal
+result and =compact_boundary=. The documented =Not enough messages to compact.=
+result is accepted as an explicit insufficient-history no-op and reported on
+stderr. Other missing boundaries, failure results and malformed streams fail.
+
+=handoff-export= reads the complete Codex JSONL source and discovered subagent
+rollouts strictly, with no code-block line limit. It excludes source scaffold
+instructions and exports only human-visible reasoning summaries. It never
+exports encrypted or raw reasoning. A discovered child's malformed transcript
+fails the export; a child whose missing/corrupt metadata cannot be associated
+with the parent cannot be discovered. Attached media remain subject to the
+existing text renderer's representation.
+
+The JSON-RPC client queues notifications received before their response,
+correlates request IDs and rejects every server request. Deadlines and SIGINT
+or SIGTERM cancellation reap the app-server. On Unix, a private process group
+also stops its children; other platforms cancel only the direct child.
+=internal/handoff= tests use an isolated fake app-server, including a persistent
+fake resume store, and never call a model or modify a real agent session.
+
 * Install
 #+begin_src zsh :eval never
 go-install-local "${NIGHTDIR}/golang/agent_session"
@@ -75,7 +138,7 @@ same arguments. Nothing in the output moved.
 * Layout
 
 One module, =agent_session=, with =main.go= doing nothing but dispatch. The work
-is in seven internal packages, and the seam between them is the point of the
+is in internal packages, and the seam between them is the point of the
 split: an adapter translates one agent's records into a =turns.Document=, and
 everything after that is shared, so a fix to the writer reaches every agent at
 once.

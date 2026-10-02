@@ -22,6 +22,13 @@ Start here:
 
 Everything below is why those five work, and what to change when they do not.
 
+To switch between Claude and Codex, use the separate
+[conversation handoff helpers](agent-handoff.md), including native-import and
+compaction versions with project and all-project pickers. The
+[reverse handoff](codex-to-claude.md) starts Claude with readable Codex history.
+[Claude compact-before-resume](claude-session-compact.md) adds native
+compaction to the existing profile-aware Claude resumers.
+
 ## The agent travels with the transcript path
 
 Nothing in this family passes an agent token around. A transcript path is the

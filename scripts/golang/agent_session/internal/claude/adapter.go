@@ -5,6 +5,10 @@
 package claude
 
 import (
+	"bufio"
+	"encoding/json"
+	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -87,4 +91,73 @@ func (Adapter) Document(path string, o session.DocOpts) (*turns.Document, error)
 		}
 	}
 	return doc, nil
+}
+
+// HandoffDocument reads every record strictly, preserving tool results at their
+// original position. Display-oriented Document deliberately tolerates corrupt
+// lines; migration must fail rather than silently omit historical context.
+func HandoffDocument(path string) (*turns.Document, error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+	r := bufio.NewReader(f)
+	var all []record
+	for line := 1; ; line++ {
+		data, readErr := r.ReadBytes('\n')
+		if len(strings.TrimSpace(string(data))) > 0 {
+			var rec record
+			if err := json.Unmarshal(data, &rec); err != nil {
+				return nil, fmt.Errorf("transcript line %d: %w", line, err)
+			}
+			if rec.Type == "" {
+				return nil, fmt.Errorf("transcript line %d: missing record type", line)
+			}
+			if (rec.Type == "user" || rec.Type == "assistant") && rec.Message == nil {
+				return nil, fmt.Errorf("transcript line %d: missing message", line)
+			}
+			// Preserve unsupported content blocks as historical JSON, not executable items.
+			if rec.Message != nil {
+				var text string
+				var blocks []json.RawMessage
+				if json.Unmarshal(rec.Message.Content, &text) != nil {
+					if json.Unmarshal(rec.Message.Content, &blocks) != nil {
+						return nil, fmt.Errorf("transcript line %d: invalid message content", line)
+					}
+					for _, raw := range blocks {
+						var block turns.Block
+						if json.Unmarshal(raw, &block) != nil || block.Type == "" {
+							return nil, fmt.Errorf("transcript line %d: invalid content block", line)
+						}
+					}
+				}
+			}
+			all = append(all, rec)
+		}
+		if readErr == io.EOF {
+			break
+		}
+		if readErr != nil {
+			return nil, readErr
+		}
+	}
+	records := conversationRecords(all)
+	blocks := make([][]turns.Block, len(records))
+	for i, rec := range records {
+		blocks[i] = decodeBlocks(rec.Message)
+		if rec.Message != nil {
+			var raw []json.RawMessage
+			if json.Unmarshal(rec.Message.Content, &raw) == nil {
+				for j := range blocks[i] {
+					switch blocks[i][j].Type {
+					case "text", "thinking", "tool_use", "tool_result":
+					default:
+						blocks[i][j] = turns.Block{Type: "event", Name: "Historical content", Text: string(raw[j])}
+					}
+				}
+			}
+		}
+	}
+	return &turns.Document{Turns: buildTurns(records, blocks, nil)}, nil
 }

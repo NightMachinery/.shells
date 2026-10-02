@@ -11,18 +11,23 @@ package main
 
 import (
 	"bufio"
+	"context"
 	"errors"
 	"flag"
 	"fmt"
 	"os"
+	"os/signal"
 	"runtime"
 	"strconv"
 	"strings"
 	"sync"
+	"syscall"
+	"time"
 
 	"agent_session/internal/agy"
 	"agent_session/internal/claude"
 	"agent_session/internal/codex"
+	"agent_session/internal/handoff"
 	"agent_session/internal/session"
 	"agent_session/internal/turns"
 )
@@ -69,6 +74,26 @@ func main() {
 	agent, sub, argv := args[0], args[1], args[2:]
 	var err error
 	switch sub {
+	case "handoff-export":
+		if agent != "codex" {
+			err = session.ErrUnsupported
+		} else {
+			err = cmdHandoffExport(argv)
+		}
+	case "handoff":
+		if agent != "claude" {
+			err = session.ErrUnsupported
+		} else {
+			err = cmdHandoff(argv)
+		}
+	case "compact-result":
+		if agent != "claude" {
+			err = session.ErrUnsupported
+		} else if len(argv) != 2 {
+			err = errors.New("compact-result requires <jsonl-file> <expected-session-id>")
+		} else {
+			err = handoff.ValidateCompactResult(argv[0], argv[1], os.Stderr)
+		}
 	case "render":
 		err = cmdRender(ad, argv)
 	case "list":
@@ -110,6 +135,14 @@ func usage() {
   agent_session <agent> meta           <transcript>   #: id <TAB> name <TAB> cwd
   agent_session <agent> preview [flags] <transcript>  #: fzf preview body for a session
   agent_session <agent> live           <root>...      #: TSV of live sessions (pid, id, name, cwd, transcript, tmux, status)
+
+  agent_session claude handoff -mode native|compact -cwd DIR [-timeout 10m]
+                               [-codex PATH] <transcript> -- [--model MODEL] [--config KEY=VALUE]...
+                        migrate the exact selected transcript; stdout is only the destination thread id
+  agent_session codex handoff-export <transcript>
+                        strict complete human-visible history as markdown, including subagents
+  agent_session claude compact-result <jsonl-file> <expected-session-id>
+                        validate Claude /compact's successful result and compact boundary
 
 agents: claude (Claude Code; roots are <config-home>/projects directories)
         codex  (Codex CLI; roots are <CODEX_HOME>/sessions directories)
@@ -424,4 +457,53 @@ func cmdLive(ad session.Adapter, argv []string) error {
 		w.WriteString(r.Row() + "\n")
 	}
 	return nil
+}
+
+func cmdHandoff(argv []string) error {
+	sep := len(argv)
+	for i, arg := range argv {
+		if arg == "--" {
+			sep = i
+			break
+		}
+	}
+	fs := flag.NewFlagSet("handoff", flag.ContinueOnError)
+	mode := fs.String("mode", "native", "native import or native Codex compact")
+	cwd := fs.String("cwd", "", "destination working directory")
+	timeout := fs.Duration("timeout", 10*time.Minute, "total handoff deadline")
+	binary := fs.String("codex", "codex", "Codex binary")
+	if err := fs.Parse(argv[:sep]); err != nil {
+		return err
+	}
+	if fs.NArg() != 1 {
+		return errors.New("handoff requires exactly one transcript")
+	}
+	var forwarded []string
+	if sep < len(argv) {
+		forwarded = argv[sep+1:]
+	}
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+	id, err := handoff.Run(ctx, handoff.Options{Mode: *mode, Cwd: *cwd, Transcript: fs.Arg(0), Codex: *binary, Timeout: *timeout, Args: forwarded, Progress: os.Stderr})
+	if err != nil {
+		return err
+	}
+	fmt.Println(id)
+	return nil
+}
+
+func cmdHandoffExport(argv []string) error {
+	if len(argv) != 1 {
+		return errors.New("handoff-export requires exactly one transcript")
+	}
+	doc, err := codex.HandoffDocument(argv[0])
+	if err != nil {
+		return err
+	}
+	out, err := turns.Render(doc, turns.Options{Format: "md", MaxBlock: 0, Diff: true, Jobs: runtime.NumCPU()})
+	if err != nil {
+		return err
+	}
+	_, err = fmt.Fprint(os.Stdout, out)
+	return err
 }
