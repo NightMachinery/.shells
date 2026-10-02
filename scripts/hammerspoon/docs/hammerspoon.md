@@ -357,6 +357,17 @@ grid unchanged. Beyond the two-key ceiling (~7.7k labels, e.g. non-HiDPI 4K),
 cells enlarge just enough for full coverage. Extended lists are memoized per
 alphabet size in `avyCombinationsFor`.
 
+The grid covers the *working* screen (`screens = "working"` in its params; see
+`docs/multi-monitor.md`), not always the focused window's, and **space** moves
+it to the next screen, left to right, with the same callback, so a click or a
+screenshot started on one monitor can land on the other. Space is in neither
+label alphabet, which is why it is free. The grid still overhangs its screen by
+one cell on every side, as it always has, so the edge pixels have labels; next
+to a second monitor that cell is drawn on the neighbour. `cursorHide`
+(hyper+ctrl+space) parks the pointer on the working screen's right edge, in
+global coordinates. It used to take the focused screen's size without its
+origin, so on a secondary screen it landed on the primary one.
+
 ## Alerts
 
 `alert/` draws alerts as coloured bands across the screen, one

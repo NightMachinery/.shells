@@ -1,19 +1,19 @@
 --- * Mouse
 function cursorHide()
-    -- Get the main screen's frame
-    local mainScreen = hs.screen.mainScreen()
-    local mainFrame = mainScreen:frame()
+    -- The working screen (core/screens.lua), in global coordinates. This used
+    -- to take the focused screen's width and height but not its origin, so on
+    -- any screen other than the primary the pointer landed on the primary,
+    -- at a position sized for the wrong display.
+    local screen = Screens.target("working")[1]
+    local frame = screen:frame()
+    local full = screen:fullFrame()
 
-    -- Calculate the position at the rightmost edge of the screen
-    -- We subtract a small amount (like 1) to ensure the cursor is still on the screen
-    local xPosition = mainFrame.w - 1
-    local yPosition = mainFrame.h / 2 -- This will place the cursor vertically at the center
-
-    -- Move the mouse to the top center (so that the top app bar gets hidden next)
-    hs.mouse.absolutePosition(hs.geometry.point(mainFrame.w / 2, 0))
-
-    -- Move the mouse to the center right
-    hs.mouse.absolutePosition(hs.geometry.point(xPosition, yPosition))
+    -- Move the mouse to the top center first (so that the top app bar gets
+    -- hidden next), then to the middle of the right edge. One point in from
+    -- the edge, so it stays on this screen rather than crossing to a
+    -- neighbour.
+    hs.mouse.absolutePosition(hs.geometry.point(full.x + full.w / 2, full.y))
+    hs.mouse.absolutePosition(hs.geometry.point(frame.x + frame.w - 1, frame.y + frame.h / 2))
 end
 hyper_bind_v2{pressedfn=cursorHide, mods={"ctrl"}, key="space"}
 -- ** Keyboard Mouse Mode
@@ -386,6 +386,11 @@ function screenPositionAvy(params)
 
         -- Define the amount to move the canvas with each arrow key press
         moveAmount = 5,
+
+        -- Which screen the grid covers: a core/screens.lua spec, resolved
+        -- when no `screen' is passed. Space in the grid moves it to the next
+        -- screen, left to right.
+        screens = "working",
     }
 
     -- Merge default values with the provided parameters
@@ -402,7 +407,7 @@ function screenPositionAvy(params)
     local secondModalBgColor = hs.drawing.color.asRGB(params.secondModalBgColor)
     local secondModalFgColor = hs.drawing.color.asRGB(params.secondModalFgColor)
 
-    local screen = hs.screen.mainScreen()
+    local screen = params.screen or Screens.target(params.screens)[1]
     local screenFrame = screen:frame()
     -- Anchor at the physical top-left corner: frame() starts below the menu bar,
     -- which would leave a bar of uncovered screen above the grid.
@@ -654,6 +659,19 @@ function screenPositionAvy(params)
             mouse_avy_modality:exit()
 
             cleanup()
+    end)
+
+    -- Space is in neither label alphabet, so it is free to move the grid to
+    -- the next screen; the callback is the same, so whatever the grid was
+    -- opened for (click, drag, screenshot) happens there instead.
+    mouse_avy_modality:bind({}, "space", function()
+            mouse_avy_modality:exit()
+            cleanup()
+
+            local nextParams = {}
+            for k, v in pairs(params) do nextParams[k] = v end
+            nextParams.screen = Screens.neighbour(screen, 1)
+            screenPositionAvy(nextParams)
     end)
 
     -- Pressing =enter= will reuse the current mouse position.
