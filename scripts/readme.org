@@ -48,9 +48,11 @@ come with it. Codex's live under =~/.agents/skills=;
 our obsolete =~/.codex/skills= links after migration. Bundled =.system= skills
 are preserved. See =./docs/agent-done.md=.
 
-The shared =delegate-weaker= skill (alias =weaker=) routes Fable's mechanical work to
-Opus and Astra's to GPT 5.6 Sol or Terra, keeping decisions and review with the
-parent. See =./docs/delegate-weaker.md= for scope and activation.
+The shared =delegate= skill selects weaker, peer, or stronger workers and keeps
+account selection separate from in-process, Paseo, or tmux execution. Existing
+=delegate-weaker= and =weaker= entrypoints select weaker mode. Fable routes to
+Opus; Astra routes routine work to Luna at max effort and bounded implementation
+to Sol. See [[NIGHTDIR:docs/delegate.md][delegation modes and backends]].
 
 [agfi:hold-acquire] takes a self-expiring hold on any resource --
 =repo:~/scripts=, =gpu:0=, =service:hs-reload= -- so one agent can do something

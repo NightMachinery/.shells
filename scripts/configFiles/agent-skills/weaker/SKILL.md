@@ -1,11 +1,16 @@
 ---
 name: weaker
-description: Alias for delegate-weaker. Use when the user invokes weaker to delegate mechanical work from Fable or Astra to Opus or GPT 5.6 Sol or Terra and preserve token quota.
+description: Alias for delegate in weaker mode. Use when invoked as weaker or named by existing global instructions.
 ---
 
-# Weaker
+# weaker
 
-Read [delegate-weaker](../delegate-weaker/SKILL.md) and apply its instructions
-to the user's task. This is an alternate entrypoint for the same skill; keep
-the delegation rules in that canonical file. Loading this alias does not itself
-require spawning a subagent.
+Read [delegate](../delegate/SKILL.md) and its
+[model routing](../delegate/references/models.md), then apply weaker mode unless
+the user explicitly selected another mode. Keep shared delegation rules in
+`delegate`; use its chosen backend instructions for execution. If the canonical
+skill is missing, report that installation problem and continue locally when
+feasible rather than launching a worker without its policy.
+
+Loading this alias does not itself require spawning a subagent. Existing scope,
+account, model, effort, and recursion constraints still apply.
