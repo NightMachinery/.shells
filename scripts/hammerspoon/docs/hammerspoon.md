@@ -502,8 +502,10 @@ it, so a wall of text elsewhere cannot push it off.
 
 ### The fullscreen flash
 
-`flashSeconds` washes every screen in the alert's colour before the alert
-settles into its band. During the flash all bands are drawn at exactly the
+`flashSeconds` washes the alert's screens (its `screens` spec, every screen by
+default) in the alert's colour before the alert settles into its band. It used
+to wash every screen whatever the spec. From zsh, `alert_screens` passes a spec
+through `hs-alert-v2`: `alert_screens=active hs-alert-v2 ...`. During the flash all bands are drawn at exactly the
 geometry they will keep, so when the wash drains away the words do not move,
 resize or reflow — a flash that re-centred its own text would yank it out from
 under whoever started reading it. Two flashes at once: last one wins.

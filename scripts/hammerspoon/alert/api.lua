@@ -59,7 +59,8 @@ end
 ---                hyper+F1/F2 being the case it was added for. Currently it
 ---                holds the peek off for every band on screen, not just this
 ---                one; see AlertEngine.peekAlpha
----   screens      a ModalMode.targetScreens spec, default "all"
+---   screens      a Screens.target spec (core/screens.lua), default "all";
+---                the flash covers the same screens
 ---   textSize     point size for this band alone, default AlertEngine.kTextSize
 ---                (15). Wrapping and band height follow it, so a large band
 ---                costs more of the stack's budget and is truncated sooner
@@ -135,6 +136,9 @@ function alertV2(text, opts)
         end
         alertEngineState.flood = {
             color = alert.color,
+            -- The flash goes where the alert goes: an alert aimed at one
+            -- screen used to wash every screen.
+            screens = alert.screens,
             startedAt = hs.timer.secondsSinceEpoch(),
             duration = flashSeconds,
             fadeIn = fadeIn,

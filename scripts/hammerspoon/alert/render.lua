@@ -388,7 +388,7 @@ local function renderFlood()
     if not wash then
         return
     end
-    for _, screen in ipairs(ModalMode.targetScreens("all")) do
+    for _, screen in ipairs(ModalMode.targetScreens(alertEngineState.flood.screens or "all")) do
         local full = screen:fullFrame()
         local elements = {
             { type = "rectangle", action = "fill", fillColor = wash },

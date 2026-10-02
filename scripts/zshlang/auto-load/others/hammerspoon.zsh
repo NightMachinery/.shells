@@ -393,6 +393,9 @@ function hs-alert-v2 {
     local fade="${alert_fade:-}"
     local id="${alert_id:-}"
     local markup="${alert_markup:-plain}" color="${alert_color:-}"
+    #: A screen spec (hammerspoon/core/screens.lua): all, active, pointer,
+    #: primary, external, role:<name>, ... Unset means every screen.
+    local screens="${alert_screens:-}"
 
     # Not `local path`: `path` is the array tied to $PATH, so declaring it local
     # and assigning a string to it empties PATH for the rest of the function.
@@ -408,6 +411,15 @@ function hs-alert-v2 {
     fi
     if test -n "$color" ; then
         opts+=", color = \"${color}\""
+    fi
+    if test -n "$screens" ; then
+        #: Interpolated into Lua source, so only the characters a spec can
+        #: contain get through.
+        if [[ "$screens" != [-_:a-zA-Z0-9]## ]] ; then
+            ecerr "$0: bad alert_screens: $(gquote-sq "$screens")"
+            return 1
+        fi
+        opts+=", screens = \"${screens}\""
     fi
     #: Unset means the engine's own fade defaults, so say nothing at all. A bare
     #: number is passed through as the ramp length; anything else truthy just
