@@ -458,13 +458,24 @@ against — a 27" 4K panel behind a USB-C hub. Pinned at 50, `m1ddc get luminanc
 returned `-7` three times in forty tries, and **exited 0 every time**, so the
 exit code is no help. The value being out of range is the only signal there is.
 
-`brightness-get-ddc` therefore range-checks each reading and re-reads up to
-`brightness_ddc_retries` times. Forty consecutive reads were clean afterwards.
+`h-m1ddc-get` therefore range-checks each reading and re-reads up to
+`brightness_ddc_retries` times; every rejected reading is in the DDC log.
 
-Writes never misbehaved, and neither did `chg` — which is why
-`brightness-inc-ddc` uses m1ddc's own `chg luminance` rather than a
-get-then-set. It is one round trip instead of two, it does its own read
-internally, and forty consecutive +1/-1 pairs landed back on exactly 50.
+Writes never misbehaved. m1ddc's own `chg` is a different matter, though this
+section used to say otherwise. `brightness-inc-ddc` used `chg luminance`
+because it looked like one round trip instead of two, with its read done
+inside m1ddc, and because forty consecutive +1/-1 pairs landed back on exactly
+50. But m1ddc 1.2.0's `chg` makes the same read as `get`: it takes the current
+and maximum values from one 12-byte reply as signed bytes, with no checksum,
+then writes current+delta clamped to that reply's own maximum. So a corrupt
+reply is written straight back to the panel (a `-7` becomes 0, a garbled one
+anything up to the maximum), and nothing above m1ddc can see it. One clean
+run of forty misses a one-in-thirteen fault about 4% of the time, so it never
+showed this was safe.
+
+Both inc leaves now go through `h-ddc-level-inc`: a validated, retried read,
+then an absolute `set`, both inside one hold of the display's lock. It is the
+same bus cost, one read and one write, in two m1ddc processes instead of one.
 
 Do not assume a different monitor, cable or hub behaves the same; DDC/CI over
 cheap hubs and HDMI adapters is where this class of tool usually fails. Some

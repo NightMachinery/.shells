@@ -1083,29 +1083,38 @@ function h-m1ddc-get {
     : "usage: h-m1ddc-get <m1ddc-display> <luminance|contrast|...>
 One validated DDC reading, as a raw integer."
     ##
-    local i="$1" attr="$2"
-    assert-args i attr @RET
+    h-m1ddc-get-via h-m1ddc "$@"
+}
+
+function h-m1ddc-get-via {
+    : "usage: h-m1ddc-get-via <h-m1ddc|h-m1ddc-unlocked> <m1ddc-display> <attr>
+The body of [agfi:h-m1ddc-get], with the runner named, so a caller already
+holding the display's lock can read without taking it a second time."
+    ##
+    local runner="$1" i="$2" attr="$3"
+    assert-args runner i attr @RET
 
     #: DDC reads come back corrupt now and then — measured here at roughly 1 in
     #: 13 over a USB-C hub, returning '-7' for a panel pinned at 50. m1ddc still
     #: exits 0 on those, so the exit code tells us nothing and the only usable
     #: signal is the value being out of range. Re-read when it is.
     #:
-    #: Writes are not affected, and neither is `chg` (m1ddc does that read
-    #: internally): 40 consecutive +1/-1 round trips landed back on exactly 50.
+    #: m1ddc's own `chg' does the same read with none of this checking -- see
+    #: [agfi:h-ddc-level-inc] -- which is why nothing here uses it any more.
     local max="${brightness_ddc_max:-100}"
     local -i tries="${brightness_ddc_retries:-3}"
     local raw='' n=0
     while (( n < tries )) ; do
         (( n++ ))
 
-        raw="$(h-m1ddc "$i" get "$attr" 2>/dev/null)" || continue
+        raw="$("$runner" "$i" get "$attr" 2>/dev/null)" || continue
 
         #: `<->` matches non-negative integers, so a corrupt '-7' fails here.
         if [[ "$raw" == <-> ]] && (( raw <= max )) ; then
             ec "$raw"
             return 0
         fi
+        h-ddc-log "${i}/${attr}/bad-read" "display=${i} get ${attr} -> $(gquote-sq "$raw") rejected (try ${n})"
     done
 
     ecerr "$0: display ${i} gave no valid ${attr} in ${tries} tries (last: $(gquote-sq "$raw"))"
@@ -1153,15 +1162,40 @@ function contrast-set-ddc {
 
 function contrast-inc-ddc {
     : "usage: contrast-inc-ddc [<delta>] [<m1ddc-display>]
-The contrast twin of [agfi:brightness-inc-ddc], and one DDC round trip for the
-same reason: m1ddc's own \`chg\` does the read-modify-write internally. The
-hyper+ctrl+F1/F2 key repeat comes through here."
+The contrast twin of [agfi:brightness-inc-ddc]. The hyper+ctrl+F1/F2 key
+repeat comes through here."
     # @appleSiliconOnly
     ##
     local inc="${1:-0.01}" i="${2:-1}"
 
     assert isAppleSilicon @MRET
     ensure-dep-m1ddc @RET
+
+    h-ddc-level-inc "$i" contrast "$inc"
+}
+
+function h-ddc-level-inc {
+    : "usage: h-ddc-level-inc <m1ddc-display> <luminance|contrast> <delta 0..1>
+A validated read-modify-write under one hold of the display's lock."
+    #: This replaced m1ddc's own `chg', which looked like the safe choice -- one
+    #: process, the read done inside m1ddc -- and is not. m1ddc 1.2.0's `chg'
+    #: reads the panel the same way `get' does, takes the current and maximum
+    #: values from one 12-byte reply as signed bytes with no checksum, and
+    #: writes current+delta clamped to *that reply's* maximum. A corrupt reply,
+    #: which [agfi:h-m1ddc-get] measures at about one read in thirteen here, is
+    #: therefore written straight back to the panel, and nothing above m1ddc
+    #: can see it. The old "40 +1/-1 pairs landed exactly" check was a single
+    #: sample, which misses a 1-in-13 fault about 4% of the time.
+    #:
+    #: The bus cost is the same -- one read, one write -- but the read is
+    #: validated and retried, and the write is an absolute `set' of a value
+    #: computed here. Both happen inside one hold of the lock, so no other
+    #: writer can land between them. The inner calls go through
+    #: [agfi:h-m1ddc-unlocked], because taking the flock again from the same
+    #: process would deadlock.
+    ##
+    local i="$1" attr="$2" inc="$3"
+    assert-args i attr inc @RET
 
     local max="${brightness_ddc_max:-100}"
     local n
@@ -1170,7 +1204,26 @@ hyper+ctrl+F1/F2 key repeat comes through here."
     #: printf rounds a small delta to 0 (or to '-0'); skip the pointless write.
     (( n == 0 )) && return 0
 
-    silent h-m1ddc "$i" chg contrast "$n"
+    h-ddc-lock-do "$i" h-ddc-level-inc-unlocked "$i" "$attr" "$n"
+}
+
+function h-ddc-level-inc-unlocked {
+    : "usage: h-ddc-level-inc-unlocked <m1ddc-display> <attr> <raw-delta>
+The body of [agfi:h-ddc-level-inc]; the caller holds the lock."
+    ##
+    local i="$1" attr="$2" n="$3"
+    assert-args i attr n @RET
+
+    local max="${brightness_ddc_max:-100}"
+    local cur
+    cur="$(h-m1ddc-get-via h-m1ddc-unlocked "$i" "$attr")" @TRET
+
+    local -i target=$(( cur + n ))
+    (( target > max )) && target=$max
+    (( target < 0 )) && target=0
+    (( target == cur )) && return 0
+
+    silent h-m1ddc-unlocked "$i" set "$attr" "$target"
 }
 
 function brightness-set-ddc {
@@ -1197,9 +1250,8 @@ function brightness-set-ddc {
 
 function brightness-inc-ddc {
     : "usage: brightness-inc-ddc [<delta>] [<m1ddc-display>]
-Uses m1ddc's own \`chg\`, so this is one DDC round trip rather than the
-get-then-set the internal backend needs. The hyper+F1/F2 key repeat comes
-through here, and some panels misbehave under rapid interleaved reads/writes."
+A validated read-modify-write through [agfi:h-ddc-level-inc], not m1ddc's
+own \`chg\`; see there for why. The hyper+F1/F2 key repeat comes through here."
     # @appleSiliconOnly
     ##
     local inc="${1:-0.01}" i="${2:-1}"
@@ -1207,14 +1259,7 @@ through here, and some panels misbehave under rapid interleaved reads/writes."
     assert isAppleSilicon @MRET
     ensure-dep-m1ddc @RET
 
-    local max="${brightness_ddc_max:-100}"
-    local n
-    n="$(printf '%.0f' $((inc*max)))"
-
-    #: printf rounds a small delta to 0 (or to '-0'); skip the pointless write.
-    (( n == 0 )) && return 0
-
-    silent h-m1ddc "$i" chg luminance "$n"
+    h-ddc-level-inc "$i" luminance "$inc"
 }
 ##
 function brightness-get {
