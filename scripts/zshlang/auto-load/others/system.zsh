@@ -951,6 +951,88 @@ on darwin -- would be."
     }
 }
 
+typeset -g ddc_log_file="${ddc_log_file-${HOME}/logs/ddc.log}"
+#: Where [agfi:h-ddc-log] appends. Empty disables it.
+typeset -g ddc_log_max_kb="${ddc_log_max_kb:-1024}"
+#: Past this size the log is cut down to its newer half.
+
+typeset -gA h_ddc_log_last
+#: The last line logged per display and attribute, so a long-lived loop that
+#: re-asserts the same value every few seconds logs it once rather than
+#: thousands of times. Per process: a garden call is a fresh fork and always
+#: logs.
+
+function h-ddc-log {
+    : "usage: h-ddc-log <key> <message>
+Appends one timestamped line, with the calling functions, to \$ddc_log_file.
+\`key' names what the line is about (display/attribute); a line identical to
+the previous one for the same key is skipped."
+    #: Nothing recorded DDC writes before this, so when contrast landed
+    #: somewhere surprising there was no way to tell which path wrote it. The
+    #: callers are the point: they are what separates a blackout restore from a
+    #: key press from a loop iteration.
+    ##
+    local log="${ddc_log_file}" max_kb="${ddc_log_max_kb:-1024}"
+    local key="$1" msg="$2"
+    test -n "$log" || return 0
+
+    #: The first few real callers, skipping the plumbing every write passes
+    #: through on its way here.
+    local fr
+    local -a callers=()
+    for fr in "${funcstack[@]:1}" ; do
+        [[ "$fr" == (h-ddc-*|h-m1ddc*|reval|assert|silent|eval|\(eval\)) ]] && continue
+        callers+=("$fr")
+        (( $#callers >= 4 )) && break
+    done
+    local line="${msg} [${(j:<:)callers}]"
+    [[ "${h_ddc_log_last[$key]}" == "$line" ]] && return 0
+    h_ddc_log_last[$key]="$line"
+
+    zmodload zsh/datetime 2>/dev/null
+    zmodload -F zsh/stat b:zstat 2>/dev/null
+    #: The trailing slash makes [agfi:bottomdir] take it as the directory.
+    ensure-dir "${log:h}/" 2>/dev/null || return 0
+
+    local -a st=()
+    if zstat -A st +size -- "$log" 2>/dev/null && (( st[1] > max_kb * 1024 )) ; then
+        local tmp="${log}.tmp.$$"
+        local -i n
+        n="$(command wc -l < "$log")" 2>/dev/null || n=0
+        command tail -n $(( n / 2 + 1 )) -- "$log" > "$tmp" 2>/dev/null \
+            && command mv -f -- "$tmp" "$log" 2>/dev/null
+        command rm -f -- "$tmp" 2>/dev/null
+    fi
+
+    print -r -- "$(strftime '%Y-%m-%d %H:%M:%S' "${EPOCHSECONDS}") pid=$$ ${line}" >> "$log" 2>/dev/null
+    return 0
+}
+
+function h-m1ddc-unlocked {
+    : "usage: h-m1ddc-unlocked <m1ddc-display> <m1ddc-args>...
+One m1ddc call on that display, logging writes. Only for code that already
+holds the display's lock through [agfi:h-ddc-lock-do]; everything else uses
+[agfi:h-m1ddc]."
+    ##
+    local i="$1" ; shift
+    assert-args i @RET
+
+    case "$1" in
+        set|chg)
+            #: m1ddc prints the value it actually wrote, which is the one fact
+            #: a corrupt read inside `chg' would change, so it is logged.
+            local out ret=0
+            out="$(command m1ddc display "$i" "$@")" || ret=$?
+            h-ddc-log "${i}/${2}" "display=${i} ${*} -> $(gquote-sq "$out") exit=${ret}"
+            [[ -n "$out" ]] && ec "$out"
+            return $ret
+            ;;
+        *)
+            command m1ddc display "$i" "$@"
+            ;;
+    esac
+}
+
 function h-m1ddc {
     : "usage: h-m1ddc <m1ddc-display> <m1ddc-args>...
 Every per-panel DDC access goes through here, so the lock in
@@ -962,7 +1044,7 @@ Not used by the \`display list' enumeration, which takes no display number."
     local i="$1" ; shift
     assert-args i @RET
 
-    h-ddc-lock-do "$i" command m1ddc display "$i" "$@"
+    h-ddc-lock-do "$i" h-m1ddc-unlocked "$i" "$@"
 }
 
 function brightness-ddc-max {

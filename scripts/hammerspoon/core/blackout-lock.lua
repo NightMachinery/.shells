@@ -750,6 +750,17 @@ local function brightnessIndices(text)
     return map
 end
 
+--- The Lua side of h-ddc-log in zshlang/auto-load/others/system.zsh: the same
+--- file and line shape, so one log answers "what wrote this level" whichever
+--- side did it. Only the native release writes DDC from here.
+local function ddcLog(msg)
+    local path = os.getenv("HOME") .. "/logs/ddc.log"
+    local f = io.open(path, "a")
+    if not f then return end
+    f:write(os.date("%Y-%m-%d %H:%M:%S") .. " hs " .. msg .. "\n")
+    f:close()
+end
+
 --- Runs { {bin, args}, ... } one after another (DDC writes must not
 --- overlap), then done(allOk).
 local function blackoutRunSteps(steps, label, done)
@@ -758,7 +769,9 @@ local function blackoutRunSteps(steps, label, done)
         i = i + 1
         local s = steps[i]
         if not s then return done(allOk) end
-        gardenTask(s[1], s[2], function(code, _, err)
+        gardenTask(s[1], s[2], function(code, out, err)
+            ddcLog(string.format("%s %s -> '%s' exit=%s [%s]", s[1], table.concat(s[2], " "),
+                                 (out or ""):gsub("%s+$", ""), tostring(code), label))
             if code ~= 0 then
                 allOk = false
                 print(string.format("%s: %s %s exited %s: %s", label, s[1], table.concat(s[2], " "),

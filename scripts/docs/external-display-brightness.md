@@ -521,6 +521,25 @@ A lock on its own would turn a one-second key hold into twenty seconds of
 queue, at ~600ms per locked `chg`, so the presses are coalesced at the source
 as well.
 
+## The DDC log
+
+Every DDC write is logged, one line each, to `$ddc_log_file` (empty disables
+it; `$ddc_log_max_kb` caps it, past which it is cut to its newer half). A line
+carries the time, the pid, the m1ddc arguments, the value m1ddc reports having
+written, its exit code, and the first few real callers:
+
+    2026-01-01 12:00:00 pid=123 display=2 set contrast 51 -> '51' exit=0 [h-display-black-restore-row<display-black-off<...]
+
+It exists because "contrast came back high" had no witness: four paths write
+contrast and nothing recorded which one had. The callers separate a blackout
+restore from a key press from a loop iteration. A line identical to the
+previous one for the same display and attribute is skipped, so the blackout
+loop's re-assert every few seconds is logged once per run, not once per tick.
+`blackoutNativeRelease` in `hammerspoon/core/blackout-lock.lua` writes the same
+shape, tagged `hs`, when it restores levels without the garden.
+
+    tail -f ~/logs/ddc.log
+
 ## The level band
 
 hyper+F1/F2 (brightness) and hyper+ctrl+F1/F2 (contrast) put an alert-v2 band on
