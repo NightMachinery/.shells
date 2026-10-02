@@ -374,7 +374,8 @@ def merge_provider_alias(home, provider, alias):
         if not isinstance(providers, dict):
             raise HandoffError("Local Paseo providers configuration must be a JSON object")
         if provider in providers:
-            if providers[provider] != alias:
+            existing = providers[provider]
+            if not isinstance(existing, dict) or {k: v for k, v in existing.items() if k != "label"} != {k: v for k, v in alias.items() if k != "label"}:
                 raise HandoffError("Existing Paseo handoff alias conflicts with the requested profile")
             return False
         providers[provider] = alias

@@ -550,6 +550,16 @@ class HandoffTests(unittest.TestCase):
         self.assertEqual(filename.read_bytes(), content)
         self.assertEqual(filename.stat().st_ino, before.st_ino)
 
+    def test_alias_merge_preserves_custom_label(self):
+        filename = self.daemon_home / "config.json"
+        alias = {"extends": "claude", "label": "Imported Claude profile",
+                 "env": {"CLAUDE_CONFIG_DIR": str(self.home)}}
+        existing = dict(alias, label="Claude (Work)")
+        filename.write_text(json.dumps({"agents": {"providers": {"handoff-test": existing}}}))
+        content = filename.read_bytes()
+        self.assertFalse(h.merge_provider_alias(str(self.daemon_home), "handoff-test", alias))
+        self.assertEqual(filename.read_bytes(), content)
+
     def test_alias_merge_refuses_conflicts_malformed_and_nonobject_config(self):
         filename = self.daemon_home / "config.json"
         alias = {"extends": "codex", "env": {"CODEX_HOME": str(self.home)}}

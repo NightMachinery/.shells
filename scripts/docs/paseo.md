@@ -101,6 +101,10 @@ The implementation uses Paseo's [native import command](https://github.com/getpa
 and [provider profiles](https://paseo.sh/docs/custom-providers).
 Terminal attachment is an [output observer](https://github.com/getpaseo/paseo/blob/main/packages/cli/src/commands/agent/attach.ts).
 
+Provider labels can be customized in `agents.providers` in the private Paseo
+configuration, followed by `paseo reload`. Handoffs preserve custom labels while
+still checking that the provider's profile configuration matches.
+
 Run the isolated checks with:
 
 ```sh
