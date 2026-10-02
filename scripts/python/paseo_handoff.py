@@ -189,23 +189,58 @@ def read_private(filename):
         raise HandoffError("Cannot read private handoff state") from exc
 
 
+def native_names(agent):
+    return {"claude", "claude.exe"} if agent == "claude" else {"codex"}
+
+
 def source_allowed(process, agent):
-    if process.uid != os.getuid() or Path(process.command).name not in {agent, "node"}:
+    if process.uid != os.getuid() or Path(process.command).name not in native_names(agent) | {"node"}:
         raise HandoffError("Source process has the wrong owner or executable")
 
 
-def ancestor(table, caller, source):
+def owner_allowed(process, agent):
+    if process.uid != os.getuid() or Path(process.command).name not in native_names(agent) | {"node", "decset-rewrite"}:
+        raise HandoffError("Source owner has the wrong owner or executable")
+
+
+def ancestry(table, caller, owner):
+    """Return the same-user path from owner to caller, or no proven path."""
     seen = set()
     current = caller.pid
+    chain = []
     while current not in seen and current in table:
         seen.add(current)
         process = table[current]
         if process.uid != os.getuid():
-            return False
+            return []
+        chain.append(process)
+        if process.pid == owner.pid:
+            return list(reversed(chain))
         current = process.ppid
-        if current == source.pid:
-            return True
-    return False
+    return []
+
+
+def ancestor(table, caller, source):
+    return caller.pid != source.pid and bool(ancestry(table, caller, source))
+
+
+def select_source(table, caller, owner, agent):
+    owner_allowed(owner, agent)
+    chain = ancestry(table, caller, owner)
+    if not chain or len(chain) < 2:
+        raise HandoffError("Invoking caller is not a descendant of the source process")
+    # Prefer the outermost actual agent binary over its Node/proxy launchers.
+    # Ignore arbitrary Node tools nearer the invoking shell when a native
+    # binary exists; without one only the owner or known proxy's outermost
+    # Node child can stand in for the native agent.
+    candidates = chain[:-1]
+    source = next((p for p in candidates if Path(p.command).name in native_names(agent)), None)
+    if source is None:
+        source = next((p for p in candidates if Path(p.command).name == "node"), None)
+    if source is None:
+        raise HandoffError("Known source proxy has no native agent on the invoking caller ancestry")
+    source_allowed(source, agent)
+    return source, chain[:chain.index(source)]
 
 
 def store_root(plan):
@@ -239,13 +274,15 @@ def prepare(args):
                       ("paseo", "executable"), ("agent_session", "executable"), ("paseo_home", None)):
         plan[key] = absolute_path(getattr(args, key), kind=kind)
     table = process_table()
-    source, caller = table.get(args.source_pid), table.get(args.caller_pid)
-    if source is None or caller is None or source.pid <= 1 or source.pid == caller.pid:
+    owner, caller = table.get(args.source_pid), table.get(args.caller_pid)
+    if owner is None or caller is None or owner.pid <= 1 or owner.pid == caller.pid:
         raise HandoffError("Source or invoking caller process is missing")
-    source_allowed(source, args.agent)
-    if not ancestor(table, caller, source):
-        raise HandoffError("Invoking caller is not a descendant of the source process")
+    source, launchers = select_source(table, caller, owner, args.agent)
     plan["source"] = asdict(source)
+    if source.pid != owner.pid:
+        plan["owner"] = asdict(owner)
+        # These snapshots prove the saved target's parent links to the owner.
+        plan["source_ancestors"] = [asdict(p) for p in reversed(launchers[1:])]
     plan["caller"] = asdict(caller)
     verify_native(plan)
     output = absolute_path(args.output)
@@ -268,15 +305,25 @@ def validate_plan(plan):
             raise HandoffError("Handoff path changed since preparation")
     try:
         source, caller = Process(**plan["source"]), Process(**plan["caller"])
+        owner = Process(**plan["owner"]) if "owner" in plan else source
+        ancestors = [Process(**p) for p in plan.get("source_ancestors", [])]
     except (KeyError, TypeError) as exc:
         raise HandoffError("Invalid saved process identity") from exc
-    for process in (source, caller):
+    for process in (source, caller, owner, *ancestors):
         if any(type(n) is not int for n in (process.pid, process.ppid, process.uid)) or process.pid <= 1:
             raise HandoffError("Invalid saved process identity")
         if not isinstance(process.started, str) or not isinstance(process.command, str) or process.uid != os.getuid():
             raise HandoffError("Invalid saved process identity")
     source_allowed(source, plan["agent"])
-    if source.pid == caller.pid:
+    owner_allowed(owner, plan["agent"])
+    if "owner" in plan:
+        chain = [source, *ancestors, owner]
+        if len({p.pid for p in chain}) != len(chain) or any(
+                child.ppid != parent.pid for child, parent in zip(chain, chain[1:])):
+            raise HandoffError("Invalid saved source-to-owner ancestry")
+    elif ancestors:
+        raise HandoffError("Saved source ancestry has no owner")
+    if caller.pid in {source.pid, owner.pid}:
         raise HandoffError("Source and caller must be distinct")
     return source, caller
 
@@ -391,6 +438,13 @@ def same_process(expected, actual):
         actual.pid, actual.uid, actual.started, actual.command)
 
 
+def verify_process_identities(source, owner):
+    table = process_table()
+    for label, expected in (("Source", source), ("Source owner", owner)):
+        if not same_process(expected, table.get(expected.pid)):
+            raise HandoffError(label + " process identity changed; refusing termination")
+
+
 def wait_gone(process, seconds):
     deadline = time.monotonic() + seconds
     while same_process(process, process_table().get(process.pid)):
@@ -484,6 +538,7 @@ def run(filename):
     private_directory(directory)
     plan = read_private(filename)
     source, caller = validate_plan(plan)
+    owner = Process(**plan["owner"]) if "owner" in plan else source
     with worker_lock(directory):
         status_dir = directory / "status"
         status_dir.mkdir(mode=0o700, exist_ok=True)
@@ -507,12 +562,10 @@ def run(filename):
         if plan["wait_exit"]:
             wait_gone(source, 600)
         else:
-            if not same_process(source, process_table().get(source.pid)):
-                raise HandoffError("Source process identity changed; refusing termination")
-            verify_live_source(plan, source, live_rows(plan))
+            verify_process_identities(source, owner)
+            verify_live_source(plan, owner, live_rows(plan))
             # Check identity after the live scan too, immediately before signal.
-            if not same_process(source, process_table().get(source.pid)):
-                raise HandoffError("Source process identity changed; refusing termination")
+            verify_process_identities(source, owner)
             print("Terminating native source PID " + str(source.pid), flush=True)
             try:
                 os.kill(source.pid, signal.SIGTERM)

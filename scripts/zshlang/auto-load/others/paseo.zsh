@@ -80,7 +80,7 @@ function 2paseo {
         if [[ "${wait_p}" == y ]] ; then
             ecerr "$0: handoff queued; exit the original session to complete it"
         else
-            ecerr "$0: Paseo preflight will run, then gracefully stop source pid ${source_pid}"
+            ecerr "$0: Paseo preflight will run, then gracefully stop the validated native process"
         fi
         ecerr "$0: recovery state: ${bundle}"
     fi

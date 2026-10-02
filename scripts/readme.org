@@ -71,7 +71,7 @@ Ambiguous ownership saves the report but refuses automatic termination;
 [agfi:paseo-install] installs Paseo through npm. From a native Claude or Codex
 session, =! 2paseo= transfers the saved conversation to the local Paseo daemon
 and attaches its output in tmux. See [[NIGHTDIR:docs/paseo.md][Paseo handoff]] for
-process checks, profile handling, and manual-exit controls.
+process checks, terminal-proxy handling, profiles, and manual-exit controls.
 
 Selected Zsh directories under =./zshlang/= can be structured as public plugins while remaining the local source of truth. Plugin entrypoint files named =*.plugin.zsh= should stay thin loaders; implementation should live in modular =*.zsh= files.
 

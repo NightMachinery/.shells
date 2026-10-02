@@ -52,14 +52,15 @@ class HandoffTests(unittest.TestCase):
         )
         self.meta = SOURCE_ID + "\tprivate name\t" + str(self.directory) + "\n"
 
-    def make_plan(self):
-        with patch.object(h, "process_table", return_value={100: self.source, 200: self.caller}), \
+    def make_plan(self, table=None):
+        with patch.object(h, "process_table", return_value=table or {100: self.source, 200: self.caller}), \
                 patch.object(h, "command", return_value=self.meta):
             h.prepare(self.args)
         return json.loads(self.planfile.read_text())
 
-    def flow(self, *, rows=None, response=None, identities=None, wait_error=False, preflight_error=False):
-        self.make_plan()
+    def flow(self, *, rows=None, response=None, identities=None, wait_error=False, preflight_error=False,
+             plan_table=None):
+        plan = self.make_plan(plan_table)
         stack = ExitStack()
         self.addCleanup(stack.close)
         stack.enter_context(patch.object(h, "verify_native"))
@@ -69,7 +70,8 @@ class HandoffTests(unittest.TestCase):
         wait = stack.enter_context(patch.object(h, "wait_gone"))
         if wait_error:
             wait.side_effect = [None, h.HandoffError("timeout")]
-        table = stack.enter_context(patch.object(h, "process_table", return_value={100: self.source}))
+        saved = [plan["source"], plan.get("owner", plan["source"])]
+        table = stack.enter_context(patch.object(h, "process_table", return_value={p["pid"]: h.Process(**p) for p in saved}))
         if identities:
             table.side_effect = identities
         if rows is None:
@@ -104,9 +106,164 @@ class HandoffTests(unittest.TestCase):
 
     def test_wrong_owner_or_executable_refused(self):
         for process in (h.Process(100, 2, os.getuid() + 1, "s", "claude"),
-                        h.Process(100, 2, os.getuid(), "s", "/bin/sleep")):
+                        h.Process(100, 2, os.getuid(), "s", "/bin/sleep"),
+                        h.Process(100, 2, os.getuid(), "s", "/bin/decset-rewrite")):
             with self.subTest(process=process), self.assertRaises(h.HandoffError):
                 h.source_allowed(process, "claude")
+
+    def proxy_table(self, *, node=False, agent="claude", command=None):
+        owner = h.Process(100, 2, os.getuid(), self.source.started, "/bin/decset-rewrite")
+        launcher = h.Process(120, 100, os.getuid(), self.source.started, "/bin/node")
+        native = h.Process(150, 120 if node else 100, os.getuid(), self.source.started,
+                           command or "/bin/" + agent)
+        caller = h.Process(200, 150, os.getuid(), self.caller.started, "/bin/zsh")
+        table = {p.pid: p for p in (owner, native, caller)}
+        if node:
+            table[launcher.pid] = launcher
+        return table
+
+    def use_codex(self):
+        self.args.agent = "codex"
+        root = self.home / "sessions"
+        root.mkdir()
+        self.transcript = root / ("rollout-2026-10-02-" + SOURCE_ID + ".jsonl")
+        self.transcript.write_text("{}\n")
+        self.args.transcript = str(self.transcript)
+
+    def test_proxy_ancestry_selects_native_codex_over_node_launcher(self):
+        self.use_codex()
+        for node in (False, True):
+            with self.subTest(node=node):
+                if self.planfile.exists():
+                    self.planfile.unlink()
+                table = self.proxy_table(node=node, agent="codex")
+                plan = self.make_plan(table)
+                self.assertEqual(plan["source"]["pid"], 150)
+                self.assertEqual(plan["owner"]["pid"], 100)
+                self.assertEqual([p["pid"] for p in plan["source_ancestors"]], [120] if node else [])
+                self.assertEqual(h.validate_plan(plan), (table[150], table[200]))
+
+    def test_claude_exe_native_and_proxy_accepted(self):
+        self.source = h.Process(100, 2, os.getuid(), self.source.started, "/bin/claude.exe")
+        plan = self.make_plan()
+        self.assertNotIn("owner", plan)
+        self.assertEqual(h.validate_plan(plan), (self.source, self.caller))
+        self.planfile.unlink()
+        plan = self.make_plan(self.proxy_table(command="/bin/claude.exe"))
+        self.assertEqual(plan["source"]["command"], "/bin/claude.exe")
+        h.validate_plan(plan)
+
+    def test_node_owner_prefers_native_child_and_keeps_owner_as_fallback(self):
+        table = self.proxy_table(node=True)
+        self.args.source_pid = 120
+        plan = self.make_plan(table)
+        self.assertEqual(plan["source"]["pid"], 150)
+        self.assertEqual(plan["owner"]["pid"], 120)
+        h.validate_plan(plan)
+        self.planfile.unlink()
+        table[150] = h.Process(150, 120, os.getuid(), self.source.started, "/bin/node")
+        plan = self.make_plan(table)
+        self.assertEqual(plan["source"]["pid"], 120)
+        self.assertNotIn("owner", plan)
+
+    def test_proxy_node_fallback_is_outermost_not_nearest_tool(self):
+        table = self.proxy_table(node=True)
+        table[150] = h.Process(150, 120, os.getuid(), self.source.started, "/bin/node")
+        plan = self.make_plan(table)
+        self.assertEqual(plan["source"]["pid"], 120)
+        h.validate_plan(plan)
+
+    def test_unknown_proxy_missing_native_wrong_uid_or_unrelated_caller_refused(self):
+        changes = [
+            (100, h.Process(100, 2, os.getuid(), self.source.started, "/bin/unknown-proxy")),
+            (150, h.Process(150, 100, os.getuid(), self.source.started, "/bin/sleep")),
+            (150, h.Process(150, 100, os.getuid() + 1, self.source.started, "/bin/claude")),
+            (200, h.Process(200, 2, os.getuid(), self.caller.started, "/bin/zsh")),
+        ]
+        for pid, replacement in changes:
+            with self.subTest(replacement=replacement):
+                table = self.proxy_table()
+                table[pid] = replacement
+                with patch.object(h, "process_table", return_value=table), self.assertRaises(h.HandoffError):
+                    h.prepare(self.args)
+                self.assertFalse(self.planfile.exists())
+
+    def test_saved_proxy_graph_or_identity_invalid_refused(self):
+        plan = self.make_plan(self.proxy_table(node=True))
+        invalid = [
+            {"owner": plan["owner"] | {"uid": os.getuid() + 1}},
+            {"owner": plan["owner"] | {"command": "/bin/unknown-proxy"}},
+            {"source": plan["source"] | {"command": "/bin/decset-rewrite"}},
+            {"source": plan["source"] | {"ppid": 987}},
+            {"source_ancestors": []},
+            {"source_ancestors": [plan["source"]]},
+        ]
+        for changed in invalid:
+            with self.subTest(changed=changed), self.assertRaises(h.HandoffError):
+                h.validate_plan(plan | changed)
+
+    def test_proxy_or_native_pid_reuse_refuses_before_or_after_live_scan(self):
+        table = self.proxy_table()
+        for pid in (100, 150):
+            replacement = h.Process(pid, table[pid].ppid, os.getuid(), "new start", table[pid].command)
+            changed = table | {pid: replacement}
+            for identities in ([changed], [table, changed]):
+                with self.subTest(pid=pid, identities=identities):
+                    if self.planfile.exists():
+                        self.planfile.unlink()
+                    imported, killed, attached, _ = self.flow(plan_table=table, identities=identities)
+                    with self.assertRaisesRegex(h.HandoffError, "identity changed"):
+                        h.run(str(self.planfile))
+                    killed.assert_not_called()
+                    imported.assert_not_called()
+                    attached.assert_not_called()
+
+    def test_proxy_row_verification_then_only_native_exact_pid_signaled(self):
+        table = self.proxy_table(node=True, command="/bin/claude.exe")
+        imported, killed, attached, wait = self.flow(plan_table=table)
+        with patch.object(h.os, "killpg") as kill_group:
+            h.run(str(self.planfile))
+        killed.assert_called_once_with(150, signal.SIGTERM)
+        kill_group.assert_not_called()
+        self.assertEqual([call.args for call in wait.call_args_list], [(table[200], 30), (table[150], 30)])
+        imported.assert_called_once()
+        attached.assert_called_once()
+        imported.reset_mock()
+        killed.reset_mock()
+        with patch.object(h, "process_table", return_value={}) as inspect:
+            h.run(str(self.planfile))
+        inspect.assert_not_called()
+        imported.assert_not_called()
+        killed.assert_not_called()
+
+    def test_proxy_shared_owner_or_target_row_refuses_signal(self):
+        table = self.proxy_table()
+        row = (100, SOURCE_ID, str(self.transcript), "interactive")
+        invalid = [[row, (100, IMPORTED_ID, "/other.jsonl", "interactive")],
+                   [(150, SOURCE_ID, str(self.transcript), "interactive")],
+                   [row, (987, SOURCE_ID, str(self.transcript), "interactive")]]
+        for rows in invalid:
+            with self.subTest(rows=rows):
+                if self.planfile.exists():
+                    self.planfile.unlink()
+                imported, killed, attached, _ = self.flow(plan_table=table, rows=[rows])
+                with self.assertRaises(h.HandoffError):
+                    h.run(str(self.planfile))
+                killed.assert_not_called()
+                imported.assert_not_called()
+                attached.assert_not_called()
+
+    def test_wait_exit_proxy_waits_for_native_without_signal(self):
+        self.args.wait_exit = True
+        table = self.proxy_table()
+        imported, killed, attached, wait = self.flow(plan_table=table, rows=[[]])
+        with patch.object(h.os, "killpg") as kill_group:
+            h.run(str(self.planfile))
+        self.assertEqual([call.args for call in wait.call_args_list], [(table[200], 30), (table[150], 600)])
+        killed.assert_not_called()
+        kill_group.assert_not_called()
+        imported.assert_called_once()
+        attached.assert_called_once()
 
     def test_uuid_and_store_mismatch_refused(self):
         self.args.id = SOURCE_ID.upper()

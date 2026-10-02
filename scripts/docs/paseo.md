@@ -52,6 +52,11 @@ without importing or stopping it.
 Automatic termination requires a source process belonging to the current user,
 in the invoking shell's ancestry, with matching live-session identity. A shared
 process owning other sessions is refused. A background session is refused.
+When the live listing identifies a `decset-rewrite` proxy or a Node launcher,
+the handoff resolves the native executable on the caller's ancestry. It retains
+the launcher's identity for the live-session checks and signals the native
+process, so a surviving child cannot keep writing the transcript. Both native
+`claude` and the pnpm-installed `claude.exe` are recognized.
 The worker uses SIGTERM for the exact validated PID, checks its start time to
 avoid signalling a reused PID, and waits for exit. Source termination never
 escalates to SIGKILL.
