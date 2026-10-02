@@ -11,6 +11,7 @@ has to sit exactly there.
 The explicit core load order is:
 
 - `helpers.lua`
+- `screens.lua`
 - `modal-mode.lua`
 - `alert/state.lua`, `alert/colors.lua`, `alert/markup.lua`,
   `alert/layout.lua`, `alert/render.lua`, `alert/api.lua`

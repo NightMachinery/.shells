@@ -58,19 +58,25 @@ local function screenUUID(screen)
     return nil
 end
 
+--- The prefs by UUID, and whether redis answered. This file loads before
+--- core/redis.lua, so the first build cannot read them at all.
 local function prefsAll()
-    if not redisGet then return {} end
+    if not redisGet then return {}, false end
     local raw, ok = redisGet("screen_prefs")
-    if not ok or type(raw) ~= "string" or raw == "" then return {} end
-    local decoded = hs.json.decode(raw)
-    if type(decoded) ~= "table" then return {} end
+    if not ok then return {}, false end
+    if type(raw) ~= "string" or raw == "" then return {}, true end
+    local okj, decoded = pcall(hs.json.decode, raw)
+    if not okj or type(decoded) ~= "table" then
+        print("Screens: screen_prefs is not a JSON object; ignored")
+        return {}, true
+    end
     local out = {}
     for k, v in pairs(decoded) do out[tostring(k):upper()] = v end
-    return out
+    return out, true
 end
 
 local function build()
-    local prefs = prefsAll()
+    local prefs, prefsRead = prefsAll()
     local records = {}
     for _, screen in ipairs(hs.screen.allScreens()) do
         records[#records + 1] = {
@@ -103,15 +109,19 @@ local function build()
             r.role = p.role
         end
     end
-    return records
+    return records, prefsRead
 end
 
---- Every attached screen, as records, left to right.
+--- Every attached screen, as records, left to right. A build made without
+--- the prefs (redis not up yet) is not kept, so roles set in screen_prefs
+--- apply as soon as redis answers rather than at the next display change.
+local cachePrefsRead = false
 function Screens.list()
-    if not cache then cache = build() end
+    if not (cache and cachePrefsRead) then cache, cachePrefsRead = build() end
     return cache
 end
 
+--- Call after editing screen_prefs; nothing watches the key.
 function Screens.invalidate()
     cache = nil
 end
