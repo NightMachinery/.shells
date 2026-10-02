@@ -54,8 +54,11 @@ end
 
 local hammerspoonCoreFiles = {
     "core/helpers.lua",
+    -- Before modal-mode.lua and everything else that picks a screen: the
+    -- screen registry, its watcher, and the one spec resolver.
+    "core/screens.lua",
     "modal-mode.lua",
-    -- After modal-mode.lua: reuses its screen watcher and targetScreens().
+    -- After modal-mode.lua: reuses its targetScreens(), which is core/screens.lua's.
     -- alert/ is one module in six files, listed rather than globbed so the
     -- order is visible here. state.lua first: it declares the AlertEngine
     -- table the rest hang off, and the alpha knob colors.lua bakes in.

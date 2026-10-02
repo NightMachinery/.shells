@@ -298,19 +298,24 @@ Hyper or Purple are active, then re-sync with the frontmost app after the
 global mode stack exits.
 
 Mode overlays are indicator groups (`ModalMode.createIndicatorGroup`): one
-canvas per target screen, cached per screen. `ModalMode.screenWatcher`
-invalidates the cached canvases whenever displays are added, removed, or
-rearranged, so overlay positions self-heal without an `hs.reload()`. Other
-modules can hook the same watcher with `ModalMode.onScreenChange(fn)` (the STT
-recording indicator does this).
+canvas per target screen, cached per screen. The screen registry,
+`core/screens.lua`, invalidates the cached canvases whenever displays are
+added, removed, or rearranged, so overlay positions self-heal without an
+`hs.reload()`. Other modules can hook the same event with
+`Screens.on("layout", fn)`, or its older name `ModalMode.onScreenChange(fn)`
+(the STT recording indicator does this). A visible group whose spec follows
+focus or the pointer is re-shown on every active-screen change too.
 
 Which screens an overlay appears on is controlled by the `overlayScreens`
-style key, resolved by `ModalMode.targetScreens`. Accepted values: `all` (every
-screen), `primary` (menu-bar screen), `internal` (built-in display),
-`all_external` (alias `external`), `active` (alias `main`; the screen with
-keyboard focus), and `mouse` (the screen containing the pointer). Specs that
-match no screen (e.g. `all_external` with no external attached, or `internal`
-in clamshell mode) fall back to the primary screen so the overlay is never
+style key, resolved by `Screens.target` (`ModalMode.targetScreens` is the old
+name for it). The specs name an intent where one exists: `all`, `primary`
+(menu-bar screen), `internal`, `external` (alias `all_external`), `active`
+(alias `main`; the focused window's screen), `pointer` (alias `mouse`),
+`typing` (where keyboard input goes), `working` (by `screens_working_policy`),
+and one screen by `uuid:<U>`, `id:<n>` or `role:<name>`. The full list, and why
+`main` here is not zsh's `main`, is in `docs/multi-monitor.md`. Specs that
+match no screen (e.g. `external` with no external attached, or `internal` in
+clamshell mode) fall back to the primary screen so the overlay is never
 invisible. App-scoped modes default to `primary`; pass `overlayScreens` in the
 mode's `overlay` table to change it. The Hyper banner defaults to `all` via the
 `hyper_overlay_screens` global in `core/hyper-mode.lua`, and the Purple banner
@@ -405,7 +410,9 @@ I clear it" — the engine clamps that to its own ceiling, so a caller that dies
 cannot leave a band on screen.
 
 It loads after `modal-mode.lua` because it reuses `ModalMode.targetScreens` and
-`ModalMode.onScreenChange` rather than running a second screen watcher. No
+`ModalMode.onScreenChange`, both `core/screens.lua`'s, rather than running a
+second screen watcher. An alert whose `screens` follows focus is re-rendered
+when the active screen changes. No
 canvas mouse events are registered, so every canvas is inert to the pointer and
 clicks pass through to whatever is underneath.
 

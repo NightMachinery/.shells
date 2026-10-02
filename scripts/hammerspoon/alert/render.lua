@@ -514,11 +514,21 @@ function AlertEngine.hookScreenChange()
         return
     end
     -- A monitor arriving or leaving would otherwise leave bands on the old
-    -- geometry, or missing from the new screen entirely. ModalMode already runs
+    -- geometry, or missing from the new screen entirely. core/screens.lua runs
     -- one screen watcher for every overlay in this config; do not start another.
     ModalMode.onScreenChange(function()
         if #alertEngineState.alerts > 0 then
             AlertEngine.render()
+        end
+    end)
+    -- An alert aimed at the focused window's screen (or the pointer's) has to
+    -- move when focus does, not on whatever render happens to come next.
+    Screens.on("active", function()
+        for _, alert in ipairs(alertEngineState.alerts) do
+            if Screens.specMoves(alert.screens) then
+                AlertEngine.render()
+                return
+            end
         end
     end)
     alertEngineState.hooked = true

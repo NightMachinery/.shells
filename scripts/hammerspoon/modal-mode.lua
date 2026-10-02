@@ -86,39 +86,15 @@ function ModalMode.positionedFrame(screenFrame, frame, position, margin)
     return frame
 end
 
+--- Both live in core/screens.lua now, which every module shares; these names
+--- stay so existing callers and console habits keep working. See the spec list
+--- there, and docs/multi-monitor.md.
 function ModalMode.screenIsInternal(screen)
-    return (screen:name() or ""):lower():match("built%-in") ~= nil
+    return Screens.screenIsInternal(screen)
 end
 
 function ModalMode.targetScreens(spec)
-    spec = spec or "all"
-
-    local screens
-    if spec == "all" then
-        screens = hs.screen.allScreens()
-    elseif spec == "primary" then
-        screens = { hs.screen.primaryScreen() }
-    elseif spec == "internal" then
-        screens = fnutils.filter(hs.screen.allScreens(), ModalMode.screenIsInternal)
-    elseif spec == "all_external" or spec == "external" then
-        screens = fnutils.filter(hs.screen.allScreens(), function(screen)
-            return not ModalMode.screenIsInternal(screen)
-        end)
-    elseif spec == "active" or spec == "main" then
-        screens = { hs.screen.mainScreen() }
-    elseif spec == "mouse" then
-        screens = { hs.mouse.getCurrentScreen() or hs.screen.mainScreen() }
-    else
-        print("ModalMode.targetScreens: unknown spec: " .. tostring(spec) .. " (falling back to 'all')")
-        screens = hs.screen.allScreens()
-    end
-
-    if #screens == 0 then
-        -- e.g., "internal" in clamshell mode, or "all_external" with no external attached
-        screens = { hs.screen.primaryScreen() }
-    end
-
-    return screens
+    return Screens.target(spec)
 end
 
 function ModalMode.updateIndicatorText(indicator, style, text, screen)
@@ -175,9 +151,11 @@ end
 ModalMode.indicatorGroups = ModalMode.indicatorGroups or {}
 
 function ModalMode.createIndicatorGroup(style)
-    -- One indicator canvas per screen in `style.overlayScreens` (see ModalMode.targetScreens).
+    -- One indicator canvas per screen in `style.overlayScreens` (see Screens.target).
     -- Canvases (and their frames) are cached per screen and rebuilt lazily after
-    -- ModalMode.screenWatcher invalidates them, so geometry never goes stale.
+    -- a layout change invalidates them, so geometry never goes stale. A spec
+    -- that follows focus or the pointer is re-resolved on every show, and on
+    -- every active-screen change while the group is visible.
     local defaultText = style.text or style.name or ""
     local group = { style = style, canvases = {}, screens = {}, text = defaultText, visible = false }
 
@@ -237,25 +215,25 @@ function ModalMode.createIndicatorGroup(style)
     return group
 end
 
-ModalMode.screenChangeCallbacks = ModalMode.screenChangeCallbacks or {}
-
+--- The screen watcher is core/screens.lua's; this is the old name for its
+--- `layout' event, kept for the modules that subscribe through it.
 function ModalMode.onScreenChange(fn)
-    table.insert(ModalMode.screenChangeCallbacks, fn)
+    Screens.on("layout", fn)
 end
 
-if not ModalMode.screenWatcher then
-    ModalMode.screenWatcher = hs.screen.watcher.new(function()
-        -- macOS can fire this several times per display change; invalidation is
-        -- idempotent and cheap, so no debouncing is needed.
-        for _, group in ipairs(ModalMode.indicatorGroups) do
-            group.invalidate()
+Screens.on("layout", function()
+    for _, group in ipairs(ModalMode.indicatorGroups) do
+        group.invalidate()
+    end
+end)
+
+Screens.on("active", function()
+    for _, group in ipairs(ModalMode.indicatorGroups) do
+        if group.visible and Screens.specMoves(group.style.overlayScreens) then
+            group.show()
         end
-        for _, fn in ipairs(ModalMode.screenChangeCallbacks) do
-            fn()
-        end
-    end)
-    ModalMode.screenWatcher:start()
-end
+    end
+end)
 
 function ModalMode.defaultStyle(o)
     o = o or {}
