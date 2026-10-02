@@ -2,7 +2,7 @@
 --- A display level -- brightness, contrast -- stepped from a held key, without
 --- letting the keypresses outrun the bus that carries them.
 ---
---- One DDC operation costs 200-380ms on this panel and a locked `chg' is a read
+--- One DDC operation costs 200-380ms on this panel and a locked step is a read
 --- plus a write, so ~600ms; key repeat is ~30ms. Firing one detached job per
 --- press used to overlap them ten to one, and unserialised DDC does not lose
 --- steps so much as invent them: ten concurrent decrements measured *one step
@@ -17,6 +17,19 @@
 --- new level in the same breath, which costs nothing extra -- the reply is what
 --- the band displays, and it makes the optimistic level self-correcting after
 --- every flush rather than drifting.
+---
+--- Which display a press steps is decided here, per press, and sent to zsh as
+--- id:<n> selectors (see core/screens.lua). It used to be left to zsh's
+--- default, `main', which is the menu-bar display: with the lid open that is
+--- the laptop panel, so the brightness keys stepped the laptop while you
+--- worked on the monitor, and the contrast keys did nothing at all, since the
+--- laptop has no contrast. The target is the screen named by the instance's
+--- `screens' knob, the active screen by default; a family that the target
+--- cannot do (contrast on the laptop) falls back to `fallbackScreens'.
+---
+--- Each target has its own flight state. A reading from one panel must never
+--- clamp, or be shown as, a step meant for another, and a reply that comes
+--- back after focus moved belongs to the display it was sent to.
 ---
 --- Written as a factory because brightness and contrast are the same problem on
 --- the same bus under the same lock, and every measurement above was taken
@@ -34,6 +47,7 @@
 --- `title' heads the band, `id' is the alert id it updates in place, `family'
 --- names the shell commands (<family>-inc, <family>-get), `knobPrefix' the
 --- globals, and `label' is what a failed garden call prints as.
+--- `internalOK' is false for a family the built-in panel cannot do.
 ---
 --- `dir' is the direction, not a boolean: the shell side is <family>-dec and
 --- <family>-inc, so that is what travels.
@@ -54,6 +68,10 @@ local kKnobDefaults = {
     --- reply is ~600ms behind the press, and being briefly uninformative beats
     --- being briefly wrong. Matched to the fastest of those writers.
     trust_seconds = 3,
+    --- A core/screens.lua spec: which display a press steps.
+    screens = "active",
+    --- Where a press goes when no target display can do this family.
+    fallback_screens = "external",
 }
 
 function levelStepperNew(opts)
@@ -70,53 +88,97 @@ function levelStepperNew(opts)
         return v
     end
 
-    --- The last reading off the panel, one entry per selected display, written
-    --- only ever from a reply. nil before the first one.
-    local reading = nil
-    --- When that came off the panel, for the trust window.
-    local readingAt = 0
-    --- The delta of the call currently out, and the delta accumulated since it
-    --- left. The reading plus both of those is where the panel is heading,
-    --- which is what the band shows: a reply only ever confirms the delta *it*
-    --- carried, so displaying the reading alone made the band jump back up
-    --- mid-hold and then down again as the next flush landed.
-    local sentDelta = 0
-    local pending = 0
-    --- True while a garden call is out. The whole serialisation is this flag.
-    local inFlight = false
+    --- Flight state per target, keyed by the target's ids ("2", "2,3").
+    ---   ids        CGDirectDisplayIDs, in band order
+    ---   names      display names, same order
+    ---   reading    the last reading per id, written only ever from a reply
+    ---   readingAt  when that came off the panel, for the trust window
+    ---   sentDelta  the delta of the call currently out
+    ---   pending    the delta accumulated since it left
+    ---   inFlight   true while a garden call is out
+    --- The reading plus both deltas is where the panel is heading, which is
+    --- what the band shows: a reply only ever confirms the delta *it* carried,
+    --- so displaying the reading alone made the band jump back up mid-hold and
+    --- then down again as the next flush landed.
+    local states = {}
+
+    --- The displays a press steps right now.
+    local function resolveTargets()
+        local recs = {}
+        for _, screen in ipairs(Screens.target(knob("screens"))) do
+            local r = Screens.record(screen)
+            if r and (opts.internalOK ~= false or not r.internal) then
+                recs[#recs + 1] = r
+            end
+        end
+        if #recs == 0 then
+            for _, screen in ipairs(Screens.target(knob("fallback_screens"))) do
+                local r = Screens.record(screen)
+                if r and (opts.internalOK ~= false or not r.internal) then
+                    recs[#recs + 1] = r
+                end
+            end
+        end
+        return recs
+    end
+
+    local function stateFor(recs)
+        local ids, names = {}, {}
+        for _, r in ipairs(recs) do
+            ids[#ids + 1] = tostring(r.cgid)
+            names[#names + 1] = r.name
+        end
+        local key = table.concat(ids, ",")
+        local st = states[key]
+        if not st then
+            st = { ids = ids, names = names, reading = nil, readingAt = 0,
+                   sentDelta = 0, pending = 0, inFlight = false }
+            states[key] = st
+        end
+        st.names = names
+        return st
+    end
 
     --- Nothing sent, nothing waiting: the panel is where the band says it is.
-    local function settled()
-        return sentDelta == 0 and pending == 0
+    local function settled(st)
+        return st.sentDelta == 0 and st.pending == 0
     end
 
-    local function outstanding()
-        return sentDelta + pending
+    local function outstanding(st)
+        return st.sentDelta + st.pending
     end
 
-    --- The reading, but only while it is still worth trusting. Every consumer
-    --- has to ask the same question: a reading too old for the band to show is
-    --- too old to suppress a write on the strength of. The clamp below used to
-    --- test only that a reading existed, which at the top of the range made a
-    --- stale 1.0 authoritative enough to swallow the keypress and not
-    --- authoritative enough to display -- so the band sat at the ellipsis and
-    --- never recovered.
-    local function trusted()
-        if not reading or #reading == 0 then return nil end
-        if (hs.timer.secondsSinceEpoch() - readingAt) > knob("trust_seconds") then
+    --- The reading, but only while it is still worth trusting, and only when
+    --- it covers every display of the target. Every consumer has to ask the
+    --- same question: a reading too old for the band to show is too old to
+    --- suppress a write on the strength of. The clamp below used to test only
+    --- that a reading existed, which at the top of the range made a stale 1.0
+    --- authoritative enough to swallow the keypress and not authoritative
+    --- enough to display -- so the band sat at the ellipsis and never
+    --- recovered.
+    local function trusted(st)
+        if not st.reading then return nil end
+        if (hs.timer.secondsSinceEpoch() - st.readingAt) > knob("trust_seconds") then
             return nil
         end
-        return reading
+        local levels = {}
+        for i, id in ipairs(st.ids) do
+            local v = st.reading[id]
+            if v == nil then return nil end
+            levels[i] = v
+        end
+        if #levels == 0 then return nil end
+        return levels
     end
 
     --- Where each display is heading, or nil when there is no reading worth
     --- trusting -- in which case the target is unknowable, however many presses
     --- are outstanding.
-    local function targets()
-        local levels = trusted()
+    local function targets(st)
+        local levels = trusted(st)
         if not levels then return nil end
 
-        local delta = outstanding()
+        local delta = outstanding(st)
         local out = {}
         for index, level in ipairs(levels) do
             out[index] = math.max(0, math.min(1, level + delta))
@@ -134,14 +196,19 @@ function levelStepperNew(opts)
     --- cannot be the ellipsis, which already means "no reading to trust", and it
     --- cannot be a region of the bar either: at 20 cells one cell is 5%, so the
     --- one to three steps typically outstanding would not move a single cell.
-    local function cue()
-        if settled() then return "" end
-        return outstanding() < 0 and " \u{2193}" or " \u{2191}"
+    local function cue(st)
+        if settled(st) then return "" end
+        return outstanding(st) < 0 and " \u{2193}" or " \u{2191}"
     end
 
-    local function bandShow()
-        local levels = targets()
-        local arrow = cue()
+    local function bandShow(st)
+        local levels = targets(st)
+        local arrow = cue(st)
+
+        --- The display's name heads the band, so with two screens it is never
+        --- a guess which one moved; with several rows each one is named.
+        local title = opts.title
+        if #st.names == 1 then title = title .. " \u{00B7} " .. st.names[1] end
 
         local text
         if not levels then
@@ -149,14 +216,15 @@ function levelStepperNew(opts)
             --- another writer may have moved the panel since. The cue still goes
             --- on, so a press is visibly doing something even when the level is
             --- not ours to report.
-            text = opts.title .. "\n" .. "\u{2026}" .. arrow
+            text = title .. "\n" .. "\u{2026}" .. arrow
         else
             local rows = {}
-            for _, level in ipairs(levels) do
-                rows[#rows + 1] = string.format("%s  %d%%%s",
-                    bar(level), math.floor(level * 100 + 0.5), arrow)
+            for i, level in ipairs(levels) do
+                local name = (#levels > 1) and ("  " .. (st.names[i] or "")) or ""
+                rows[#rows + 1] = string.format("%s  %d%%%s%s",
+                    bar(level), math.floor(level * 100 + 0.5), arrow, name)
             end
-            text = opts.title .. "\n" .. table.concat(rows, "\n")
+            text = title .. "\n" .. table.concat(rows, "\n")
         end
 
         --- flashSeconds 0 deliberately: a fullscreen wash on every step of a key
@@ -175,17 +243,41 @@ function levelStepperNew(opts)
         })
     end
 
+    --- Replies come back as "<cgid> <level>" lines, one per display, so a
+    --- display that failed to answer cannot shift the others' rows.
     local function parse(out)
         if not out or out == "" then return nil end
 
-        local levels = {}
+        local levels, any = {}, false
         for line in tostring(out):gmatch("[^\r\n]+") do
-            local n = tonumber((line:gsub("%s", "")))
-            if n then levels[#levels + 1] = math.max(0, math.min(1, n)) end
+            local id, v = line:match("^%s*(%d+)%s+(%S+)%s*$")
+            local n = tonumber(v)
+            if id and n then
+                levels[id] = math.max(0, math.min(1, n))
+                any = true
+            end
         end
 
-        if #levels == 0 then return nil end
+        if not any then return nil end
         return levels
+    end
+
+    --- One command, one round trip: step every display, then report where each
+    --- landed. The shell's own lock makes each step atomic against the
+    --- blackout loop and brightness-auto. With no step to make -- at either
+    --- end of the range, where the clamp takes the whole delta -- it is the
+    --- read alone, because the band still has to be told where the panel is.
+    local function command(st)
+        local parts = {}
+        if st.sentDelta ~= 0 then
+            for _, id in ipairs(st.ids) do
+                parts[#parts + 1] = string.format("%s-inc %.4f id:%s", opts.family, st.sentDelta, id)
+            end
+        end
+        for _, id in ipairs(st.ids) do
+            parts[#parts + 1] = string.format("ec \"%s $(%s-get id:%s 2>/dev/null)\"", id, opts.family, id)
+        end
+        return table.concat(parts, " ; ")
     end
 
     local flush
@@ -193,67 +285,69 @@ function levelStepperNew(opts)
     --- `readIfIdle' asks for a bare reading when there is no delta to send and
     --- nothing the band would trust. Only a keypress passes it; the tail call
     --- below must not, or a read that keeps failing would spin.
-    flush = function(readIfIdle)
-        if inFlight then return end
-        if pending == 0 then
+    flush = function(st, readIfIdle)
+        if st.inFlight then return end
+        if st.pending == 0 then
             --- Nothing to write. Bail out if the band already has a level it
             --- would show, or if this was not a keypress; otherwise fall
             --- through to ask.
-            if targets() or not readIfIdle then return end
+            if targets(st) or not readIfIdle then return end
         end
 
-        sentDelta = pending
-        pending = 0
-        inFlight = true
+        st.sentDelta = st.pending
+        st.pending = 0
+        st.inFlight = true
 
-        --- One command, one round trip: step, then report where that landed.
-        --- The shell's own lock makes the pair atomic against the blackout loop
-        --- and brightness-auto. With no step to make -- at either end of the
-        --- range, where the clamp takes the whole delta -- it is the read
-        --- alone, because the band still has to be told where the panel is.
-        local cmd = sentDelta ~= 0
-            and string.format("%s-inc %.4f ; %s-get", opts.family, sentDelta, opts.family)
-            or (opts.family .. "-get")
-        brishz_eval_out_hs(cmd, function(out)
-            inFlight = false
+        brishz_eval_out_hs(command(st), function(out)
+            st.inFlight = false
             --- Whatever it carried is either in the reading below or lost with
             --- the call; either way it is no longer outstanding.
-            sentDelta = 0
+            st.sentDelta = 0
 
             local levels = parse(out)
             if levels then
-                reading = levels
-                readingAt = hs.timer.secondsSinceEpoch()
+                st.reading = levels
+                st.readingAt = hs.timer.secondsSinceEpoch()
             else
                 --- The call failed, so we cannot say whether its write landed.
                 --- The old reading is no longer something to vouch for.
-                reading = nil
+                st.reading = nil
             end
 
-            bandShow()
+            bandShow(st)
             --- Whatever was pressed while that was out.
-            flush()
+            flush(st)
         end, opts.label)
     end
 
     local function step(dir)
+        local recs = resolveTargets()
+        if #recs == 0 then
+            alert_gateway(opts.title .. "\nno display here can do this", {
+                id = opts.id, seconds = knob("band_seconds"), flashSeconds = 0,
+                screens = "all", peek = false,
+            })
+            return
+        end
+        local st = stateFor(recs)
+
         local delta = (dir == "dec") and -knob("step") or knob("step")
 
-        pending = pending + delta
+        st.pending = st.pending + delta
 
         --- Hold the key past either end and the accumulator would otherwise run
         --- off to -0.5 while the panel sat at 0, so the first press back up
         --- would need forty more before anything moved. Clamped against the
         --- first display: with one panel that is exact, and with several it is
         --- the best a single scalar accumulator can do.
-        local levels = trusted()
+        local levels = trusted(st)
         if levels and levels[1] then
-            local base = levels[1] + sentDelta
-            pending = math.max(-base, math.min(1 - base, pending))
+            local base = levels[1] + st.sentDelta
+            st.pending = math.max(-base, math.min(1 - base, st.pending))
         end
 
-        bandShow()
-        flush(true)
+        bandShow(st)
+        flush(st, true)
     end
 
     return { step = step }

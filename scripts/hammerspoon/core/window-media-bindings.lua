@@ -88,11 +88,18 @@ hyper_bind_v1("f5", function() inputMuteToggle() end)
 -- its header. Brightness and contrast are the same problem on the same bus
 -- under the same lock, so they are two instances of it rather than two copies.
 --
--- The knobs it seeds, per instance and live-editable from the console:
---   hyper_brightness_step           hyper_contrast_step           0.01
---   hyper_brightness_band_seconds   hyper_contrast_band_seconds   1.5
---   hyper_brightness_bar_cells      hyper_contrast_bar_cells      20
---   hyper_brightness_trust_seconds  hyper_contrast_trust_seconds  3
+-- Both act on the active screen's display, the one with the focused window,
+-- resolved per press through core/screens.lua. Contrast on the laptop panel,
+-- which has none, goes to the external displays instead.
+--
+-- The knobs it seeds, per instance and live-editable from the console; their
+-- defaults are kKnobDefaults in core/level-stepper.lua:
+--   hyper_brightness_step              hyper_contrast_step
+--   hyper_brightness_band_seconds      hyper_contrast_band_seconds
+--   hyper_brightness_bar_cells         hyper_contrast_bar_cells
+--   hyper_brightness_trust_seconds     hyper_contrast_trust_seconds
+--   hyper_brightness_screens           hyper_contrast_screens
+--   hyper_brightness_fallback_screens  hyper_contrast_fallback_screens
 local brightnessStepper = levelStepperNew{
     title = "Brightness",
     id = "hyper-brightness",
@@ -107,6 +114,8 @@ local contrastStepper = levelStepperNew{
     family = "contrast",
     knobPrefix = "hyper_contrast_",
     label = "hyperContrastStep",
+    -- IOKit has no contrast, so the built-in panel is never a target.
+    internalOK = false,
 }
 
 --- Globals, because core/blackout-lock.lua's chord tap calls them by name and

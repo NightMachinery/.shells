@@ -734,7 +734,7 @@ hyper+F1/F2 steps brightness and hyper+ctrl+F1/F2 steps contrast. Both are
 presses like it drops the blackout chords.
 
 The stepper exists because the keys outrun the bus they drive. One DDC
-operation costs 200-380ms on this panel and a locked `chg` is a read plus a
+operation costs 200-380ms on this panel and a locked step is a read plus a
 write, so about 600ms; key repeat is about 30ms. One detached job per press
 overlapped them ten to one, and unserialised DDC does not lose steps so much as
 invent them: ten concurrent decrements once measured *one step brighter* than
@@ -751,12 +751,37 @@ the optimistic level self-correcting after every flush rather than drifting.
 Brightness and contrast are one instance each because they are the same problem
 on the same bus under the same lock: every measurement above was taken against
 the bus, not against either axis. The knobs are per instance and live-editable
-from the console, read at press time rather than at load:
+from the console, read at press time rather than at load; their defaults are
+`kKnobDefaults` in `core/level-stepper.lua`:
 
-    hyper_brightness_step           hyper_contrast_step           0.01
-    hyper_brightness_band_seconds   hyper_contrast_band_seconds   1.5
-    hyper_brightness_bar_cells      hyper_contrast_bar_cells      20
-    hyper_brightness_trust_seconds  hyper_contrast_trust_seconds  3
+    hyper_brightness_step              hyper_contrast_step
+    hyper_brightness_band_seconds      hyper_contrast_band_seconds
+    hyper_brightness_bar_cells         hyper_contrast_bar_cells
+    hyper_brightness_trust_seconds     hyper_contrast_trust_seconds
+    hyper_brightness_screens           hyper_contrast_screens
+    hyper_brightness_fallback_screens  hyper_contrast_fallback_screens
+
+### Which display a press steps
+
+The active screen's, the one with the focused window, resolved on every press
+through `core/screens.lua` and sent to zsh as `id:<n>`. The `*_screens` knob
+takes any screen spec, so `hyper_contrast_screens = "pointer"` makes contrast
+follow the mouse instead. A display the family cannot drive is skipped. That
+only matters for contrast on the laptop panel, which has none, and those
+presses go to `*_fallback_screens`, the external displays.
+
+This used to be left to zsh's default selector, `main`. That is the menu-bar
+display, which with the lid open is the laptop panel. So the brightness keys
+stepped the laptop while you worked on the monitor, and the contrast keys did
+nothing at all, because `contrast-inc-internal` does not exist. The band said
+"…" and nothing else.
+
+Every target has its own flight state: reading, trust window, pending and sent
+deltas. A reading from one panel never clamps a step meant for another, and a
+reply that lands after focus moved still belongs to the display it was sent to.
+Each reply line is `<id> <level>`, so a display that does not answer cannot
+shift the other rows. With one display the band's title names it
+(`Contrast · PHL 279P1`); with several, each row carries its display's name.
 
 `trust_seconds` is how long a reading off the panel is worth believing. The
 cache is authoritative only until something else writes, and three other things
