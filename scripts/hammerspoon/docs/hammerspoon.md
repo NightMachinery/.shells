@@ -811,7 +811,7 @@ deltas. A reading from one panel never clamps a step meant for another, and a
 reply that lands after focus moved still belongs to the display it was sent to.
 Each reply line is `<id> <level>`, so a display that does not answer cannot
 shift the other rows. With one display the band's title names it
-(`Contrast · PHL 279P1`); with several, each row carries its display's name.
+(`Contrast · <display name>`); with several, each row carries its display's name.
 
 `trust_seconds` is how long a reading off the panel is worth believing. The
 cache is authoritative only until something else writes, and three other things
