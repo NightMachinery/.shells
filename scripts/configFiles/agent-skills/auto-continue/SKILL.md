@@ -1,6 +1,6 @@
 ---
 name: auto-continue
-description: Arm this session to resume itself when its usage limit resets. Registers the current session with a watcher that polls the account's usage and, once it is blocked, types Continue. into this session after the reset. Use when the user types /auto-continue, /auto-continue off or /auto-continue status.
+description: Arm this session to resume itself when its usage limit resets. Registers the current session with a watcher that polls the account's usage and, once it is blocked, sends Continue. to this session after the reset, through Paseo when running there. Use when the user types /auto-continue, /auto-continue off or /auto-continue status.
 argument-hint: "[off|status|--frontmost]"
 ---
 
@@ -27,12 +27,17 @@ variant; report it.
 ## What to say
 
 Relay the command's output verbatim — the scope, the target (something like
-`tmux:%3`, `kitty:12` or `codex:<thread>`) and the poll interval are the facts
+`tmux:%3`, `kitty:12`, `codex:<thread>` or `paseo:<agent-id>`) and the poll interval are the facts
 the user wants, so do not paraphrase them. A gray line saying usage is already
 possible is expected: it is the first check, and it means the account's usage
 could be read.
 
-Then, once, in one or two sentences: a watcher now polls this account's usage;
+For a Paseo target, explain once that its own quota-failed turn is watched and
+resumed through Paseo when its bound profile has usable quota. No keyboard
+idle gate applies, and `/auto-continue off` disables it. Do not promise a
+terminal watcher or a scheduled deadline for Paseo.
+
+For other targets, once, in one or two sentences: a watcher now polls this account's usage;
 when it is blocked, a job is armed for the reset that types `Continue.` into
 this session, but only if the keyboard has been idle for a while — otherwise a
 notification is sent instead. `/auto-continue off` undoes it.
