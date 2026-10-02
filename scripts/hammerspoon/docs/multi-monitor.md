@@ -182,20 +182,38 @@ Screens.target("role:laptop")[1]:name()
 
 ## Follow-ups and open questions
 
-Unmeasured, because the work was written while a blackout was running and
-nothing could be reloaded or shown:
+Measured after the reload (2026-10-02; macOS 14.3.1, Hammerspoon 1.1.1, the
+laptop panel plus one monitor):
 
-- **Does `newWithActiveScreen` report focus moving between screens?** Its
-  documentation says it reports active-screen changes, but whether a click or
-  hyper+; from one screen to the other fires it has not been checked. If it
-  does not, overlays with a moving spec move only on their next show.
-- **Does kitty move a live panel on macOS?** kitty's help says that on Wayland
-  a panel's output is fixed at creation. If macOS behaves the same, the panel
-  has to be recreated on the new screen, which means moving its tabs out and
-  back.
-- **Everything else in the live checklist**: each level key with focus on each
-  screen, an F1/F2 blackout cycle, cursorHide and avy on the monitor, an
-  app-mode overlay following focus.
+- **The registry and specs.** `Screens.list()` gave the laptop as `laptop`
+  and the monitor as `external-1`, both with UUIDs. Every spec resolved to the
+  screen it should, with focus on the monitor and the pointer on the laptop,
+  and an unknown spec fell back to both screens.
+- **The contrast keys.** One `hyperContrastStep("inc")` and one `"dec"` from
+  the console, with focus on the monitor, moved its contrast 51, 52, 51, and
+  `ddc.log` recorded both `set` calls with their callers.
+- **`newWithActiveScreen` reports focus moving between screens.** A
+  subscriber on `active` fired once when focus went from the monitor to the
+  laptop, with no display change. So overlays with a moving spec follow focus.
+- **kitty accepts the move.** kitty 0.48.2 answered ok to the incremental
+  `os-panel` call on a live panel, in about 20 ms.
+
+Still unmeasured:
+
+- **Does the kitty panel actually change screens?** The call succeeds, but
+  every show so far was on the screen the panel was already on. kitty's help
+  says that on Wayland a panel's output is fixed at creation. If macOS behaves
+  the same, the panel has to be recreated on the new screen, which means
+  moving its tabs out and back.
+- **The new blackout restore.** The blackout that ended before the reload was
+  restored by the old code, so the UUID rows, the last-good fallback and the
+  floors (see `docs/external-display-brightness.md`) have been tested only
+  against fake m1ddc and brightness binaries. One F1/F2 cycle would settle
+  it.
+- **The keys that move focus and the pointer**: hyper+; and hyper+shift+;,
+  `cursorHide` and avy on the monitor, an app-mode overlay following focus.
+  They were left for a real press, because driving them from a script takes
+  over the screen.
 
 Known gaps:
 

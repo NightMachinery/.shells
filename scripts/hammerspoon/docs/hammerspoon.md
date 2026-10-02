@@ -1632,10 +1632,12 @@ socket that is the payload `{action: "os-panel", incremental: true, os_panel:
 ["output-name=<name>"]}`, captured from `kitten @` on a fake socket. A failed
 move is printed to the console, not banded, and the panel is shown where it
 is. Two identical monitors share a name; which of them kitty picks then is
-untested. kitty's help says that on Wayland the output can be set only at creation; whether a
-live panel actually moves on macOS has **not been measured yet**. If it does
-not, the fallback is to recreate the panel on the new screen, which means
-moving its tabs out and back in.
+untested. kitty's help says that on Wayland the output can be set only at
+creation. On macOS kitty 0.48.2 accepts the move on a live panel: it answered
+ok, in about 20 ms, on a real press (2026-10-02). Whether the panel then shows
+on the other screen has **not been measured yet**. If it does not, the
+fallback is to recreate the panel on the new screen, which means moving its
+tabs out and back in.
 
 In window mode `kittyWindowToggle` shows kitty's normal window maximized on
 the screen the mouse is on, and hides it on the next press. From a fullscreen
