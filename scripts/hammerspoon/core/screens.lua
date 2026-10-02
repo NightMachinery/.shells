@@ -305,4 +305,91 @@ local kMovingSpecs = { active = true, main = true, typing = true, mouse = true, 
 function Screens.specMoves(spec)
     return kMovingSpecs[spec or "all"] == true
 end
+
+--- ** Moving focus between screens
+--- hyper+; and hyper+shift+; (bound in core/app-hotkeys.lua). Screens are
+--- taken left to right and wrap, so with two it is a toggle and with more it
+--- walks across them.
+---
+--- Focus and the pointer move together. Half of this config follows the
+--- focused window's screen and half the pointer's (see the spec list above),
+--- and a keyboard jump that left the pointer behind would send the next
+--- pointer-side action -- avy with screens_working_policy=pointer, a click --
+--- back to the screen just left.
+
+local kFocusBandId = "screen-focus"
+
+local function focusBand(screen, text)
+    alert_gateway(text, {
+        id = kFocusBandId,
+        seconds = 0.8,
+        flashSeconds = 0,
+        screens = "id:" .. tostring(screen:id()),
+        peek = false,
+    })
+end
+
+local function centreOf(frame)
+    return hs.geometry.point(frame.x + frame.w / 2, frame.y + frame.h / 2)
+end
+
+--- Front to back, the standard visible windows on `screen'.
+local function windowsOn(screen)
+    local out, id = {}, screen:id()
+    for _, w in ipairs(hs.window.orderedWindows()) do
+        local s = w:screen()
+        if s and s:id() == id and w:isStandard() and w:isVisible() then
+            out[#out + 1] = w
+        end
+    end
+    return out
+end
+
+--- Focus the frontmost window on the next screen. With no window there,
+--- nothing can take focus -- macOS focuses windows, not screens -- so the
+--- pointer goes over anyway and the band says so; faking it by focusing the
+--- Finder desktop moves focus somewhere unpredictable.
+function Screens.focusNext(delta)
+    local from = hs.screen.mainScreen() or hs.mouse.getCurrentScreen()
+    local to = Screens.neighbour(from, delta or 1)
+    if not to or (from and to:id() == from:id()) then
+        focusBand(to or hs.screen.primaryScreen(), "only one screen")
+        return
+    end
+    local r = Screens.record(to)
+    local name = r and r.name or "?"
+
+    local w = windowsOn(to)[1]
+    if w then
+        w:focus()
+        hs.mouse.absolutePosition(centreOf(w:frame()))
+        focusBand(to, "\u{2192} " .. name)
+    else
+        hs.mouse.absolutePosition(centreOf(to:frame()))
+        focusBand(to, "no windows on " .. name)
+    end
+end
+
+--- Move the focused window to the next screen, keeping its frame relative
+--- to the screen (hs.window:moveToScreen scales it) and clamped inside it,
+--- then focus it there and bring the pointer along.
+function Screens.moveWindowNext(delta)
+    local w = hs.window.focusedWindow()
+    if not w then
+        focusBand(hs.screen.mainScreen() or hs.screen.primaryScreen(), "no focused window")
+        return
+    end
+    local from = w:screen()
+    local to = Screens.neighbour(from, delta or 1)
+    if not to or to:id() == from:id() then
+        focusBand(from, "only one screen")
+        return
+    end
+
+    w:moveToScreen(to, false, true, 0)
+    w:focus()
+    hs.mouse.absolutePosition(centreOf(w:frame()))
+    local r = Screens.record(to)
+    focusBand(to, "\u{2192} " .. (r and r.name or "?") .. "  (moved " .. (w:application() and w:application():name() or "window") .. ")")
+end
 --- @end

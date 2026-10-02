@@ -412,12 +412,19 @@ appHotkey{
 -- appHotkey{ key='m', appName='com.google.Chrome.app.ahiigpfcghkbjfcibpojancebdfjmoop' } -- https://devdocs.io/offline ; 'm' is also set as a search engine in Chrome
 -- appHotkey{ key='m', appName='com.kapeli.dashdoc' } -- dash can bind itself in its pref
 appHotkey{
-    key=';',
+    -- Was hyper+;, which now moves focus between screens (below).
+    key='y',
     appName={
         'chat.delta.desktop.electron',
         'com.microsoft.Excel',
     }
 }
+
+-- hyper+; focuses the next screen's frontmost window, hyper+shift+; moves the
+-- focused window to the next screen; both bring the pointer along. Screens go
+-- left to right and wrap. See Screens.focusNext in core/screens.lua.
+hyper_bind_v2{ key=';', pressedfn=function() Screens.focusNext(1) end }
+hyper_bind_v2{ key=';', mods={'shift'}, pressedfn=function() Screens.moveWindowNext(1) end }
 
 -- appHotkey{ key='c', appName='com.microsoft.VSCodeInsiders' }
 -- appHotkey{ key='c', appName='com.apple.Terminal' }

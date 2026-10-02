@@ -96,6 +96,20 @@ is still frontmost would let macOS choose again. When the target is kitty in
 panel mode, it comes back through `kittyPanelShow`, since kitty activating
 shows nothing by itself. With no target the app is simply hidden.
 
+### Moving between screens: hyper+; and hyper+shift+;
+
+hyper+; focuses the frontmost window on the next screen, and hyper+shift+;
+moves the focused window to the next screen, scaled to keep its place, and
+focuses it there. Screens are taken left to right and wrap, so with two it is a
+toggle. Both move the pointer to the window too, because some of this config
+follows the focused screen and some follows the pointer, and leaving the
+pointer behind would send the next pointer-side action back. A short band on
+the target screen names it. A screen with no window cannot take focus (macOS
+focuses windows, not screens), so the pointer goes there anyway and the band
+says "no windows on" it. hyper+; used to be the Delta Chat / Excel app hotkey,
+which is now hyper+y. The code is `Screens.focusNext` and
+`Screens.moveWindowNext` in `core/screens.lua`; see `docs/multi-monitor.md`.
+
 ## The ipc print recursion fix
 
 `hs -c` used to wedge whenever anything printed to the Hammerspoon console
