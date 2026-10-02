@@ -1616,6 +1616,26 @@ was focused by hand. The window level is
 Spotlight at 23 and Handy at 25. 3 never came up over a fullscreen space. It
 applies only to panels created after the config is loaded.
 
+With more than one display, the panel shows on the screen named by the Lua
+global `kitty_panel_screens`, a `core/screens.lua` spec resolved at every
+show (default `working`, the focused window's screen; `false` leaves the
+panel wherever kitty put it). kitty names a panel's screen by `output-name`,
+which on macOS is the screen's localized name, the same string as
+`hs.screen:name()`; `kitten panel --output-name list` prints them. A new
+panel gets `--os-panel output-name=<name>` at creation. An existing one gets
+`resize-os-window --action=os-panel --incremental output-name=<name>`
+before the `show`, only when the wanted screen differs from the one this file
+last gave it, so a show on the same screen costs no extra call; a display
+change forgets that, since macOS may have moved the panel itself. Over the
+socket that is the payload `{action: "os-panel", incremental: true, os_panel:
+["output-name=<name>"]}`, captured from `kitten @` on a fake socket. A failed
+move is printed to the console, not banded, and the panel is shown where it
+is. Two identical monitors share a name; which of them kitty picks then is
+untested. kitty's help says that on Wayland the output can be set only at creation; whether a
+live panel actually moves on macOS has **not been measured yet**. If it does
+not, the fallback is to recreate the panel on the new screen, which means
+moving its tabs out and back in.
+
 In window mode `kittyWindowToggle` shows kitty's normal window maximized on
 the screen the mouse is on, and hides it on the next press. From a fullscreen
 app a press switches to kitty's desktop and a second press switches back,

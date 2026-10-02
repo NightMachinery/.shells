@@ -32,6 +32,11 @@ local kittyPanelClass = "kitty-panel"
 -- variable $kitty_panel_fold_strays; set it here or from the console.
 kitty_panel_fold_strays = kitty_panel_fold_strays or false
 
+-- The screen the panel shows on: a core/screens.lua spec, resolved at every
+-- show, or false to leave the panel wherever kitty put it. The default,
+-- "working", is the focused window's screen (see screens_working_policy).
+if kitty_panel_screens == nil then kitty_panel_screens = "working" end
+
 -- Running tasks, sockets and pending timers are pinned with hsPin and
 -- hsAfter (core/helpers.lua), so they are neither collected before their
 -- callbacks fire nor kept forever afterwards.
@@ -223,23 +228,53 @@ local function kittyPanelFold(sock, st, freshTab, cb)
     nextTab()
 end
 
+--- ** Which screen the panel is on
+--
+-- kitty names a panel's screen by `output-name', which on macOS is the
+-- screen's localized name, the same string as hs.screen:name() (`kitten
+-- panel --output-name list' prints them). Two identical monitors share a
+-- name; which of them kitty picks then is untested.
+--
+-- kittyPanelOutput is the output this file last gave the panel, so a show
+-- on the same screen costs nothing extra; nil means unknown (a reload, or a
+-- display change, after which macOS may have moved the panel itself).
+local kittyPanelOutput = nil
+
+-- The output name the panel should be on now, or nil to leave it alone.
+local function kittyPanelWantedOutput()
+    if not (kitty_panel_screens and Screens) then return nil end
+    local s = Screens.target(kitty_panel_screens)[1]
+    return s and s:name()
+end
+
+if Screens then Screens.on("layout", function() kittyPanelOutput = nil end) end
+
 -- `edge=center' covers the display; the window level comes from
 -- `macos_ns_window_layer' in kitty.conf (above every window in the space,
 -- below Spotlight and Handy). Nothing here may focus anything: focusing a
 -- hidden panel activates kitty on the desktop space before `show' has joined
 -- the current one. That is kittyPanelShow's job, after the show.
 local function kittyPanelCreate(sock, cb)
-    kitten(sock, { "launch", "--type=os-panel",
+    local output = kittyPanelWantedOutput()
+    local argv = { "launch", "--type=os-panel",
                    "--os-panel", "edge=center",
                    "--os-panel", "layer=top",
-                   "--os-panel", "focus-policy=on-demand",
-                   "--os-window-class", kittyPanelClass,
-                   "--dont-take-focus" },
+                   "--os-panel", "focus-policy=on-demand" }
+    if output then
+        table.insert(argv, "--os-panel")
+        table.insert(argv, "output-name=" .. output)
+    end
+    for _, a in ipairs({ "--os-window-class", kittyPanelClass, "--dont-take-focus" }) do
+        table.insert(argv, a)
+    end
+
+    kitten(sock, argv,
            function(ok, out, err)
                if not ok then return cb(nil, nil, "could not create the panel: " .. err) end
 
                local fresh = tonumber((out:gsub("%s+", "")))
                if not fresh then return cb(nil, nil, "launch printed no window id: " .. out) end
+               kittyPanelOutput = output
 
                -- A new panel counts as shown for kitty, so a first `show'
                -- would be a no-op while macOS has put it on the desktop space
@@ -335,13 +370,26 @@ local function kittyPanelShowSlow(done)
     kittyPanelEnsure(function(sock, st, err)
         if not sock then return done(err) end
 
-        kitten(sock, { "resize-os-window", "--match", kittyMatchID(st.win), "--action=show" }, function(ok, _, err2)
-            if not ok then return done("show: " .. err2) end
-            if not st.active then return done() end
+        local function show()
+            kitten(sock, { "resize-os-window", "--match", kittyMatchID(st.win), "--action=show" }, function(ok, _, err2)
+                if not ok then return done("show: " .. err2) end
+                if not st.active then return done() end
 
-            kitten(sock, { "focus-window", "--match", kittyMatchID(st.active) }, function(ok2, _, err3)
-                done((not ok2) and ("focus: " .. err3) or nil)
+                kitten(sock, { "focus-window", "--match", kittyMatchID(st.active) }, function(ok2, _, err3)
+                    done((not ok2) and ("focus: " .. err3) or nil)
+                end)
             end)
+        end
+
+        -- A failed move is only printed, not banded, and the panel shown
+        -- where it is: the wrong screen beats no panel.
+        local output = kittyPanelWantedOutput()
+        if not output or output == kittyPanelOutput then return show() end
+        kitten(sock, { "resize-os-window", "--match", kittyMatchID(st.win), "--action=os-panel",
+                       "--incremental", "output-name=" .. output }, function(ok, _, err2)
+            if ok then kittyPanelOutput = output
+            else print("kittyPanel: move to " .. output .. ": " .. err2) end
+            show()
         end)
     end)
 end
@@ -531,15 +579,30 @@ function kittyPanelShow(label)
         if not st then return slow(why) end
         if kitty_panel_fold_strays and #st.strays > 0 then return slow() end
 
-        kittyRC(path, "resize-os-window", { match = kittyMatchID(st.win), action = "show" }, function(ok, err)
-            mark("show")
-            if not ok then return slow(err) end
-            if not st.active then return done() end
-            kittyRC(path, "focus-window", { match = kittyMatchID(st.active) }, function(ok2, err2)
-                mark("focus")
-                if not ok2 then return slow(err2) end
-                done()
+        local function show()
+            kittyRC(path, "resize-os-window", { match = kittyMatchID(st.win), action = "show" }, function(ok, err)
+                mark("show")
+                if not ok then return slow(err) end
+                if not st.active then return done() end
+                kittyRC(path, "focus-window", { match = kittyMatchID(st.active) }, function(ok2, err2)
+                    mark("focus")
+                    if not ok2 then return slow(err2) end
+                    done()
+                end)
             end)
+        end
+
+        -- The payload `kitten @ resize-os-window --action=os-panel
+        -- --incremental output-name=X' sends (captured on a fake socket).
+        -- A failed move is only printed and the panel shown where it is.
+        local output = kittyPanelWantedOutput()
+        if not output or output == kittyPanelOutput then return show() end
+        kittyRC(path, "resize-os-window", { match = kittyMatchID(st.win), action = "os-panel", incremental = true,
+                                            os_panel = { "output-name=" .. output } }, function(ok, err)
+            mark("move")
+            if ok then kittyPanelOutput = output
+            else print("kittyPanel: " .. label .. ": move to " .. output .. ": " .. tostring(err)) end
+            show()
         end)
     end, mark)
 end
