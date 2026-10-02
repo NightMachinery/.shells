@@ -13,6 +13,17 @@ The installer explicitly uses [agfi:npm-install-npm]. The general
 installed this package on this machine. No change to the general installer is
 required. See [global npm installation issues](npm-global-installs.md).
 
+## Official agent skills
+
+The upstream [`paseo` skill](https://github.com/getpaseo/paseo/tree/main/skills/paseo)
+and its `paseo-help` companion are installed under
+`~/code/skills/paseo/skills/`. [agfi:agent-skills-link] exposes these sources to
+Codex, the installed Claude profiles, and Antigravity without copying them.
+Use `paseo` for agent/workspace operations and `paseo-help` for product questions
+and troubleshooting. These are upstream skills, separate from [agfi:2paseo].
+
+## Terminal handoff
+
 Run this from Claude Code's shell shortcut, or a shell inside Codex:
 
 ```zsh

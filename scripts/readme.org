@@ -72,6 +72,8 @@ Ambiguous ownership saves the report but refuses automatic termination;
 session, =! 2paseo= transfers the saved conversation to the local Paseo daemon
 and attaches its output in tmux. See [[NIGHTDIR:docs/paseo.md][Paseo handoff]] for
 process checks, terminal-proxy handling, profiles, and manual-exit controls.
+The official =paseo= and =paseo-help= skills are installed in the shared
+standalone skill-source layout and linked into the agents' skill directories.
 
 Selected Zsh directories under =./zshlang/= can be structured as public plugins while remaining the local source of truth. Plugin entrypoint files named =*.plugin.zsh= should stay thin loaders; implementation should live in modular =*.zsh= files.
 
