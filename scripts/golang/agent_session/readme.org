@@ -33,6 +33,7 @@ agent_session claude handoff -mode native -cwd "$PWD" source.jsonl -- --model gp
 agent_session claude handoff -mode compact -cwd "$PWD" source.jsonl -- --config 'model_reasoning_effort="high"'
 agent_session claude compact-result compact-stream.jsonl expected-session-id
 agent_session codex handoff-export source-rollout.jsonl
+agent_session codex handoff-claude -cwd "$PWD" -config-home "$HOME/.claude" -history full-history.md
 #+end_src
 
 =handoff= writes only the exact destination thread UUID to stdout after success;
@@ -79,6 +80,16 @@ exports encrypted or raw reasoning. A discovered child's malformed transcript
 fails the export; a child whose missing/corrupt metadata cannot be associated
 with the parent cannot be discovered. Attached media remain subject to the
 existing text renderer's representation.
+
+=handoff-claude= seeds a new private native Claude transcript from the full
+readable archive, with a fresh UUID and linked user/assistant records. The
+assistant's single text block preserves the archive verbatim; historical tools
+are never native executable blocks. It returns only the absolute destination
+path, never overwrites an existing session, and makes no model call. The zsh
+compact reverse handoff must then run and verify Claude's own =/compact= before
+resuming that same UUID. The complete archive remains for recovery. This path
+uses Claude's destination model/context limits and fails on oversized history
+instead of truncating it.
 
 The JSON-RPC client queues notifications received before their response,
 correlates request IDs and rejects every server request. Deadlines and SIGINT

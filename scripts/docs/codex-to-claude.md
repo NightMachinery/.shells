@@ -9,6 +9,9 @@ than trying to feed compacted Codex items to Claude.
 codex-to-claude <transcript-or-session-id> [claude options...]
 codex-to-claude-fz                  # current project's Codex sessions
 codex-to-claude-all-fz              # Codex sessions across projects
+codex-to-claude-compact <transcript-or-session-id> [claude options...]
+codex-to-claude-compact-fz
+codex-to-claude-compact-all-fz
 
 agent_handoff_claude_profile=work codex-to-claude-all-fz --model opus
 ```
@@ -35,6 +38,35 @@ current instructions. Reading the file consumes destination context; this
 path does not pre-compact it. Unavailable source images or external artifacts
 remain references, rather than being reconstructed.
 
+## Claude compaction before launch
+
+[agfi:codex-to-claude-compact] first exports the same complete readable history.
+It seeds a fresh conversation under the selected Claude profile's
+`projects/<cwd-slug>/<new-uuid>.jsonl`, with private file permissions and no
+ordinary model turn. A handoff instruction and a single assistant text block
+hold the archive verbatim; historical tool calls remain inert text. This uses
+Claude's local transcript format, rather than transferring Codex's opaque
+compaction state.
+
+It then runs Claude's native `/compact` on that exact new session using
+[the existing compaction helper](claude-session-compact.md). Only verified
+success, or the recognized insufficient-history no-op, opens the same ID
+interactively. The final prompt continues unfinished work from the summary and
+consults the full archive if needed. It respects recorded pauses and completed
+tasks.
+
+```zsh
+agent_handoff_claude_profile=work codex-to-claude-compact-all-fz --model opus
+```
+
+Compaction uses the destination Claude account, model, and context limit.
+It does not inherit Codex's context-window override. Oversized history, quota
+errors, or transcript-format incompatibility stop the handoff without silently
+truncating history or opening an uncompacted session. On failure, the printed
+destination transcript and full archive remain available for inspection or a
+later `claude-resume-compact` attempt. The retry knob is
+`claude_code_session_resume_compact_retries`, as for Claude resumers.
+
 A live source, missing directory, cancelled picker, ambiguous ID, malformed
 source transcript, or failed export stops the launch. Session, print-mode, directory, and worktree
 overrides are rejected so they cannot redirect the handoff.
@@ -46,3 +78,5 @@ an existing Claude conversation before opening it.
 Run `zsh -f zshlang/tests/agent-handoff-reverse.zsh` for the isolated reverse
 handoff checks. `agent_session codex handoff-export <transcript>` validates
 the full JSONL before rendering readable history without elision.
+`agent_session codex handoff-claude -cwd DIR -config-home HOME -history FILE`
+seeds the private destination transcript and returns its exact absolute path.

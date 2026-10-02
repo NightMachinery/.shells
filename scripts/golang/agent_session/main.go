@@ -74,6 +74,12 @@ func main() {
 	agent, sub, argv := args[0], args[1], args[2:]
 	var err error
 	switch sub {
+	case "handoff-claude":
+		if agent != "codex" {
+			err = session.ErrUnsupported
+		} else {
+			err = cmdHandoffClaude(argv)
+		}
 	case "handoff-export":
 		if agent != "codex" {
 			err = session.ErrUnsupported
@@ -141,6 +147,8 @@ func usage() {
                         migrate the exact selected transcript; stdout is only the destination thread id
   agent_session codex handoff-export <transcript>
                         strict complete human-visible history as markdown, including subagents
+  agent_session codex handoff-claude -cwd DIR -config-home HOME -history ARCHIVE_FILE
+                        seed a fresh Claude session for native compaction; stdout is its absolute path
   agent_session claude compact-result <jsonl-file> <expected-session-id>
                         validate Claude /compact's successful result and compact boundary
 
@@ -505,5 +513,24 @@ func cmdHandoffExport(argv []string) error {
 		return err
 	}
 	_, err = fmt.Fprint(os.Stdout, out)
+	return err
+}
+
+func cmdHandoffClaude(argv []string) error {
+	fs := flag.NewFlagSet("handoff-claude", flag.ContinueOnError)
+	cwd := fs.String("cwd", "", "destination working directory")
+	home := fs.String("config-home", "", "destination Claude configuration home")
+	history := fs.String("history", "", "full historical markdown archive")
+	if err := fs.Parse(argv); err != nil {
+		return err
+	}
+	if fs.NArg() != 0 {
+		return errors.New("handoff-claude accepts only -cwd, -config-home and -history flags")
+	}
+	path, err := handoff.SeedClaude(handoff.ClaudeSeedOptions{Cwd: *cwd, ConfigHome: *home, History: *history})
+	if err != nil {
+		return err
+	}
+	_, err = fmt.Fprintln(os.Stdout, path)
 	return err
 }

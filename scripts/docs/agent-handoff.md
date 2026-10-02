@@ -66,7 +66,7 @@ claude-to-codex-compact-fz --model gpt-6.1-sol \
 
 Codex's compacted state may include opaque encrypted items. It remains in the
 Codex thread and is not a readable summary for another agent. For the reverse
-direction, see [the readable Claude handoff](codex-to-claude.md). For native
+direction, see [the readable and Claude-compacted handoffs](codex-to-claude.md). For native
 Claude compact-before-resume, see [Claude compaction](claude-session-compact.md).
 
 Implementation: `zshlang/auto-load/others/agent-handoff.zsh` keeps shell policy;
