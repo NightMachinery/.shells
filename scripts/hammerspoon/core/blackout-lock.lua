@@ -707,48 +707,130 @@ local function blackoutKillLoop(label)
     os.execute("/bin/kill -TERM " .. list .. " 2>/dev/null")
 end
 
---- @duplicateCode/736a48d066f9273d3104c8dd2c69713b: display-black-off and
---- h-display-black-restore-row in zshlang/auto-load/others/system.zsh. The
---- row format (display-id, backend, backend-local id, brightness, contrast,
---- gamma-applied; levels 0..1 or `-' for unknown), the fallback levels, and
---- the re-resolving of each display by its CGDirectDisplayID, since the saved
---- local ids are positional and a hotplug while black renumbers them.
+--- @duplicateCode/736a48d066f9273d3104c8dd2c69713b: display-black-off,
+--- h-display-black-restore-row, h-display-black-restore-level and
+--- h-display-black-row-key in zshlang/auto-load/others/system.zsh. The row
+--- format (display-id, backend, backend-local id, brightness, contrast,
+--- gamma-applied, display UUID; levels 0..1 or `-' for unknown; older rows
+--- have no UUID), the fallback levels, the floors, the last-good keys, and
+--- the re-resolving of each display by UUID and then by CGDirectDisplayID,
+--- since the saved local ids are positional and a hotplug while black
+--- renumbers them.
+---
+--- Everything from here to `@end blackout-restore-pure' is pure Lua, no hs.*,
+--- so a test can load it on its own with a plain lua interpreter.
 local kFallbackBrightness = 0.5
 local kFallbackContrast = 0.75
+local kFloorBrightness = 0.1
+local kFloorContrast = 0.1
+local kLastGoodPrefix = "display_level_last_good"
 local kM1ddc = "/opt/homebrew/bin/m1ddc"
 local kBrightnessBin = "/usr/local/bin/brightness"
 
-local function level100(v, fallback)
-    local x = tonumber(v) or fallback
+--- A level worth trusting: a number above zero.
+local function levelUsable(v)
+    local x = tonumber(((tostring(v or "")):gsub(",", ".")))
+    return x ~= nil and x > 0
+end
+
+--- The level a restore writes, 0..100: the saved one, else the last-good
+--- one, else the fallback, never below the floor. `lastGood' is a function
+--- (uuid, family) -> level or nil, so the caller decides how to reach redis.
+local function restoreLevel100(saved, uuid, family, lastGood, fallback, floor)
+    local x
+    if levelUsable(saved) then
+        x = tonumber(((tostring(saved)):gsub(",", ".")))
+    else
+        local lg = uuid and lastGood and lastGood(uuid, family)
+        if levelUsable(lg) then
+            x = tonumber(((tostring(lg)):gsub(",", ".")))
+        else
+            x = fallback
+        end
+    end
+    x = math.max(x, floor)
     return math.max(0, math.min(100, math.floor(x * 100 + 0.5)))
 end
 
---- m1ddc display number by CGDirectDisplayID (both strings), from
---- `m1ddc display list detailed'.
+--- From `m1ddc display list detailed': m1ddc display number by
+--- CGDirectDisplayID, and CGDirectDisplayID by upper-cased display UUID (all
+--- strings). m1ddc lists the built-in panel too, so the UUID map covers it.
 local function m1ddcNumbers(text)
-    local map, n = {}, nil
+    local map, uuids, n, id = {}, {}, nil, nil
     for line in (text or ""):gmatch("[^\n]+") do
         local num = line:match("^%[(%d+)%] ")
         if num then
-            n = num
+            n, id = num, nil
         else
-            local id = line:match("^%s*%-%s*Display ID:%s+(%d+)")
-            if id and n then map[id] = n end
+            local did = line:match("^%s*%-%s*Display ID:%s+(%d+)")
+            if did and n then
+                map[did] = n
+                id = did
+            end
+            local u = line:match("^%s*%-%s*System UUID:%s+([%-%x]+)")
+            if u and id then uuids[u:upper()] = id end
         end
     end
-    return map
+    return map, uuids
+end
+
+--- The CGDirectDisplayID a saved row's display has now, or nil when it is
+--- not attached. A row with a UUID resolves by UUID only, since another
+--- display may have inherited its old id; a row without one, written before
+--- rows carried it, by its id.
+local function resolveRowId(row, uuids, attached)
+    if row.uuid and row.uuid ~= "" and row.uuid ~= "-" then
+        return uuids[row.uuid:upper()]
+    end
+    if attached[row.id] then return row.id end
+    return nil
+end
+
+--- The steps that restore every row, plus how many rows have no display.
+--- `internal' maps CG id -> brightness index, `ddc' CG id -> m1ddc number,
+--- `uuids' UUID -> CG id; `uuidOf' CG id -> UUID, for a row without one.
+local function blackoutRestoreSteps(rows, internal, ddc, uuids, lastGood)
+    local uuidOf = {}
+    for u, id in pairs(uuids) do uuidOf[id] = u end
+    local attached = {}
+    for id in pairs(internal) do attached[id] = true end
+    for id in pairs(ddc) do attached[id] = true end
+
+    local steps, missing = {}, 0
+    for _, r in ipairs(rows) do
+        local id = resolveRowId(r, uuids, attached)
+        local uuid = (id and uuidOf[id]) or r.uuid
+        if r.backend == "internal" and id and internal[id] then
+            steps[#steps + 1] = { kBrightnessBin, { "-d", internal[id],
+                string.format("%.3f", restoreLevel100(r.b, uuid, "brightness", lastGood,
+                                                      kFallbackBrightness, kFloorBrightness) / 100) } }
+        elseif r.backend == "ddc" and id and ddc[id] then
+            local n = ddc[id]
+            steps[#steps + 1] = { kM1ddc, { "display", n, "set", "luminance",
+                tostring(restoreLevel100(r.b, uuid, "brightness", lastGood,
+                                         kFallbackBrightness, kFloorBrightness)) } }
+            steps[#steps + 1] = { kM1ddc, { "display", n, "set", "contrast",
+                tostring(restoreLevel100(r.c, uuid, "contrast", lastGood,
+                                         kFallbackContrast, kFloorContrast)) } }
+        else
+            missing = missing + 1
+        end
+    end
+    return steps, missing
 end
 
 --- `brightness' display index by CGDirectDisplayID, from `brightness -l'
---- ("display 0: main, active, ..., built-in, ID 0x1").
+--- ("display 0: main, active, ..., built-in, ID 0x1"). Built-in panels only:
+--- an external one is listed too, but `brightness' cannot drive it.
 local function brightnessIndices(text)
     local map = {}
     for line in (text or ""):gmatch("[^\n]+") do
-        local idx, hex = line:match("^display (%d+): .*, ID 0x(%x+)$")
+        local idx, hex = line:match("^display (%d+): .*built%-in.*, ID 0x(%x+)$")
         if idx then map[tostring(tonumber(hex, 16))] = idx end
     end
     return map
 end
+--- @end blackout-restore-pure
 
 --- The Lua side of h-ddc-log in zshlang/auto-load/others/system.zsh: the same
 --- file and line shape, so one log answers "what wrote this level" whichever
@@ -812,7 +894,7 @@ function blackoutNativeRelease(label)
         local f = {}
         for field in (line .. "\t"):gmatch("([^\t]*)\t") do f[#f + 1] = field end
         if f[2] == "internal" or f[2] == "ddc" then
-            rows[#rows + 1] = { id = f[1], backend = f[2], b = f[4], c = f[5] }
+            rows[#rows + 1] = { id = f[1], backend = f[2], b = f[4], c = f[5], uuid = f[7] }
         end
     end
     if #rows == 0 then
@@ -835,24 +917,18 @@ function blackoutNativeRelease(label)
         end
     end
 
+    --- Redis is up (checked above), so a last-good level is one GET away.
+    local function lastGood(uuid, family)
+        local v = redisGet(kLastGoodPrefix .. ":" .. uuid:upper() .. ":" .. family)
+        return type(v) == "string" and v:match("^(%S+)") or nil
+    end
+
     gardenTask(kBrightnessBin, { "-l" }, function(_, bout)
         gardenTask(kM1ddc, { "display", "list", "detailed" }, function(_, dout)
-            local internal, ddc = brightnessIndices(bout), m1ddcNumbers(dout)
-            local steps, missing = {}, 0
-            for _, r in ipairs(rows) do
-                if r.backend == "internal" and internal[r.id] then
-                    steps[#steps + 1] = { kBrightnessBin, { "-d", internal[r.id],
-                        string.format("%.3f", level100(r.b, kFallbackBrightness) / 100) } }
-                elseif r.backend == "ddc" and ddc[r.id] then
-                    local n = ddc[r.id]
-                    steps[#steps + 1] = { kM1ddc, { "display", n, "set", "luminance",
-                                                    tostring(level100(r.b, kFallbackBrightness)) } }
-                    steps[#steps + 1] = { kM1ddc, { "display", n, "set", "contrast",
-                                                    tostring(level100(r.c, kFallbackContrast)) } }
-                else
-                    missing = missing + 1
-                    print(label .. ": display " .. tostring(r.id) .. " (" .. r.backend .. ") is not attached; left to zsh")
-                end
+            local ddc, uuids = m1ddcNumbers(dout)
+            local steps, missing = blackoutRestoreSteps(rows, brightnessIndices(bout), ddc, uuids, lastGood)
+            if missing > 0 then
+                print(label .. ": " .. missing .. " saved display(s) not attached or not drivable; left to zsh")
             end
             blackoutRunSteps(steps, label, function(allOk) report(allOk, missing) end)
         end, 5, nil, label)

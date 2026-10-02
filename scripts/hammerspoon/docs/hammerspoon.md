@@ -837,11 +837,16 @@ nothing but binaries:
 - It runs `hs.screen.restoreGamma()`, and again 0.5 s and 1.5 s later, since a
   killed iteration's gamma write travels over `hs -c` and may land after it.
 - It puts back the levels zsh saved in redis (`display_black_saved`), re-resolving
-  each display by its CGDirectDisplayID through `brightness -l` and `m1ddc
-  display list detailed`, since the saved local ids are positional. Built-in
-  panels go through `brightness -d`, DDC panels through `m1ddc ... set
-  luminance` and `set contrast`, one write at a time; unknown levels land on
-  the same fallbacks as zsh's (0.5 and 0.75).
+  each display by its UUID (by its CGDirectDisplayID for a row older than the
+  UUID field) through `brightness -l` and `m1ddc display list detailed`, since
+  the saved local ids are positional. Built-in panels go through `brightness
+  -d`, DDC panels through `m1ddc ... set luminance` and `set contrast`, one
+  write at a time. An unknown level follows zsh's chain: the display's
+  last-good level from redis, then the fallback, never below the restore
+  floor. See "An unknown level is not leave it alone" in
+  `docs/external-display-brightness.md`. The logic is pure Lua, from
+  `kFallbackBrightness` to `@end blackout-restore-pure`, so a plain `lua`
+  interpreter can test it on its own.
 - When every row was restored it deletes the key, as `display-black-off` does,
   and a band says the blackout ended without BrishGarden. A display that is not
   attached, or a redis that is down, gets a crit band instead.
