@@ -13,6 +13,17 @@ The installer explicitly uses [agfi:npm-install-npm]. The general
 installed this package on this machine. No change to the general installer is
 required. See [global npm installation issues](npm-global-installs.md).
 
+To install the desktop app alongside the npm CLI:
+
+```sh
+brew install --cask --no-binaries paseo
+```
+
+The cask normally links its bundled CLI as `paseo`, conflicting with npm's
+existing binary. `--no-binaries` installs `/Applications/Paseo.app` without
+replacing that link. The desktop's bundled CLI remains available at
+`/Applications/Paseo.app/Contents/Resources/bin/paseo`.
+
 ## Official agent skills
 
 The upstream [`paseo` skill](https://github.com/getpaseo/paseo/tree/main/skills/paseo)
