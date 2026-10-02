@@ -500,6 +500,10 @@ function h-agent-auto-continue-here {
 }
 
 function agent-auto-continue-on {
+    if [[ -n "${PASEO_AGENT_ID:-}" ]] ; then
+        paseo-auto-continue-on "$@"
+        return $?
+    fi
     : "usage: agent-auto-continue-on [--frontmost]
 Registers the calling agent session to be resumed when its usage limit resets,
 and starts the watcher for its scope. Meant to be run by the shared
@@ -550,6 +554,10 @@ and starts the watcher for its scope. Meant to be run by the shared
 }
 
 function agent-auto-continue-off {
+    if [[ -n "${PASEO_AGENT_ID:-}" ]] ; then
+        paseo-auto-continue-off "$@"
+        return $?
+    fi
     : "usage: agent-auto-continue-off
 Forgets the calling session's registration; with nothing left in its scope,
 cancels the scope's armed job and stops its watcher."
@@ -588,6 +596,10 @@ cancels the scope's armed job and stops its watcher."
 }
 
 function agent-auto-continue-status {
+    if [[ -n "${PASEO_AGENT_ID:-}" ]] ; then
+        paseo-auto-continue-status "$@"
+        return $?
+    fi
     : "usage: agent-auto-continue-status
 This session's registration, its scope's watcher, and the scope's armed jobs."
     ##

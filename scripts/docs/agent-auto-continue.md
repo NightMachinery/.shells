@@ -1,5 +1,11 @@
 # `/auto-continue`: a session arms itself to resume after its usage limit resets
 
+Inside Paseo, the same skill targets the exact Paseo agent and sends through
+Paseo instead of a terminal. Its local watcher uses the existing quota readers
+and only resumes that agent's own quota-failed turn. See
+[Auto-continue for Paseo](paseo-auto-continue.md) for usage and differences
+(including direct delivery without the keyboard idle gate).
+
 `/auto-continue` is one skill, shared by Claude Code (both seats), Codex and
 Antigravity, the same way `/done` is. Typed in a running session it registers
 that session to be resumed when its account's usage limit resets, and makes
