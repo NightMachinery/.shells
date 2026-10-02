@@ -14,9 +14,9 @@ Apply this within the session's delegation permissions and the user's task scope
 
 - **Fable / Claude:** use **Opus**, selecting the available Opus model through
   the runtime's model selector rather than inheriting Fable.
-- **Astra / Codex:** use **GPT 5.6 Terra** (`gpt-5.6-terra`) for straightforward
-  extraction, repetitive transformations, and routine checks. Use **GPT 5.6 Sol**
-  (`gpt-5.6-sol`) for bounded implementation or edits needing more local reasoning.
+- **Astra / Codex:** use **GPT 6 Luna** (`gpt-6-luna`, with max effort level) for straightforward
+  extraction, repetitive transformations, and routine checks. Use **GPT 6.1 Sol**
+  (`gpt-6.1-sol`, OR ANY LATER AVAILABLE VERSIONS) for bounded implementation or edits needing more local reasoning.
 
 These are the user's routing preferences, not a claim about exact prices or
 separate quota pools. Check the available tool schema and model choices before
