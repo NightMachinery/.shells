@@ -653,6 +653,128 @@ function claude-code-session-import {
     ec "${target}"
 }
 
+function h-claude-code-session-compact-args {
+    #: Validate resume modes before any import, and return only preparation
+    #: options in reply. Positional task text belongs to the final launch.
+    ##
+    local arg key
+    local -a prepared
+    while (( $# )) ; do
+        arg="${1}"
+        shift
+        key="${arg%%=*}"
+        case "${key}" in
+            --resume|--continue|--fork-session|--session-id|--print|--output-format|--input-format|--no-session-persistence|--disable-slash-commands|--replay-user-messages|--include-partial-messages|--from-pr|--remote|--teleport|--bare|--init|--init-only|--maintenance|-r|-c|-p)
+                ecerr "$0: incompatible compact-before-resume argument: ${arg}"
+                return 64
+                ;;
+            -r?*|-p?*|-c?*)
+                ecerr "$0: incompatible compact-before-resume argument: ${arg}"
+                return 64
+                ;;
+            --model|--effort|--settings|--permission-mode|--setting-sources|--system-prompt|--append-system-prompt|--max-turns|--max-budget-usd)
+                prepared+=("${arg}")
+                if [[ "${arg}" != *=* ]] ; then
+                    if (( ! $# )) || [[ "${1}" == --* ]] ; then
+                        ecerr "$0: missing value for ${arg}"
+                        return 64
+                    fi
+                    prepared+=("${1}")
+                    shift
+                fi
+                ;;
+        esac
+    done
+    reply=("${prepared[@]}")
+}
+
+function h-claude-code-session-compact-idle {
+    #: Refuse a live source before import and re-check the destination before
+    #: compaction. The ordinary resume/import force knobs do not bypass this.
+    ##
+    local transcript="${1:a}" rows row recorded
+    local agent_session_live_list_cache='' claude_code_session_live_list_cache=''
+    local -a fields
+    rows="$(h-claude-code-session-live-list)" || {
+        ecerr "$0: cannot check for live Claude sessions; not compacting"
+        return 1
+    }
+    for row in "${(@f)rows}" ; do
+        fields=("${(@ps:\t:)row}")
+        (( ${#fields} >= 5 )) || continue
+        recorded="${fields[5]}"
+        if [[ -n "${recorded}" && "${recorded:a}" == "${transcript}" ]] ; then
+            ecerr "$0: session is live (pid ${fields[1]}); quit it before compacting"
+            return 1
+        fi
+    done
+}
+
+function h-claude-code-session-compact-profile-run {
+    #: Normalize the destination for preparation and final launch. Default
+    #: must be unset, since even setting ~/.claude changes credential lookup.
+    ##
+    local profile="${1}" home
+    shift
+    home="$(h-claude-code-profile-config-home "${profile}")" @RET
+    if [[ "${home:a}" == "${HOME}/.claude" ]] ; then
+        ( unset CLAUDE_CONFIG_DIR ; "$@" )
+    else
+        ( export CLAUDE_CONFIG_DIR="${home}" ; "$@" )
+    fi
+}
+
+function h-claude-code-session-compact-prepare {
+    #: Native /compact only, in the transcript cwd and destination profile.
+    #: A successful process is not enough: verify its exact session and
+    #: compact boundary (or insufficient-history no-op) before opening a UI.
+    ##
+    local retries="${claude_code_session_resume_compact_retries:-2}"
+    local transcript="${1}" profile="${2}" launcher="${3}" dir capture
+    shift 3
+    if [[ "${retries}" != <-> ]] || (( ${#retries} > 2 || retries > 20 )) ; then
+        ecerr "$0: compact_retries must be an integer from 0 to 20"
+        return 64
+    fi
+    h-claude-code-session-dep @RET
+    ensure-cmd gmktemp @RET
+    dir="$(h-agent-session-dir "${transcript}" claude)" @RET
+    if ! test -d "${dir}" ; then
+        ecerr "$0: session directory is unavailable: ${dir}"
+        return 1
+    fi
+    h-claude-code-session-compact-idle "${transcript}" @RET
+    capture="$(command gmktemp "${TMPDIR:-/tmp}/claude-session-compact.XXXXXXXX.jsonl")" @RET
+    {
+        command chmod 600 "${capture}" @RET
+        ecerr "$0: compacting ${transcript:t:r} on profile ${profile}"
+        (
+            builtin cd -q -- "${dir}" @RET
+            #: This print process belongs to the destination session. Source
+            #: identities can trigger nested-Claude refusal or stale pane hooks.
+            #: Clear only in preparation; the final managed path stays intact.
+            unset CLAUDECODE CLAUDE_CODE_SESSION_ID CLAUDE_SESSION_ID CLAUDE_PID \
+                AI_AGENT CODEX_THREAD_ID CODEX_SESSION_ID CODEX_SANDBOX \
+                ANTIGRAVITY_AGENT ANTIGRAVITY_TRAJECTORY_ID ANTIGRAVITY_CONVERSATION_ID \
+                AGENT_SESSION_REUSE_PANE AGENT_SESSION_HOOK_ARGS_FILE AGENT_SESSION_STATE
+            local claude_max_retries="${retries}"
+            local -x CLAUDE_CODE_MAX_RETRIES="${retries}"
+            h-claude-code-session-compact-profile-run "${profile}" "${launcher}" \
+                --resume "${transcript:t:r}" "$@" \
+                --print --output-format stream-json --verbose --tools '' -- /compact
+        ) > "${capture}" || {
+            local ret=$?
+            ecerr "$0: native /compact failed (${ret}); session will not launch"
+            return "${ret}"
+        }
+        agent_session claude compact-result "${capture}" "${transcript:t:r}" >&2 @RET
+    } always {
+        #: This function created exactly this capture; never delete anything
+        #: selected by the caller, and never keep transcript output on disk.
+        command rm -f -- "${capture}"
+    }
+}
+
 function claude-code-session-resume {
     #: Resumes a Claude Code session under a profile: the one that owns it, or
     #: another one, in which case [agfi:claude-code-session-import] forks it
@@ -667,6 +789,7 @@ function claude-code-session-resume {
     #:
     #: Usage: claude-code-session-resume <transcript|uuid> [to-profile] [claude args...]
     ##
+    local compact_p="${claude_code_session_resume_compact_p:-n}"
     local session="${1}"
     local to_profile="${2}"
     local -a extra
@@ -687,6 +810,14 @@ function claude-code-session-resume {
         return 1
     fi
 
+    local -a compact_args reply
+    if bool "${compact_p}" ; then
+        h-claude-code-session-compact-args "${extra[@]}" @RET
+        compact_args=("${reply[@]}")
+        h-agent-session-resume-argv claude "${source:t:r}" "${launcher}" "${extra[@]}" @RET
+        h-claude-code-session-compact-idle "${source}" @RET
+    fi
+
     local transcript="${source}"
     if [[ "${to_profile}" != "${from_profile}" ]] ; then
         transcript="$(claude-code-session-import "${source}" "${to_profile}")" @RET
@@ -694,9 +825,17 @@ function claude-code-session-resume {
 
     #: In the session's own directory, which this used to only warn about; see
     #: [agfi:h-agent-session-resume-run] and `agent_session_resume_cd_p'.
-    local -a reply
     h-agent-session-resume-argv claude "${transcript:t:r}" "${launcher}" "${extra[@]}" @RET
-    h-agent-session-resume-run "${transcript}" "${reply[@]}"
+    if bool "${compact_p}" ; then
+        h-claude-code-session-compact-prepare "${transcript}" "${to_profile}" "${launcher}" "${compact_args[@]}" @RET
+        #: Preparation helpers may use the dynamically scoped reply array.
+        h-agent-session-resume-argv claude "${transcript:t:r}" "${launcher}" "${extra[@]}" @RET
+    fi
+    if bool "${compact_p}" ; then
+        h-agent-session-resume-run "${transcript}" h-claude-code-session-compact-profile-run "${to_profile}" "${reply[@]}"
+    else
+        h-agent-session-resume-run "${transcript}" "${reply[@]}"
+    fi
 }
 aliasfn claude-resume claude-code-session-resume
 
@@ -741,6 +880,45 @@ function claude-resume-work {
 }
 aliasfn claude-resume-work-fz claude-code-session-resume-fz work
 aliasfn claude-resume-work-all-fz claude_code_session_resume_scope=all claude-code-session-resume-fz work
+#: Compact the selected destination before the ordinary resume machinery,
+#: including its managed-pane redirect. All variants share the resume knobs.
+aliasfn claude-code-session-resume-compact claude_code_session_resume_compact_p=y claude-code-session-resume
+aliasfn claude-code-session-resume-compact-fz claude_code_session_resume_compact_p=y claude-code-session-resume-fz
+aliasfn claude-code-session-resume-compact-all-fz claude_code_session_resume_compact_p=y claude-code-session-resume-all-fz
+aliasfn claude-resume-compact claude-code-session-resume-compact
+aliasfn claude-resume-compact-fz claude-code-session-resume-compact-fz
+aliasfn claude-resume-compact-all-fz claude-code-session-resume-compact-all-fz
+aliasfn claude-resume-compact-default claude_code_session_resume_compact_p=y claude-resume-default
+aliasfn claude-resume-compact-default-fz claude_code_session_resume_compact_p=y claude-resume-default-fz
+aliasfn claude-resume-compact-default-all-fz claude_code_session_resume_compact_p=y claude-resume-default-all-fz
+aliasfn claude-resume-compact-work claude_code_session_resume_compact_p=y claude-resume-work
+aliasfn claude-resume-compact-work-fz claude_code_session_resume_compact_p=y claude-resume-work-fz
+aliasfn claude-resume-compact-work-all-fz claude_code_session_resume_compact_p=y claude-resume-work-all-fz
+
+@opts-setprefix claude-code-session-resume claude_code_session_resume
+@opts-setprefix claude-code-session-resume-fz claude_code_session_resume
+@opts-setprefix claude-code-session-resume-all-fz claude_code_session_resume
+@opts-setprefix claude-resume claude_code_session_resume
+@opts-setprefix claude-resume-fz claude_code_session_resume
+@opts-setprefix claude-resume-all-fz claude_code_session_resume
+@opts-setprefix claude-resume-default claude_code_session_resume
+@opts-setprefix claude-resume-default-fz claude_code_session_resume
+@opts-setprefix claude-resume-default-all-fz claude_code_session_resume
+@opts-setprefix claude-resume-work claude_code_session_resume
+@opts-setprefix claude-resume-work-fz claude_code_session_resume
+@opts-setprefix claude-resume-work-all-fz claude_code_session_resume
+@opts-setprefix claude-code-session-resume-compact claude_code_session_resume
+@opts-setprefix claude-code-session-resume-compact-fz claude_code_session_resume
+@opts-setprefix claude-code-session-resume-compact-all-fz claude_code_session_resume
+@opts-setprefix claude-resume-compact claude_code_session_resume
+@opts-setprefix claude-resume-compact-fz claude_code_session_resume
+@opts-setprefix claude-resume-compact-all-fz claude_code_session_resume
+@opts-setprefix claude-resume-compact-default claude_code_session_resume
+@opts-setprefix claude-resume-compact-default-fz claude_code_session_resume
+@opts-setprefix claude-resume-compact-default-all-fz claude_code_session_resume
+@opts-setprefix claude-resume-compact-work claude_code_session_resume
+@opts-setprefix claude-resume-compact-work-fz claude_code_session_resume
+@opts-setprefix claude-resume-compact-work-all-fz claude_code_session_resume
 ##
 #: Promoting an in-process subagent to a session of its own
 ##
