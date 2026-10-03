@@ -31,3 +31,7 @@ socket and window id, so two kitty instances cannot share cycling state.
 Automated tests cover ordering, deduplication, cycling validation, screen
 extraction, vim mode, UTF-8 trimming and sanitization. The screen fixtures are
 fabricated from CLI layouts, with no real session text.
+
+In kitty, `alt+/` invokes dabbrev only when a Claude Code or Codex command
+line is in the foreground. The kitten checks the foreground process again,
+so an old agent title never steals zsh bindings. Reload kitty.conf with Cmd+F5.
