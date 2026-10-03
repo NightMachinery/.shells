@@ -462,28 +462,23 @@ local function kittyStandardWindow(app)
     return nil
 end
 
--- Where hiding puts you back: the newest app in recentApps
--- (core/app-hotkeys.lua) other than kitty, read at press time. The same
--- list the app hotkeys return through, fed by an application watcher on
--- every switch, so it is never stale (the old `kitty_prev_app' was, whenever
--- kitty had been reached by another route, and nil after every reload).
-local function kittyReturnCandidates()
-    return recentAppsCandidates(function(bid) return bid == kittyBundleID end)
+-- Where hiding puts you back: the previous app on the screen kitty is on,
+-- by screenReturnTarget (core/app-hotkeys.lua), the rule the app hotkeys
+-- return by. Read at press time: kitty is frontmost then, so the active
+-- screen is kitty's, and the hide's own activation has not yet been filed.
+-- The recent-apps lists are fed by an application watcher on every switch,
+-- so they are never stale (the old `kitty_prev_app' was, whenever kitty had
+-- been reached by another route, and nil after every reload).
+local function kittyReturnTarget()
+    local kitty = getApp(kittyBundleID)
+    return screenReturnTarget(hs.screen.mainScreen(), kitty and kitty:pid(), kittyBundleID)
 end
 
--- Focuses the first candidate that is still running and not hidden
--- (appReturnUsable). A dead hs.application raises or answers nil, hence the
--- pcall.
-local function kittyFocusAfterHide(candidates)
-    for _, back in ipairs(candidates or {}) do
-        local ok, done = pcall(function()
-            if not appReturnUsable(back) then return false end
-            local win = back:focusedWindow()
-            if win then win:focus() else back:activate() end
-            return true
-        end)
-        if ok and done then return end
-    end
+-- Carries the target out. A dead hs.application raises, hence the pcall.
+local function kittyFocusAfterHide(target)
+    if not target then return end
+    local ok, err = pcall(screenReturnFocus, target, "kitty")
+    if not ok then print("kittyFocusAfterHide: " .. tostring(err)) end
 end
 
 -- In panel mode this watcher hides the panel when kitty is left by any route
@@ -532,7 +527,7 @@ function kittyPanelToggle(app, front, shown)
     if shown then
         -- Read now, not in the timer: the hide may activate something and
         -- the watcher would overwrite the memory before the timer fires.
-        local back = kittyReturnCandidates()
+        local back = kittyReturnTarget()
         kittyPanelHide("kittyPanelToggle")
         hs.timer.doAfter(0.35, function() kittyFocusAfterHide(back) end)
         return
@@ -558,7 +553,7 @@ function kittyWindowToggle(app, front)
 
     if app:isFrontmost() then
         -- Read before hide(): the activation hide() causes updates the memory.
-        local back = kittyReturnCandidates()
+        local back = kittyReturnTarget()
         kittyEvictFromFullscreen(win)
         app:hide()
         kittyFocusAfterHide(back)

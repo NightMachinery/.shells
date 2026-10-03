@@ -89,13 +89,53 @@ passthrough key; and Handy, whose dictation overlay is cmd+'. A password
 dialog such as sudo's askpass does enter it, and has quit by the next hide;
 the entries behind it are why this is a list and not one app.
 
-On a hide, the return target is the newest entry that is still running and not
-hidden (`appReturnUsable`: you hid that one on purpose). It is brought forward
-first, and the app is hidden only once the target's activation arrives
-(`appHideWatcher`), or after a second if it never does: hiding the app while it
-is still frontmost would let macOS choose again. When the target is kitty in
-panel mode, it comes back through `kittyPanelShow`, since kitty activating
-shows nothing by itself. With no target the app is simply hidden.
+A hide returns you to the previous app *on the screen the hidden app was on*.
+With one list for both monitors, hiding an app on the laptop could hand focus
+to whatever had last been used on the monitor. So `recentAppsByScreen` keeps
+the same kind of list per screen, keyed by display UUID. An activation is
+filed under the active screen a moment after it (`kRecentScreenDelay`;
+`hs.screen.mainScreen()`, which asks no app anything), and focus moving to another screen without an
+activation, between two windows of one app, is filed by the screen registry's
+`active` event. `screenReturnTarget(screen, pid)` picks the target, in this
+order:
+
+- the newest app filed under that screen that still has a normal window
+  there. An app whose only visible windows are on the other screen is passed
+  over. An app with no window on screen at all is taken on its record only
+  when the app being hidden is in native fullscreen: the rest of that screen's
+  windows are then in another Space, which the on-screen window list leaves
+  out. Even then it must still be running and not hidden (`appReturnUsable`:
+  you hid that one on purpose). Anywhere else such an app is passed over,
+  since it is a Finder after a click on the desktop, or an app whose windows
+  are all closed or minimized, and activating it would show nothing;
+- the frontmost normal window on that screen of any other app, for apps used
+  before the last reload;
+- the newest usable app anywhere, the old rule, when nothing else is on that
+  screen, since focus has to go somewhere.
+
+A window in the on-screen list belongs to an app that is running and not
+hidden, so the first two rules ask no app anything until they have picked one.
+Whether the hidden app is fullscreen costs two Accessibility queries to it,
+asked only when the first rule meets an app with no window on screen;
+`hs.spaces.spaceType` would answer too, but took 21 to 37 ms when measured on
+2026-10-03.
+
+"Normal window" means CoreGraphics layer 0, visible, and no smaller than
+`kMinNormalW` by `kMinNormalH` (`Screens.isNormalEntry`), read from `hs.window.list` rather than
+Accessibility (see "Moving between screens" below). When the target's front
+window is on the other screen, bringing the app forward would land there, so
+its window on this screen is focused instead (`screenReturnFocus`), and an
+app whose window cannot be fetched is passed over. Choosing
+costs one window-list read: 12 ms measured on 2026-10-03, and the press's
+"returning to" line says which rule chose and how long it took. The target is
+brought forward first, and the app is hidden only once the target's activation
+arrives (`appHideWatcher`), or after a second if it never does: hiding the app
+while it is still frontmost would let macOS choose again. When the target is
+kitty in panel mode, it comes back through `kittyPanelShow`, which shows on
+the working screen, since kitty activating shows nothing by itself. With no
+target the app is simply hidden. The kitty toggle's own hide returns the same
+way.
+
 
 ### Moving between screens: hyper+; and hyper+shift+;
 
@@ -1684,12 +1724,12 @@ it is moved there.
 Both modes share two things. The first is the launch: kitty quits when its
 last window closes (`macos_quit_when_last_window_closed`), so "not running" is
 a normal state and the key has to start it. The second is the return of focus
-after a hide, which macOS will not do for you. The candidates are the "recent
-apps" list of `core/app-hotkeys.lua` (see "App hotkeys" above) without kitty,
-read at press time, before the hide, because the activation the hide causes
-would change it. `kittyFocusAfterHide` then focuses the first candidate that
-is still running and not hidden (its focused window, falling back to
-`activate()`, inside `pcall`). In panel mode `kittyFocusWatcher`, an
+after a hide, which macOS will not do for you. The target is the previous
+app on the screen kitty is on, chosen by `screenReturnTarget` in
+`core/app-hotkeys.lua` with kitty left out (see "App hotkeys" above), and read
+at press time, before the hide, because the activation the hide causes would
+change the lists. `kittyFocusAfterHide` then carries it out through
+`screenReturnFocus`, inside `pcall`. In panel mode `kittyFocusWatcher`, an
 `hs.application.watcher`, also hides the panel when any non-transient app is
 activated, by an app hotkey, Cmd-Tab or a click, because an overlay cannot go
 behind the app you switch to.

@@ -163,14 +163,178 @@ function appReturnUsable(app)
     return ok and usable or false
 end
 
+--- ** Recent apps per screen
+--
+-- A hide returns you to the previous app *on the screen you were on*: with
+-- one list for every screen, hiding an app on the laptop could hand focus to
+-- whatever was last used on the monitor. recentAppsByScreen[uuid] is the
+-- same kind of list as recentApps, one per screen. An activation is filed
+-- under the active screen a moment after it (hs.screen.mainScreen(), which
+-- asks no app anything), and focus moving to another screen without an
+-- activation, between two windows of one app, is filed by the registry's
+-- `active' event (core/screens.lua).
+recentAppsByScreen = {}
+
+local function screenKey(screen)
+    local ok, u = pcall(function() return screen:getUUID() end)
+    return ok and u and u:upper() or nil
+end
+
+-- The delay before reading the active screen after an activation: the
+-- screen follows the new key window, which macOS settles after it reports
+-- the activation.
+local kRecentScreenDelay = 0.1
+
+function recentAppsPushOn(app, screen)
+    local key = screen and screenKey(screen)
+    local ok, bid, pid = pcall(function() return app:bundleID(), app:pid() end)
+    if not key or not ok or not pid or recentAppsTransient[bid] then return end
+    local list = recentAppsByScreen[key] or {}
+    recentAppsByScreen[key] = list
+    for i = #list, 1, -1 do
+        local okp, same = pcall(function() return list[i]:pid() == pid end)
+        if not okp or same then table.remove(list, i) end
+    end
+    table.insert(list, 1, app)
+    list[recentAppsMax + 1] = nil
+end
+
+-- Files the frontmost app under the active screen after kRecentScreenDelay,
+-- reading both then: macOS can report the screen change before the
+-- activation that caused it, and filing at once would put the app being
+-- left under the screen being entered. `pid', when given, files only if
+-- that app is still in front by then.
+local function recentAppsFileFront(pid)
+    hsAfter(kRecentScreenDelay, function()
+        local ok, front = pcall(function() return hs.application.frontmostApplication() end)
+        if ok and front and (pid == nil or front:pid() == pid) then
+            recentAppsPushOn(front, hs.screen.mainScreen())
+        end
+    end)
+end
+
 -- Global, so it is not collected.
 recentAppsWatcher = hs.application.watcher.new(function(_, event, app)
-    if event == hs.application.watcher.activated and app then recentAppsPush(app) end
+    if event ~= hs.application.watcher.activated or not app then return end
+    recentAppsPush(app)
+    recentAppsFileFront(app:pid())
 end)
 recentAppsWatcher:start()
+if Screens then Screens.on("active", function() recentAppsFileFront() end) end
 do
     local front = hs.application.frontmostApplication()
     if front then recentAppsPush(front) end
+    recentAppsFileFront()
+end
+
+--- Where focus should go when the app with pid `skipPid' leaves `screen':
+---   { app = <hs.application>, window = <hs.window or nil>, kittyPanel = true|nil, why = "..." }
+--- or nil. In order:
+---   1. the newest app filed under `screen' that still has a normal window
+---      there. When the app being left is in native fullscreen, the rest of
+---      the screen's windows are in another Space, which CoreGraphics'
+---      on-screen list leaves out, so there an app filed under the screen
+---      with no window on screen anywhere is taken on its record (if
+---      appReturnUsable). Anywhere else such an app is passed over: it is a
+---      Finder after a click on the desktop, or an app with every window
+---      closed or minimized, and activating it would show nothing;
+---   2. the frontmost normal window on `screen' of any other app, for apps
+---      used before the last reload or pushed out of the list;
+---   3. the newest usable app anywhere, the old rule, when nothing else is
+---      on that screen: focus has to go somewhere.
+--- `window' is set when the app's front window is on another screen, so
+--- bringing the app forward would land there: that window is focused
+--- instead, and an app whose window cannot be fetched is passed over. The
+--- kitty panel is never on screen while another app is frontmost, so in
+--- panel mode kitty is taken on its record alone and comes back through
+--- kittyPanelShow, which shows on the working screen.
+--- `skipBid' rejects one more bundle id (kitty's own toggle passes kitty).
+--- One CoreGraphics read (Screens.windowStack) per call. A window in that
+--- list belongs to a running app that is not hidden, so steps 1 and 2 ask
+--- no app anything until they pick one.
+function screenReturnTarget(screen, skipPid, skipBid)
+    local function skip(pid, bid) return pid == skipPid or (skipBid and bid == skipBid) end
+    local stack = Screens.windowStack()
+    local key = screen and screenKey(screen)
+
+    -- Per pid: its first normal window anywhere, and its first on `screen'.
+    local frontOf, onScreenOf = {}, {}
+    for _, e in ipairs(stack) do
+        if Screens.isNormalEntry(e) then
+            if not frontOf[e.pid] then frontOf[e.pid] = e end
+            if not onScreenOf[e.pid] then
+                local s = Screens.screenOfFrame(e.frame)
+                if s and screen and s:id() == screen:id() then onScreenOf[e.pid] = e end
+            end
+        end
+    end
+
+    -- Whether the app being left (frontmost, on `screen') is in native
+    -- fullscreen: two Accessibility queries to it, asked at most once and
+    -- only when step 1 meets an app with no window on screen.
+    -- hs.spaces.spaceType would answer too, but took 21 to 37 ms here.
+    local fullscreenHere = nil
+    local function leavingFullscreen()
+        if fullscreenHere == nil then
+            local ok, full = pcall(function()
+                local w = hs.application.frontmostApplication():focusedWindow()
+                return w ~= nil and w:isFullScreen()
+            end)
+            fullscreenHere = ok and full == true
+        end
+        return fullscreenHere
+    end
+
+    local function landing(app, pid, why, onRecord)
+        local e = onScreenOf[pid]
+        if not e then
+            if onRecord and not frontOf[pid] and leavingFullscreen() and appReturnUsable(app) then
+                return { app = app, why = why .. ", in another Space" }
+            end
+            return nil
+        end
+        local t = { app = app, why = why }
+        if frontOf[pid] ~= e then
+            t.window = Screens.entryWindow(e)
+            if not t.window then return nil end
+        end
+        return t
+    end
+
+    local panelMode = kitty_hotkey_mode == "panel" and kittyPanelShow
+    for _, a in ipairs((key and recentAppsByScreen[key]) or {}) do
+        local ok, pid, bid = pcall(function() return a:pid(), a:bundleID() end)
+        if ok and not skip(pid, bid) then
+            if panelMode and bid == "net.kovidgoyal.kitty" then
+                if appReturnUsable(a) then return { app = a, kittyPanel = true, why = "last used on this screen" } end
+            else
+                local t = landing(a, pid, "last used on this screen", true)
+                if t then return t end
+            end
+        end
+    end
+
+    if screen then
+        for _, e in ipairs(Screens.normalWindowsOn(screen, nil, stack)) do
+            local app = hs.application.applicationForPID(e.pid)
+            local ok, bid = pcall(function() return app and app:bundleID() end)
+            if app and ok and not skip(e.pid, bid) and not recentAppsTransient[bid] then
+                local t = landing(app, e.pid, "front window on this screen")
+                if t then return t end
+            end
+        end
+    end
+
+    for _, a in ipairs(recentAppsCandidates(function(bid, pid) return skip(pid, bid) end)) do
+        if appReturnUsable(a) then
+            local ok, bid = pcall(function() return a:bundleID() end)
+            if panelMode and ok and bid == "net.kovidgoyal.kitty" then
+                return { app = a, kittyPanel = true, why = "nothing else on this screen" }
+            end
+            return { app = a, why = "nothing else on this screen" }
+        end
+    end
+    return nil
 end
 
 -- One console line per press, so a slow switch can be traced to where the
@@ -228,16 +392,25 @@ local function appBringForward(app)
     return app:_bringtofront(false)
 end
 
+--- Carries out a screenReturnTarget: the kitty panel through kittyPanelShow,
+--- a window on the screen through hs.window:focus (one app's Accessibility),
+--- and otherwise the app through appBringForward, which asks it nothing.
+function screenReturnFocus(t, label)
+    if t.kittyPanel then return kittyPanelShow(label) end
+    if t.window and pcall(function() t.window:focus() end) then return end
+    appBringForward(t.app)
+end
+
 -- The second press of an app's hotkey hides the app and returns you to the
--- app you were in before it. Left to itself, macOS activates an app of its
--- own choosing when the frontmost app hides: hyper+x, hyper+k, hyper+k
--- landed in Telegram rather than Emacs. So the return target, the newest
--- entry of recentApps that is still running and not hidden, is brought
--- forward first, and the app is hidden only once the target has activated
--- (or after a second, if it never does): hiding the app while it is still
--- frontmost would let macOS choose again. In panel mode the kitty panel
--- comes back through kittyPanelShow, since kitty activating shows nothing by
--- itself. With no target the app is simply hidden, as before.
+-- app you were in before it on the same screen. Left to itself, macOS
+-- activates an app of its own choosing when the frontmost app hides:
+-- hyper+x, hyper+k, hyper+k landed in Telegram rather than Emacs. So the
+-- return target (screenReturnTarget, above) is brought forward first, and
+-- the app is hidden only once the target has activated (or after a second,
+-- if it never does): hiding the app while it is still frontmost would let
+-- macOS choose again. In panel mode the kitty panel comes back through
+-- kittyPanelShow, since kitty activating shows nothing by itself. With no
+-- target the app is simply hidden, as before.
 --
 -- appHidePending is the hide waiting for its target; the activation watcher
 -- below finishes it. Global, like appSwitchPending.
@@ -257,19 +430,15 @@ local function appHideFinish(why)
                             or ("once " .. p.backName .. " had activated")))
 end
 
-local function appReturnTarget(app)
-    local pid = app:pid()
-    for _, a in ipairs(recentAppsCandidates(function(_, apid) return apid == pid end)) do
-        if appReturnUsable(a) then return a end
-    end
-    return nil
-end
-
 local function appHideReturning(app, t0, hyperNote)
     appHideFinish("superseded by another hide")
 
     local name = app:name() or "?"
-    local back = appReturnTarget(app)
+    -- The app is frontmost, so the active screen is the one it is on.
+    local tq = hs.timer.absoluteTime()
+    local target = screenReturnTarget(hs.screen.mainScreen(), app:pid())
+    local queryMs = appSwitchMs(tq, hs.timer.absoluteTime())
+    local back = target and target.app
     if not back then
         app:hide()
         print(string.format("appHotkey: %s: hidden, no app to return to (handler %.1f ms%s)", name,
@@ -283,19 +452,17 @@ local function appHideReturning(app, t0, hyperNote)
         if appHidePending == pending then appHideFinish("no activation within 1 s") end
     end)
 
-    if back:bundleID() == "net.kovidgoyal.kitty" and kitty_hotkey_mode == "panel" and kittyPanelShow then
-        kittyPanelShow("appHotkey")
-    else
-        appBringForward(back)
-    end
-    print(string.format("appHotkey: %s: returning to %s (handler %.1f ms%s)", name, pending.backName,
-                        appSwitchMs(t0, hs.timer.absoluteTime()), hyperNote))
+    screenReturnFocus(target, "appHotkey")
+    print(string.format("appHotkey: %s: returning to %s, %s%s (handler %.1f ms, %.1f of it choosing%s)", name,
+                        pending.backName, target.why, target.window and ", its window here" or "",
+                        appSwitchMs(t0, hs.timer.absoluteTime()), queryMs, hyperNote))
 end
 
 appHideWatcher = hs.application.watcher.new(function(_, event, app)
     local p = appHidePending
     if not p or event ~= hs.application.watcher.activated or not app then return end
-    if app:pid() == p.backPid then appHideFinish() end
+    if app:pid() ~= p.backPid then return end
+    appHideFinish()
 end)
 appHideWatcher:start()
 
