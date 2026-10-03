@@ -116,6 +116,20 @@ Provider labels can be customized in `agents.providers` in the private Paseo
 configuration, followed by `paseo reload`. Handoffs preserve custom labels while
 still checking that the provider's profile configuration matches.
 
+When an imported provider duplicates a built-in entry, check both resolved
+binaries, configuration homes, and active/archived session references before
+consolidating. Existing conversations retain their provider entry ID. Preserve
+an entry that serves a live conversation rather than deleting it or rewriting
+the conversation's provider in stored state.
+
+An enabled custom entry may extend a disabled built-in provider. Keeping the
+imported entry, giving it a normal display label, and setting the duplicate
+built-in entry's `enabled` to `false` leaves one enabled choice while preserving
+resume compatibility. Save a private configuration backup, use `paseo reload`,
+then verify provider availability and the live conversation. Provider changes
+can apply without a daemon restart; unrelated restart-required paths reported
+by reload are a separate issue.
+
 Run the isolated checks with:
 
 ```sh
