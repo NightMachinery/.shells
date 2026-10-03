@@ -464,9 +464,9 @@ end
 
 -- Where hiding puts you back: the previous app on the screen kitty is on,
 -- by screenReturnTarget (core/app-hotkeys.lua), the rule the app hotkeys
--- return by. `snap' (screenReturnSnapshot) is taken at press time: kitty is
--- frontmost then, so the active screen is kitty's, and the hide's own
--- activation has not yet been filed. The recent-apps lists are fed by an
+-- return by. `snap' (screenReturnSnapshot) is taken at press time, on the
+-- screen of kitty's own panel or window, before the hide's own activation
+-- has been filed. The recent-apps lists are fed by an
 -- application watcher on every switch, so they are never stale (the old
 -- `kitty_prev_app' was, whenever kitty had been reached by another route,
 -- and nil after every reload). nil when there is no target, or choosing
@@ -535,8 +535,10 @@ function kittyPanelToggle(app, front, shown)
         -- The lists are copied now, before the hide's activation updates
         -- them, and the target is chosen in the timer: choosing reads the
         -- window list and may ask apps over Accessibility, and the hide is
-        -- only sent once this handler returns.
-        local snap = screenReturnSnapshot(hs.screen.mainScreen())
+        -- only sent once this handler returns. The screen is the panel's
+        -- own (one Accessibility query to kitty, like kittyPanelShown).
+        local okp, panelScreen = pcall(function() return kittyPanelWindow(app):screen() end)
+        local snap = screenReturnSnapshot(okp and panelScreen or Screens.focusedScreen())
         kittyPanelHide("kittyPanelToggle")
         -- hsAfter, not hs.timer.doAfter: a timer nothing references is
         -- stopped when the garbage collector takes it (timer_gc in
@@ -567,7 +569,8 @@ function kittyWindowToggle(app, front)
         -- Chosen before hide(), unlike the panel's: hide() lets macOS
         -- activate an app of its own choosing, and the return should follow
         -- it as closely as it can.
-        local back = kittyReturnTarget(screenReturnSnapshot(hs.screen.mainScreen()))
+        local okw, winScreen = pcall(function() return win:screen() end)
+        local back = kittyReturnTarget(screenReturnSnapshot(okw and winScreen or Screens.focusedScreen()))
         kittyEvictFromFullscreen(win)
         app:hide()
         kittyFocusAfterHide(back)

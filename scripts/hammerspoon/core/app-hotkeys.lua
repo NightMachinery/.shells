@@ -172,11 +172,13 @@ end
 -- A hide returns you to the previous app *on the screen you were on*: with
 -- one list for every screen, hiding an app on the laptop could hand focus to
 -- whatever was last used on the monitor. recentAppsByScreen[uuid] is the
--- same kind of list as recentApps, one per screen. An activation is filed
--- under the active screen a moment after it (hs.screen.mainScreen(), which
--- asks no app anything), and focus moving to another screen without an
--- activation, between two windows of one app, is filed by the registry's
--- `active' event (core/screens.lua).
+-- same kind of list as recentApps, one per screen. The registry's `focus'
+-- event (core/screens.lua) files the frontmost app under the screen of its
+-- own front window, read from CoreGraphics' window list once focus has
+-- settled after an activation, or after focus moved between two windows of
+-- one app. It used to be the screen hs.screen.mainScreen() named, which
+-- falls behind focus: Brave brought forward on the monitor was filed under
+-- the laptop, and hiding an app on the laptop then returned to Brave.
 recentAppsByScreen = {}
 
 -- pid -> the key of the screen it was filed under last: where its front
@@ -187,11 +189,6 @@ local function screenKey(screen)
     local ok, u = pcall(function() return screen:getUUID() end)
     return ok and u and u:upper() or nil
 end
-
--- The delay before reading the active screen after an activation: the
--- screen follows the new key window, which macOS settles after it reports
--- the activation.
-local kRecentScreenDelay = 0.1
 
 function recentAppsPushOn(app, screen)
     local key = screen and screenKey(screen)
@@ -208,32 +205,25 @@ function recentAppsPushOn(app, screen)
     recentAppsLastScreen[pid] = key
 end
 
--- Files the frontmost app under the active screen after kRecentScreenDelay,
--- reading both then: macOS can report the screen change before the
--- activation that caused it, and filing at once would put the app being
--- left under the screen being entered. `pid', when given, files only if
--- that app is still in front by then.
-local function recentAppsFileFront(pid)
-    hsAfter(kRecentScreenDelay, function()
-        local ok, front = pcall(function() return hs.application.frontmostApplication() end)
-        if ok and front and (pid == nil or front:pid() == pid) then
-            recentAppsPushOn(front, hs.screen.mainScreen())
-        end
-    end)
-end
-
 -- Global, so it is not collected.
 recentAppsWatcher = hs.application.watcher.new(function(_, event, app)
     if event ~= hs.application.watcher.activated or not app then return end
     recentAppsPush(app)
-    recentAppsFileFront(app:pid())
 end)
 recentAppsWatcher:start()
-if Screens then Screens.on("active", function() recentAppsFileFront() end) end
+-- An app with no window on screen is not filed: the screen would be a
+-- guess, and a hide passes over such an app anyway.
+Screens.on("focus", function(app, screen, fromWindow)
+    if app and fromWindow then recentAppsPushOn(app, screen) end
+end)
 do
     local front = hs.application.frontmostApplication()
-    if front then recentAppsPush(front) end
-    recentAppsFileFront()
+    if front then
+        recentAppsPush(front)
+        local stack = Screens.windowStack()
+        local s = Screens.windowScreenOf(front:pid(), stack)
+        if s then recentAppsPushOn(front, s) end
+    end
 end
 
 --- The recent-apps lists for screenReturnTarget's `snap', copied now, since
@@ -880,8 +870,9 @@ end)
 -- reads its `popupScreen' setting at every popup (Maccy/Menu/PopupLocation.swift
 -- and Extensions/NSScreen+ForPopup.swift upstream): 0 falls back to
 -- NSScreen.main inside Maccy, and with 0 the popup opened on the laptop
--- while you worked on the monitor (why NSScreen.main answered the laptop is
--- unmeasured); n means NSScreen.screens[n - 1], the order
+-- while you worked on the monitor (NSScreen.mainScreen falls behind focus
+-- inside Hammerspoon, see "The focused screen" in core/screens.lua; inside
+-- Maccy that is unmeasured); n means NSScreen.screens[n - 1], the order
 -- hs.screen.allScreens() lists them in. Its "window center" setting is no
 -- better: it centres on the front app's first CoreGraphics window at any
 -- layer, which for Brave is a 24 px strip.

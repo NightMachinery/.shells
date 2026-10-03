@@ -9,7 +9,8 @@ live next to each feature in `docs/hammerspoon.md`; this file is the map.
 These are used throughout, here and in `core/screens.lua`:
 
 - **Active screen**: the screen of the focused window,
-  `hs.screen.mainScreen()`.
+  `Screens.focusedScreen()`, read from CoreGraphics' window list. Not
+  `hs.screen.mainScreen()`, which falls behind focus (see "Where focus is").
 - **Primary screen**: the screen with the menu bar,
   `hs.screen.primaryScreen()`. With the lid open this is usually the laptop
   panel.
@@ -36,7 +37,8 @@ These are used throughout, here and in `core/screens.lua`:
 
 The word `main` means two different screens on the two sides:
 
-- In Hammerspoon, `hs.screen.mainScreen()` is the **active** screen.
+- In Hammerspoon, `hs.screen.mainScreen()` is meant to be the **active**
+  screen (though it lags; see "Where focus is").
 - In zsh's display commands (`brightness-get main`, the default selector of
   [agfi:h-brightness-select]), `main` is the **primary** screen.
 
@@ -138,10 +140,12 @@ blackout restore or let overlays follow focus.
   because a UUID identifies one particular monitor. Nothing watches the key, so
   run `Screens.invalidate()` after editing it.
 - Events, through `Screens.on(event, fn)`: `layout` (screens added, removed,
-  moved or resized), `added` (with the record), `removed` (with the UUID) and
-  `active` (the active screen changed). They come from
-  `hs.screen.watcher.newWithActiveScreen`. `ModalMode.onScreenChange(fn)` is
-  kept as the old name for `Screens.on("layout", fn)`.
+  moved or resized), `added` (with the record), `removed` (with the UUID),
+  `active` (the active screen changed) and `focus` (with the frontmost app
+  and its screen, once focus has settled after any switch). Layout changes
+  come from `hs.screen.watcher`; the other two from the focus check in
+  "Where focus is". `ModalMode.onScreenChange(fn)` is kept as the old name
+  for `Screens.on("layout", fn)`.
 - `Screens.target(spec)` resolves every spec. The list, with its aliases, is
   the comment above that function. A spec that matches nothing falls back to
   the primary screen, and an unknown one to every screen, so nothing is ever
@@ -215,12 +219,63 @@ bounds and layer, in 19 to 40 ms, asking no app anything. Accessibility's
   For state outside Hammerspoon that has to follow a screen (Maccy's
   setting).
 
+### Where focus is
+
+`hs.screen.mainScreen()` is meant to answer the active screen, and everything
+that followed focus used to ask it. It falls behind. Measured 2026-10-03,
+with the load average near 46: after hyper+/ brought Brave's fullscreen
+window forward on the monitor, it still answered the laptop 0.15, 0.5 and
+1.2 s later, while CoreGraphics' window list and Accessibility (Brave's
+focused window) both had the monitor at 0.15 s. Once focus went back to
+kitty on the laptop, it answered the monitor, so it was one change behind
+rather than slow, and waiting did not help: hyper+; kept picking the same
+screen however long you waited. After the reload, with kitty focused on the
+laptop, it still answered the monitor. Whether it lags on an idle machine is
+unmeasured.
+
+That one cause was behind four bugs reported the same day:
+
+- hyper+z opened the kitty panel on the screen focus had just left;
+- Maccy's popup stayed on the laptop, because `popupScreen` was written for
+  the screen `mainScreen` named;
+- hyper+; kept going to the monitor;
+- a hide returned to the wrong app. Brave, brought forward on the monitor,
+  was filed in the laptop's list, so hyper+x, hyper+/, hyper+l, hyper+l
+  (Emacs and Telegram on the laptop) returned to Brave instead of Emacs.
+
+So the active screen is now `Screens.focusedScreen()`: the screen of the
+frontmost app's front normal window in the window list, else of its front
+window floating below the menu bar (the kitty panel), else `mainScreen` as a
+last resort. The frontmost app comes from NSWorkspace, which was right in
+the same measurement. A hide takes the screen of the hidden app's own
+window, and kitty's the screen of its panel or window.
+
+The trade-offs:
+
+- For: it agrees with what is on screen, and it asks no app anything.
+- Against: a window-list read costs 19 to 40 ms where `mainScreen` cost
+  nothing. So the answer is kept while the same app stays frontmost, for at
+  most `kFocusTrustSeconds`, and read afresh `kFocusSettleSeconds` after
+  every activation, every active-screen change `hs.screen.watcher` reports,
+  and every focus change hyper+; and hyper+shift+; make. That read emits
+  `focus` and, when the screen changed, `active`; the per-screen app lists
+  are filed from `focus`.
+- Against: a click that moves focus between two windows of one app on two
+  screens activates nothing. It is seen when `hs.screen.watcher` reports it,
+  which may be late for the same reason as `mainScreen` (unmeasured), or when
+  the kept answer expires.
+- Rejected: asking Accessibility for the frontmost app's focused window. It
+  is exact, but it is a query to that app on every read, and a hung app
+  holds Hammerspoon's one Lua thread, and so every hyper key, until the
+  query times out.
+
 ### Checking it from the console
 
 ```lua
 hs.inspect(Screens.list())
 Screens.target("working")[1]:name()
 Screens.target("role:laptop")[1]:name()
+Screens.focusedScreen():name(), hs.screen.mainScreen():name()
 ```
 
 ## Follow-ups and open questions
@@ -273,6 +328,11 @@ both screens on yet (see "Still unmeasured" below):
   laptop is unmeasured. The first write made macOS 14 ask whether Hammerspoon may
   access data from other apps, because Maccy's settings live in its sandbox
   container.
+
+Found in real use on 2026-10-03, after the round above:
+
+- **The `mainScreen` lag** behind hyper+z, Maccy, hyper+; and the hide
+  return; see "Where focus is".
 
 Still unmeasured:
 

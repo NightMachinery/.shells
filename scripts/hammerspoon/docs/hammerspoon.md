@@ -94,12 +94,16 @@ the entries behind it are why this is a list and not one app.
 A hide returns you to the previous app *on the screen the hidden app was on*.
 With one list for both monitors, hiding an app on the laptop could hand focus
 to whatever had last been used on the monitor. So `recentAppsByScreen` keeps
-the same kind of list per screen, keyed by display UUID. An activation is
-filed under the active screen a moment after it (`kRecentScreenDelay`;
-`hs.screen.mainScreen()`, which asks no app anything), and focus moving to another screen without an
-activation, between two windows of one app, is filed by the screen registry's
-`active` event. `screenReturnTarget(screen, pid)` picks the target, in this
-order:
+the same kind of list per screen, keyed by display UUID. The screen
+registry's `focus` event files the frontmost app under the screen of its own
+front window, read from CoreGraphics' window list once focus has settled
+after an activation, or after focus moved between two windows of one app. It
+used to file under `hs.screen.mainScreen()`, which falls behind focus (see
+"Where focus is" in `docs/multi-monitor.md`): Brave, brought forward on the
+monitor, was filed under the laptop, so hyper+x, hyper+/, hyper+l, hyper+l
+returned to Brave instead of Emacs. The screen a hide leaves is the one with
+the hidden app's own front window. `screenReturnTarget(screen, pid)` picks
+the target, in this order:
 
 - the newest app filed under that screen that still has a normal window
   there. An app whose only visible windows are on the other screen is passed
@@ -190,13 +194,16 @@ one window-list read, and only a floating window pays for more.
 Maccy places its hyper+v popup itself. Set to "screen center", Maccy 0.31
 reads its `popupScreen` setting at every popup: 0, the default, falls back to
 `NSScreen.main` inside Maccy (its source), and with 0 the popup opened on the
-laptop while you worked on the monitor; why `NSScreen.main` answered the
-laptop there is unmeasured. n means the n-th of `NSScreen.screens`, the order
+laptop while you worked on the monitor. Inside Hammerspoon the same call falls
+behind focus (see "Where focus is" in `docs/multi-monitor.md`); inside Maccy
+that is unmeasured. n means the n-th of `NSScreen.screens`, the order
 `hs.screen.allScreens()` lists them in.
 Its "window center" setting would be no better: it centres on the front app's
 first CoreGraphics window at any layer, which for Brave is a 24 px strip. So
 `core/app-hotkeys.lua` keeps `popupScreen` pointing at the screen named by the
-spec `maccy_popup_screens` (`false` leaves Maccy alone),
+spec `maccy_popup_screens` (`false` leaves Maccy alone; the default, `active`,
+had followed the lagging `mainScreen` until 2026-10-03 and so kept writing the
+laptop),
 rewriting it with `defaults write` when `Screens.onTargetChange` sees that
 screen change, on a focus or display change, so a press costs nothing extra.
 One write runs at a time, and a change that arrives meanwhile is written after
@@ -220,6 +227,10 @@ focuses windows, not screens), so the pointer goes there anyway and the band
 says "no windows on" it. hyper+; used to be the Delta Chat / Excel app hotkey,
 which is now hyper+y. The code is `Screens.focusNext` and
 `Screens.moveWindowNext` in `core/screens.lua`; see `docs/multi-monitor.md`.
+"The next screen" is counted from the focused screen, `Screens.focusedScreen()`,
+read from the window list. It used to be `hs.screen.mainScreen()`, which lags
+one focus change behind, so hyper+; kept switching to the screen it had just
+left (see "Where focus is" in `docs/multi-monitor.md`).
 
 The frontmost window on a screen comes from CoreGraphics' window list
 (`hs.window.list`, wrapped as `Screens.windowStack`): every on-screen window,

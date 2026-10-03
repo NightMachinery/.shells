@@ -27,14 +27,20 @@
 ---   added     fn(record), once per screen that was not there before
 ---   removed   fn(uuid), once per screen that went away
 ---   active    the focused window's screen changed
+---   focus     fn(app, screen, fromWindow) once focus has settled after an
+---             activation or an active-screen change: the frontmost app and
+---             its screen, and whether that screen came from one of the
+---             app's own windows (see "The focused screen")
 ---
---- The watcher is hs.screen.watcher.newWithActiveScreen, the variant that
---- also reports active-screen changes, so overlays that follow focus can move
+--- Layout changes come from hs.screen.watcher. The focused screen is read
+--- from CoreGraphics' window list, not from hs.screen.mainScreen(), which
+--- lags (see "The focused screen"), so that overlays that follow focus move
 --- with it instead of staying where they first opened.
 
 Screens = Screens or {}
 
-Screens.subscribers = Screens.subscribers or { layout = {}, added = {}, removed = {}, active = {} }
+Screens.subscribers = Screens.subscribers or { layout = {}, added = {}, removed = {}, active = {}, focus = {} }
+Screens.subscribers.focus = Screens.subscribers.focus or {}
 
 --- The `working' intent: which screen a user-directed action lands on when
 --- it is not tied to typing or to the pointer. An enum, not a boolean:
@@ -179,56 +185,9 @@ local function emit(event, ...)
     end
 end
 
-local function activeUUID()
-    local s = hs.screen.mainScreen()
-    return s and screenUUID(s)
-end
-
-local function onLayout()
-    Screens.invalidate()
-    local now = {}
-    for _, r in ipairs(Screens.list()) do
-        if r.uuid then now[r.uuid] = r end
-    end
-    for u in pairs(knownUUIDs) do
-        if not now[u] then
-            knownUUIDs[u] = nil
-            emit("removed", u)
-        end
-    end
-    for u, r in pairs(now) do
-        if not knownUUIDs[u] then
-            knownUUIDs[u] = true
-            emit("added", r)
-        end
-    end
-    --- macOS can fire this several times per display change; every
-    --- subscriber is idempotent and cheap, so no debouncing.
-    emit("layout")
-    lastActiveUUID = activeUUID()
-end
-
-local function onActive()
-    local u = activeUUID()
-    if u == lastActiveUUID then return end
-    lastActiveUUID = u
-    emit("active")
-end
-
 for _, r in ipairs(Screens.list()) do
     if r.uuid then knownUUIDs[r.uuid] = true end
 end
-lastActiveUUID = activeUUID()
-
-if Screens.watcher then Screens.watcher:stop() end
-Screens.watcher = hs.screen.watcher.newWithActiveScreen(function(activeChanged)
-    if activeChanged then
-        onActive()
-    else
-        onLayout()
-    end
-end)
-Screens.watcher:start()
 
 --- ** Resolving a spec to screens
 --- The one place a screen spec means something. Specs name an intent where
@@ -237,9 +196,10 @@ Screens.watcher:start()
 ---   primary                 the menu-bar display (zsh calls this `main')
 ---   internal                built-in panel(s)
 ---   external, all_external  the rest
----   active, main            the focused window's screen. `main' only because
----                           hs.screen.mainScreen() is that; do not confuse
----                           it with zsh's `main', which is `primary' here
+---   active, main            the focused window's screen (Screens.focusedScreen).
+---                           `main' only because hs.screen.mainScreen() is
+---                           meant to answer the same; do not confuse it
+---                           with zsh's `main', which is `primary' here
 ---   mouse, pointer          the screen under the mouse
 ---   typing                  where keyboard input goes: the active screen
 ---   working                 by screens_working_policy, active or pointer
@@ -248,7 +208,7 @@ Screens.watcher:start()
 --- A spec that matches nothing falls back to the primary screen (e.g.
 --- `internal' in clamshell), and an unknown one to every screen.
 local function activeScreen()
-    return hs.screen.mainScreen() or hs.screen.primaryScreen()
+    return Screens.focusedScreen() or hs.screen.primaryScreen()
 end
 
 local function pointerScreen()
@@ -453,6 +413,185 @@ function Screens.entryWindow(e)
     return nil
 end
 
+--- ** The focused screen
+--- The screen of the window with keyboard focus, from the window list
+--- above: the frontmost app's front normal window, else its front visible
+--- window floating below the menu bar (the kitty panel is at layer 4), else
+--- the screen the latest read found from a window, else
+--- hs.screen.mainScreen().
+---
+--- Not hs.screen.mainScreen() first, though it means the same: it is
+--- NSScreen.mainScreen inside Hammerspoon, and it falls behind. Measured
+--- 2026-10-03, with the load average near 46: 1.2 s after hyper+/ brought
+--- Brave's fullscreen window forward on the external screen it still
+--- answered the laptop, while the window list and Accessibility (Brave's
+--- focused window) both had the external screen at 0.15 s; once focus went
+--- back to kitty on the laptop, it answered the external screen. Waiting
+--- longer did not help either: hyper+; kept choosing the same screen (seen
+--- the same day). Whether it lags on an idle machine is unmeasured. While
+--- this config read it, everything that follows focus followed it late or
+--- the wrong way: activations were filed under the screen just left
+--- (core/app-hotkeys.lua), so a hide returned to an app on the other
+--- screen, and hyper+z, Maccy's popup and hyper+; all went to the screen
+--- focus had left.
+---
+--- The answer is kept and reused while the same app stays frontmost, for at
+--- most kFocusTrustSeconds (kFocusGuessSeconds when it had to fall back to
+--- mainScreen), so the callers that ask often, an alert per level-key
+--- press, read nothing. It is read afresh kFocusSettleSeconds after every
+--- activation, every active-screen change hs.screen.watcher reports, and
+--- every focus change made here, and that read emits `focus', and `active'
+--- when the screen changed. A frontmost app with no window on screen then
+--- (a Space still sliding in, a Finder with every window closed) is read
+--- once more after kFocusRetrySeconds.
+
+-- kCGMainMenuWindowLevel; the menu bar and status items sit at and above it.
+local kMenuBarLayer = 24
+
+local kFocusTrustSeconds, kFocusGuessSeconds = 2, 0.25
+local kFocusSettleSeconds, kFocusRetrySeconds = 0.1, 0.4
+
+--- The screen of `pid''s front window in `stack' (a windowStack(), read
+--- now when nil): its front normal window, else its front visible window of
+--- a normal size floating below the menu bar. nil when it has neither.
+function Screens.windowScreenOf(pid, stack)
+    if not pid then return nil end
+    local floating = nil
+    for _, e in ipairs(stack or Screens.windowStack()) do
+        if e.pid == pid then
+            if Screens.isNormalEntry(e) then return Screens.screenOfFrame(e.frame) end
+            if not floating and e.layer > 0 and e.layer < kMenuBarLayer and e.alpha > 0
+               and e.frame.w >= kMinNormalW and e.frame.h >= kMinNormalH then
+                floating = e
+            end
+        end
+    end
+    return floating and Screens.screenOfFrame(floating.frame) or nil
+end
+
+-- { pid, screen, untilAt }: the latest read, and until when it is trusted.
+local focusCache = nil
+
+-- The screen the latest read found from a window. When the frontmost app
+-- shows none, focus is taken to be still there: kitty is frontmost with its
+-- panel hidden after a dialog closes, and hyper+z then sent the panel to the
+-- screen mainScreen named, which was the other one (seen 2026-10-03).
+local lastWindowScreen = nil
+
+local function stillAttached(screen)
+    return screen ~= nil and Screens.record(screen) ~= nil
+end
+
+local function frontmost()
+    local ok, front = pcall(hs.application.frontmostApplication)
+    if not (ok and front) then return nil, nil end
+    local okp, pid = pcall(function() return front:pid() end)
+    return front, okp and pid or nil
+end
+
+--- The focused screen, read now, and the frontmost app, and whether the
+--- screen came from one of its windows rather than a fallback. `stack' is a
+--- windowStack() to reuse.
+function Screens.focusedScreenRead(stack)
+    local front, pid = frontmost()
+    local s = Screens.windowScreenOf(pid, stack)
+    local fromWindow = s ~= nil
+    if fromWindow then
+        lastWindowScreen = s
+    elseif stillAttached(lastWindowScreen) then
+        s = lastWindowScreen
+    else
+        s = hs.screen.mainScreen() or hs.screen.primaryScreen()
+    end
+    focusCache = {
+        pid = pid,
+        screen = s,
+        untilAt = hs.timer.secondsSinceEpoch() + (fromWindow and kFocusTrustSeconds or kFocusGuessSeconds),
+    }
+    return s, front, fromWindow
+end
+
+--- The focused screen, from the latest read while it still applies.
+function Screens.focusedScreen()
+    local c = focusCache
+    if c and hs.timer.secondsSinceEpoch() < c.untilAt then
+        local _, pid = frontmost()
+        if pid == c.pid then return c.screen end
+    end
+    return (Screens.focusedScreenRead())
+end
+
+local function onLayout()
+    Screens.invalidate()
+    local now = {}
+    for _, r in ipairs(Screens.list()) do
+        if r.uuid then now[r.uuid] = r end
+    end
+    for u in pairs(knownUUIDs) do
+        if not now[u] then
+            knownUUIDs[u] = nil
+            emit("removed", u)
+        end
+    end
+    for u, r in pairs(now) do
+        if not knownUUIDs[u] then
+            knownUUIDs[u] = true
+            emit("added", r)
+        end
+    end
+    --- macOS can fire this several times per display change; every
+    --- subscriber is idempotent and cheap, so no debouncing.
+    emit("layout")
+    local s = Screens.focusedScreenRead()
+    lastActiveUUID = s and screenUUID(s)
+end
+
+local focusCheckPending = false
+
+local function focusCheck(isRetry)
+    if not isRetry then focusCheckPending = false end
+    local s, front, fromWindow = Screens.focusedScreenRead()
+    local u = s and screenUUID(s)
+    if u ~= lastActiveUUID then
+        lastActiveUUID = u
+        emit("active")
+    end
+    emit("focus", front, s, fromWindow)
+    if front and not fromWindow and not isRetry then
+        hsAfter(kFocusRetrySeconds, function() focusCheck(true) end)
+    end
+end
+
+--- Read the focused screen again once focus has settled. Activations and
+--- hs.screen.watcher call it; so should anything that moves focus without
+--- an activation, between two windows of one app.
+function Screens.recheckFocus()
+    if focusCheckPending then return end
+    focusCheckPending = true
+    hsAfter(kFocusSettleSeconds, function() focusCheck(false) end)
+end
+
+do
+    local s = Screens.focusedScreenRead()
+    lastActiveUUID = s and screenUUID(s)
+end
+
+if Screens.watcher then Screens.watcher:stop() end
+Screens.watcher = hs.screen.watcher.newWithActiveScreen(function(activeChanged)
+    if activeChanged then
+        Screens.recheckFocus()
+    else
+        onLayout()
+    end
+end)
+Screens.watcher:start()
+
+if Screens.appWatcher then Screens.appWatcher:stop() end
+Screens.appWatcher = hs.application.watcher.new(function(_, event)
+    if event == hs.application.watcher.activated then Screens.recheckFocus() end
+end)
+Screens.appWatcher:start()
+
 --- ** Moving focus between screens
 --- hyper+; and hyper+shift+; (bound in core/app-hotkeys.lua). Screens are
 --- taken left to right and wrap, so with two it is a toggle and with more it
@@ -496,7 +635,7 @@ end
 --- pointer goes over anyway and the band says so; faking it by focusing the
 --- Finder desktop moves focus somewhere unpredictable.
 function Screens.focusNext(delta)
-    local from = hs.screen.mainScreen() or hs.mouse.getCurrentScreen()
+    local from = Screens.focusedScreen()
     local to = Screens.neighbour(from, delta or 1)
     if not to or (from and to:id() == from:id()) then
         focusBand(to or hs.screen.primaryScreen(), "only one screen")
@@ -512,6 +651,8 @@ function Screens.focusNext(delta)
     local w = frontWindowOn(to)
     if w then
         w:focus()
+        -- Two windows of one app activate nothing.
+        Screens.recheckFocus()
         hs.mouse.absolutePosition(centreOf(w:frame()))
         focusBand(to, "\u{2192} " .. name)
     else
@@ -581,12 +722,12 @@ Screens.moveHandlers = Screens.moveHandlers or {}
 --- leaves fullscreen, moves, and goes fullscreen again on the new screen.
 function Screens.moveWindowNext(delta)
     if moving then
-        focusBand(hs.screen.mainScreen() or hs.screen.primaryScreen(), "still moving a window")
+        focusBand(Screens.focusedScreen(), "still moving a window")
         return
     end
     local w = hs.window.focusedWindow()
     if not w then
-        focusBand(hs.screen.mainScreen() or hs.screen.primaryScreen(), "no focused window")
+        focusBand(Screens.focusedScreen(), "no focused window")
         return
     end
     local from = w:screen()
