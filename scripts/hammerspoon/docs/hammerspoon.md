@@ -111,6 +111,13 @@ says "no windows on" it. hyper+; used to be the Delta Chat / Excel app hotkey,
 which is now hyper+y. The code is `Screens.focusNext` and
 `Screens.moveWindowNext` in `core/screens.lua`; see `docs/multi-monitor.md`.
 
+The frontmost window on a screen comes from CoreGraphics' window list
+(`hs.window.list`, wrapped as `Screens.windowStack`): every on-screen window,
+front to back, with its owner's pid, bounds and layer, in 19 to 40 ms, asking
+no app anything. Only the app whose window is picked is then asked for it. The
+first version used `hs.window.orderedWindows()`, which asks every running app
+over Accessibility (see "App hotkeys" above for what that costs).
+
 ## The ipc print recursion fix
 
 `hs -c` used to wedge whenever anything printed to the Hammerspoon console

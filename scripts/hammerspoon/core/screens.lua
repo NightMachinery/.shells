@@ -316,6 +316,110 @@ function Screens.specMoves(spec)
     return kMovingSpecs[spec or "all"] == true
 end
 
+--- ** Windows on a screen, without Accessibility
+--- hs.window.orderedWindows() and hs.window.allWindows() ask every running
+--- process over Accessibility, and some take 1.5 s each to answer (see
+--- core/app-hotkeys.lua). CoreGraphics' window list asks none: hs.window.list
+--- gives every on-screen window front to back with its owner's pid, bounds
+--- and layer, in 19 to 40 ms (measured 2026-10-02, 38 windows). Only the one
+--- app whose window is picked is then asked for its hs.window.
+---
+--- Layer 0 holds normal windows. Floating ones sit above it: the kitty panel
+--- at 4, Brave's 24 px strip at 26, the menu bar and Hammerspoon's canvases
+--- higher still.
+
+--- Smallest normal window worth focusing; layer-0 helper strips are smaller.
+local kMinNormalW, kMinNormalH = 100, 60
+
+--- Window id -> layer, from the latest windowStack(): every read replaces it
+--- whole, so closed windows drop out.
+local layerOfId = {}
+
+--- Every on-screen window, front to back:
+---   { id, pid, layer, alpha, frame = hs.geometry rect }
+--- CG bounds are global, top-left origin, the same space as hs.screen:frame().
+function Screens.windowStack()
+    local out, layers = {}, {}
+    local ok, list = pcall(hs.window.list, false)
+    if not ok or type(list) ~= "table" then return out end
+    for _, w in ipairs(list) do
+        local b = w.kCGWindowBounds
+        if b and w.kCGWindowOwnerPID then
+            local e = {
+                id = w.kCGWindowNumber,
+                pid = w.kCGWindowOwnerPID,
+                layer = w.kCGWindowLayer or 0,
+                alpha = w.kCGWindowAlpha or 1,
+                frame = hs.geometry.rect(b.X, b.Y, b.Width, b.Height),
+            }
+            out[#out + 1] = e
+            layers[e.id] = e.layer
+        end
+    end
+    layerOfId = layers
+    return out
+end
+
+--- The CoreGraphics layer of window `id', or nil when it is not on screen.
+--- Answered from the last windowStack() when that saw the window, so asking
+--- about the same windows again costs nothing; a window it has not seen
+--- costs one fresh read. A window that changes layer while staying open
+--- keeps its old answer until the next read, which also replaces every
+--- other answer, so an id is only ever answered for the window that held it
+--- at the last read.
+function Screens.layerOf(id)
+    if id == nil then return nil end
+    local l = layerOfId[id]
+    if l ~= nil then return l end
+    Screens.windowStack()
+    return layerOfId[id]
+end
+
+--- The screen holding the centre of `frame', else the one it overlaps most.
+function Screens.screenOfFrame(frame)
+    local cx, cy = frame.x + frame.w / 2, frame.y + frame.h / 2
+    local best, bestArea = nil, 0
+    for _, r in ipairs(Screens.list()) do
+        local f = r.fullFrame
+        if cx >= f.x and cx < f.x + f.w and cy >= f.y and cy < f.y + f.h then return r.screen end
+        local i = f:intersect(frame)
+        if i.area > bestArea then best, bestArea = r.screen, i.area end
+    end
+    return best
+end
+
+--- Whether a windowStack entry is a normal window: layer 0, visible, and
+--- not a helper strip.
+function Screens.isNormalEntry(e)
+    return e.layer == 0 and e.alpha > 0 and e.frame.w >= kMinNormalW and e.frame.h >= kMinNormalH
+end
+
+--- The normal windows on `screen', front to back, whose pid skip(pid) does
+--- not reject. `stack' is a windowStack() to reuse, so one press reads the
+--- list once.
+function Screens.normalWindowsOn(screen, skip, stack)
+    local out, id = {}, screen:id()
+    for _, e in ipairs(stack or Screens.windowStack()) do
+        if Screens.isNormalEntry(e) and not (skip and skip(e.pid)) then
+            local s = Screens.screenOfFrame(e.frame)
+            if s and s:id() == id then out[#out + 1] = e end
+        end
+    end
+    return out
+end
+
+--- The hs.window for a windowStack entry, asking only its owning app.
+function Screens.entryWindow(e)
+    local app = hs.application.applicationForPID(e.pid)
+    if not app then return nil end
+    local ok, wins = pcall(function() return app:allWindows() end)
+    if not ok then return nil end
+    for _, w in ipairs(wins) do
+        if w:id() == e.id then return w end
+    end
+    return nil
+end
+
 --- ** Moving focus between screens
 --- hyper+; and hyper+shift+; (bound in core/app-hotkeys.lua). Screens are
 --- taken left to right and wrap, so with two it is a toggle and with more it
@@ -343,16 +447,15 @@ local function centreOf(frame)
     return hs.geometry.point(frame.x + frame.w / 2, frame.y + frame.h / 2)
 end
 
---- Front to back, the standard visible windows on `screen'.
-local function windowsOn(screen)
-    local out, id = {}, screen:id()
-    for _, w in ipairs(hs.window.orderedWindows()) do
-        local s = w:screen()
-        if s and s:id() == id and w:isStandard() and w:isVisible() then
-            out[#out + 1] = w
-        end
+--- The frontmost normal window on `screen' as an hs.window, or nil. It used
+--- to be hs.window.orderedWindows() filtered by screen, which asks every app
+--- over Accessibility (see "Windows on a screen" above).
+local function frontWindowOn(screen)
+    for _, e in ipairs(Screens.normalWindowsOn(screen)) do
+        local w = Screens.entryWindow(e)
+        if w then return w end
     end
-    return out
+    return nil
 end
 
 --- Focus the frontmost window on the next screen. With no window there,
@@ -369,7 +472,7 @@ function Screens.focusNext(delta)
     local r = Screens.record(to)
     local name = r and r.name or "?"
 
-    local w = windowsOn(to)[1]
+    local w = frontWindowOn(to)
     if w then
         w:focus()
         hs.mouse.absolutePosition(centreOf(w:frame()))
