@@ -3,7 +3,7 @@
 
 function h-rsync-optional-xattrs {
     : "rsync with extended attributes by default, retrying once when unsupported"
-    setopt localoptions nomultios
+    setopt localoptions nomultios pipefail
     ensure-cmd rsync tee mktemp cat @RET
 
     local args=("$@") err_file stdin_file='' errors
