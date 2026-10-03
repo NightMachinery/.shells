@@ -169,8 +169,45 @@ Each is documented with its feature in `docs/hammerspoon.md`:
 - **Focus keys**: hyper+; focuses the frontmost window on the next screen,
   and hyper+shift+; moves the focused window there. Both bring the pointer
   along. ("Moving between screens".)
-- **kitty panel** shows on the screen named by `kitty_panel_screens`, default
-  `working`. ("kitty: hyper+z".)
+- **kitty panel** shows on the screen named by `kitty_panel_screens`. Every
+  show asks kitty for a fresh layout on that screen, and fits the panel when
+  it is still off; hyper+shift+; moves the shown panel through kitty, not
+  over Accessibility. ("kitty: hyper+z".)
+- **Return after a hide**: the second press of an app hotkey, and hiding
+  kitty, return to the previous app on the same screen
+  (`screenReturnTarget`), not the newest app anywhere. ("App hotkeys".)
+- **Floating windows**: after any activation this config causes (an app
+  hotkey, a hide's return, kitty's return), a focused window above layer 0,
+  such as a Picture-in-Picture video, hands focus to the app's front normal
+  window (`appFocusOffFloating`). ("App hotkeys".)
+- **Maccy's hyper+v popup** opens on the active screen: its `popupScreen`
+  setting is rewritten whenever the active screen changes. ("App hotkeys".)
+
+### Windows on a screen
+
+The registry knows screens; several fixes also need the windows on one. That
+comes from CoreGraphics' window list (`hs.window.list`), wrapped as
+`Screens.windowStack()`: every on-screen window front to back, with owner pid,
+bounds and layer, in 19 to 40 ms, asking no app anything. Accessibility's
+`hs.window.orderedWindows()` asks every running app instead, and some take
+1.5 s to answer. On top of it:
+
+- `Screens.isNormalEntry(e)`: layer 0, visible, and not smaller than a
+  helper strip (`kMinNormalW`, `kMinNormalH`). Floating
+  windows sit above layer 0 (the kitty panel at 4, Brave's 24 px strip at
+  26).
+- `Screens.normalWindowsOn(screen, skip, stack)`: those on one screen, front
+  to back.
+- `Screens.entryWindow(e)`: the `hs.window` for an entry, asking only its
+  owning app.
+- `Screens.layerOf(id)`: a window's layer, from the last read when that saw
+  the window, else from a fresh one. The floating-window check uses it, so
+  asking about the same windows again costs nothing.
+- `Screens.moveHandlers`: windows that hyper+shift+; must move some other
+  way than Accessibility. The kitty panel registers one.
+- `Screens.onTargetChange(spec, fn)`: calls `fn(screen)` whenever a spec
+  resolves to a different screen, for state outside Hammerspoon that has to
+  follow one (Maccy's setting).
 
 ### Checking it from the console
 
@@ -198,13 +235,49 @@ laptop panel plus one monitor):
 - **kitty accepts the move.** kitty 0.48.2 answered ok to the incremental
   `os-panel` call on a live panel, in about 20 ms.
 
+Bugs found in real use the same night, each pinned down with a runtime probe
+(installed through `hs -c`, logging to a file, gone at the next reload), as
+"When a hyper chord does nothing" in `docs/hammerspoon.md` recommends:
+
+- **The kitty panel came out at the wrong size.** Shown from the laptop after
+  living on the monitor, it came out 1920×1056, the monitor's size, at the
+  laptop's origin. kitty takes the size from the screen it lays the panel out
+  on, so either it used outdated screen data or no move was sent: the move
+  was skipped whenever a record said the panel was on that screen already,
+  and the record went stale whenever anything else moved the panel. Now
+  every show sends the move, and the panel is fitted to kitty's own layout
+  frame when it is still off.
+- **hyper+shift+; did nothing.** The key arrived with shift and hyper
+  entered, and the handler ran without error, but the window was Thunderbird
+  in native fullscreen, whose `AXPosition` is not settable. Fixed by leaving
+  fullscreen, moving, and going fullscreen again, and by checking every move.
+- **hyper+/ focused Brave's Picture-in-Picture window.** Fixed by the
+  floating-window check above. Its first version skipped any window that
+  called itself standard, and a Chromium PiP window does (AeroSpace's
+  recorded Accessibility dumps, upstream), so it would never have fired; it
+  now goes by the layer alone.
+- **A hide returned to an app on the other monitor.** Fixed by the per-screen
+  lists.
+- **Maccy's popup opened on the laptop.** Fixed by keeping `popupScreen` on
+  the active screen. The first write made macOS 14 ask whether Hammerspoon may
+  access data from other apps, because Maccy's settings live in its sandbox
+  container.
+
 Still unmeasured:
 
-- **Does the kitty panel actually change screens?** The call succeeds, but
-  every show so far was on the screen the panel was already on. kitty's help
-  says that on Wayland a panel's output is fixed at creation. If macOS behaves
-  the same, the panel has to be recreated on the new screen, which means
-  moving its tabs out and back.
+- **Do the second-round fixes work on two screens?** They loaded cleanly and
+  their read-only parts were exercised from the console (the window list in
+  20 ms, a return target chosen in 12 ms), but the laptop panel was off by
+  then, so the panel fit, a fullscreen move, a per-screen return across two
+  screens, Maccy following focus, and a Picture-in-Picture redirect all wait
+  for a real press with both screens on.
+- **Does the panel take a fitted frame, and keep it?** It is a borderless
+  window, which may refuse a new size over Accessibility; the console line
+  says `could not fit` then. If kitty fights the fit, the panel has to be
+  recreated on the new screen instead.
+- **Brave's Picture-in-Picture window, measured here.** The layer-3 figure
+  comes from Chromium's source and AeroSpace's dumps. No PiP video has been
+  open since the probes were armed.
 - **The new blackout restore.** The blackout that ended before the reload was
   restored by the old code, so the UUID rows, the last-good fallback and the
   floors (see `docs/external-display-brightness.md`) have been tested only
@@ -224,7 +297,14 @@ Known gaps:
 - **The avy grid overhangs its screen** by one cell on every side, so next to
   a second monitor the edge cells are drawn on the neighbour.
 - **Window-mode kitty** still follows the pointer screen rather than
-  `working`.
+  `working`. Its hide also still hides kitty first and focuses the return
+  target afterwards, so macOS picks an app for a moment in between; the app
+  hotkeys focus the target first and hide once it has activated.
+- **A summon from the other screen.** From B on the laptop, an app hotkey
+  that brings up A on the monitor and a second press return to the monitor's
+  previous app, not to B. That is the per-screen rule as asked for. Should it
+  turn out wrong in practice, the shape for a choice is an enum knob (screen,
+  summoner, global), not a boolean.
 - **Duplicate names.** Two identical monitors share an `hs.screen:name()`.
   The registry does not care (it keys on UUID), but band labels would read the
   same, and kitty's `output-name` cannot tell them apart.
