@@ -316,6 +316,29 @@ function Screens.specMoves(spec)
     return kMovingSpecs[spec or "all"] == true
 end
 
+--- ** Following a spec
+--- fn(screen) now, and again whenever Screens.target(spec)[1] becomes a
+--- different screen: on a display change, and for a moving spec on every
+--- active-screen change. For state that lives outside Hammerspoon and must
+--- track a screen (an app preference, say), so it is set once per change
+--- rather than at every use. Returns forget(): call it when applying failed,
+--- so the next event applies again even if the screen is the same.
+function Screens.onTargetChange(spec, fn)
+    local last = nil
+    local function check()
+        local s = Screens.target(spec)[1]
+        local u = s and screenUUID(s)
+        if u == last then return end
+        last = u
+        local ok, err = pcall(fn, s)
+        if not ok then print("Screens.onTargetChange(" .. tostring(spec) .. "): " .. tostring(err)) end
+    end
+    Screens.on("layout", function() last = nil check() end)
+    if Screens.specMoves(spec) then Screens.on("active", check) end
+    check()
+    return function() last = nil end
+end
+
 --- ** Windows on a screen, without Accessibility
 --- hs.window.orderedWindows() and hs.window.allWindows() ask every running
 --- process over Accessibility, and some take 1.5 s each to answer (see

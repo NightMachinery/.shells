@@ -777,3 +777,47 @@ hyper_bind_v1("d", function()
         alert_gateway("Could not dismiss notifications: " .. err, { color = "warn" })
     end, 30, nil, "hyper+d")
 end)
+
+--- * Maccy's popup on the active screen
+--
+-- hyper+v passes ctrl+alt+cmd+shift+v through to Maccy (core/hyper-mode.lua),
+-- and Maccy places its popup itself. Set to "screen center", Maccy 0.31
+-- reads its `popupScreen' setting at every popup (Maccy/Menu/PopupLocation.swift
+-- and Extensions/NSScreen+ForPopup.swift upstream): 0 means NSScreen.main
+-- inside Maccy, which has no key window when its hotkey fires, and the popup
+-- opened on the laptop while you worked on the monitor; n means
+-- NSScreen.screens[n - 1], the order hs.screen.allScreens() lists them in.
+-- Its "window center" setting is no better: it centres on the front app's
+-- first CoreGraphics window at any layer, which for Brave is a 24 px strip.
+--
+-- So popupScreen is kept pointing at the screen named by the spec
+-- `maccy_popup_screens' (default "active"; false leaves Maccy alone),
+-- rewritten through `defaults' whenever that screen changes, and a press
+-- costs nothing extra.
+--
+-- Maccy is sandboxed, so its settings live in its container, and on macOS
+-- 14 the first write there from a process Hammerspoon starts makes macOS ask
+-- whether Hammerspoon may access data from other apps (seen 2026-10-03). The
+-- write waits for that answer, hence the long timeout; a failed write is
+-- forgotten, so the next screen change tries again.
+if maccy_popup_screens == nil then maccy_popup_screens = "active" end
+
+local maccyBundleID = "org.p0deje.Maccy"
+
+if maccy_popup_screens and Screens then
+    local forget
+    forget = Screens.onTargetChange(maccy_popup_screens, function(screen)
+        if not screen then return end
+        local index = nil
+        for i, s in ipairs(hs.screen.allScreens()) do
+            if s:id() == screen:id() then index = i break end
+        end
+        if not index then return end
+        gardenTask("/usr/bin/defaults", { "write", maccyBundleID, "popupScreen", "-int", tostring(index) },
+                   function(code, _, err)
+                       if code == 0 then return end
+                       print("Maccy popupScreen: defaults exited " .. code .. ": " .. err)
+                       if forget then forget() end
+                   end, 120, nil, "maccy-popup-screen")
+    end)
+end
