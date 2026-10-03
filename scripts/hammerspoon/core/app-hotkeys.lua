@@ -146,9 +146,11 @@ end
 
 --- The recent apps, newest first, less those skip(bundleID, pid) rejects.
 --- Read it at press time: the switch the press causes updates the list.
-function recentAppsCandidates(skip)
+--- `from', when given, is read instead of recentApps: a copy taken at press
+--- time by screenReturnSnapshot, for a choice made later.
+function recentAppsCandidates(skip, from)
     local list = {}
-    for _, a in ipairs(recentApps) do
+    for _, a in ipairs(from or recentApps) do
         local ok, keep = pcall(function() return not (skip and skip(a:bundleID(), a:pid())) end)
         if ok and keep then list[#list + 1] = a end
     end
@@ -232,6 +234,20 @@ do
     recentAppsFileFront()
 end
 
+--- The recent-apps lists for screenReturnTarget's `snap', copied now, since
+--- every activation changes them in place. It asks no app anything, so a key
+--- handler can take it and leave the choice, with its window-list read, to
+--- a timer.
+function screenReturnSnapshot(screen)
+    local function copy(t) return table.move(t, 1, #t, 1, {}) end
+    local key = screen and screenKey(screen)
+    return {
+        screen = screen,
+        byScreen = copy((key and recentAppsByScreen[key]) or {}),
+        recent = copy(recentApps),
+    }
+end
+
 --- Where focus should go when the app with pid `skipPid' leaves `screen':
 ---   { app = <hs.application>, window = <hs.window or nil>, kittyPanel = true|nil, why = "..." }
 --- or nil. In order:
@@ -257,6 +273,9 @@ end
 --- panel mode kitty is taken on its record alone and comes back through
 --- kittyPanelShow, which shows on the working screen.
 --- `skipBid' rejects one more bundle id (kitty's own toggle passes kitty).
+--- `snap', from screenReturnSnapshot, stands in for the recent-apps lists
+--- as they were when it was taken, for a choice made after a switch has
+--- updated them.
 --- One CoreGraphics read (Screens.windowStack) per call. A window in that
 --- list belongs to a running app that is not hidden, so steps 1 and 2 ask
 --- no app anything until they pick one.
@@ -313,7 +332,7 @@ function screenReturnTarget(screen, skipPid, skipBid)
     end
 
     local panelMode = kitty_hotkey_mode == "panel" and kittyPanelShow
-    for _, a in ipairs((key and recentAppsByScreen[key]) or {}) do
+    for _, a in ipairs((snap and snap.byScreen) or (key and recentAppsByScreen[key]) or {}) do
         local ok, pid, bid = pcall(function() return a:pid(), a:bundleID() end)
         if ok and not skip(pid, bid) then
             if panelMode and bid == "net.kovidgoyal.kitty" then
@@ -336,7 +355,7 @@ function screenReturnTarget(screen, skipPid, skipBid)
         end
     end
 
-    for _, a in ipairs(recentAppsCandidates(function(bid, pid) return skip(pid, bid) end)) do
+    for _, a in ipairs(recentAppsCandidates(function(bid, pid) return skip(pid, bid) end, snap and snap.recent)) do
         if appReturnUsable(a) then
             local ok, bid = pcall(function() return a:bundleID() end)
             if panelMode and ok and bid == "net.kovidgoyal.kitty" then

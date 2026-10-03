@@ -134,10 +134,17 @@ costs one window-list read: 12 ms measured on 2026-10-03, and the press's
 brought forward first, and the app is hidden only once the target's activation
 arrives (`appHideWatcher`), or after a second if it never does: hiding the app
 while it is still frontmost would let macOS choose again. When the target is
-kitty in panel mode, it comes back through `kittyPanelShow`, which shows on
-the working screen, since kitty activating shows nothing by itself. With no
-target the app is simply hidden. The kitty toggle's own hide returns the same
-way.
+kitty in panel mode, it comes back through `kittyPanelShow`, which shows it on
+the screen named by `kitty_panel_screens`, since kitty activating shows
+nothing by itself. With no target the app is simply hidden.
+
+The kitty toggle's own hide returns the same way. In panel mode it copies the
+recent-apps lists at the press (`screenReturnSnapshot`), sends the hide, and
+chooses the target from that copy once the hide has gone out
+(`screenReturnTarget`'s `snap`): the hide is only sent once the key handler
+returns, and choosing reads the window list and may ask apps over
+Accessibility. Window mode still chooses before it hides, so the return
+follows the hide as closely as it can.
 
 Bringing an app forward raises its front window, and that can be a floating
 one: Brave's Picture-in-Picture video floats above its browser windows, so

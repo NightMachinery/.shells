@@ -464,14 +464,21 @@ end
 
 -- Where hiding puts you back: the previous app on the screen kitty is on,
 -- by screenReturnTarget (core/app-hotkeys.lua), the rule the app hotkeys
--- return by. Read at press time: kitty is frontmost then, so the active
--- screen is kitty's, and the hide's own activation has not yet been filed.
--- The recent-apps lists are fed by an application watcher on every switch,
--- so they are never stale (the old `kitty_prev_app' was, whenever kitty had
--- been reached by another route, and nil after every reload).
-local function kittyReturnTarget()
+-- return by. `snap' (screenReturnSnapshot) is taken at press time: kitty is
+-- frontmost then, so the active screen is kitty's, and the hide's own
+-- activation has not yet been filed. The recent-apps lists are fed by an
+-- application watcher on every switch, so they are never stale (the old
+-- `kitty_prev_app' was, whenever kitty had been reached by another route,
+-- and nil after every reload). nil when there is no target, or choosing
+-- raised.
+local function kittyReturnTarget(snap)
     local kitty = getApp(kittyBundleID)
-    return screenReturnTarget(hs.screen.mainScreen(), kitty and kitty:pid(), kittyBundleID)
+    local ok, t = pcall(screenReturnTarget, snap.screen, kitty and kitty:pid(), kittyBundleID, snap)
+    if not ok then
+        print("kittyReturnTarget: " .. tostring(t))
+        return nil
+    end
+    return t
 end
 
 -- Carries the target out. A dead hs.application raises, hence the pcall.
@@ -525,14 +532,16 @@ end
 function kittyPanelToggle(app, front, shown)
     if shown == nil then shown = app and app:isFrontmost() and kittyPanelShown(app) end
     if shown then
-        -- Read now, not in the timer: the hide may activate something and
-        -- the watcher would overwrite the memory before the timer fires.
-        local back = kittyReturnTarget()
+        -- The lists are copied now, before the hide's activation updates
+        -- them, and the target is chosen in the timer: choosing reads the
+        -- window list and may ask apps over Accessibility, and the hide is
+        -- only sent once this handler returns.
+        local snap = screenReturnSnapshot(hs.screen.mainScreen())
         kittyPanelHide("kittyPanelToggle")
         -- hsAfter, not hs.timer.doAfter: a timer nothing references is
         -- stopped when the garbage collector takes it (timer_gc in
         -- Hammerspoon's libtimer.m), which would silently drop the return.
-        hsAfter(0.35, function() kittyFocusAfterHide(back) end)
+        hsAfter(0.35, function() kittyFocusAfterHide(kittyReturnTarget(snap)) end)
         return
     end
 
@@ -555,8 +564,10 @@ function kittyWindowToggle(app, front)
     end
 
     if app:isFrontmost() then
-        -- Read before hide(): the activation hide() causes updates the memory.
-        local back = kittyReturnTarget()
+        -- Chosen before hide(), unlike the panel's: hide() lets macOS
+        -- activate an app of its own choosing, and the return should follow
+        -- it as closely as it can.
+        local back = kittyReturnTarget(screenReturnSnapshot(hs.screen.mainScreen()))
         kittyEvictFromFullscreen(win)
         app:hide()
         kittyFocusAfterHide(back)
