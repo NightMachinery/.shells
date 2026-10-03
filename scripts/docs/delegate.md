@@ -1,6 +1,6 @@
 # Delegating work and independent opinions
 
-The shared [delegate skill](../configFiles/agent-skills/delegate/SKILL.md)
+The shared `delegate` skill
 combines task selection, worker briefing, account boundaries, ownership, and
 result review in one workflow. Select a mode explicitly:
 
@@ -51,7 +51,8 @@ preserves authorized account/provider selection, write ownership, and recursion
 limits. Workers do not launch stronger descendants without permission in their
 brief. Persistent sessions are closed only within existing authorization.
 
-Sources stay under `configFiles/agent-skills/delegate/`, with model policy in
+Sources live under `~/code/skills/tmux-subagents/skills/delegate/`, alongside
+the `delegate-weaker` and `weaker` compatibility entrypoints. Model policy is in
 `references/models.md` and Paseo binding in `references/paseo.md`. The existing
 [agfi:agent-skills-link] installs directory links for all configured agents,
 including both Claude accounts. It preserves reference files alongside the

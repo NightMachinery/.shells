@@ -1,7 +1,7 @@
 # Weaker delegation compatibility
 
 The former standalone `delegate-weaker` workflow is merged into the shared
-[delegate skill](../configFiles/agent-skills/delegate/SKILL.md). It supports
+`delegate` skill in `~/code/skills/tmux-subagents/skills/`. It supports
 weaker, peer, and stronger workers with separate model/account/backend choices.
 See [delegation modes and backends](delegate.md) for current usage and policy.
 
