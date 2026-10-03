@@ -45,3 +45,44 @@ file mtime and size and refreshed after insertion. Other kitty windows are
 captured by the kitten; tracked paths come from a time-boxed =git ls-files=.
 The current screen stays first. A cold transcript cache costs no insertion
 latency; press again after the first worker has warmed it.
+
+* Shared FIM transport
+
+=llm_complete fim= reads one JSON object on stdin with =provider=, =prefix=,
+=suffix= and optional =model=, =max_tokens=, =stop= (string or array),
+=temperature=, =timeout= (seconds), =strip_space=, =source=, =target= and =log=.
+Completion bytes go to stdout, without a final newline unless stdout is a
+terminal. Errors are one stderr line beginning =fim-get:=. HTTP and API-key
+errors return 1. Network errors retain curl-compatible exit codes (timeout
+28, DNS 6, connect 7, certificate 60, other transfer errors 52).
+
+=fim providers= prints names sorted; =fim providers --json= prints entries
+with =name=, =model=, =endpoint=, =key_env=, =extract= and provider overrides.
+Keys come from those environment variable names, never from stdin or argv.
+HTTP(S)_PROXY and NO_PROXY are honored; ALL_PROXY is intentionally ignored.
+
+The optional =~/.config/llm_complete/providers.json= merges provider fields
+over the built-in table. =LLM_COMPLETE_CONFIG= can select another file for
+tests. Omitted fields inherit. Explicit call fields override provider fields,
+then Go defaults apply (64 tokens, newline stop, temperature 0, 20 seconds,
+leading-space stripping off). Zero tokens and empty/null stop disable them.
+
+#+begin_src json
+{
+  "providers": {
+    "local": {
+      "endpoint": "http://localhost:8000/fim",
+      "model": "local-model",
+      "key_env": "",
+      "extract": "text",
+      "max_tokens": 80
+    }
+  },
+  "default_provider": "codestral",
+  "agent_fim": {"prefix_chars": 2000, "suffix_chars": 1000, "reply_chars": 1500, "log": true},
+  "logging": {"sources": {"zsh": false}, "max_bytes": 1048576, "files": 4}
+}
+#+end_src
+
+Provider reply shapes are =chat= for choices[0].message.content and =text=
+for choices[0].text. No caller maintains its own provider table.

@@ -31,6 +31,8 @@ func run(args []string, in io.Reader, out, errs io.Writer) int {
 		return 2
 	}
 	switch args[0] {
+	case "fim":
+		return runFIM(args[1:], in, out, errs)
 	case "terminal":
 		var r TerminalRequest
 		if len(args) == 5 && args[2] == "tmux" {
