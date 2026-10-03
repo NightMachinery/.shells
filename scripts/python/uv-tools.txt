@@ -2,7 +2,7 @@
 amzqr
 arxiv-latex-cleaner
 asitop
--e ~/code/python/BrishGarden --with-editable ~/code/python/brish
+-e ~/code/python/BrishGarden --with-editable ~/code/python/brish --with-editable ~/code/uni/PyNight
 catsql
 git+https://github.com/NightMachinery/cis-applications2org.git
 copyparty
