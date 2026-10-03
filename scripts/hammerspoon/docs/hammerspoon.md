@@ -118,6 +118,23 @@ no app anything. Only the app whose window is picked is then asked for it. The
 first version used `hs.window.orderedWindows()`, which asks every running app
 over Accessibility (see "App hotkeys" above for what that costs).
 
+A window in native fullscreen cannot be moved: its `AXPosition` is not
+settable. The first version therefore did nothing at all on a fullscreen
+Thunderbird and still showed its "moved" band (measured 2026-10-02 with a
+runtime probe: the press arrived, the handler ran without error, and the
+window had not moved). Now such a window leaves fullscreen, is moved once the
+animation has settled, and goes fullscreen again on the new screen. Every move
+is checked afterwards, since Hammerspoon ignores the result of every
+Accessibility write. If the window has not moved, the band says "could not
+move" instead of claiming it did. Firefox, Thunderbird and Chromium browsers
+switch on `AXEnhancedUserInterface` when they think an assistive app is
+running, which makes their moves unreliable; Hammerspoon 1.1.1's own frame
+setter already turns it off around every move (`-[HSwindow setFrame:]` in its
+`HSuicore.m`), so nothing more is done about it here. Only one move runs at a
+time; a watchdog frees the key if a step of the fullscreen dance never calls
+back, so a crash in the middle cannot leave every later press saying "still
+moving a window".
+
 ## The ipc print recursion fix
 
 `hs -c` used to wedge whenever anything printed to the Hammerspoon console

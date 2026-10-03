@@ -483,10 +483,68 @@ function Screens.focusNext(delta)
     end
 end
 
---- Move the focused window to the next screen, keeping its frame relative
---- to the screen (hs.window:moveToScreen scales it) and clamped inside it,
---- then focus it there and bring the pointer along.
+local function onScreen(w, screen)
+    local s = w:screen()
+    return s ~= nil and s:id() == screen:id()
+end
+
+--- hs.window:moveToScreen, keeping the frame relative to the screen (it
+--- scales it) and clamped inside it, and whether the window landed there:
+--- Hammerspoon ignores the result of every Accessibility write, so a window
+--- that refuses the move would otherwise pass for moved. Hammerspoon 1.1.1
+--- already switches the app's AXEnhancedUserInterface off around the move
+--- (-[HSwindow setFrame:] in HSuicore.m), which Firefox, Thunderbird and
+--- Chromium browsers turn on and which makes their moves unreliable.
+local function moveTo(w, to)
+    w:moveToScreen(to, false, true, 0)
+    return onScreen(w, to)
+end
+
+--- done(true) once w:isFullScreen() == want and the frame has held still
+--- for one poll, or done(false) after kSettleSeconds. macOS animates the
+--- way in and out of fullscreen, and a window that is still animating
+--- cannot be moved.
+local kSettlePoll, kSettleSeconds = 0.1, 3
+local function whenSettled(w, want, done)
+    local deadline = hs.timer.secondsSinceEpoch() + kSettleSeconds
+    local last = nil
+    local function poll()
+        local ok, f = pcall(function() return w:isFullScreen() == want and w:frame() or nil end)
+        if not ok then return done(false) end
+        if f and last and f:equals(last) then return done(true) end
+        last = f
+        if hs.timer.secondsSinceEpoch() > deadline then return done(false) end
+        hsAfter(kSettlePoll, poll)
+    end
+    hsAfter(kSettlePoll, poll)
+end
+
+--- One move at a time: the fullscreen dance takes a second or two, and a
+--- second press in the middle of it would move a window that is still
+--- animating. The watchdog frees the key should a step die without calling
+--- back, which would otherwise leave every later press saying "still
+--- moving".
+local moving = nil
+local kMoveWatchdogSeconds = 2 * kSettleSeconds + 2
+
+--- Windows that move some other way than Accessibility, by name:
+---   fn(w, to, done) -> true when it took the move, then done(ok, note)
+--- once it is over; false to leave it to the Accessibility move. The kitty
+--- panel registers one (core/kitty-panel.lua): kitty keeps its own record of
+--- the panel's screen, and lays the panel out on that screen again at its
+--- next re-layout.
+Screens.moveHandlers = Screens.moveHandlers or {}
+
+--- Move the focused window to the next screen, then focus it there and
+--- bring the pointer along. A native fullscreen window cannot be moved at
+--- all (its AXPosition is not settable: measured on Thunderbird
+--- 2026-10-02, where the old version of this silently did nothing), so it
+--- leaves fullscreen, moves, and goes fullscreen again on the new screen.
 function Screens.moveWindowNext(delta)
+    if moving then
+        focusBand(hs.screen.mainScreen() or hs.screen.primaryScreen(), "still moving a window")
+        return
+    end
     local w = hs.window.focusedWindow()
     if not w then
         focusBand(hs.screen.mainScreen() or hs.screen.primaryScreen(), "no focused window")
@@ -498,11 +556,58 @@ function Screens.moveWindowNext(delta)
         focusBand(from, "only one screen")
         return
     end
-
-    w:moveToScreen(to, false, true, 0)
-    w:focus()
-    hs.mouse.absolutePosition(centreOf(w:frame()))
+    local app = w:application()
+    local appName = app and app:name() or "window"
     local r = Screens.record(to)
-    focusBand(to, "\u{2192} " .. (r and r.name or "?") .. "  (moved " .. (w:application() and w:application():name() or "window") .. ")")
+    local toName = r and r.name or "?"
+
+    local token = {}
+    moving = token
+    local watchdog = hsAfter(kMoveWatchdogSeconds, function()
+        if moving == token then
+            moving = nil
+            print("Screens.moveWindowNext: moving " .. appName .. " did not finish; key freed")
+        end
+    end)
+    local function finish(ok, note, how)
+        if moving ~= token then return end
+        moving = nil
+        hsCancel(watchdog)
+        if not ok then
+            focusBand(from, "could not move " .. appName .. " to " .. toName .. (note or ""))
+            print("Screens.moveWindowNext: could not move " .. appName .. (note or ""))
+            return
+        end
+        pcall(function()
+            w:focus()
+            hs.mouse.absolutePosition(centreOf(w:frame()))
+        end)
+        focusBand(to, "\u{2192} " .. toName .. "  (moved " .. appName .. ")")
+        print("Screens.moveWindowNext: moved " .. appName .. " to " .. toName .. (how or ""))
+    end
+
+    for name, handler in pairs(Screens.moveHandlers) do
+        local ok, took = pcall(handler, w, to, function(moved, note) finish(moved, note, " (" .. name .. ")") end)
+        if not ok then print("Screens.moveWindowNext: " .. name .. ": " .. tostring(took)) end
+        if ok and took then return end
+    end
+
+    local okf, full = pcall(function() return w:isFullScreen() end)
+    if not (okf and full) then
+        local okm, moved = pcall(moveTo, w, to)
+        return finish(okm and moved)
+    end
+
+    focusBand(from, "leaving fullscreen to move " .. appName)
+    w:setFullScreen(false)
+    whenSettled(w, false, function(left)
+        if not left then return finish(false, ": it did not leave fullscreen") end
+        local okm, moved = pcall(moveTo, w, to)
+        if not (okm and moved) then return finish(false, " after leaving fullscreen") end
+        w:setFullScreen(true)
+        whenSettled(w, true, function(back)
+            finish(true, nil, back and ", fullscreen again" or ", but it did not go fullscreen again")
+        end)
+    end)
 end
 --- @end
