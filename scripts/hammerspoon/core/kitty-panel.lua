@@ -297,7 +297,7 @@ end
 -- runs after the show, and after the focus too, so it never holds them up.
 local kPanelFitSlack = 2
 
-local function kittyPanelFit(label, screen)
+local function kittyPanelFitNow(label, screen)
     local app = getApp(kittyBundleID)
     if not (app and screen) then return end
     local want = kittyPanelFrameOn(screen)
@@ -315,13 +315,23 @@ local function kittyPanelFit(label, screen)
             pcall(function() w:setFrame(want, 0) end)
             local okg, g = pcall(function() return w:frame() end)
             g = okg and g or f
-            print(string.format("kittyPanel: %s: %s the panel to %s: %dx%d@%d,%d -> %dx%d@%d,%d", label,
+            -- %g, not %d: Accessibility frames can be fractional, and
+            -- Lua 5.4's %d raises on 1056.5.
+            print(string.format("kittyPanel: %s: %s the panel to %s: %gx%g@%g,%g -> %gx%g@%g,%g", label,
                                 near(g) and "fitted" or "could not fit", screen:name() or "?",
                                 f.w, f.h, f.x, f.y, g.w, g.h, g.x, g.y))
             return
         end
     end
     print("kittyPanel: " .. label .. ": no panel window to fit")
+end
+
+-- kittyPanelFitNow with any error printed, not raised: kittyPanelMoveTo
+-- calls it before done(), and an error there would leave hyper+shift+;
+-- saying "still moving a window" until the move's watchdog fires.
+local function kittyPanelFit(label, screen)
+    local ok, err = pcall(kittyPanelFitNow, label, screen)
+    if not ok then print("kittyPanel: " .. label .. ": fit: " .. tostring(err)) end
 end
 
 -- `edge=center' covers the display; the window level comes from
@@ -460,8 +470,10 @@ local function kittyPanelShowSlow(done)
             end)
         end
 
-        -- A failed move is only printed, not banded, and the panel shown
-        -- where it is: the wrong screen beats no panel.
+        -- A failed move is only printed, not banded, and the panel is still
+        -- shown: the fit after the show then sets it to the wanted screen
+        -- over Accessibility, while kitty keeps its old output-name until a
+        -- later show's move gets through.
         local output, outScreen = kittyPanelWantedOutput()
         local function fit() kittyPanelFit("kittyPanelShowSlow", outScreen) end
         if not output then return show() end
@@ -679,7 +691,8 @@ function kittyPanelShow(label)
 
         -- The payload `kitten @ resize-os-window --action=os-panel
         -- --incremental output-name=X' sends (captured on a fake socket).
-        -- A failed move is only printed and the panel shown where it is.
+        -- A failed move is only printed; the fit still runs (see
+        -- kittyPanelShowSlow).
         local output, outScreen = kittyPanelWantedOutput()
         local function fit() kittyPanelFit(label, outScreen) end
         if not output then return show() end

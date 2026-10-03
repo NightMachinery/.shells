@@ -1739,8 +1739,9 @@ wanted screen was the one it had last asked for, and that record went stale
 whenever something else moved the panel: hyper+shift+; over Accessibility, or
 a display change. kitty 0.48.2 applies such a config without comparing it to
 the stored one, so a move to the screen the panel is on just lays it out
-afresh. A failed move is printed to the console, not banded, and the panel is
-shown where it is.
+afresh. A failed move is printed to the console, not banded. The panel is
+still shown, and the fit below then sets it to the wanted screen over
+Accessibility, behind kitty's back, until a later show's move gets through.
 
 kitty answers ok to a name it does not know, and leaves the panel on the
 screen under its centre (`screen_for_name` in kitty's `cocoa_window.m`). A
@@ -1759,7 +1760,8 @@ out 1920×1056 at the laptop's origin, spilling onto the monitor (measured
 from the screen it picks, so it either laid the panel out against outdated
 screen data or was never asked to, because the old record said the panel was
 on the laptop already; which of the two is unknown. Sending the move on every
-show covers the second. For the first, after every show `kittyPanelFit`
+show covers the second. For the first, after every show that sends the panel
+to a screen (whenever `kitty_panel_screens` resolves to one), `kittyPanelFit`
 checks the panel against
 the frame kitty's own layout gives an `edge=center` panel
 (`kittyPanelFrameOn`: the screen's whole width, from the bottom of the menu
