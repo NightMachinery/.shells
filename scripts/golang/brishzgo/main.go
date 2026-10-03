@@ -17,14 +17,24 @@ import (
 
 const magicReadStdin = "MAGIC_READ_STDIN"
 
-// boolP is the scripts' `bool`: n, no and 0 (in any case) and the empty
-// string are false, anything else is true.
+// boolP is brishzq.zsh's `bool`: n, no and 0 (in any case) and the empty
+// string are false, anything else is true. The variables that brishzq.zsh
+// reads too (brishz_binary, brishz_raw) are parsed with it, for parity.
 func boolP(s string) bool {
 	switch strings.ToLower(s) {
 	case "", "n", "no", "0":
 		return false
 	}
 	return true
+}
+
+// boolCoreP is the `bool` of the scripts' zshlang/basic/core.zsh, which
+// also takes false (in any case) as false. brishz_stream is parsed with
+// it: brishzq.zsh has no such variable, so there is no parity to keep, and
+// brishz_stream=false must not turn on the one mode where an interrupt
+// stops the remote command.
+func boolCoreP(s string) bool {
+	return boolP(s) && strings.ToLower(s) != "false"
 }
 
 type config struct {
@@ -87,7 +97,7 @@ func newConfig(args []string, env lookupEnv, pwd, home string) config {
 	c.binary = boolP(env.get("brishz_binary"))
 	rawOpt := env.get("brishz_raw")
 	c.raw = rawOpt == "" || boolP(rawOpt)
-	c.stream = boolP(env.get("brishz_stream"))
+	c.stream = boolCoreP(env.get("brishz_stream"))
 	c.debug = boolP(env.get("brishz_debug"))
 
 	// As in brishzq.zsh: local requests send the API key file's header

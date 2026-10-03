@@ -264,8 +264,9 @@ func TestStreamRoundTrip(t *testing.T) {
 	if got.code != 300 || got.out != "lit" || g.reqs[0].path != "/zsh/stream/" || g.reqs[0].header.Get("Expect") != "" {
 		t.Errorf("literal: got %+v, %+v", got, g.reqs)
 	}
-	// brishz_stream is off by default, and with a false value.
-	for _, v := range []string{"", "n", "0", "no"} {
+	// brishz_stream is off by default, and with a false value, false
+	// included (core.zsh's bool).
+	for _, v := range []string{"", "n", "0", "no", "false", "FALSE"} {
 		gr := newFakeGarden(t, func(w http.ResponseWriter, r *http.Request, body []byte) {
 			rawReply(w, "", "", 0, "1")
 		})

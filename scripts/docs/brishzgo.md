@@ -72,14 +72,18 @@ only joined by spaces, with no wrapping and no forwarding.
   raw request sends `1`, as `brishzq.zsh` does.
 - `brishz_noquote`: see above.
 - `brishz_binary`: the exact-bytes opt-in of [brishz-binary](brishz-binary.md),
-  parsed like the scripts' `bool`. See "Transport" for what it changes here.
+  parsed like `brishzq.zsh`'s `bool`: empty, `n`, `no` and `0` (in any case)
+  are false, and anything else is true, `false` included, as in
+  `brishzq.zsh`. See "Transport" for what it changes here.
 - `brishz_raw`: the raw API, on unless set to a false value (`n`, `no`, `0`).
   `brishz_raw=n` uses the JSON API directly.
-- `brishz_stream`: the streaming API, off unless set to a true value (parsed
-  like the scripts' `bool`). See "The streaming API" below. `brishzq.zsh`
-  has no such mode, and ignores the variable.
-- `brishz_debug`: a true value prints the request and reply headers and the
-  command text to stderr. The values of the API key file's headers and of
+- `brishz_stream`: the streaming API, off unless set to a true value, parsed
+  like the `bool` of `zshlang/basic/core.zsh`: empty, `n`, `no`, `0` and
+  `false` (in any case) are false, and anything else is true. See "The
+  streaming API" below. `brishzq.zsh` has no such mode, and ignores the
+  variable.
+- `brishz_debug`: a true value (as for `brishz_binary`) prints the request
+  and reply headers and the command text to stderr. The values of the API key file's headers and of
   `Authorization` are printed as `<redacted>`.
 - `DISABLE_BRISH=y`: exit 1 at once, as `brishzq.zsh` does.
 - The proxy variables, read as curl reads them: `http_proxy` for an http

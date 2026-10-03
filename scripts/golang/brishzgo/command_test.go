@@ -124,6 +124,16 @@ func TestBoolP(t *testing.T) {
 	}
 }
 
+// TestBoolCoreP: core.zsh's bool, for brishz_stream, also takes false as
+// false; off is true there too.
+func TestBoolCoreP(t *testing.T) {
+	for in, want := range map[string]bool{"": false, "n": false, "No": false, "0": false, "false": false, "FALSE": false, "False": false, "y": true, "1": true, "off": true, "x": true} {
+		if boolCoreP(in) != want {
+			t.Errorf("boolCoreP(%q) = %v", in, !want)
+		}
+	}
+}
+
 func TestDisabled(t *testing.T) {
 	var out, errb bytes.Buffer
 	if code := run(nil, envOf("DISABLE_BRISH", "Y"), "/x", "", nil, &out, &errb); code != 1 {
