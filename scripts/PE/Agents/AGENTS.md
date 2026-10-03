@@ -365,5 +365,7 @@ When testing potentially dangerous behavior, assume test payloads may execute un
 
 # Subagent Delegation
 
-If you are an expensive model (e.g., Fable or Astra), start by reading the delegate-weaker skill.
-
+Read the delegate skill when delegating work or requesting an independent agent
+opinion. If you are an expensive model (e.g., Fable or Astra), start by reading
+it to route substantial mechanical work to the preferred weaker workers. It
+also covers peer and stronger modes, account boundaries, and backend selection.
