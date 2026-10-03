@@ -203,8 +203,9 @@ once, with status 130, and the worker keeps its state, so a session keeps
 its variables, functions and directory. A command that traps or ignores
 SIGINT in the worker itself goes on: its processes get SIGTERM about 2 s
 later and SIGKILL 2 s after that, and each time one dies, the command runs
-its next statement. It ends only when the garden kills its worker, about
-4.5 s after the interrupt (about 8.5 s while it keeps writing). The worker
+its next statement. It ends only when the garden kills its worker: about
+4.5 s after the interrupt when nothing runs below the worker, about 7 s when
+something does, and up to about 13 s while it keeps writing. The worker
 then dies, and Brish replaces it, so a session loses its state, and its next
 request waits for a new worker to start. These later steps also stop
 background jobs that earlier commands left on that worker. BrishGarden's
