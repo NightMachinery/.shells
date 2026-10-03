@@ -823,8 +823,11 @@ appHotkey{
     appName={
         'io.mpv',
         'com.openai.codex',
+        'sh.paseo.desktop'
     }
 }
+-- shift+m: paseo:
+
 -- appHotkey{ key='m', appName='com.adobe.Reader' }
 
 appHotkey{ key='n', appName='com.apple.MobileSMS' } -- Apple Messages
