@@ -827,7 +827,7 @@ appHotkey{
     }
 }
 -- shift+m: paseo:
-
+appHotkey{ key='m', mods={'shift'}, appName='sh.paseo.desktop' }
 -- appHotkey{ key='m', appName='com.adobe.Reader' }
 
 appHotkey{ key='n', appName='com.apple.MobileSMS' } -- Apple Messages
