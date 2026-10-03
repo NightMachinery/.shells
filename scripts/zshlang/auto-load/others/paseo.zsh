@@ -6,8 +6,8 @@ function paseo-install {
     local package='@getpaseo/cli'
     (( $# <= 1 )) || { ecerr "$0: expected at most one version"; return 64; }
     [[ -n "${1:-}" ]] && package+="@${1}"
-    #: Keep Paseo on the npm route; npm-install's auto engine selects pnpm.
-    npm-install-npm "${package}" @RET
+    local -a npm_install_pnpm_opts=(--allow-build=esbuild,msgpackr-extract,node-pty)
+    npm-install "${package}" @RET
     h-npm-install-report paseo
 }
 

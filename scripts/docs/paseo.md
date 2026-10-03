@@ -5,21 +5,28 @@ Install or update the CLI with [agfi:paseo-install]:
 ```zsh
 paseo-install
 paseo-install 0.10.2                 # optionally choose a version
-npm-install-npm @getpaseo/cli        # equivalent explicit npm route
+npm-install @getpaseo/cli            # uses pnpm when available
 ```
 
-The installer explicitly uses [agfi:npm-install-npm]. The general
-[agfi:npm-install] selects pnpm when available; the npm route successfully
-installed this package on this machine. No change to the general installer is
-required. See [global npm installation issues](npm-global-installs.md).
+The installer uses [agfi:npm-install], which selects pnpm when available and
+npm otherwise. It allows the native dependency builds for `esbuild`,
+`msgpackr-extract`, and `node-pty`. See
+[global npm installation issues](npm-global-installs.md).
 
-To install the desktop app alongside the npm CLI:
+When migrating an active standalone daemon from npm to pnpm, install its current
+version first and put `PNPM_HOME` on `PATH`, using pnpm's own shim directly.
+Do not symlink that shim into another directory: its paths are relative to its
+location. Keep the old npm
+package until the daemon has been restarted from pnpm in a planned maintenance
+window. Installing or replacing the CLI alone does not move a running daemon.
+
+To install the desktop app alongside the package-manager CLI:
 
 ```sh
 brew install --cask --no-binaries paseo
 ```
 
-The cask normally links its bundled CLI as `paseo`, conflicting with npm's
+The cask normally links its bundled CLI as `paseo`, conflicting with the
 existing binary. `--no-binaries` installs `/Applications/Paseo.app` without
 replacing that link. The desktop's bundled CLI remains available at
 `/Applications/Paseo.app/Contents/Resources/bin/paseo`.
