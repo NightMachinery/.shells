@@ -80,3 +80,53 @@ func TestFallbackSendsNoStdinBefore404(t *testing.T) {
 		t.Errorf("the raw request read stdin before the 404:\n%s", errb.String())
 	}
 }
+
+// TestStdinPasses: each request reads all of stdin through its own reader,
+// the later ones replaying what the earlier ones read (from memory, or past
+// replayLimit from the temp file) and then reading on. An earlier
+// request's reader gets io.EOF once a later one exists, and every reader
+// does once the JSON API took over.
+func TestStdinPasses(t *testing.T) {
+	stdin := strings.Repeat("0123456789", 1000)
+	for _, limit := range []int{1 << 20, 1000} {
+		old := replayLimit
+		replayLimit = limit
+		src := newStdinSource(config{stdinMagic: true}, strings.NewReader(stdin))
+		r1, _ := src.reader()
+		buf := make([]byte, 3000)
+		if n, err := io.ReadFull(r1, buf); n != 3000 || err != nil {
+			t.Fatalf("limit %d: pass 1 read %d, %v", limit, n, err)
+		}
+		r2, _ := src.reader()
+		if n, err := r1.Read(buf); n != 0 || err != io.EOF {
+			t.Errorf("limit %d: an old pass read %d, %v", limit, n, err)
+		}
+		// Small reads, so a read of the copy ends exactly at its end.
+		var got bytes.Buffer
+		small := make([]byte, 7)
+		for got.Len() < 5000 {
+			n, err := r2.Read(small)
+			got.Write(small[:n])
+			if err != nil {
+				t.Fatalf("limit %d: pass 2: %v", limit, err)
+			}
+		}
+		r3, _ := src.reader()
+		all, err := io.ReadAll(r3)
+		if err != nil || string(all) != stdin {
+			t.Errorf("limit %d: pass 3 got %d bytes, %v", limit, len(all), err)
+		}
+		if read, spilled := src.alreadyRead(); read != int64(len(stdin)) || spilled != (limit == 1000) {
+			t.Errorf("limit %d: read %d, spilled %v", limit, read, spilled)
+		}
+		r4, _ := src.reader()
+		if data, err := src.all(); err != nil || string(data) != stdin {
+			t.Errorf("limit %d: all: %v, %d bytes", limit, err, len(data))
+		}
+		if n, err := r4.Read(buf); n != 0 || err != io.EOF {
+			t.Errorf("limit %d: a pass after the JSON API took over read %d, %v", limit, n, err)
+		}
+		replayLimit = old
+		temps.removeAll()
+	}
+}

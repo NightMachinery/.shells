@@ -171,11 +171,11 @@ func (c *client) printNotice(body []byte) int {
 	return exitNotice
 }
 
-// raw runs the command through POST /zsh/raw/. fallback is true when the
-// garden has no raw API (HTTP 404 or 405) or refused the request
-// (X-Brish-Refused: 1); then nothing ran.
-func (c *client) raw(in *stdinSource) (code int, fallback bool) {
-	sub := "raw/"
+// rawRequest is a request of the raw API's shape, for route ("raw/" or
+// "stream/"): the command, then stdin, as the body. On a failure it has
+// told the user, and returns the exit status.
+func (c *client) rawRequest(route string, in *stdinSource) (*http.Request, int) {
+	sub := route
 	if c.cfg.nolog != "" {
 		sub += "nolog/"
 	}
@@ -202,7 +202,12 @@ func (c *client) raw(in *stdinSource) (code int, fallback bool) {
 	var body io.Reader
 	length := int64(-1)
 	if in.magic {
-		body = io.MultiReader(bytes.NewReader(cmd), in)
+		r, err := in.reader()
+		if err != nil {
+			fmt.Fprintf(c.stderr, "brishzgo: %v; nothing ran\n", err)
+			return nil, 1
+		}
+		body = io.MultiReader(bytes.NewReader(cmd), r)
 	} else {
 		all := make([]byte, 0, len(cmd)+len(in.literal))
 		all = append(append(all, cmd...), in.literal...)
@@ -211,18 +216,29 @@ func (c *client) raw(in *stdinSource) (code int, fallback bool) {
 	}
 	req, err := c.newRequest(u, body, length, "application/octet-stream")
 	if err != nil {
-		return curlExitCode(err, false), false
+		return nil, curlExitCode(err, false)
 	}
 	req.Header.Set("X-Brish-Cmd-Length", strconv.Itoa(len(cmd)))
 	if in.magic {
-		// So that a garden without the raw API answers before we send
-		// any of stdin, which the fallback then still has; see replayLimit.
-		// Go's transport sends the body after a final reply such as that
-		// 404 unless the connection is to close, so it is.
+		// So that a garden without this API answers before we send any of
+		// stdin, which the fallback then still has; see replayLimit. Go's
+		// transport sends the body after a final reply such as that 404
+		// unless the connection is to close, so it is.
 		req.Header.Set("Expect", "100-continue")
 		req.Close = true
 	}
 	c.debugf("command (%d bytes): %q", len(cmd), cmd)
+	return req, 0
+}
+
+// raw runs the command through POST /zsh/raw/. fallback is true when the
+// garden has no raw API (HTTP 404 or 405) or refused the request
+// (X-Brish-Refused: 1); then nothing ran.
+func (c *client) raw(in *stdinSource) (code int, fallback bool) {
+	req, code := c.rawRequest("raw/", in)
+	if req == nil {
+		return code, false
+	}
 
 	resp, code := c.do(req)
 	if resp == nil {
@@ -425,7 +441,7 @@ func (c *client) json(in *stdinSource) int {
 			kind = jsonStdinFile
 			cmd = stdinRedirect(path, cmd)
 			read, _ := in.alreadyRead()
-			c.debugf("stdin: %d bytes, %d of them already read by the raw request; in %s", size, read, path)
+			c.debugf("stdin: %d bytes, %d of them already read by earlier requests; in %s", size, read, path)
 		}
 	default:
 		stdin, err = in.all()
@@ -438,7 +454,7 @@ func (c *client) json(in *stdinSource) int {
 				kind = jsonB64
 			}
 			read, _ := in.alreadyRead()
-			c.debugf("stdin: %d bytes, %d of them already read by the raw request", len(stdin), read)
+			c.debugf("stdin: %d bytes, %d of them already read by earlier requests", len(stdin), read)
 		}
 	}
 	if err != nil {

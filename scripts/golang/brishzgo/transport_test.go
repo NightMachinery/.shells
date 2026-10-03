@@ -337,7 +337,11 @@ func TestFallbackReplay(t *testing.T) {
 
 	// all(), for a garden on another machine, reads the spilled copy.
 	src := newStdinSource(config{stdinMagic: true}, strings.NewReader(stdin))
-	if _, err := io.Copy(io.Discard, io.LimitReader(src, 5000)); err != nil {
+	r, err := src.reader()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := io.Copy(io.Discard, io.LimitReader(r, 5000)); err != nil {
 		t.Fatal(err)
 	}
 	if read, spilled := src.alreadyRead(); read != 5000 || !spilled {
