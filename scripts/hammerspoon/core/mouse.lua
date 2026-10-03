@@ -1,19 +1,41 @@
 --- * Mouse
-function cursorHide()
-    -- The working screen (core/screens.lua), in global coordinates. This used
-    -- to take the focused screen's width and height but not its origin, so on
-    -- any screen other than the primary the pointer landed on the primary,
-    -- at a position sized for the wrong display.
-    local screen = Screens.target("working")[1]
+-- Seconds between the screens of one cursorHide, so each screen's pass is
+-- seen on its own rather than merged with the next screen's.
+local kCursorHideStepSeconds = 0.1
+
+-- One pass on `screen', in global coordinates: the pointer to the top centre
+-- first (so that the top app bar gets hidden next), then to the middle of the
+-- right edge. One point in from the edge, so it stays on this screen rather
+-- than crossing to a neighbour.
+local function cursorHideOn(screen)
     local frame = screen:frame()
     local full = screen:fullFrame()
-
-    -- Move the mouse to the top center first (so that the top app bar gets
-    -- hidden next), then to the middle of the right edge. One point in from
-    -- the edge, so it stays on this screen rather than crossing to a
-    -- neighbour.
     hs.mouse.absolutePosition(hs.geometry.point(full.x + full.w / 2, full.y))
     hs.mouse.absolutePosition(hs.geometry.point(frame.x + frame.w - 1, frame.y + frame.h / 2))
+end
+
+-- Puts away a menu bar (and a fullscreen app's toolbar) that macOS left
+-- showing, on every screen, and parks the pointer on the working screen
+-- (core/screens.lua), which goes last. Passing the pointer over the top of
+-- a screen is what makes macOS hide its bar again, so one screen's pass
+-- does nothing for a bar stuck on another. This used to do the working
+-- screen alone, and before that took the focused screen's width and height
+-- but not its origin, so on any screen other than the primary the pointer
+-- landed on the primary.
+function cursorHide()
+    local working = Screens.target("working")[1]
+    local order = {}
+    for _, r in ipairs(Screens.list()) do
+        if r.screen:id() ~= working:id() then table.insert(order, r.screen) end
+    end
+    table.insert(order, working)
+    local i = 0
+    local function step()
+        i = i + 1
+        cursorHideOn(order[i])
+        if i < #order then cursorHideTimer = hs.timer.doAfter(kCursorHideStepSeconds, step) end
+    end
+    step()
 end
 hyper_bind_v2{pressedfn=cursorHide, mods={"ctrl"}, key="space"}
 -- ** Keyboard Mouse Mode

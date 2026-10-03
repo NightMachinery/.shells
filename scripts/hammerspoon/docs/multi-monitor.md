@@ -169,7 +169,9 @@ Each is documented with its feature in `docs/hammerspoon.md`:
 - **Alerts**: the fullscreen flash covers the alert's own screens, and zsh's
   `hs-alert-v2` takes `alert_screens`.
 - **Mouse**: `cursorHide` and the avy grid use `working`, and space in the
-  grid moves it to the next screen.
+  grid moves it to the next screen. `cursorHide` also passes over the top of
+  every other screen first, since a menu bar stuck down is put away only by
+  the pointer passing over its own screen's top.
 - **Focus keys**: hyper+; focuses the frontmost window on the next screen,
   and hyper+shift+; moves the focused window there. Both bring the pointer
   along. ("Moving between screens".)

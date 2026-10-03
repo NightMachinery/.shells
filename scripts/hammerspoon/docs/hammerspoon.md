@@ -582,9 +582,16 @@ screenshot started on one monitor can land on the other. Space is in neither
 label alphabet, which is why it is free. The grid still overhangs its screen by
 one cell on every side, as it always has, so the edge pixels have labels; next
 to a second monitor that cell is drawn on the neighbour. `cursorHide`
-(hyper+ctrl+space) parks the pointer on the working screen's right edge, in
-global coordinates. It used to take the focused screen's size without its
-origin, so on a secondary screen it landed on the primary one.
+(hyper+ctrl+space) puts away a menu bar, or a fullscreen app's toolbar, that
+macOS left showing. Passing the pointer over the top of a screen is what makes
+macOS hide that screen's bar again, so it does that on every screen in turn,
+the working screen last, and parks the pointer on the working screen's right
+edge, in global coordinates. Warping the pointer is enough: with Brave
+fullscreen on the monitor, a warp to its top grew Brave's layer-26 window in
+the window list from 24 to 52 points tall, and a warp away shrank it back.
+It used to do the working screen alone, and before that took the focused
+screen's size without its origin, so on a secondary screen it landed on the
+primary one.
 
 ## Alerts
 
