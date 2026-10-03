@@ -203,11 +203,15 @@ window had not moved). Now such a window leaves fullscreen, is moved once the
 animation has settled, and goes fullscreen again on the new screen. Every move
 is checked afterwards, since Hammerspoon ignores the result of every
 Accessibility write. If the window has not moved, the band says "could not
-move" instead of claiming it did. Firefox, Thunderbird and Chromium browsers
-switch on `AXEnhancedUserInterface` when they think an assistive app is
-running, which makes their moves unreliable; Hammerspoon 1.1.1's own frame
-setter already turns it off around every move (`-[HSwindow setFrame:]` in its
-`HSuicore.m`), so nothing more is done about it here. Only one move runs at a
+move" instead of claiming it did, and a fullscreen window goes fullscreen again
+where it was, so a failed move leaves it as it was found. A moved window must
+still be on the new screen once it is fullscreen again, since macOS picks the
+screen it goes fullscreen on. Hammerspoon 1.1.1's own frame setter switches
+the app's `AXEnhancedUserInterface` off around every move (`-[HSwindow
+setFrame:]` in its `HSuicore.m`), so nothing more is done about that attribute
+here. An assistive app sets it on an app (Chromium's source names VoiceOver),
+and the app reacts to it; Thunderbird had it on (2026-10-02), set by something
+not yet identified. Only one move runs at a
 time; a watchdog frees the key if a step of the fullscreen dance never calls
 back, so a crash in the middle cannot leave every later press saying "still
 moving a window".

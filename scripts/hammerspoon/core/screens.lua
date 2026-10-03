@@ -516,8 +516,10 @@ end
 --- Hammerspoon ignores the result of every Accessibility write, so a window
 --- that refuses the move would otherwise pass for moved. Hammerspoon 1.1.1
 --- already switches the app's AXEnhancedUserInterface off around the move
---- (-[HSwindow setFrame:] in HSuicore.m), which Firefox, Thunderbird and
---- Chromium browsers turn on and which makes their moves unreliable.
+--- (-[HSwindow setFrame:] in HSuicore.m). An assistive app sets that
+--- attribute on an app (Chromium's source names VoiceOver), and the app
+--- reacts to it; Thunderbird had it on here (2026-10-02), set by something
+--- not identified.
 local function moveTo(w, to)
     w:moveToScreen(to, false, true, 0)
     return onScreen(w, to)
@@ -525,8 +527,8 @@ end
 
 --- done(true) once w:isFullScreen() == want and the frame has held still
 --- for one poll, or done(false) after kSettleSeconds. macOS animates the
---- way in and out of fullscreen, and a window that is still animating
---- cannot be moved.
+--- way in and out of fullscreen; the move waits for that to finish rather
+--- than racing it (whether a move made mid-animation fails is untested).
 local kSettlePoll, kSettleSeconds = 0.1, 3
 local function whenSettled(w, want, done)
     local deadline = hs.timer.secondsSinceEpoch() + kSettleSeconds
@@ -622,13 +624,25 @@ function Screens.moveWindowNext(delta)
     end
 
     focusBand(from, "leaving fullscreen to move " .. appName)
-    w:setFullScreen(false)
+    if not pcall(function() w:setFullScreen(false) end) then
+        return finish(false, ": it would not leave fullscreen")
+    end
     whenSettled(w, false, function(left)
         if not left then return finish(false, ": it did not leave fullscreen") end
         local okm, moved = pcall(moveTo, w, to)
-        if not (okm and moved) then return finish(false, " after leaving fullscreen") end
-        w:setFullScreen(true)
+        moved = okm and moved
+        -- Back into fullscreen whether or not it moved, so a failed move
+        -- leaves the window fullscreen where it was, as it was found.
+        pcall(function() w:setFullScreen(true) end)
         whenSettled(w, true, function(back)
+            if not moved then
+                return finish(false, back and " (it is fullscreen again where it was)"
+                                          or " after leaving fullscreen, and it did not go fullscreen again")
+            end
+            -- macOS picks the screen a window goes fullscreen on, so the
+            -- move is only done if it is still on the new one.
+            local oks, there = pcall(onScreen, w, to)
+            if not (oks and there) then return finish(false, ": it ended up on another screen") end
             finish(true, nil, back and ", fullscreen again" or ", but it did not go fullscreen again")
         end)
     end)
