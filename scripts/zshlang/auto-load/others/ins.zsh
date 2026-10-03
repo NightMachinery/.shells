@@ -458,7 +458,7 @@ function ins-sudoless {
     fi
 }
 ##
-function install() {
+function install {
     local pkgs=("$@")
     assert-args pkgs @RET
 
@@ -476,7 +476,6 @@ function install() {
     fi
 }
 aliasfn ins install
-
 
 function install-latest {
     local pkgs=("$@") strict="${install_latest_strict}"
