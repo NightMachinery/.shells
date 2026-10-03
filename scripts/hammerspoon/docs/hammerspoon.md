@@ -197,6 +197,12 @@ time; a watchdog frees the key if a step of the fullscreen dance never calls
 back, so a crash in the middle cannot leave every later press saying "still
 moving a window".
 
+Windows that have to move some other way register in `Screens.moveHandlers`.
+The kitty panel is one: kitty keeps its own record of the panel's screen and
+lays the panel out there again at its next re-layout, so an Accessibility move
+would be undone. hyper+shift+; on the panel therefore moves it through kitty
+(`kittyPanelMoveTo`, see "kitty: hyper+z").
+
 ## The ipc print recursion fix
 
 `hs -c` used to wedge whenever anything printed to the Hammerspoon console
@@ -1705,25 +1711,60 @@ applies only to panels created after the config is loaded.
 
 With more than one display, the panel shows on the screen named by the Lua
 global `kitty_panel_screens`, a `core/screens.lua` spec resolved at every
-show (default `working`, the focused window's screen; `false` leaves the
-panel wherever kitty put it). kitty names a panel's screen by `output-name`,
+show (`false` leaves the panel wherever kitty put it). kitty names a panel's screen by `output-name`,
 which on macOS is the screen's localized name, the same string as
 `hs.screen:name()`; `kitten panel --output-name list` prints them. A new
 panel gets `--os-panel output-name=<name>` at creation. An existing one gets
 `resize-os-window --action=os-panel --incremental output-name=<name>`
-before the `show`, only when the wanted screen differs from the one this file
-last gave it, so a show on the same screen costs no extra call; a display
-change forgets that, since macOS may have moved the panel itself. Over the
+before every `show`, even when it should be on that screen already. Over the
 socket that is the payload `{action: "os-panel", incremental: true, os_panel:
-["output-name=<name>"]}`, captured from `kitten @` on a fake socket. A failed
-move is printed to the console, not banded, and the panel is shown where it
-is. Two identical monitors share a name; which of them kitty picks then is
-untested. kitty's help says that on Wayland the output can be set only at
-creation. On macOS kitty 0.48.2 accepts the move on a live panel: it answered
-ok, in about 20 ms, on a real press (2026-10-02). Whether the panel then shows
-on the other screen has **not been measured yet**. If it does not, the
-fallback is to recreate the panel on the new screen, which means moving its
-tabs out and back in.
+["output-name=<name>"]}`, captured from `kitten @` on a fake socket, and it
+costs one call of 1 to 4 ms. The first version skipped the call when the
+wanted screen was the one it had last asked for, and that record went stale
+whenever something else moved the panel: hyper+shift+; over Accessibility, or
+a display change. kitty 0.48.2 applies such a config without comparing it to
+the stored one, so a move to the screen the panel is on just lays it out
+afresh. A failed move is printed to the console, not banded, and the panel is
+shown where it is.
+
+kitty answers ok to a name it does not know, and leaves the panel on the
+screen under its centre (`screen_for_name` in kitty's `cocoa_window.m`). A
+kitty running since before a display change can hold an outdated name, since
+it updates its monitor list in place and keeps the old names. So the state
+kitten (`configFiles/kitty/kitty_panel_state.py`) also reports the panel's
+stored `output` and the `monitors` kitty knows, and a show whose wanted name is
+not among them prints `kitty knows no screen named ...`. Two identical
+monitors share a name; which of them kitty picks then is untested. kitty's
+help says that on Wayland the output can be set only at creation; on macOS
+kitty re-reads it at every layout.
+
+Shown on the laptop after living on the 1920×1056 monitor, the panel came
+out 1920×1056 at the laptop's origin, spilling onto the monitor (measured
+2026-10-02 with a runtime probe, kitty 0.48.2). kitty's layout takes the size
+from the screen it picks, so it either laid the panel out against outdated
+screen data or was never asked to, because the old record said the panel was
+on the laptop already; which of the two is unknown. Sending the move on every
+show covers the second. For the first, after every show `kittyPanelFit`
+checks the panel against
+the frame kitty's own layout gives an `edge=center` panel
+(`kittyPanelFrameOn`: the screen's whole width, from the bottom of the menu
+bar to the screen's bottom edge, over the Dock) and sets it over
+Accessibility when it is off by more than `kPanelFitSlack`. The check reads
+the panel's bounds from the CoreGraphics window list and asks kitty nothing
+unless the panel is off: reading them over Accessibility took 10 to 85 ms
+right after a show (measured 2026-10-03), while kitty was busy drawing. It
+runs once the panel is up and focused, so it never delays either. The console
+says `fitted the panel to <screen>: <old> -> <new>` when it worked, and `could
+not fit` when the panel did not take the new frame. Whether kitty's borderless
+panel accepts a frame this way, and keeps it, is not measured yet; if it does
+not, the fallback is to recreate the panel on the new screen, which means
+moving its tabs out and back in.
+
+hyper+shift+; on the shown panel moves it to the next screen through kitty
+(`kittyPanelMoveTo`, registered in `Screens.moveHandlers`), then fits it the
+same way. An Accessibility move would leave kitty's stored name behind, and
+kitty would put the panel back on that screen at its next re-layout (a
+display, DPI or font-size change).
 
 In window mode `kittyWindowToggle` shows kitty's normal window maximized on
 the screen the mouse is on, and hides it on the next press. From a fullscreen

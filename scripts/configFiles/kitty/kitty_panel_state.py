@@ -16,6 +16,12 @@ The fields, all optional:
   active    the panel's active tab's active window, the one to focus
   firstTab  the panel's first tab, where stray tabs are moved to
   strays    the tabs of every other OS window, in order
+  output    the output-name kitty has stored for the panel (its screen)
+  monitors  the screen names kitty knows, which output-name must match
+
+output and monitors come from undocumented fast_data_types getters (the
+ones kitty's own resize-os-window uses), so a kitty that drops them only
+drops those two fields.
 """
 
 import json
@@ -27,6 +33,16 @@ PANEL_CLASS = "kitty-panel"
 
 def main(args):
     pass
+
+
+def _screen_fields(os_window_id):
+    try:
+        from kitty.fast_data_types import glfw_get_monitor_names, layer_shell_config_for_os_window
+        lsc = layer_shell_config_for_os_window(os_window_id) or {}
+        return {"output": lsc.get("output_name") or "",
+                "monitors": [name for name, _ in glfw_get_monitor_names()]}
+    except Exception:
+        return {}
 
 
 @result_handler(no_ui=True)
@@ -46,6 +62,7 @@ def handle_result(args, answer, target_window_id, boss):
             active_window = active_tab.active_window if active_tab else None
             if active_window is not None:
                 state["active"] = active_window.id
+            state.update(_screen_fields(tm.os_window_id))
         elif tm.wm_class != PANEL_CLASS:
             state["strays"].extend(tab.id for tab in tabs)
     return json.dumps(state)
