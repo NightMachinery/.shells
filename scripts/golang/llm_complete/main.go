@@ -31,6 +31,22 @@ func run(args []string, in io.Reader, out, errs io.Writer) int {
 		return 2
 	}
 	switch args[0] {
+	case "agent-context":
+		var a AgentContextRequest
+		c, err := readConfig()
+		if err == nil {
+			err = decode(in, &a)
+		}
+		var r FIMRequest
+		if err == nil {
+			r, err = agentContext(c, a)
+		}
+		if err != nil {
+			fmt.Fprintln(errs, "llm_complete:", err)
+			return 1
+		}
+		json.NewEncoder(out).Encode(r)
+		return 0
 	case "fim":
 		return runFIM(args[1:], in, out, errs)
 	case "terminal":
@@ -47,7 +63,17 @@ func run(args []string, in io.Reader, out, errs io.Writer) int {
 			fmt.Fprintln(errs, "llm_complete: invalid terminal request")
 			return 1
 		}
-		err := terminalDabbrev(r)
+		if len(args) > 1 && args[1] == "warm" {
+			loadContext(r)
+			return 0
+		}
+		configureVim(&r)
+		var err error
+		if len(args) > 1 && args[1] == "fim" {
+			err = terminalFIM(r)
+		} else {
+			err = terminalDabbrev(r)
+		}
 		if err != nil {
 			notify(r, err.Error())
 			return 1

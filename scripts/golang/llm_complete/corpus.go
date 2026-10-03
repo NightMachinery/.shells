@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"syscall"
 	"time"
 )
 
@@ -17,6 +18,7 @@ type ContextCorpus struct {
 	Transcript string   `json:"transcript"`
 	Mtime      int64    `json:"mtime"`
 	Size       int64    `json:"size"`
+	ProcessID  int      `json:"process_id"`
 }
 
 func rootDir() string {
@@ -30,7 +32,7 @@ func contextFile(r TerminalRequest) string { return targetFile(r) + ".context" }
 func cachedContext(r TerminalRequest) ContextCorpus {
 	var c ContextCorpus
 	b, err := os.ReadFile(contextFile(r))
-	if err != nil || json.Unmarshal(b, &c) != nil {
+	if err != nil || json.Unmarshal(b, &c) != nil || c.ProcessID != r.Screen.ProcessID {
 		return ContextCorpus{}
 	}
 	st, err := os.Stat(c.Transcript)
@@ -72,6 +74,7 @@ func loadContext(r TerminalRequest) ContextCorpus {
 	if err != nil || json.Unmarshal([]byte(result), &c) != nil {
 		return ContextCorpus{}
 	}
+	c.ProcessID = r.Screen.ProcessID
 	c.Transcript = transcript
 	c.Mtime = st.ModTime().UnixNano()
 	c.Size = st.Size()
@@ -104,3 +107,38 @@ func terminalCorpora(r TerminalRequest) []string {
 }
 
 func fmtInt(n int) string { return strconv.Itoa(n) }
+
+// Cold or changed transcripts warm off the keypress path, including when the
+// first press has no screen candidates. Pass only identity metadata on stdin.
+func warmContext(r TerminalRequest) {
+	if cachedContext(r).Transcript != "" {
+		return
+	}
+	if privateDir(stateDir()) != nil {
+		return
+	}
+	f, err := os.CreateTemp(stateDir(), ".warm-*")
+	if err != nil {
+		return
+	}
+	defer f.Close()
+	defer os.Remove(f.Name())
+	r.Screen.Lines = nil
+	r.Others = nil
+	if json.NewEncoder(f).Encode(r) != nil {
+		return
+	}
+	if _, err = f.Seek(0, 0); err != nil {
+		return
+	}
+	exe, err := os.Executable()
+	if err != nil {
+		return
+	}
+	cmd := exec.Command(exe, "terminal", "warm")
+	cmd.Stdin = f
+	cmd.SysProcAttr = &syscall.SysProcAttr{Setsid: true}
+	if cmd.Start() == nil {
+		_ = cmd.Process.Release()
+	}
+}

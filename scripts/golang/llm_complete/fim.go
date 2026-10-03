@@ -359,7 +359,12 @@ func runFIM(args []string, in io.Reader, out, errs io.Writer) int {
 		fmt.Fprintln(errs, "fim-get: invalid JSON request")
 		return 1
 	}
-	result, code, msg, _ := performFIM(c, r)
+	started := time.Now()
+	result, code, msg, body := performFIM(c, r)
+	if err := writeFIMLog(c, r, body, started, result, msg, code); err != nil {
+		fmt.Fprintln(errs, "fim-get: context log:", err)
+		return 1
+	}
 	if code != 0 {
 		fmt.Fprintln(errs, msg)
 		return code

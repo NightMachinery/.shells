@@ -20,8 +20,7 @@ func tmuxScreen(physical, joined, agent string, x, y int) Screen {
 		l := Line{Text: p}
 		if j < len(js) {
 			remain := js[j][min(used, len(js[j])):]
-			trim := strings.TrimRight(p, " ")
-			if strings.HasPrefix(remain, trim) && len(remain) > len(trim) {
+			if strings.HasPrefix(remain, p) && len(remain) > len(p) {
 				l.Wrapped = true
 				used += len(p)
 				if used > len(js[j]) {
@@ -42,11 +41,11 @@ func min(a, b int) int {
 	}
 	return b
 }
-func paneAgent(pid int) string {
+func paneAgentIdentity(pid int) (string, int) {
 	// Read process names only. Claude's full command line can contain credentials.
 	raw, err := child(500*time.Millisecond, "", "ps", "-axo", "pid=,ppid=,comm=")
 	if err != nil {
-		return ""
+		return "", 0
 	}
 	type proc struct {
 		pid, ppid int
@@ -76,6 +75,7 @@ func paneAgent(pid int) string {
 		}
 	}
 	agent := ""
+	identity := 0
 	for _, p := range procs {
 		if !descendants[p.pid] {
 			continue
@@ -83,12 +83,13 @@ func paneAgent(pid int) string {
 		name := strings.TrimSuffix(p.name, ".exe")
 		if name == "claude" || name == "codex" {
 			if agent != "" && agent != name {
-				return ""
+				return "", 0
 			}
 			agent = name
+			identity = p.pid
 		}
 	}
-	return agent
+	return agent, identity
 }
 func captureTmux(r TerminalRequest) (Screen, error) {
 	meta, err := tmux(r, "", "display-message", "-p", "-t", r.Target, "#{cursor_x}\t#{cursor_y}\t#{pane_pid}\t#{pane_in_mode}")
@@ -102,7 +103,7 @@ func captureTmux(r TerminalRequest) (Screen, error) {
 	x, _ := strconv.Atoi(f[0])
 	y, _ := strconv.Atoi(f[1])
 	pid, _ := strconv.Atoi(f[2])
-	agent := paneAgent(pid)
+	agent, identity := paneAgentIdentity(pid)
 	if agent == "" {
 		return Screen{}, errors.New("completion requires a Claude Code or Codex pane")
 	}
@@ -114,7 +115,12 @@ func captureTmux(r TerminalRequest) (Screen, error) {
 	if err != nil {
 		return Screen{}, err
 	}
-	return tmuxScreen(physical, joined, agent, x, y), nil
+	s := tmuxScreen(physical, joined, agent, x, y)
+	s.ProcessID = identity
+	snapshot := r
+	snapshot.Screen = s
+	configureVim(&snapshot)
+	return snapshot.Screen, nil
 }
 func prepareTmux(r *TerminalRequest) error {
 	s, err := captureTmux(*r)

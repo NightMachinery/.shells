@@ -73,7 +73,16 @@ func capture(r TerminalRequest) (Screen, error) {
 	if err != nil {
 		return Screen{}, err
 	}
-	return kittyScreen(raw, r.Screen.Agent)
+	agent, pid, err := kittyAgent(r)
+	if err != nil {
+		return Screen{}, err
+	}
+	s, err := kittyScreen(raw, agent)
+	s.ProcessID = pid
+	snapshot := r
+	snapshot.Screen = s
+	configureVim(&snapshot)
+	return snapshot.Screen, err
 }
 func notify(r TerminalRequest, msg string) {
 	if r.Source == "tmux" {
@@ -132,7 +141,7 @@ func writePrivate(name string, v any) error {
 func sameInput(a, b Screen) bool {
 	ia, ea := extract(a)
 	ib, eb := extract(b)
-	return ea == nil && eb == nil && a.Agent == b.Agent && ia.Prefix == ib.Prefix && ia.Suffix == ib.Suffix
+	return ea == nil && eb == nil && a.Agent == b.Agent && a.ProcessID == b.ProcessID && ia.Prefix == ib.Prefix && ia.Suffix == ib.Suffix
 }
 func insert(r TerminalRequest, text string, backspaces int) error {
 	if r.Source == "tmux" {
@@ -154,6 +163,12 @@ func insert(r TerminalRequest, text string, backspaces int) error {
 	return err
 }
 func terminalDabbrev(r TerminalRequest) error {
+	defer warmContext(r)
+	unlock, err := targetLock(r)
+	if err != nil {
+		return err
+	}
+	defer func() { unlock() }()
 	filename := targetFile(r)
 	var old Cycle
 	if b, err := os.ReadFile(filename); err == nil {
@@ -170,12 +185,61 @@ func terminalDabbrev(r TerminalRequest) error {
 	if !sameInput(r.Screen, current) {
 		return errors.New("prompt changed, discarded expansion")
 	}
+	if err = staleTicket(r); err != nil {
+		return err
+	}
 	if err = insert(r, e.Text, e.Backspaces); err != nil {
 		return err
 	}
 	if err = writePrivate(filename, e.State); err != nil {
 		return err
 	}
-	loadContext(r)
+	unlock()
+	unlock = func() {}
 	return nil
+}
+
+func kittyAgent(r TerminalRequest) (string, int, error) {
+	raw, err := kitty(r, "", "ls")
+	if err != nil {
+		return "", 0, err
+	}
+	var windows []struct {
+		Tabs []struct {
+			Windows []struct {
+				ID         int `json:"id"`
+				Foreground []struct {
+					PID     int      `json:"pid"`
+					Cmdline []string `json:"cmdline"`
+				} `json:"foreground_processes"`
+			} `json:"windows"`
+		} `json:"tabs"`
+	}
+	if json.Unmarshal([]byte(raw), &windows) != nil {
+		return "", 0, errors.New("cannot verify kitty foreground process")
+	}
+	for _, oswin := range windows {
+		for _, tab := range oswin.Tabs {
+			for _, w := range tab.Windows {
+				if strconv.Itoa(w.ID) != r.Target {
+					continue
+				}
+				for _, p := range w.Foreground {
+					for i, arg := range p.Cmdline {
+						if i >= 3 {
+							break
+						}
+						name := filepath.Base(arg)
+						if name == "codex" {
+							return "codex", p.PID, nil
+						}
+						if name == "claude" || name == "claude.exe" || strings.HasPrefix(name, "claude-") {
+							return "claude", p.PID, nil
+						}
+					}
+				}
+			}
+		}
+	}
+	return "", 0, errors.New("agent foreground process changed")
 }

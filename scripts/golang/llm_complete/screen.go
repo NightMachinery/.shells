@@ -12,10 +12,12 @@ type Line struct {
 	Wrapped bool   `json:"wrapped"`
 }
 type Screen struct {
-	Lines []Line `json:"lines"`
-	X     int    `json:"cursor_x"`
-	Y     int    `json:"cursor_y"`
-	Agent string `json:"agent"`
+	Lines     []Line `json:"lines"`
+	X         int    `json:"cursor_x"`
+	Y         int    `json:"cursor_y"`
+	Agent     string `json:"agent"`
+	ProcessID int    `json:"process_id,omitempty"`
+	Vim       bool   `json:"vim,omitempty"`
 }
 type Input struct {
 	Prefix string `json:"prefix"`
@@ -119,10 +121,17 @@ func extract(s Screen) (Input, error) {
 	}
 	// Only a mode indicator BELOW the caret counts, never an old assistant quote.
 	if s.Agent == "claude" {
+		insertMode := false
 		for _, l := range s.Lines[s.Y+1:] {
+			if strings.Contains(l.Text, "-- INSERT --") {
+				insertMode = true
+			}
 			if strings.Contains(l.Text, "-- NORMAL --") || strings.Contains(l.Text, "-- VISUAL --") {
 				return out, errors.New("Claude vim mode: enter INSERT mode first")
 			}
+		}
+		if s.Vim && !insertMode {
+			return out, errors.New("Claude vim mode: enter INSERT mode first")
 		}
 	}
 	start := -1

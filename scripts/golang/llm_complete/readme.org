@@ -86,3 +86,25 @@ leading-space stripping off). Zero tokens and empty/null stop disable them.
 
 Provider reply shapes are =chat= for choices[0].message.content and =text=
 for choices[0].text. No caller maintains its own provider table.
+
+* Agent context and logs
+
+=agent-context= reads ={screen, last_reply, source, target, provider}= and
+optional FIM parameters on stdin, returning the assembled FIM request. Context
+budgets are Unicode code points: last 2000 prompt prefix, first 1000 suffix,
+and last 1500 assistant reply by default. An absent reply falls back to the
+screen above the input. =terminal fim= performs this asynchronously through
+the generalized launcher and validates prompt, caret, agent process identity
+and request generation before insertion.
+
+Agent requests log by default; other sources require opt-in. Logs are readable
+text in =~/logs/llm_complete/=, with 0700 directories and 0600 files, at most
+1 MiB per file and four files by default. The exact resolved body parameters,
+verbatim prefix, =⟦CURSOR⟧=, suffix, timing, outcome and completion are recorded.
+No keys or headers are recorded. See =logging= and =agent_fim= in the example.
+=LLM_COMPLETE_LOG_DIR= selects scratch storage for tests. A per-call =log=
+boolean overrides source settings and the agent default.
+
+=fim --shell= is the zsh adapter: NUL-delimited field/value pairs on stdin.
+=fim default-provider= exposes the configured default for shell initialization.
+No serializer receives buffer text as an argument.

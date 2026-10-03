@@ -86,6 +86,7 @@ type Cycle struct {
 	Index      int      `json:"index"`
 	Inserted   string   `json:"inserted"`
 	Agent      string   `json:"agent"`
+	ProcessID  int      `json:"process_id,omitempty"`
 }
 type Expansion struct {
 	Text       string `json:"text"`
@@ -94,7 +95,7 @@ type Expansion struct {
 }
 
 func validCycle(c Cycle, in Input, agent string) bool {
-	return c.Agent == agent && c.Prefix+c.Inserted == in.Prefix && c.Suffix == in.Suffix && len(c.Candidates) > 0 && c.Index >= 0 && c.Index < len(c.Candidates) && c.Inserted == strings.TrimPrefix(c.Candidates[c.Index], c.Fragment) && ascii(c.Inserted)
+	return c.Agent == agent && c.Prefix+c.Inserted == in.Prefix && c.Suffix == in.Suffix && len(c.Candidates) > 0 && c.Index >= 0 && c.Index < len(c.Candidates) && c.Inserted == strings.TrimPrefix(c.Candidates[c.Index], c.Fragment) && ascii(c.Inserted) && c.Fragment == fragment(c.Prefix) && strings.HasPrefix(c.Candidates[c.Index], c.Fragment) && sanitise(c.Inserted) == c.Inserted
 }
 func expand(s Screen, corpora []string, old Cycle) (Expansion, error) {
 	var e Expansion
@@ -103,7 +104,7 @@ func expand(s Screen, corpora []string, old Cycle) (Expansion, error) {
 		return e, err
 	}
 	var c Cycle
-	if validCycle(old, in, s.Agent) {
+	if validCycle(old, in, s.Agent) && old.ProcessID == s.ProcessID {
 		c = old
 		c.Index = (c.Index + 1) % len(c.Candidates)
 		e.Backspaces = len(c.Inserted)
@@ -130,7 +131,7 @@ func expand(s Screen, corpora []string, old Cycle) (Expansion, error) {
 			return e, errors.New("no dabbrev candidates")
 		}
 		// A non-ASCII remainder can expand once, but must never be backspaced by cycling.
-		c = Cycle{Prefix: in.Prefix, Suffix: in.Suffix, Fragment: f, Candidates: cs, Agent: s.Agent}
+		c = Cycle{Prefix: in.Prefix, Suffix: in.Suffix, Fragment: f, Candidates: cs, Agent: s.Agent, ProcessID: s.ProcessID}
 	}
 	if e.Backspaces > 0 { // Skip candidates whose deletion count is unverified.
 		for n := 0; n < len(c.Candidates) && !ascii(strings.TrimPrefix(c.Candidates[c.Index], c.Fragment)); n++ {
