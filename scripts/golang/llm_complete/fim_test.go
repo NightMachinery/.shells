@@ -2,10 +2,15 @@ package main
 
 import (
 	"bytes"
+	"context"
+	"crypto/x509"
 	"encoding/json"
+	"io"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -25,6 +30,83 @@ func testConfig(t *testing.T, url, extract string) Config {
 	c.Providers["codestral"] = p
 	t.Setenv("codestral_api_key", "INERT_KEY")
 	return c
+}
+
+func TestNetworkErrorCodes(t *testing.T) {
+	for _, tc := range []struct {
+		err  error
+		code int
+	}{
+		{context.DeadlineExceeded, 28}, {&net.DNSError{Err: "fabricated", Name: "example.invalid"}, 6},
+		{x509.UnknownAuthorityError{}, 60}, {&net.OpError{Op: "dial", Err: io.EOF}, 7}, {io.EOF, 52},
+	} {
+		if got := networkCode(tc.err); got != tc.code {
+			t.Fatal(got, tc.code)
+		}
+	}
+	tls := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
+	defer tls.Close()
+	l, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	closed := "http://" + l.Addr().String()
+	l.Close()
+	for _, tc := range []struct {
+		endpoint string
+		code     int
+	}{{tls.URL, 60}, {closed, 7}} {
+		c := testConfig(t, tc.endpoint, "chat")
+		_, code, msg, _ := performFIM(c, FIMRequest{Prefix: "inert"})
+		want := "fim-get: codestral: curl error " + fmtInt(tc.code)
+		if code != tc.code || msg != want {
+			t.Fatal(code, msg)
+		}
+	}
+}
+
+func TestHTTPProxyEnvironment(t *testing.T) {
+	// ProxyFromEnvironment caches its first environment. Exercise each setup
+	// in a fresh process, as real CLI requests do.
+	if mode := os.Getenv("LLM_TEST_PROXY_CHILD"); mode != "" {
+		if mode == "all-only" {
+			r, _ := http.NewRequest("POST", "http://example.invalid/fim", nil)
+			proxy, err := http.ProxyFromEnvironment(r)
+			if err != nil || proxy != nil {
+				t.Fatal("ALL_PROXY unexpectedly used")
+			}
+			return
+		}
+		c := testConfig(t, "http://example.invalid/fim", "chat")
+		out, code, msg, _ := performFIM(c, FIMRequest{Prefix: "inert"})
+		if code != 0 || msg != "" || out != " proxied" {
+			t.Fatal(out, code, msg)
+		}
+		return
+	}
+	proxy := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Host != "example.invalid" || r.Header.Get("Authorization") != "Bearer INERT_KEY" {
+			t.Error("proxy request")
+		}
+		w.Write([]byte(`{"choices":[{"message":{"content":" proxied"}}]}`))
+	}))
+	defer proxy.Close()
+	for _, mode := range []string{"http", "all-only"} {
+		cmd := exec.Command(os.Args[0], "-test.run=^TestHTTPProxyEnvironment$")
+		for _, e := range os.Environ() {
+			k := strings.SplitN(e, "=", 2)[0]
+			if !strings.Contains(strings.ToUpper(k), "PROXY") && k != "REQUEST_METHOD" {
+				cmd.Env = append(cmd.Env, e)
+			}
+		}
+		cmd.Env = append(cmd.Env, "LLM_TEST_PROXY_CHILD="+mode, "ALL_PROXY="+proxy.URL)
+		if mode == "http" {
+			cmd.Env = append(cmd.Env, "HTTP_PROXY="+proxy.URL)
+		}
+		if b, err := cmd.CombinedOutput(); err != nil {
+			t.Fatalf("%s: %v %s", mode, err, b)
+		}
+	}
 }
 func TestFIMErrors(t *testing.T) {
 	for _, tc := range []struct{ body, want string }{
