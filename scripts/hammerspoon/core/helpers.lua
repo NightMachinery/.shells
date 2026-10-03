@@ -407,8 +407,8 @@ end
 -- onResult(code, stdout, stderr) exactly once.
 local function gardenCall(bin, args, label, opts, onResult)
     opts = opts or {}
-    -- bshEndpoint as well: brishzq.zsh reads it before GARDEN_PORT, and the
-    -- files it sources may set one.
+    -- bshEndpoint as well: the clients read it before GARDEN_PORT, so one in
+    -- Hammerspoon's own environment would otherwise win.
     local env = garden_port_override and {
         GARDEN_PORT = tostring(garden_port_override),
         bshEndpoint = "http://127.0.0.1:" .. tostring(garden_port_override),

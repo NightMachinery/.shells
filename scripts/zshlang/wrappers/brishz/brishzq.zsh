@@ -19,7 +19,17 @@ function psource {
 }
 ##
 path+=( /usr/local/bin /opt/homebrew/bin /home/linuxbrew/.linuxbrew/bin )
+#: The caller's endpoint wins over the one ~/.privateShell sets, so
+#: `GARDEN_PORT=7299 brishzq.zsh ...' reaches a test garden on 7299, not the
+#: live one. brishz.dash and brishzgo source nothing, so they already obey it.
+typeset -ga h_brishzq_caller_endpoint=(
+    ${GARDEN_PORT+"GARDEN_PORT=${GARDEN_PORT}"}
+    ${bshEndpoint+"bshEndpoint=${bshEndpoint}"}
+)
 psource ~/.privateShell
+if (( ${#h_brishzq_caller_endpoint} )) ; then
+    export "${h_brishzq_caller_endpoint[@]}"
+fi
 ##
 autoload -Uz regexp-replace
 

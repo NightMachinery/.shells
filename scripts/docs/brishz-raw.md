@@ -52,7 +52,9 @@ its silent routes cover only `/zsh/nolog/`; the JSON retry stays silent.
   with `brishz_noquote` `$LINENO` is 1, not 2. No byte is lost either way.
   Nothing in zshlang tests what kind of file its stdin is.
 - `bshEndpoint`, `GARDEN_PORT`, the API key header and the remote basic auth
-  work as on the JSON path. Stdin travels in the request, so a remote garden
+  work as on the JSON path. The caller's `bshEndpoint` or `GARDEN_PORT` beats
+  the one `~/.privateShell` sets, so `GARDEN_PORT=7299 brishzq.zsh ...`
+  reaches a test garden on 7299. Stdin travels in the request, so a remote garden
   gets it too. (The remote proxy's route was not tested; it forwards
   `/api/v1/zsh/raw/` to `/zsh/raw/` like any other path.)
 - `brishz_copy` copies the equivalent `print | curl` pipeline.

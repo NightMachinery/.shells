@@ -96,8 +96,10 @@ writes more than the pipe buffer blocks forever (measured with Hammerspoon
 
 `garden_port_override` points the helpers, their clients and the probe at
 another port. It sets both `GARDEN_PORT` and `bshEndpoint` for the client,
-because `brishzq.zsh` reads `bshEndpoint` first and the files it sources may
-set one; with `GARDEN_PORT` alone, a test call went to the live BrishGarden.
+because the clients read `bshEndpoint` first, so one in Hammerspoon's own
+environment would otherwise win. A caller's `GARDEN_PORT` or `bshEndpoint`
+also beats the one `~/.privateShell` sets, which `brishzq.zsh` sources (before
+that fix, `GARDEN_PORT` alone sent a test call to the live BrishGarden).
 Set it to a closed port such as 7231 to play a dead BrishGarden, test with
 inert commands (`print -r -- sentinel`), and swap `alert_gateway` for a
 recorder while testing, so no band reaches the screen.
