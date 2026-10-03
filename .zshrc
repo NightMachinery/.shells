@@ -348,6 +348,15 @@ function nightsh-load-zshrc() {
   ##
   # source-plugin intelfx/pure
   source-plugin sindresorhus/pure
+  #: pure falls back to `who -m' when $SSH_CONNECTION is empty, but macOS keeps
+  #: utmpx rows of SSH sessions that died uncleanly, so a local tab reusing such
+  #: a tty showed `user@host' and exported PROMPT_PURE_SSH_CONNECTION to its
+  #: children. Trust only isSSH. See =~/scripts/docs/utmpx-stale-ssh.md=.
+  if (( ${+prompt_pure_state} )) && ! isSSH && (( UID != 0 )) \
+      && ! prompt_pure_is_inside_container ; then
+    prompt_pure_state[username]=''
+    unset PROMPT_PURE_SSH_CONNECTION
+  fi
 
   bella_zsh_disable1=''
   function prompt_pure_check_cmd_exec_time () {
