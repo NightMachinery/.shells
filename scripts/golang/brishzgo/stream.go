@@ -12,6 +12,7 @@ import (
 	"strconv"
 	"strings"
 	"sync/atomic"
+	"time"
 )
 
 // The streaming API's reply body is a sequence of frames: a type byte, the
@@ -26,6 +27,10 @@ const (
 	// An exit frame's payload is a number; anything longer is not one.
 	maxExitPayload = 32
 )
+
+// debugSignalWait is how long a signal waits for its brishz_debug line
+// before it kills us.
+const debugSignalWait = 100 * time.Millisecond
 
 var (
 	// errCutShort: the body ended before its exit frame, as when the
@@ -126,8 +131,22 @@ func (c *client) stream(in *stdinSource) (int, fallback) {
 	var interrupted atomic.Bool
 	remove := sigs.add(func() {
 		interrupted.Store(true)
-		c.debugf("signal: closing the connection, so the garden kills the command")
+		// Close the connection first, and never wait long on stderr: it
+		// may be a full pipe that nobody reads, and a write blocked there
+		// would keep the connection open (so the command running) and the
+		// signal from killing us.
 		cancel()
+		if c.cfg.debug {
+			written := make(chan struct{})
+			go func() {
+				c.debugf("signal: closed the connection, so the garden kills the command")
+				close(written)
+			}()
+			select {
+			case <-written:
+			case <-time.After(debugSignalWait):
+			}
+		}
 	})
 	defer remove()
 	// The signal handler kills us right after it closed the connection;

@@ -533,3 +533,75 @@ func TestStreamSignals(t *testing.T) {
 		t.Errorf("ignored SIGINT: %v, rest %q", err, rest)
 	}
 }
+
+// TestStreamSignalStalledStderr: with brishz_debug=y and our stderr on a
+// full pipe that nobody reads, a SIGINT still closes the connection at once
+// and kills us with SIGINT. The signal's cleanup closes the connection
+// before it writes its debug line, and does not wait long for that write.
+func TestStreamSignalStalledStderr(t *testing.T) {
+	bin := builtBinary(t)
+	gone := make(chan time.Time, 1)
+	g := newFakeGarden(t, func(w http.ResponseWriter, r *http.Request, body []byte) {
+		w.Header().Set("X-Brish-Stream", "1")
+		w.Write(frameOf(frameStdout, []byte("started\n")))
+		w.(http.Flusher).Flush()
+		// More stderr than a pipe holds: the client blocks writing it,
+		// and this write blocks once the socket buffers are full.
+		w.Write(frameOf(frameStderr, bytes.Repeat([]byte("e"), 4<<20)))
+		select {
+		case <-r.Context().Done():
+			gone <- time.Now()
+		case <-time.After(20 * time.Second):
+		}
+	})
+	stderrR, stderrW, err := os.Pipe()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer stderrR.Close()
+	dfl := []string{"perl", "-e", `$SIG{$_} = "DEFAULT" for qw(INT TERM HUP); exec @ARGV or die`, bin, "true"}
+	cmd := exec.Command(dfl[0], dfl[1:]...)
+	cmd.Env = []string{"PATH=" + os.Getenv("PATH"), "HOME=" + t.TempDir(), "bshEndpoint=" + g.URL, "brishz_stream=y", "brishz_debug=y"}
+	cmd.Stderr = stderrW
+	stdout, err := cmd.StdoutPipe()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := cmd.Start(); err != nil {
+		t.Fatal(err)
+	}
+	stderrW.Close()
+	br := bufio.NewReader(stdout)
+	if line, err := br.ReadString('\n'); line != "started\n" {
+		t.Fatalf("first line %q, %v", line, err)
+	}
+	// By now the client is blocked on its stderr.
+	time.Sleep(300 * time.Millisecond)
+	t0 := time.Now()
+	cmd.Process.Signal(syscall.SIGINT)
+	exited := make(chan struct{})
+	go func() {
+		io.Copy(io.Discard, br)
+		cmd.Wait()
+		close(exited)
+	}()
+	select {
+	case <-exited:
+	case <-time.After(5 * time.Second):
+		cmd.Process.Kill()
+		<-exited
+		t.Fatal("still alive 5 s after SIGINT")
+	}
+	ws := cmd.ProcessState.Sys().(syscall.WaitStatus)
+	if !ws.Signaled() || ws.Signal() != syscall.SIGINT {
+		t.Errorf("not killed by SIGINT: %v", cmd.ProcessState)
+	}
+	select {
+	case at := <-gone:
+		if d := at.Sub(t0); d > time.Second {
+			t.Errorf("the garden saw the connection close %v after the SIGINT", d)
+		}
+	case <-time.After(2 * time.Second):
+		t.Error("the garden did not see the connection close")
+	}
+}
