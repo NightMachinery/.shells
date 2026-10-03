@@ -51,8 +51,8 @@ dim "channels: $(micromamba config list 2>/dev/null | tr '\n' ' ' | head -c 200)
 ##
 #: A general-purpose python env. Kept separate from any tool env so a broken
 #: research dependency cannot take the shell down with it.
-: "${NIGHT_PY_ENV:=py312}"
-: "${NIGHT_PY_VERSION:=3.12}"
+: "${NIGHT_PY_ENV:=py314}"
+: "${NIGHT_PY_VERSION:=3.14}"
 
 if micromamba env list 2>/dev/null | grep -q "[/ ]${NIGHT_PY_ENV}\$\|/${NIGHT_PY_ENV} " ; then
     ok "env ${NIGHT_PY_ENV} already exists"
