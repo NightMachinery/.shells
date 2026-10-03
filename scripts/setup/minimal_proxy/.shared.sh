@@ -182,7 +182,11 @@ else
     export PATH="${HOME}/miniconda3/bin:${PATH}"
     export MAMBA_ROOT_PREFIX="${HOME}/micromamba"
 
-    mamba_default_env=p310
+    #: Hosts set up before the move to 3.14 only have p310.
+    mamba_default_env=p314
+    if ! test -d "${MAMBA_ROOT_PREFIX}/envs/${mamba_default_env}" ; then
+        mamba_default_env=p310
+    fi
 fi
 
 if test -d "${MAMBA_ROOT_PREFIX}" ; then

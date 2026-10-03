@@ -230,7 +230,7 @@ function micromamba-setup {
     micromamba config append channels conda-forge --env
     micromamba self-update
 
-    micromamba create --yes -c conda-forge --name p310 python=3.10 numpy 
+    micromamba create --yes -c conda-forge --name p314 python=3.14 numpy 
 
     #: To activate the newly created environment:
     source ~/.shared.sh 
