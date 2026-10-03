@@ -226,7 +226,8 @@ fi
 ##
 #: --- llm (Simon Willison's) ---
 #: Python, so it gets its own uv-managed venv rather than a release binary.
-#: python/requirements.txt pins the plugin set: llm and llm-gemini.
+#: The full plugin set lives in python/uv-tools.txt; this stage installs the
+#: one a fresh host needs, llm-gemini.
 #:
 #: @warn Plugins must be added with `llm install', which installs into llm's
 #: OWN venv. `uv tool install llm-gemini' would create a second, separate

@@ -1,5 +1,6 @@
 insables="$NIGHTDIR"/setup/installables
 pipables="$NIGHTDIR"/python/requirements.txt
+uvtoolables="$NIGHTDIR"/python/uv-tools.txt
 inslables="$NIGHTDIR"/setup/installables-linux
 nodables="$NIGHTDIR"/setup/node.g
 brewables="$NIGHTDIR"/setup/brewables
@@ -10,7 +11,7 @@ ins_gem="$NIGHTDIR/setup/ins_gem"
 alias bmac='brewables="$brewables_mac" '
 ###
 function deps-clean {
-    re duplicates-clean-sort-file-inplace "$insables" "$inslables" "$nodables" "$brewables" "$brewables_mac" "$pipables" "$ins_go" "$ins_gem"
+    re duplicates-clean-sort-file-inplace "$insables" "$inslables" "$nodables" "$brewables" "$brewables_mac" "$pipables" "$uvtoolables" "$ins_go" "$ins_gem"
 }
 aliasfn clean-deps deps-clean
 ##
@@ -57,6 +58,28 @@ function piadd() {
         pi "$1"
 }
 noglobfn piadd
+
+function uv-tool-install {
+    #: Install a Python CLI into its own venv. A uv-managed interpreter, never
+    #: the conda env, so removing or rebuilding that env cannot break a tool.
+    #: Usage: uv-tool-install [--python X.Y] <pkg> [--with <plugin>]...
+    ##
+    local args=("$@")
+    assert-args args @RET
+
+    if (( ! ${args[(I)--python]} )) ; then
+        args=(--python "${NIGHT_PY_VERSION:-3.14}" "${args[@]}")
+    fi
+
+    UV_PYTHON_PREFERENCE=only-managed reval-ec uv tool install "${args[@]}"
+}
+
+function uvtadd {
+    ec "$*" >> "$uvtoolables"
+    test -n "$noi" ||
+        uv-tool-install "$@"
+}
+noglobfn uvtadd
 ##
 function go-install-local {
     local d="${1:?}"
@@ -254,6 +277,24 @@ function ins-pip {
     done
 }
 
+function ins-uv-tools {
+    #: Each line of the manifest is the argument list of one `uv tool install`.
+    #: A leading `~/` is expanded, for the local editable checkouts.
+    ##
+    local line words failed=()
+    for line in "${(@f)$(command grep -v '^[[:space:]]*\(#\|$\)' "$uvtoolables")}" ; do
+        words=("${(@Q)${(z)line}}")
+        uv-tool-install "${(@)words/#\~\//$HOME/}" ||
+            failed+=("$line")
+    done
+
+    if (( ${#failed} )) ; then
+        ecerr "$0: failed:"
+        ecerr "${(F)failed}"
+        return 1
+    fi
+}
+
 function ins-ins() {
     zargs -n 1 -- $(cat "$insables") -- ins #Don't quote the inputs, it makes zargs treat them as one monolithic input.
 }
@@ -288,6 +329,7 @@ ins-all() {
     fi
     ins-ins
     ins-pip
+    ins-uv-tools
     ins-npm
     ins-go
     ins-gem

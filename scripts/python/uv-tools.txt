@@ -1,0 +1,54 @@
+# One `uv tool install` argument list per line; see [agfi:ins-uv-tools].
+amzqr
+arxiv-latex-cleaner
+asitop
+-e ~/code/python/BrishGarden --with-editable ~/code/python/brish
+catsql
+git+https://github.com/NightMachinery/cis-applications2org.git
+copyparty
+csvkit
+ddgr
+-e ~/code/python/ebook_chunker --with ipython --with-editable ~/code/uni/PyNight --with-editable ~/code/python/brish
+edir
+epr-reader
+fanficfare
+git+https://github.com/NightMachinery/fdroid_downloader.git
+fichub-cli
+gallery-dl
+gcalcli
+-e ~/code/python/gemini_tts
+-e ~/code/python/get_the_nini --with-editable ~/code/uni/PyNight --with-editable ~/code/python/brish
+glances
+google-images-download
+-e ~/code/python/gost-trier
+hachoir
+httpie
+instaloader
+iredis
+-e ~/code/python/jalali-calendar-cli
+jill
+khal
+-e ~/code/misc/kitty-theme-changer
+libgen-py
+lightnovel-crawler
+llm --with llm-gemini --with llm-anthropic --with llm-groq --with llm-openrouter --with llm-vertex --with llm-openai-via-codex
+magic-wormhole
+mcp-proxy --with 'mcp<2'
+nbdime
+openai-whisper
+overleaf-sync
+pdfcropmargins
+piep
+pix2tex
+pixcat
+py-spy
+pypyp
+pytube
+ruff
+spotdl
+subliminal
+ttok
+waybackpack
+wifi-password
+xkcdpass
+yq
