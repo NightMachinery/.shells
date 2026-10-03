@@ -215,8 +215,13 @@ function wget-dir {
 function uv-pip {
     if isDefined-cmd uv ; then
         if test -z "${CONDA_PREFIX}" ; then
-            for d in ~/anaconda ~/miniforge3 ~/miniconda3 ; do
-                if test -e "$d" ; then
+            #: Target the env that owns the python on PATH, so `pi` installs
+            #: where `python` will import from.
+            local py_prefix
+            py_prefix="$(command -v python3)" &&
+                py_prefix="${py_prefix%/bin/python3}"
+            for d in "${py_prefix}" ~/miniforge3 ~/anaconda ~/miniconda3 ; do
+                if test -e "$d/conda-meta" ; then
                     local -x CONDA_PREFIX="$d"
 
                     break
