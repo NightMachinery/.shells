@@ -267,13 +267,28 @@ class HandoffTests(unittest.TestCase):
 
     def test_uuid_and_store_mismatch_refused(self):
         self.args.id = SOURCE_ID.upper()
-        with self.assertRaises(h.HandoffError):
-            h.prepare(self.args)
+        with self.assertRaisesRegex(h.HandoffError, "filename does not match"):
+            self.make_plan()
         self.args.id = SOURCE_ID
         plan = self.make_plan()
         plan["id"] = IMPORTED_ID
         with self.assertRaises(h.HandoffError):
             h.verify_native(plan)
+
+    def test_uppercase_session_keeps_its_case(self):
+        # macOS `uuidgen` ids: Claude Code names the transcript as given.
+        upper = SOURCE_ID.upper()
+        self.transcript.unlink()
+        self.transcript = self.transcript.with_name(upper + ".jsonl")
+        self.transcript.write_text("{}\n")
+        self.args.id, self.args.transcript = upper, str(self.transcript)
+        self.meta = upper + "\tprivate name\t" + str(self.directory) + "\n"
+        plan = self.make_plan()
+        self.assertEqual(plan["id"], upper)
+        h.validate_plan(plan)
+        for bad in (SOURCE_ID[:-2] + "Bc", "{" + SOURCE_ID + "}", SOURCE_ID.replace("-", "")):
+            with self.subTest(bad=bad), self.assertRaises(h.HandoffError):
+                h.valid_uuid(bad)
 
     def test_metadata_uuid_or_cwd_mismatch_refused(self):
         plan = self.make_plan()

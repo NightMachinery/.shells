@@ -31,7 +31,7 @@ MARKERS = {
     "AI_AGENT", "AGENT_SESSION_REUSE_PANE", "AGENT_SESSION_STATE",
     "PASEO_AGENT_ID", "PASEO_HOST", "CLAUDE_CONFIG_DIR", "CODEX_HOME",
 }
-UUID_RE = re.compile(r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\Z")
+UUID_RE = re.compile(r"[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\Z")
 PS_RE = re.compile(
     r"^\s*(\d+)\s+(\d+)\s+(\d+)\s+"
     r"((?:Mon|Tue|Wed|Thu|Fri|Sat|Sun)\s+"
@@ -138,7 +138,14 @@ def process_table():
 
 
 def valid_uuid(value):
-    if not isinstance(value, str) or not UUID_RE.fullmatch(value) or str(uuid.UUID(value)) != value:
+    # Claude Code keeps a session id in the case it was given, so a session
+    # started with macOS `uuidgen` has an uppercase id and transcript name, and
+    # Paseo opens `<id>.jsonl` as spelled. Keep the case; refuse a mixed one,
+    # which is no session's spelling.
+    if not isinstance(value, str) or not UUID_RE.fullmatch(value):
+        raise HandoffError("Expected a canonical native session UUID")
+    canonical = str(uuid.UUID(value))
+    if value not in (canonical, canonical.upper()):
         raise HandoffError("Expected a canonical native session UUID")
     return value
 

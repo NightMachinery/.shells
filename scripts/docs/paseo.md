@@ -56,6 +56,11 @@ process. It imports that same conversation ID and runs `paseo attach` in its
 tmux session. Within tmux, the command switches to that session. Elsewhere it
 prints the `tmux attach-session` command; the worker still performs the handoff.
 
+The UUID keeps the case it was created in. Claude Code names a transcript after
+the session ID it was given, so a session started with macOS `uuidgen` has an
+uppercase one, and Paseo opens `<id>.jsonl` exactly as spelled. A mixed-case
+ID is refused.
+
 This resumes saved history in a new provider process. It does not adopt the
 original process. Source history is retained. The importer sends no task prompt;
 continue the conversation through Paseo when ready.
