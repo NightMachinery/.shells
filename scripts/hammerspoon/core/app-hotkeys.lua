@@ -175,6 +175,10 @@ end
 -- `active' event (core/screens.lua).
 recentAppsByScreen = {}
 
+-- pid -> the key of the screen it was filed under last: where its front
+-- window was when it was last in use. One entry per process ever filed.
+recentAppsLastScreen = {}
+
 local function screenKey(screen)
     local ok, u = pcall(function() return screen:getUUID() end)
     return ok and u and u:upper() or nil
@@ -197,6 +201,7 @@ function recentAppsPushOn(app, screen)
     end
     table.insert(list, 1, app)
     list[recentAppsMax + 1] = nil
+    recentAppsLastScreen[pid] = key
 end
 
 -- Files the frontmost app under the active screen after kRecentScreenDelay,
@@ -231,13 +236,16 @@ end
 ---   { app = <hs.application>, window = <hs.window or nil>, kittyPanel = true|nil, why = "..." }
 --- or nil. In order:
 ---   1. the newest app filed under `screen' that still has a normal window
----      there. When the app being left is in native fullscreen, the rest of
----      the screen's windows are in another Space, which CoreGraphics'
----      on-screen list leaves out, so there an app filed under the screen
----      with no window on screen anywhere is taken on its record (if
----      appReturnUsable). Anywhere else such an app is passed over: it is a
----      Finder after a click on the desktop, or an app with every window
----      closed or minimized, and activating it would show nothing;
+---      there. When `screen' shows a native fullscreen Space (the frontmost
+---      app's focused window is fullscreen there), the rest of the screen's
+---      windows are in another Space, which CoreGraphics' on-screen list
+---      leaves out, so there an app with no window on the screen is taken
+---      on its record, if appReturnUsable and if `screen' is where it was
+---      filed last (recentAppsLastScreen): its front window is then here,
+---      and bringing it forward will not land on another screen. Anywhere
+---      else such an app is passed over: it is a Finder after a click on the
+---      desktop, or an app with every window closed or minimized, and
+---      activating it would show nothing;
 ---   2. the frontmost normal window on `screen' of any other app, for apps
 ---      used before the last reload or pushed out of the list;
 ---   3. the newest usable app anywhere, the old rule, when nothing else is
@@ -269,16 +277,18 @@ function screenReturnTarget(screen, skipPid, skipBid)
         end
     end
 
-    -- Whether the app being left (frontmost, on `screen') is in native
-    -- fullscreen: two Accessibility queries to it, asked at most once and
-    -- only when step 1 meets an app with no window on screen.
-    -- hs.spaces.spaceType would answer too, but took 21 to 37 ms here.
+    -- Whether `screen' shows a native fullscreen Space, by the frontmost
+    -- app's focused window: the app being left, for an app hotkey. Two
+    -- Accessibility queries to it (three when it is fullscreen), asked at
+    -- most once and only when step 1 meets an app with no window on the
+    -- screen. hs.spaces.spaceType would answer too, but took 21 to 37 ms
+    -- here.
     local fullscreenHere = nil
     local function leavingFullscreen()
         if fullscreenHere == nil then
             local ok, full = pcall(function()
                 local w = hs.application.frontmostApplication():focusedWindow()
-                return w ~= nil and w:isFullScreen()
+                return w ~= nil and w:isFullScreen() and (screen == nil or w:screen():id() == screen:id())
             end)
             fullscreenHere = ok and full == true
         end
@@ -288,7 +298,8 @@ function screenReturnTarget(screen, skipPid, skipBid)
     local function landing(app, pid, why, onRecord)
         local e = onScreenOf[pid]
         if not e then
-            if onRecord and not frontOf[pid] and leavingFullscreen() and appReturnUsable(app) then
+            if onRecord and key and recentAppsLastScreen[pid] == key and leavingFullscreen()
+               and appReturnUsable(app) then
                 return { app = app, why = why .. ", in another Space" }
             end
             return nil

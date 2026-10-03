@@ -101,11 +101,14 @@ order:
 
 - the newest app filed under that screen that still has a normal window
   there. An app whose only visible windows are on the other screen is passed
-  over. An app with no window on screen at all is taken on its record only
-  when the app being hidden is in native fullscreen: the rest of that screen's
-  windows are then in another Space, which the on-screen window list leaves
-  out. Even then it must still be running and not hidden (`appReturnUsable`:
-  you hid that one on purpose). Anywhere else such an app is passed over,
+  over. An app with no window on that screen is taken on its record only
+  when the screen shows a native fullscreen Space (the frontmost app's focused
+  window is fullscreen there): the rest of that screen's windows are then in
+  another Space, which the on-screen window list leaves out. Even then this
+  screen must be the one it was filed under last (`recentAppsLastScreen`), so
+  its front window is here and bringing it forward does not land on the other
+  screen, and it must still be running and not hidden (`appReturnUsable`: you
+  hid that one on purpose). Anywhere else such an app is passed over,
   since it is a Finder after a click on the desktop, or an app whose windows
   are all closed or minimized, and activating it would show nothing;
 - the frontmost normal window on that screen of any other app, for apps used
