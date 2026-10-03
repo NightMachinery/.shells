@@ -1,3 +1,17 @@
+#: Claude Code builds its shell snapshot by sourcing this file and dumping
+#: every function into a file that each of its commands sources *after*
+#: .zshenv. .zshenv already loads the library fresh for every command, so the
+#: dump only replaced current functions and options with their session-start
+#: copies. Give it neither (`emulate -R zsh' leaves only zsh's defaults, which
+#: the dump omits), and skip this file's interactive setup. Aliases stay: the
+#: snapshot opens with `unalias -a', so without them a command has none at
+#: all. See =~/scripts/docs/claude-code-shell.md=.
+if [[ -n "${CLAUDECODE:-}" && "${SNAPSHOT_FILE:-}" == */shell-snapshots/snapshot-* ]] ; then
+    unfunction -m '*'
+    emulate -R zsh
+    return 0
+fi
+###
 # @perf zshrc takes a lot of time (2s?). Most of these seem to be from compinit. Hard to profile these as their second runs are lighter.
 ###
 function nightsh-load-zshrc() {
