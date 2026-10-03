@@ -405,3 +405,12 @@ request by process group takes the request that replaces it down too; and
 =cat -v= renders a real ESC byte and a literal =^[= pair identically, so it
 cannot be used to check any of this), and why =fim_strip_space_p= is off: the
 leading space these models return is almost always the right one.
+
+* Xray restart loop
+
+[agfi:v2-on] uses [agfi:loop] to relaunch Xray after every exit, with a
+three-second interval by default. =v2_on_retry_delay= accepts whole seconds
+from 1 to 300, and =v2_on_config= can select a different readable config file.
+Missing prerequisites leave the current session running. [agfi:v2-off] replaces the same session with
+the direct gost proxy and stops the old loop and process tree. See
+[[NIGHTDIR:docs/v2ray-restart.md][restart behavior, stop signals and activation]].

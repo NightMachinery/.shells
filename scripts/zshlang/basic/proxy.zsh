@@ -163,8 +163,25 @@ function reval-pxa-if-no-proxy {
 }
 ##
 function v2-on {
-    tmuxnew v2ray-genrouter xray -config $nightNotes/private/configs/zii/v2ray/genrouter.json
-    # tmuxnew v2ray-genrouter xray -config $nightNotes/private/configs/zii/v2ray/genrouter.json
+    : "Start Xray in tmux with a three-second restart loop."
+    local notes_root="${nightNotes}"
+    local config="${v2_on_config:-${notes_root}/private/configs/zii/v2ray/genrouter.json}"
+    local delay="${v2_on_retry_delay:-3}"
+    ensure-cmd xray zsh tmux sleep @RET
+    if [[ "${delay}" != <1-300> ]] ; then
+        ecerr "$0: v2_on_retry_delay must be an integer from 1 to 300 seconds"
+        return 2
+    fi
+    if [[ ! -f "${config}" || ! -r "${config}" ]] ; then
+        ecerr "$0: Xray config must be an existing readable file"
+        return 2
+    fi
+    #: A fresh shell loads [agfi:loop]. Pass the config and delay as argv,
+    #: so paths with spaces or quotes stay data. [agfi:v2-off] and
+    #: [agfi:tmux-job-stop] terminate the whole session's process tree.
+    tmuxnew v2ray-genrouter "${commands[zsh]}" -c \
+        'lo_s="$1" loop command "$2" -config "$3"' \
+        v2-on "${delay}" "${commands[xray]}" "${config}"
 }
 
 function v2-off {
