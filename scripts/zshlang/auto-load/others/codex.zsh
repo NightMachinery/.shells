@@ -9,7 +9,9 @@ function h-codex-notify-suppressed-p {
     #: Fail open throughout: an unfamiliar payload, missing sqlite, a migration,
     #: or a locked database must not silence an ordinary Codex task.
     ##
-    setopt localoptions extendedglob
+    #: Claude Code's own shell runs commands under NO_BARE_GLOB_QUAL; the
+    #: `(Nom)' below needs the option back to be a qualifier at all.
+    setopt localoptions extendedglob bareglobqual
     local info="${1}"
     local config_home="${CODEX_HOME:-${HOME}/.codex}"
 

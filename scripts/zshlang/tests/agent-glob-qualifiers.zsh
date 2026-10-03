@@ -73,7 +73,7 @@ glob-qual-test-expect-resolve 'unknown uuid' \
 typeset -g glob_qual_test_unguarded
 glob_qual_test_unguarded="$(
     builtin cd -q -- "${glob_qual_test_root}" &&
-    command perl - zshlang/auto-load/others/{agent-*,agents,agents-md,agy-session,claude-session,codex-session,hold}.zsh \
+    command perl - zshlang/auto-load/others/{agent-*,agents,agents-md,agy-session,claude-session,codex,codex-session,hold}.zsh \
         zshlang/plugins/agent-session/*.zsh <<'EOF'
 use strict; use warnings;
 for my $file (@ARGV) {
