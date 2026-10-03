@@ -329,6 +329,66 @@ lays the panel out there again at its next re-layout, so an Accessibility move
 would be undone. hyper+shift+; on the panel therefore moves it through kitty
 (`kittyPanelMoveTo`, see "kitty: hyper+z").
 
+#### mpv: moved by a drag
+
+mpv would not move at all, windowed or fullscreen (five presses on
+2026-10-03, each "could not move mpv (it is fullscreen again where it
+was)"). Measured on a separate test mpv playing a generated test pattern,
+in 0.37 and 0.41 alike:
+
+- mpv takes a new size over Accessibility but keeps every position inside
+  the screen it is on: `x` stops at the screen's right edge less the
+  window's width, whatever is asked, and `y` is taken as given.
+  `moveToScreen`, `setTopLeft` and a raw `AXPosition` write all stop there.
+- Leaving fullscreen, mpv goes back to the windowed frame it last set
+  itself, on whichever screen that was, so the fullscreen dance always met
+  a window that could not leave the old screen.
+- A drag moves it, as one by hand does: mpv drags its window by the video.
+  A synthetic drag works once mpv is the active app; while it is not, the
+  press only brings it forward.
+
+So when the Accessibility move leaves a window on its old screen, and its app
+is named in `Screens.dragMoveApps` (only mpv so far), `dragTo` drags it by
+the middle of its frame to where the move would have put it, then lets
+`moveToScreen` scale it there. It refuses when another window covers that
+point. The drag runs on timers, so other hotkeys stay live during it. Only
+listed apps are dragged, because a press in the middle of most windows does
+something: in a browser it would land on the page, or pull a tab out. The
+console line says ", dragged" when a drag did the move.
+
+Leaving fullscreen, mpv animates toward the frame it remembers, rests there
+for about 0.2 s, and may then jump to another. `whenSettled`'s one still poll
+took that rest for the end, and the move counted as done because the window
+happened to be on the target screen. For listed apps the move out of
+fullscreen therefore first waits until the frame has held still for
+`kDragSettleStill`.
+
+Measured with the test mpv, through `Screens.moveWindowNext` itself:
+windowed moves both ways, by drag, in about 1.2 s; a fullscreen move from the
+laptop to the monitor, fullscreen again there, in about 2.2 s. The first
+fullscreen attempt after a string of test moves failed: mpv left fullscreen
+onto a stale frame on the monitor, and went fullscreen again on the laptop.
+The second, straight after, worked. mpv's own record of its frame does not
+follow moves it did not make, which is the likely cause; a second press is
+the remedy until that is pinned down.
+
+Dead ends, for the record:
+
+- mpv's `screen` property, set at runtime over its IPC socket, does nothing
+  (0.37 and 0.41).
+- Its `geometry` property is applied at runtime in 0.41 (not 0.37), but only
+  within the screen mpv is on.
+- `fs-screen` and then `fullscreen=yes` does put mpv fullscreen on the given
+  screen, but needs an IPC socket in every mpv, which mpv started from a shell
+  does not have, and the window goes back to its old screen when it leaves
+  fullscreen.
+- The first synthetic drags "failed" only because the kitty panel was
+  covering mpv and took them; hence the covering check.
+
+The installed mpv was 0.37 (`/opt/homebrew/bin/mpv` is a hand-made link to
+`/Applications/mpv.app`); Homebrew's 0.41 is installed but not linked. The
+drag works with both.
+
 ## The ipc print recursion fix
 
 `hs -c` used to wedge whenever anything printed to the Hammerspoon console

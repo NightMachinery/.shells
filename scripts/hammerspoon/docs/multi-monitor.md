@@ -398,6 +398,15 @@ Found in real use on 2026-10-03, after the round above:
   own screen hides it, and hyper+; can focus the panel. Scripted: the panel
   stayed up on the monitor while Emacs was activated on the laptop, hyper+;
   then landed in kitty, and activating Brave on the monitor hid it.
+- **mpv would not move to the other screen.** mpv keeps every position
+  written over Accessibility inside its current screen, and leaving
+  fullscreen it returns to a frame it remembers. hyper+shift+; now drags
+  windows of apps listed in `Screens.dragMoveApps` (mpv) when the plain move
+  is refused; see "mpv: moved by a drag" in `docs/hammerspoon.md`. Tested on
+  a test mpv: windowed moves both ways and a fullscreen move to the monitor
+  worked, though one fullscreen attempt right after many test moves landed
+  back on the laptop. The fullscreen move from the monitor to the laptop is
+  untested.
 
 Still unmeasured:
 

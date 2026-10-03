@@ -698,6 +698,128 @@ local function moveTo(w, to)
     return onScreen(w, to)
 end
 
+--- Apps, by name, whose windows refuse to leave their screen over
+--- Accessibility but can be dragged there by their middle. mpv takes a new
+--- size but keeps every position write inside its current screen (x stops
+--- at the screen's right edge less the window's width; y is taken), in 0.37
+--- and 0.41 alike, and it goes back to its old windowed frame on the old
+--- screen when it leaves fullscreen. A drag is what moves it, as by hand:
+--- mpv drags its window by the video (window-dragging), and a synthetic
+--- drag does it too once mpv is the active app; while it was not, the press
+--- only brought it forward (measured 2026-10-03 on a test mpv). Only apps
+--- named here are dragged, since a press in the middle of most windows does
+--- something (a browser's would land on the page, or pull a tab out).
+Screens.dragMoveApps = Screens.dragMoveApps or { mpv = true }
+
+-- The drag's steps: how many, and the seconds between them and around the
+-- press, so the app sees an ordinary drag rather than a jump.
+local kDragSteps, kDragStepSeconds, kDragHoldSeconds = 30, 0.02, 0.15
+
+--- Drags `w' (unmoved, on its old screen) to where moveToScreen would have
+--- put it on `to', by the middle of its frame, then lets moveToScreen scale
+--- it there; done(onScreen). Not when something else covers that point
+--- (the kitty panel would get the drag), or the app is not in
+--- dragMoveApps.
+local function dragTo(w, to, done)
+    local app = w:application()
+    local name = app and app:name()
+    if not (name and Screens.dragMoveApps[name]) then return done(false) end
+    local f, fromFrame, toFrame = w:frame(), w:screen():frame(), to:frame()
+    local grab = { x = math.floor(f.x + f.w / 2), y = math.floor(f.y + f.h / 2) }
+    for _, e in ipairs(Screens.windowStack()) do
+        if e.alpha > 0 and grab.x >= e.frame.x and grab.x < e.frame.x + e.frame.w
+           and grab.y >= e.frame.y and grab.y < e.frame.y + e.frame.h then
+            if e.pid ~= app:pid() then
+                print("Screens.moveWindowNext: not dragging " .. name .. ": another window covers it")
+                return done(false)
+            end
+            break
+        end
+    end
+    -- Where moveToScreen would put the top left, kept inside `to'.
+    local x = toFrame.x + (f.x - fromFrame.x) / fromFrame.w * toFrame.w
+    local y = toFrame.y + (f.y - fromFrame.y) / fromFrame.h * toFrame.h
+    x = math.max(toFrame.x, math.min(x, toFrame.x + toFrame.w - math.min(f.w, toFrame.w)))
+    y = math.max(toFrame.y, math.min(y, toFrame.y + toFrame.h - math.min(f.h, toFrame.h)))
+    local drop = { x = math.floor(grab.x + x - f.x), y = math.floor(grab.y + y - f.y) }
+
+    local T, P = hs.eventtap.event.types, hs.eventtap.event.properties
+    pcall(function() app:activate() end)
+    hs.mouse.absolutePosition(grab)
+    local i, last = 0, grab
+    local function step()
+        i = i + 1
+        if i <= kDragSteps then
+            local p = { x = math.floor(grab.x + (drop.x - grab.x) * i / kDragSteps),
+                        y = math.floor(grab.y + (drop.y - grab.y) * i / kDragSteps) }
+            local e = hs.eventtap.event.newMouseEvent(T.leftMouseDragged, p)
+            e:setProperty(P.mouseEventDeltaX, p.x - last.x)
+            e:setProperty(P.mouseEventDeltaY, p.y - last.y)
+            e:post()
+            last = p
+            return hsAfter(kDragStepSeconds, step)
+        end
+        hs.eventtap.event.newMouseEvent(T.leftMouseUp, drop):post()
+        hsAfter(kDragHoldSeconds, function()
+            local landed = onScreen(w, to)
+            if landed then pcall(moveTo, w, to) end
+            done(landed)
+        end)
+    end
+    -- After the activation, so the press starts a drag rather than only
+    -- bringing the app forward.
+    hsAfter(kDragHoldSeconds, function()
+        local down = hs.eventtap.event.newMouseEvent(T.leftMouseDown, grab)
+        down:setProperty(P.mouseEventClickState, 1)
+        down:post()
+        hsAfter(kDragHoldSeconds, step)
+    end)
+end
+
+-- How long a dragMoveApps window's frame must hold still after it leaves
+-- fullscreen, and the most to wait for that. mpv animates out of
+-- fullscreen toward a frame it remembers, rests there for about 0.2 s,
+-- then jumps to its windowed frame (mpv 0.41, 2026-10-03: on the monitor
+-- at 633 ms, back on the laptop at 829 ms). whenSettled's one still poll
+-- took the rest for the end, the move counted as done because the window
+-- happened to be on the target screen, and mpv then jumped back.
+local kDragSettleStill, kDragSettleMax, kDragSettlePoll = 0.5, 3, 0.1
+
+local function whenStill(w, done)
+    local deadline = hs.timer.secondsSinceEpoch() + kDragSettleMax
+    local last, since = nil, hs.timer.secondsSinceEpoch()
+    local function poll()
+        local ok, f = pcall(function() return w:frame() end)
+        local now = hs.timer.secondsSinceEpoch()
+        if not ok then return done() end
+        if not (last and f:equals(last)) then last, since = f, now end
+        if now - since >= kDragSettleStill or now > deadline then return done() end
+        hsAfter(kDragSettlePoll, poll)
+    end
+    poll()
+end
+
+--- moveTo, and when the window refused to leave its screen, dragTo;
+--- done(moved, how), `how' naming the drag when one did it. With
+--- `settle', a window of a dragMoveApps app is first left to hold still
+--- (see kDragSettleStill), for the move out of fullscreen.
+local function moveOrDrag(w, to, done, settle)
+    local app = w:application()
+    local name = app and app:name()
+    if settle and name and Screens.dragMoveApps[name] then
+        return whenStill(w, function() moveOrDrag(w, to, done) end)
+    end
+    local okm, moved = pcall(moveTo, w, to)
+    if okm and moved then return done(true) end
+    local okd, err = pcall(dragTo, w, to, function(landed)
+        done(landed, landed and ", dragged" or nil)
+    end)
+    if not okd then
+        print("Screens.moveWindowNext: drag: " .. tostring(err))
+        done(false)
+    end
+end
+
 --- The newest window id CoreGraphics lists now, taken before a fullscreen
 --- change so that its stand-ins (below) can be told apart from windows made
 --- before it. The window server hands ids out in increasing order: every id
@@ -906,9 +1028,10 @@ function Screens.moveWindowNext(delta)
     local okf, full = pcall(function() return w:isFullScreen() end)
     mark("read")
     if not (okf and full) then
-        local okm, moved = pcall(moveTo, w, to)
-        mark("moved")
-        return finish(okm and moved)
+        return moveOrDrag(w, to, function(moved, how)
+            mark("moved")
+            finish(moved, nil, how)
+        end)
     end
 
     focusBand(from, "leaving fullscreen to move " .. appName)
@@ -920,41 +1043,41 @@ function Screens.moveWindowNext(delta)
     whenSettled(w, false, pid, sinceId, function(left)
         mark("out of fullscreen")
         if not left then return finish(false, ": it did not leave fullscreen") end
-        local okm, moved = pcall(moveTo, w, to)
-        moved = okm and moved
-        mark("moved")
-        -- Back into fullscreen whether or not it moved, so a failed move
-        -- leaves the window fullscreen where it was, as it was found.
-        local sinceBack = newestWindowId()
-        pcall(function() w:setFullScreen(true) end)
-        whenSettled(w, true, pid, sinceBack, function(back)
-            mark("fullscreen again")
-            if not moved then
-                return finish(false, back and " (it is fullscreen again where it was)"
-                                          or " after leaving fullscreen, and it did not go fullscreen again")
-            end
-            -- macOS picks the screen a window goes fullscreen on, so the
-            -- move is only done if it is still on the new one.
-            local oks, there = pcall(onScreen, w, to)
-            if not (oks and there) then return finish(false, ": it ended up on another screen") end
-            finish(true, nil, back and ", fullscreen again" or ", but it did not go fullscreen again")
-            -- Should a stand-in leak anyway, move it out of sight, and say
-            -- so when that fails, rather than leave a still picture of the
-            -- window to pass for a second window. Older leftovers of the
-            -- same app that this move brought into view go too.
-            hsAfter(1, function()
-                local okl, left = pcall(standInsNow, w, pid, sinceId)
-                local leaked = okl and #left or 0
-                local okp, parked = pcall(Screens.parkStandIns, app)
-                parked = okp and parked or 0
-                if leaked == 0 and parked == 0 then return end
-                print(string.format("Screens.moveWindowNext: %d stand-in window(s) of %s left by this move; "
-                                    .. "%d stand-in(s) moved out of sight", leaked, appName, parked))
-                if leaked > parked then
-                    focusBand(left[1].screen, "a leftover picture of " .. appName .. " stayed here")
+        moveOrDrag(w, to, function(moved, how)
+            mark("moved")
+            -- Back into fullscreen whether or not it moved, so a failed move
+            -- leaves the window fullscreen where it was, as it was found.
+            local sinceBack = newestWindowId()
+            pcall(function() w:setFullScreen(true) end)
+            whenSettled(w, true, pid, sinceBack, function(back)
+                mark("fullscreen again")
+                if not moved then
+                    return finish(false, back and " (it is fullscreen again where it was)"
+                                              or " after leaving fullscreen, and it did not go fullscreen again")
                 end
+                -- macOS picks the screen a window goes fullscreen on, so the
+                -- move is only done if it is still on the new one.
+                local oks, there = pcall(onScreen, w, to)
+                if not (oks and there) then return finish(false, ": it ended up on another screen") end
+                finish(true, nil, (how or "") .. (back and ", fullscreen again" or ", but it did not go fullscreen again"))
+                -- Should a stand-in leak anyway, move it out of sight, and say
+                -- so when that fails, rather than leave a still picture of the
+                -- window to pass for a second window. Older leftovers of the
+                -- same app that this move brought into view go too.
+                hsAfter(1, function()
+                    local okl, left = pcall(standInsNow, w, pid, sinceId)
+                    local leaked = okl and #left or 0
+                    local okp, parked = pcall(Screens.parkStandIns, app)
+                    parked = okp and parked or 0
+                    if leaked == 0 and parked == 0 then return end
+                    print(string.format("Screens.moveWindowNext: %d stand-in window(s) of %s left by this move; "
+                                        .. "%d stand-in(s) moved out of sight", leaked, appName, parked))
+                    if leaked > parked then
+                        focusBand(left[1].screen, "a leftover picture of " .. appName .. " stayed here")
+                    end
+                end)
             end)
-        end)
+        end, true)
     end)
 end
 --- @end
