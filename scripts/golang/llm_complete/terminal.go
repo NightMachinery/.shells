@@ -60,8 +60,31 @@ func kittyScreen(text, agent string) (Screen, error) {
 	s.Y = y - 1
 	s.X = x - 1
 	text = text[:m[0]]
-	for _, l := range strings.Split(strings.TrimSuffix(text, "\n"), "\n") {
-		s.Lines = append(s.Lines, Line{Text: strings.TrimSuffix(l, "\r"), Wrapped: strings.HasSuffix(l, "\r")})
+	if i := strings.Index(text, "\x1b[?25"); i >= 0 {
+		text = text[:i]
+	}
+	// Kitty emits CR at each physical row, followed by LF only at hard
+	// breaks. A soft wrap is a bare CR, not CR+LF. Preserve physical rows
+	// so cursor coordinates agree with the native kitten's snapshot.
+	if strings.Contains(text, "\r") {
+		for len(text) > 0 {
+			i := strings.IndexByte(text, '\r')
+			if i < 0 {
+				s.Lines = append(s.Lines, Line{Text: text})
+				break
+			}
+			l := Line{Text: text[:i], Wrapped: true}
+			text = text[i+1:]
+			if strings.HasPrefix(text, "\n") {
+				l.Wrapped = false
+				text = text[1:]
+			}
+			s.Lines = append(s.Lines, l)
+		}
+	} else {
+		for _, l := range strings.Split(strings.TrimSuffix(text, "\n"), "\n") {
+			s.Lines = append(s.Lines, Line{Text: l})
+		}
 	}
 	return s, nil
 }
@@ -73,12 +96,13 @@ func capture(r TerminalRequest) (Screen, error) {
 	if err != nil {
 		return Screen{}, err
 	}
-	agent, pid, err := kittyAgent(r)
+	agent, pid, columns, err := kittyAgent(r)
 	if err != nil {
 		return Screen{}, err
 	}
 	s, err := kittyScreen(raw, agent)
 	s.ProcessID = pid
+	s.Columns = columns
 	snapshot := r
 	snapshot.Screen = s
 	configureVim(&snapshot)
@@ -199,15 +223,16 @@ func terminalDabbrev(r TerminalRequest) error {
 	return nil
 }
 
-func kittyAgent(r TerminalRequest) (string, int, error) {
+func kittyAgent(r TerminalRequest) (string, int, int, error) {
 	raw, err := kitty(r, "", "ls")
 	if err != nil {
-		return "", 0, err
+		return "", 0, 0, err
 	}
 	var windows []struct {
 		Tabs []struct {
 			Windows []struct {
 				ID         int `json:"id"`
+				Columns    int `json:"columns"`
 				Foreground []struct {
 					PID     int      `json:"pid"`
 					Cmdline []string `json:"cmdline"`
@@ -216,7 +241,7 @@ func kittyAgent(r TerminalRequest) (string, int, error) {
 		} `json:"tabs"`
 	}
 	if json.Unmarshal([]byte(raw), &windows) != nil {
-		return "", 0, errors.New("cannot verify kitty foreground process")
+		return "", 0, 0, errors.New("cannot verify kitty foreground process")
 	}
 	for _, oswin := range windows {
 		for _, tab := range oswin.Tabs {
@@ -231,15 +256,15 @@ func kittyAgent(r TerminalRequest) (string, int, error) {
 						}
 						name := filepath.Base(arg)
 						if name == "codex" {
-							return "codex", p.PID, nil
+							return "codex", p.PID, w.Columns, nil
 						}
 						if name == "claude" || name == "claude.exe" || strings.HasPrefix(name, "claude-") {
-							return "claude", p.PID, nil
+							return "claude", p.PID, w.Columns, nil
 						}
 					}
 				}
 			}
 		}
 	}
-	return "", 0, errors.New("agent foreground process changed")
+	return "", 0, 0, errors.New("agent foreground process changed")
 }

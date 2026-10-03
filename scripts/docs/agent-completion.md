@@ -101,6 +101,16 @@ individual sources, for example `{"emacs": true, "kitty": false}`. A per-call
 `log` boolean takes precedence. zsh, Emacs and Hammerspoon do not log by default.
 Shell calls can opt in with `fim_log_p=y`; Emacs calls can pass `:log t`.
 
+Kitty remote text uses bare CR for a terminal soft wrap and CR+LF for a hard
+break. Native snapshots and remote rereads now preserve the same physical rows.
+The CLIs can also wrap their own editor rows without terminal continuation
+flags; full-width rows are joined using the captured window width. A deliberate
+hard newline exactly at the editor margin is indistinguishable from that wrap.
+Codex also word-wraps short rows before long tokens without a terminal flag.
+Those boundaries retain a newline in captured context; the screen does not
+reveal whether the original separator was a space or a hard newline.
+Blank hard lines inside the input remain part of the prefix or suffix.
+
 Screen capture cannot distinguish padding from deliberate trailing spaces on
 previous hard lines. Avoid depending on those spaces as model context. Cycling
 with a non-ASCII remainder stays disabled until the two CLIs' deletion behavior
@@ -112,7 +122,9 @@ The maintained `golang/llm_complete/tests/live-terminal.py` is opt-in. Give it
 only dedicated scratch CLI targets. It never submits a prompt. It verifies
 expansion and cycling, vim refusal, Persian/combining/emoji deletion behavior,
 a delayed HTTP reply discarded after typing, an unchanged input accepting a
-reply, and exact context logging. Terminal rendering can canonically compose
+reply, and exact context logging. `--multiline-only` checks hard blank lines,
+soft wraps and suffix capture with the caret before the remaining text.
+Terminal rendering can canonically compose
 combining marks, so assertions compare equivalent Unicode text. Current CLIs
 delete Persian code points and whole combining/emoji graphemes; arbitrary
 non-ASCII cycling remains conservative.
@@ -122,3 +134,15 @@ outdated binaries still rebuild through [agfi:go-local-dep]. Observed live
 latency includes the terminal's redraw and remote-control calls; this is slower
 than pure candidate generation. The transcript warms in a detached helper after the first press, including a
 press with no screen candidates. Press again once the cache is ready.
+
+Live acceptance covered Claude Code and Codex in kitty and an isolated tmux
+server: actual shortcuts, cycling, vim refusal, unchanged insertion and delayed
+stale replies. TextEdit covered Hammerspoon's AX and key-capture paths. The real
+zsh widget passed both a local stub and Codestral with pxa-local; the maintained
+zpty harness also checks pipe bytes and sentinel argv privacy. Emacs was tested
+in batch, including the actual plz rollback, without reloading the live server.
+Other-window and other-pane corpora, detached transcript warming and the last
+assistant reply were exercised with fabricated text. Parser parity fixtures and
+transcript rendering parity use fabricated data. Observed end-to-end dabbrev
+latency was roughly 150 to 320 ms including remote control and terminal redraw;
+the tens-of-milliseconds aim remains unmet. Non-ASCII cycling remains disabled.

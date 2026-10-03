@@ -15,6 +15,7 @@ type Screen struct {
 	Lines     []Line `json:"lines"`
 	X         int    `json:"cursor_x"`
 	Y         int    `json:"cursor_y"`
+	Columns   int    `json:"columns,omitempty"`
 	Agent     string `json:"agent"`
 	ProcessID int    `json:"process_id,omitempty"`
 	Vim       bool   `json:"vim,omitempty"`
@@ -61,6 +62,13 @@ func cellWidth(r rune) int {
 		return 2
 	}
 	return 1
+}
+func cells(s string) int {
+	n := 0
+	for _, r := range s {
+		n += cellWidth(r)
+	}
+	return n
 }
 func byteAtCell(s string, x int) (int, error) {
 	if x < 0 {
@@ -111,6 +119,11 @@ func marker(s string, agent string) int {
 	}
 	return i
 }
+func inputFooter(s string) bool {
+	t := strings.TrimSpace(s)
+	return strings.HasPrefix(t, "? for shortcuts") || strings.Contains(t, "context left") ||
+		strings.Contains(t, " · Context ") || strings.HasPrefix(t, "← for agents")
+}
 func extract(s Screen) (Input, error) {
 	var out Input
 	if s.Agent != "claude" && s.Agent != "codex" {
@@ -150,10 +163,17 @@ func extract(s Screen) (Input, error) {
 	end := s.Y
 	for end+1 < len(s.Lines) {
 		l := s.Lines[end+1].Text
-		if border(l) || strings.TrimSpace(l) == "" || strings.HasPrefix(strings.TrimSpace(l), "? for shortcuts") || strings.Contains(l, "context left") {
+		if border(l) || inputFooter(l) {
 			break
 		}
 		end++
+	}
+	// Codex separates its unbordered editor from the footer with blank rows.
+	// Internal blank rows belong to the prompt; only trailing padding is removed.
+	if s.Agent == "codex" {
+		for end > s.Y && strings.TrimSpace(s.Lines[end].Text) == "" {
+			end--
+		}
 	}
 	var full strings.Builder
 	cursor := -1
@@ -182,7 +202,10 @@ func extract(s Screen) (Input, error) {
 			cursor = full.Len() + local
 		}
 		full.WriteString(text)
-		if i < end && !s.Lines[i].Wrapped {
+		// Both CLIs also wrap inside their editor before drawing terminal
+		// rows. Those full-width rows have no terminal continuation flag.
+		wrapped := s.Lines[i].Wrapped || s.Columns > 4 && cells(strings.TrimRight(raw, " ")) >= s.Columns-2
+		if i < end && !wrapped {
 			full.WriteByte('\n')
 		}
 	}

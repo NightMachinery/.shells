@@ -54,15 +54,22 @@ class Target:
     def set(self,text):
         self.key('ctrl+e','ctrl+u')
         self.wait(lambda _:self.prompt() in ('','Ask Codex to do anything','Find and fix a bug in @filename','Improve documentation in @filename'))
+        if not text:return
         self.text(text);self.wait(lambda _:self.prompt()==unicodedata.normalize('NFC',text))
     def snapshot(self):
-        raw=self.rc('get-text','--match','id:'+self.target,'--add-cursor','--add-wrap-markers')
+        raw=subprocess.check_output(['kitten','@','--to',self.socket,'get-text','--match','id:'+self.target,'--add-cursor','--add-wrap-markers']).decode()
         match=list(re.finditer(r'\x1b\[(\d+);(\d+)H',raw))[-1]
-        rows=raw[:match.start()].rstrip('\n').split('\n')
+        rows=[]
+        remaining=raw[:match.start()].split('\x1b[?25')[0]
+        while '\r' in remaining:
+            row,remaining=remaining.split('\r',1)
+            wrapped=not remaining.startswith('\n')
+            if not wrapped:remaining=remaining[1:]
+            rows.append({'text':row,'wrapped':wrapped})
         listing=json.loads(self.rc('ls'))
         window=next(w for o in listing for t in o['tabs'] for w in t['windows'] if str(w['id'])==self.target)
         process=next(p for p in window['foreground_processes'] if any(pathlib.Path(x).name in (self.agent,self.agent+'.exe') for x in p['cmdline'][:3]))
-        return {'source':'kitty','socket':self.socket,'target':self.target,'kitty_pid':int(re.search(r'kitty-(\d+)\.sock',self.socket)[1]),'cwd':window['cwd'],'kitten':KITTEN,'screen':{'agent':self.agent,'process_id':process['pid'],'cursor_y':int(match[1])-1,'cursor_x':int(match[2])-1,'lines':[{'text':r.rstrip('\r'),'wrapped':r.endswith('\r')} for r in rows]}}
+        return {'source':'kitty','socket':self.socket,'target':self.target,'kitty_pid':int(re.search(r'kitty-(\d+)\.sock',self.socket)[1]),'cwd':window['cwd'],'kitten':KITTEN,'screen':{'agent':self.agent,'process_id':process['pid'],'cursor_y':int(match[1])-1,'cursor_x':int(match[2])-1,'columns':window['columns'],'lines':rows}}
     def operation(self,op,env=None,background=False):
         if self.source=='kitty' and env is None:
             return self.rc('kitten','--match','id:'+self.target,KITTEN,op)
@@ -141,9 +148,48 @@ def stale_checks(target):
         print(f'PASS: {target.source}/{target.agent} unchanged prompt accepts FIM')
     server.shutdown()
 
+def multiline_checks(target):
+    server=http.server.ThreadingHTTPServer(('127.0.0.1',0),Handler)
+    threading.Thread(target=server.serve_forever,daemon=True).start()
+    with tempfile.TemporaryDirectory(prefix='llm-complete-multiline-',dir='/private/tmp') as d:
+        config=pathlib.Path(d)/'providers.json'
+        config.write_text(json.dumps({'providers':{'codestral':{'endpoint':f'http://127.0.0.1:{server.server_port}','key_env':''}}}))
+        env=dict(os.environ,LLM_COMPLETE_CONFIG=str(config),LLM_COMPLETE_LOG_DIR=d+'/logs')
+        for draft,back,prefix,suffix in [('first\n\nlast',6,'first','\n\nlast'),(('a'*140)+'tail',4,('a'*140),'tail')]:
+            target.set('')
+            if target.source=='kitty':
+                target.rc('send-text','--match','id:'+target.target,'--bracketed-paste=enable','--stdin',text=draft)
+            else:
+                target.rc('load-buffer','-b','llm-complete-multiline','-',text=draft)
+                target.rc('paste-buffer','-p','-d','-b','llm-complete-multiline','-t',target.target)
+            target.wait(lambda text:('last' if '\n' in draft else 'tail') in text)
+            target.key(*(['left']*back))
+            # Wait for the rendered caret, not a fixed sleep.
+            def ready(_):
+                if target.source=='kitty':
+                    sc=target.snapshot()['screen']
+                    req=json.loads(run([BINARY,'agent-context'],json.dumps({'screen':sc})))
+                    return req['prefix'].endswith(prefix) and req.get('suffix')==suffix
+                y=int(target.rc('display-message','-p','-t',target.target,'#{cursor_y}'))
+                x=int(target.rc('display-message','-p','-t',target.target,'#{cursor_x}'))
+                physical=target.rc('capture-pane','-p','-t',target.target).splitlines()
+                return ('first' in physical[y] and x==7) if '\n' in draft else x>2
+            target.wait(ready)
+            Handler.received.clear();Handler.release.set()
+            target.operation('fim',env=env)
+            assert Handler.body['prompt'].endswith(prefix),(target.source,target.agent,'prefix')
+            assert Handler.body['suffix']==suffix,(target.source,target.agent,'suffix')
+            target.wait(lambda text:'inertCompletion' in text)
+            target.key(*(['right']*30+['backspace']*190))
+            target.wait(lambda _:target.prompt() in ('','Ask Codex to do anything','Find and fix a bug in @filename','Improve documentation in @filename'))
+        print(f'PASS: {target.source}/{target.agent} hard blank lines, soft wraps and suffix at caret')
+    server.shutdown()
+
 if __name__=='__main__':
-    p=argparse.ArgumentParser();p.add_argument('--source',choices=['kitty','tmux'],required=True);p.add_argument('--socket',required=True);p.add_argument('--claude',required=True);p.add_argument('--codex',required=True);p.add_argument('--stale-only',action='store_true');p.add_argument('--basic-only',action='store_true');args=p.parse_args()
+    p=argparse.ArgumentParser();p.add_argument('--source',choices=['kitty','tmux'],required=True);p.add_argument('--socket',required=True);p.add_argument('--claude',required=True);p.add_argument('--codex',required=True);p.add_argument('--stale-only',action='store_true');p.add_argument('--basic-only',action='store_true');p.add_argument('--multiline-only',action='store_true');args=p.parse_args()
     for agent in ['claude','codex']:
         target=Target(args.source,args.socket,getattr(args,agent),agent)
+        if args.multiline_only:
+            multiline_checks(target);continue
         if not args.stale_only:target.checks()
         if not args.basic_only:stale_checks(target)

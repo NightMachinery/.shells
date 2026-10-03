@@ -108,3 +108,12 @@ boolean overrides source settings and the agent default.
 =fim --shell= is the zsh adapter: NUL-delimited field/value pairs on stdin.
 =fim default-provider= exposes the configured default for shell initialization.
 No serializer receives buffer text as an argument.
+
+* Screen boundaries
+
+Kitty wrap-marker output separates physical rows with CR; LF following CR
+marks a hard break. The native kitten and remote reread use matching flags.
+Full-width editor rows also join when the CLI wraps them without a terminal
+continuation flag. A hard newline exactly at that margin is ambiguous, as are
+intentional trailing spaces versus terminal padding. Internal blank hard lines
+remain in the prompt. The opt-in live harness accepts =--multiline-only=.

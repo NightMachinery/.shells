@@ -92,12 +92,12 @@ func paneAgentIdentity(pid int) (string, int) {
 	return agent, identity
 }
 func captureTmux(r TerminalRequest) (Screen, error) {
-	meta, err := tmux(r, "", "display-message", "-p", "-t", r.Target, "#{cursor_x}\t#{cursor_y}\t#{pane_pid}\t#{pane_in_mode}")
+	meta, err := tmux(r, "", "display-message", "-p", "-t", r.Target, "#{cursor_x}\t#{cursor_y}\t#{pane_pid}\t#{pane_in_mode}\t#{pane_width}")
 	if err != nil {
 		return Screen{}, err
 	}
 	f := strings.Split(strings.TrimSpace(meta), "\t")
-	if len(f) != 4 || f[3] != "0" {
+	if len(f) != 5 || f[3] != "0" {
 		return Screen{}, errors.New("tmux pane is not in its input mode")
 	}
 	x, _ := strconv.Atoi(f[0])
@@ -117,6 +117,7 @@ func captureTmux(r TerminalRequest) (Screen, error) {
 	}
 	s := tmuxScreen(physical, joined, agent, x, y)
 	s.ProcessID = identity
+	s.Columns, _ = strconv.Atoi(f[4])
 	snapshot := r
 	snapshot.Screen = s
 	configureVim(&snapshot)

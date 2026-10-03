@@ -50,7 +50,7 @@ def handle_result(args, answer, target_window_id, boss):
         return
     root = os.environ.get('NIGHTDIR', os.path.expanduser('~/scripts'))
     request = {
-        'screen': {'agent': agent, 'process_id': process_id, 'cursor_x': w.screen.cursor.x, 'cursor_y': w.screen.cursor.y,
+        'screen': {'agent': agent, 'process_id': process_id, 'cursor_x': w.screen.cursor.x, 'cursor_y': w.screen.cursor.y, 'columns': w.screen.columns,
                    'lines': [{'text': str(w.screen.line(i)),
                               'wrapped': w.screen.line(i).last_char_has_wrapped_flag()}
                              for i in range(w.screen.lines)]},

@@ -154,12 +154,15 @@ func TestCaptureWrapsAndControlSafety(t *testing.T) {
 	if err != nil || in.Prefix != "abcdefghi" || in.Suffix != "j" {
 		t.Fatalf("%+v %v", in, err)
 	}
-	s, err = kittyScreen("› abcdef\r\n  ghij\n\x1b[2;6H\x1b[?25h", "codex")
+	s, err = kittyScreen("› abcdef\r  ghij\r\n\x1b[?25h\x1b[2;6H", "codex")
 	if err != nil {
 		t.Fatal(err)
 	}
 	if !s.Lines[0].Wrapped {
 		t.Fatal("kitty wrap")
+	}
+	if len(s.Lines) != 2 || s.Lines[1].Wrapped {
+		t.Fatal("kitty hard break", s.Lines)
 	}
 	if sanitise("a\n\r\x1b\x00\x7fb\u2028c") != "abc" {
 		t.Fatal("controls")
@@ -213,5 +216,31 @@ func TestClaudeVimNoNormalLabel(t *testing.T) {
 	os.WriteFile(filepath.Join(cwd, ".claude/settings.local.json"), []byte(`{"editorMode":"normal"}`), 0600)
 	if claudeVim(cwd) {
 		t.Fatal("local override")
+	}
+}
+
+func TestInputBlankLinesAfterCaret(t *testing.T) {
+	for _, agent := range []string{"claude", "codex"} {
+		m, footer := "❯", "──────"
+		if agent == "codex" {
+			m, footer = "›", "  GPT-test · Context 0% used · weekly limit"
+		}
+		s := Screen{Agent: agent, X: 7, Lines: []Line{{Text: m + " first"}, {Text: "  "}, {Text: "  last"}, {Text: ""}, {Text: footer}}}
+		if agent == "claude" {
+			s.Lines = append(s.Lines, Line{Text: "-- INSERT --"})
+			s.Lines = append(s.Lines[:3], s.Lines[4:]...)
+		}
+		in, err := extract(s)
+		if err != nil || in.Prefix != "first" || in.Suffix != "\n\nlast" {
+			t.Fatalf("%s: %+v %v", agent, in, err)
+		}
+	}
+}
+
+func TestEditorWrapWithoutTerminalFlag(t *testing.T) {
+	s := Screen{Agent: "codex", Columns: 10, Y: 1, X: 4, Lines: []Line{{Text: "› abcdefgh"}, {Text: "  ijtail"}, {Text: ""}, {Text: "? for shortcuts"}}}
+	in, err := extract(s)
+	if err != nil || in.Prefix != "abcdefghij" || in.Suffix != "tail" {
+		t.Fatal(in, err)
 	}
 }
