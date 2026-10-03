@@ -926,15 +926,38 @@ end
 
 hyper_bind_v2{key="s", pressedfn=screenshotAvy}
 
-function screenshotAll()
-    hs.task.new("/usr/sbin/screencapture", nil, {"-c"}):start()
+-- hyper+3, and hyper+shift+s once the hyper banner has faded, copy a picture
+-- of the screen `screenshot_screens' names, a core/screens.lua spec;
+-- hyper+shift+3 copies every screen. Several screens make one picture of
+-- the rectangle around them. Plain `screencapture -c' copied only the
+-- primary screen, wherever you were working.
+if screenshot_screens == nil then screenshot_screens = "active" end
+
+function screenshotScreens(spec)
+    local rect = nil
+    for _, s in ipairs(Screens.target(spec)) do
+        local f = s:fullFrame()
+        rect = rect and rect:union(f) or f
+    end
+    local args = {"-c"}
+    if rect then
+        args[2] = string.format("-R%g,%g,%g,%g", rect.x, rect.y, rect.w, rect.h)
+    end
+    hs.task.new("/usr/sbin/screencapture", nil, args):start()
 end
-function hScreenshotAll()
+function screenshotScreen()
+    screenshotScreens(screenshot_screens)
+end
+function screenshotAll()
+    screenshotScreens("all")
+end
+function hScreenshotScreen()
     hyper_exit()
     hs.timer.usleep(300000)
     -- to wait for the hyper alert and the OS sticky modifier alerts to fade out
 
-    screenshotAll()
+    screenshotScreen()
 end
-hyper_bind_v2{mods={}, key="3", pressedfn=screenshotAll}
-hyper_bind_v2{mods={"shift"}, key="s", pressedfn=hScreenshotAll}
+hyper_bind_v2{mods={}, key="3", pressedfn=screenshotScreen}
+hyper_bind_v2{mods={"shift"}, key="3", pressedfn=screenshotAll}
+hyper_bind_v2{mods={"shift"}, key="s", pressedfn=hScreenshotScreen}

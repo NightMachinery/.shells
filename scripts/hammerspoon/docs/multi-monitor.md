@@ -189,6 +189,13 @@ Each is documented with its feature in `docs/hammerspoon.md`:
 - **Maccy's hyper+v popup** opens on the screen named by
   `maccy_popup_screens`: its `popupScreen` setting is rewritten when that
   screen changes, one write at a time. ("App hotkeys".)
+- **Screenshots**: hyper+3 copies the screen named by `screenshot_screens`
+  (the active one by default) and hyper+shift+3 every screen, through
+  `screencapture -R` on the screens' frames. A picture of one screen comes
+  out at its full resolution (the monitor gave 3840×2160 for its 1920×1080
+  points). One across both screens comes out at one pixel per point
+  (3390×1080), with an empty strip under the shorter laptop screen: one
+  clipboard image has to span them. (Measured 2026-10-03, to a file.)
 
 ### Windows on a screen
 
@@ -403,10 +410,6 @@ Still unmeasured:
 
 Known gaps:
 
-- **`screenshotAll`** (hyper+3 and hyper+shift+s, `core/mouse.lua`) runs
-  `screencapture -c`.
-  What that puts on the clipboard with two displays is unmeasured: measuring
-  it overwrites the clipboard.
 - **The avy grid overhangs its screen** by one cell on every side, so next to
   a second monitor the edge cells are drawn on the neighbour.
 - **Window-mode kitty** still follows the pointer screen rather than
