@@ -3061,6 +3061,10 @@ function h-agent-session-records-unreadable {
     #: invisible that way for fifteen hours. This is where that becomes
     #: visible; [agfi:agent-session-selftest] runs it.
     ##
+    #: Claude Code's own shell runs commands under NO_BARE_GLOB_QUAL; the
+    #: `(N)' below needs the option back to be a qualifier at all.
+    setopt localoptions bareglobqual
+
     ensure-cmd python3 @RET
 
     local -a roots

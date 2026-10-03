@@ -727,6 +727,10 @@ Plain-text summary of one subagent, for an fzf preview."
     #: the pane -- which is what the child chose to put on a screen -- so that
     #: browsing a fan-out never pages other conversations past you.
     ##
+    #: Claude Code's own shell runs commands under NO_BARE_GLOB_QUAL; the
+    #: checkpoints' `(N.om)' needs the option back to be a qualifier at all.
+    setopt localoptions bareglobqual
+
     local pane_lines="${agent_subagents_preview_pane_lines:-25}"
     while (( $# )) ; do
         case "${1}" in

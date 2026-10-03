@@ -378,6 +378,10 @@ function h-claude-code-session-resolve {
     #: matches are an error rather than a guess: the same uuid in two profiles
     #: is exactly what [agfi:claude-code-session-import] exists to avoid.
     ##
+    #: Claude Code's own shell runs commands under NO_BARE_GLOB_QUAL; the
+    #: `(N)' below needs the option back to be a qualifier at all.
+    setopt localoptions bareglobqual
+
     local input="${1}"
     assert-args input @RET
 
@@ -561,6 +565,11 @@ function claude-code-session-import {
     #:
     #: Usage: claude-code-session-import <transcript|uuid> <to-profile>
     ##
+    #: Claude Code's own shell runs commands under NO_BARE_GLOB_QUAL; the
+    #: `(N)' on the subagent transcripts needs the option back to be a
+    #: qualifier at all.
+    setopt localoptions bareglobqual
+
     local remove_source_p="${claude_code_session_import_remove_source_p:-n}"
     local force_p="${claude_code_session_import_force_p:-n}"
 
