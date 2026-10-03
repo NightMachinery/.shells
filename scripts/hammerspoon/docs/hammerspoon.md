@@ -106,17 +106,27 @@ the hidden app's own front window. `screenReturnTarget(screen, pid)` picks
 the target, in this order:
 
 - the newest app filed under that screen that still has a normal window
-  there. An app whose only visible windows are on the other screen is passed
-  over. An app with no window on that screen is taken on its record only
-  when the screen shows a native fullscreen Space (the frontmost app's focused
-  window is fullscreen there): the rest of that screen's windows are then in
-  another Space, which the on-screen window list leaves out. Even then this
-  screen must be the one it was filed under last (`recentAppsLastScreen`), so
-  its front window is here and bringing it forward does not land on the other
-  screen, and it must still be running and not hidden (`appReturnUsable`: you
-  hid that one on purpose). Anywhere else such an app is passed over,
-  since it is a Finder after a click on the desktop, or an app whose windows
-  are all closed or minimized, and activating it would show nothing;
+  there. The on-screen window list leaves out windows in Spaces that are not
+  showing, and hidden apps, so an app with no window on that screen is taken
+  on its record when this screen is the one it was filed under last
+  (`recentAppsLastScreen`) and:
+  - it is hidden. It is unhidden, and its windows come back where they were.
+    Hidden apps used to be passed over, as hidden on purpose, and hyper+x,
+    hyper+l, hyper+/, hyper+l, hyper+l, hyper+x then went to Brave on the
+    monitor, not to Telegram, the laptop's previous app, hidden by the second
+    hyper+l (2026-10-03). The newest app on the screen wins, hidden or not.
+  - or it is running and not hidden, and either the screen
+    shows a native fullscreen Space (the frontmost app's focused window is
+  fullscreen there, so the rest of the screen is in other Spaces) or the
+  app's own focused window, asked over Accessibility, is on that screen and
+  not minimized. The second case is a fullscreen Emacs while the screen
+  shows the Space of the app being hidden: hyper+x, hyper+l, hyper+l used to
+  return to kitty there, because only the first case existed (seen
+  2026-10-03). When such an app also shows a window on the other screen, its
+  window on this one is focused rather than the app, which would land on the
+  other screen. Any other app with no window there is passed over, since it
+  is an app whose windows are all closed or minimized, and activating it
+  would show nothing;
 - the frontmost normal window on that screen of any other app, for apps used
   before the last reload;
 - the newest usable app anywhere, the old rule, when nothing else is on that
@@ -143,12 +153,25 @@ list once (its cost is under "Moving between screens" below; one choice took
 line says which rule chose and how long it took. The target is
 brought forward first, and the app is hidden only once the target's activation
 arrives (`appHideWatcher`), or after a second if it never does: hiding the app
-while it is still frontmost would let macOS choose again. When the target is
-kitty in panel mode, it comes back through `kittyPanelShow`, which shows it on
-the screen named by `kitty_panel_screens`, since kitty activating shows
-nothing by itself. With no target the app is simply hidden.
+while it is still frontmost would let macOS choose again. In panel mode kitty
+is never a target: the panel is summoned with hyper+z, not returned to. It
+used to be taken on its record and shown again through `kittyPanelShow`, and
+hyper+x, hyper+x then brought the panel up (2026-10-03). With no target the
+app is simply hidden.
 
-The kitty toggle's own hide returns the same way. In panel mode it copies the
+That per-screen rule is one value of the enum `hide_return_policy`:
+
+- `screen`, the default: the rules above.
+- `summoner`: the app you were in just before the one being hidden, on
+  whichever screen, which is the app that brought you there (the last rule
+  alone). hyper+x, hyper+/, hyper+l, hyper+l with Emacs and Telegram on the
+  laptop and Brave on the monitor then lands in Brave, where `screen` lands
+  in Emacs.
+
+An unknown value prints a console line at each hide and acts as `screen`.
+
+The kitty toggle's own hide returns the same way, from the screen of kitty's
+panel or window. In panel mode it copies the
 recent-apps lists at the press (`screenReturnSnapshot`), sends the hide, and
 chooses the target from that copy once the hide has gone out
 (`screenReturnTarget`'s `snap`): the hide is only sent once the key handler

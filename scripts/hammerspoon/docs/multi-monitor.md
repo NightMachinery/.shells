@@ -179,7 +179,9 @@ Each is documented with its feature in `docs/hammerspoon.md`:
   over Accessibility. ("kitty: hyper+z".)
 - **Return after a hide**: the second press of an app hotkey, and hiding
   kitty, return to the previous app on the same screen
-  (`screenReturnTarget`), not the newest app anywhere. ("App hotkeys".)
+  (`screenReturnTarget`), not the newest app anywhere. The enum
+  `hide_return_policy` picks the rule: `screen` (that), or `summoner`, the
+  app you were in just before, on whichever screen. ("App hotkeys".)
 - **Floating windows**: after any activation this config causes (an app
   hotkey, a hide's return, kitty's return), a focused window above layer 0,
   such as a Picture-in-Picture video, hands focus to the app's front normal
@@ -333,6 +335,13 @@ Found in real use on 2026-10-03, after the round above:
 
 - **The `mainScreen` lag** behind hyper+z, Maccy, hyper+; and the hide
   return; see "Where focus is".
+- **hyper+x, hyper+l, hyper+l returned to kitty, not Emacs.** Emacs was
+  filed under the laptop correctly, but it was fullscreen in its own Space,
+  so once Telegram's Space showed, its window was not in the on-screen list,
+  and an app without a window there was taken on its record only when the
+  app being hidden was fullscreen. Now the app's own focused window, asked
+  over Accessibility (1.4 ms for Emacs), counts too; the same sequence,
+  scripted, returned to Emacs.
 
 Still unmeasured:
 
@@ -379,9 +388,10 @@ Known gaps:
   hotkeys focus the target first and hide once it has activated.
 - **A summon from the other screen.** From B on the laptop, an app hotkey
   that brings up A on the monitor and a second press return to the monitor's
-  previous app, not to B. That is the per-screen rule as asked for. Should it
-  turn out wrong in practice, the shape for a choice is an enum knob (screen,
-  summoner, global), not a boolean.
+  previous app, not to B. That is the per-screen rule, the default.
+  `hide_return_policy = "summoner"` returns to B instead, for every hide.
+  Choosing per press (by whether the hidden app was summoned from another
+  screen, say) is not built.
 - **Duplicate names.** Two identical monitors share an `hs.screen:name()`.
   The registry does not care (it keys on UUID), but band labels would read the
   same, and kitty's `output-name` cannot tell them apart.
