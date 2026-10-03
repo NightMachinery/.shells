@@ -32,15 +32,6 @@ function rssln2k() {
     } always { popf }
 }
 ##
-function sumgensim() {
-    doc "Not recced. Doesn't respect sentence boundaries. We are also feeding it via env vars which is also really bad because env vars have a limited size."
-
-    # text="$(wread "$1" text)"
-    # lynx -dump -nolist
-    # elinks can be used for this too, as it also has a -dump option (and has -no-references to omit the list of links)
-    text="$(w3m -dump "$1")" word_count="${2:-150}" serr python -c 'from gensim.summarization import summarize ; import os; print(summarize(os.environ["text"], word_count=int(os.environ["word_count"])))'
-}
-
 function sumy-text {
     ## ALT:
     #: Not that good (bad free tier, traditional algo):
