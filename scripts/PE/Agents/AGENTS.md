@@ -153,6 +153,7 @@ For a job that must outlive your shell and session:
 - If the directory is already a Git repository, commit your changes when you reach a natural endpoint.
 - Push all commits at the end, after the work is complete.
 - If there is no existing Git repository, do not create one unless the user asks.
+- If the gpg signing key has any problems, just commit without signing, without interrupting the user. Still report this to them at end.
 
 ## Atomic Commits
 
@@ -354,6 +355,7 @@ The following has been redefined in Zsh as functions or aliases; use `command ..
 
 - `install`
 - `as`
+- `log`
 
 You should offer to expand this list as you encounter new such cases.
 
