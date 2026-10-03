@@ -29,6 +29,13 @@
 -- name lookup finds something is if an app is literally *named* "io.mpv".
 -- A dot is the test because bundle IDs are reverse-DNS and app names are not;
 -- a plain name like 'mpv' keeps the old behaviour.
+--
+-- One case the bundle lookup misses: an app started from a shell by its
+-- executable (mpv as `mpv file`, or Homebrew's /opt/homebrew/bin/mpv)
+-- reports no bundle ID at all, so 'io.mpv' found nothing while mpv ran,
+-- and hyper+m went on to the next app in its list (2026-10-03). Such apps
+-- are kept in `bundlelessApps' below, under the ID in their bundle's
+-- Info.plist when they have one, else under their name.
 function getApp(appName)
     local apps = hs.application.applicationsForBundleID(appName)
     if apps and #apps > 0 then
@@ -36,10 +43,65 @@ function getApp(appName)
     end
 
     if appName:find(".", 1, true) then
-        return nil
+        return bundlelessApp(appName)
     end
 
     return hs.application.get(appName)
+end
+
+--- Running apps that report no bundle ID, by the ID their bundle's
+--- Info.plist names, each the instance activated last. Filled from
+--- activations and, at load, from the windows on screen, never by walking
+--- every app (see getApp), so an app with no window on screen when
+--- Hammerspoon loads is found from its next activation on. Last, not
+--- first: an mpv started on 2026-09-30 sat windowless beside the one in use.
+bundlelessApps = {}
+local bundleIdOfPath = {}
+
+local function bundlelessKey(app)
+    local ok, bid, path = pcall(function() return app:bundleID(), app:path() end)
+    if not ok or bid ~= nil or not path then return nil end
+    local id = bundleIdOfPath[path]
+    if id == nil then
+        local info = path:match("%.app$") and hs.application.infoForBundlePath(path)
+        id = info and info.CFBundleIdentifier or false
+        bundleIdOfPath[path] = id
+    end
+    return id or nil
+end
+
+function bundlelessNote(app)
+    local id = app and bundlelessKey(app)
+    if id then bundlelessApps[id] = app end
+end
+
+function bundlelessApp(id)
+    local app = bundlelessApps[id]
+    if not app then return nil end
+    local ok, running = pcall(function() return app:isRunning() end)
+    if ok and running then return app end
+    bundlelessApps[id] = nil
+    return nil
+end
+
+-- Global, so it is not collected.
+bundlelessWatcher = hs.application.watcher.new(function(_, event, app)
+    if event == hs.application.watcher.activated or event == hs.application.watcher.launched then
+        bundlelessNote(app)
+    end
+end)
+bundlelessWatcher:start()
+do
+    -- Front to back, so the frontmost instance is noted last and wins.
+    local stack = Screens.windowStack()
+    local seen = {}
+    for i = #stack, 1, -1 do
+        local pid = stack[i].pid
+        if not seen[pid] then
+            seen[pid] = true
+            bundlelessNote(hs.application.applicationForPID(pid))
+        end
+    end
 end
 
 -- Find which app is making app-switching slow.
@@ -791,7 +853,10 @@ appHotkey{
 appHotkey{
     key='.',
     -- mods={'shift'},
-    appName='com.google.Chrome'
+    appName={
+        'com.google.Chrome',
+        'com.apple.Safari',
+    }
 }
 appHotkey{
     key='.',
