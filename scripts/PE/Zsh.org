@@ -251,6 +251,19 @@ setopt multios re_match_pcre extendedglob
 
 If you need to set an option or trap, be sure to use =setopt localoptions= or =setopt localtraps=.
 
+- Claude Code's Bash tool runs commands with =NO_BARE_GLOB_QUAL= and =NO_EXTENDED_GLOB=, so a bare glob qualifier such as =(N)= is a literal there, and a function that globs with one fails with "no matches found" when an agent or a =!= line calls it. A function that uses a bare qualifier must restore the option itself:
+#+begin_src zsh :eval never
+function h-claude-code-session-resolve {
+    ...
+    #: Claude Code's own shell runs commands under NO_BARE_GLOB_QUAL; the
+    #: `(N)' below needs the option back to be a qualifier at all.
+    setopt localoptions bareglobqual
+    ...
+    hits+=( "${d}"/*/"${input}"*.jsonl(N) )
+#+end_src
+
+=zshlang/tests/agent-glob-qualifiers.zsh= checks the agent tooling files for this.
+
 - Use =in-or-args= variants idiomatically:
   - =in-or-args "$@"=: return text from args/stdin/clipboard.
   - =in-or-args2 "$@"=: populate =$inargs= (string) and =$in_or_args_in_p=.
