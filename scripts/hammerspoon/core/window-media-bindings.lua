@@ -529,7 +529,10 @@ function kittyPanelToggle(app, front, shown)
         -- the watcher would overwrite the memory before the timer fires.
         local back = kittyReturnTarget()
         kittyPanelHide("kittyPanelToggle")
-        hs.timer.doAfter(0.35, function() kittyFocusAfterHide(back) end)
+        -- hsAfter, not hs.timer.doAfter: a timer nothing references is
+        -- stopped when the garbage collector takes it (timer_gc in
+        -- Hammerspoon's libtimer.m), which would silently drop the return.
+        hsAfter(0.35, function() kittyFocusAfterHide(back) end)
         return
     end
 
