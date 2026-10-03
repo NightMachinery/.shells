@@ -115,8 +115,11 @@ garden of any version and mode runs what it runs for `brishzq.zsh`:
 `MAGIC_READ_STDIN` in a temp file that the command reads with
 `< file { ... }`. The temp file carries any bytes, NUL and invalid UTF-8
 included, to a garden on this machine, and is removed when `brishzgo` exits,
-also on SIGHUP, SIGINT and SIGTERM. Invalid UTF-8 in `cmd` or `stdin`
-becomes U+FFFD, the way jq replaces it.
+also on SIGHUP, SIGINT and SIGTERM (after which `brishzgo` dies of that
+signal). A signal that was ignored when `brishzgo` started stays ignored: a
+background job of a non-interactive shell starts with SIGINT ignored, so
+that a Ctrl-C meant for the script leaves it running. Invalid UTF-8 in
+`cmd` or `stdin` becomes U+FFFD, the way jq replaces it.
 
 The fallback has all of stdin even though the raw request streamed it. A
 refusing garden read all of it, and the raw request keeps a copy of what it

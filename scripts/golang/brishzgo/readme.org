@@ -21,6 +21,8 @@ That puts =brishzgo= in =~/go/bin=. It is registered in =setup/setup_go=.
 - =stdin.go=: streamed stdin, with the copy a fallback needs.
 - =tempfile.go=: the temp file that carries stdin to the JSON API, removed on
   exit and on signals.
+- =signals.go=: SIGHUP, SIGINT and SIGTERM run the cleanups, then end us with
+  the same signal; one ignored at start stays ignored.
 - =transport.go=: the raw API, the JSON fallback and the replies.
 - =jqtext.go=: invalid UTF-8 replaced the way jq replaces it, for the JSON
   API's strings.
