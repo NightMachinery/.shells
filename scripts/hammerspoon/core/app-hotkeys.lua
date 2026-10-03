@@ -50,11 +50,15 @@ function getApp(appName)
 end
 
 --- Running apps that report no bundle ID, by the ID their bundle's
---- Info.plist names, each the instance activated last. Filled from
---- activations and, at load, from the windows on screen, never by walking
---- every app (see getApp), so an app with no window on screen when
---- Hammerspoon loads is found from its next activation on. Last, not
---- first: an mpv started on 2026-09-30 sat windowless beside the one in use.
+--- Info.plist names: for each, its instances, activated last first. Filled
+--- from activations and, at load, from the windows on screen, never by
+--- walking every app (see getApp), so an app with no window on screen when
+--- Hammerspoon loads is found from its next activation on.
+---
+--- Only regular apps (kind() 1, a Dock icon) are taken. mpv playing audio
+--- alone has no window and runs as an accessory app (kind() 0), and hyper+m
+--- must pass it over for the mpv showing a video; read without asking mpv
+--- anything (2026-10-03, two mpv processes side by side).
 bundlelessApps = {}
 local bundleIdOfPath = {}
 
@@ -70,17 +74,28 @@ local function bundlelessKey(app)
     return id or nil
 end
 
+local function regularRunning(app)
+    local ok, yes = pcall(function() return app:isRunning() and app:kind() == 1 end)
+    return ok and yes
+end
+
 function bundlelessNote(app)
     local id = app and bundlelessKey(app)
-    if id then bundlelessApps[id] = app end
+    if not id then return end
+    local list = bundlelessApps[id] or {}
+    local pid = app:pid()
+    for i = #list, 1, -1 do
+        local ok, same = pcall(function() return list[i]:pid() == pid end)
+        if not ok or same or not regularRunning(list[i]) then table.remove(list, i) end
+    end
+    if regularRunning(app) then table.insert(list, 1, app) end
+    bundlelessApps[id] = list
 end
 
 function bundlelessApp(id)
-    local app = bundlelessApps[id]
-    if not app then return nil end
-    local ok, running = pcall(function() return app:isRunning() end)
-    if ok and running then return app end
-    bundlelessApps[id] = nil
+    for _, app in ipairs(bundlelessApps[id] or {}) do
+        if regularRunning(app) then return app end
+    end
     return nil
 end
 

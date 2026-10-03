@@ -52,12 +52,13 @@ An app started from a shell by its executable reports no bundle ID, so that
 lookup misses it: mpv run as `mpv file` (or Homebrew's `/opt/homebrew/bin/mpv`)
 was running while hyper+m skipped `io.mpv` and activated the next app in its
 list. `getApp` then asks `bundlelessApps`, which files each running app
-without a bundle ID under the ID its bundle's `Info.plist` names, keeping the
-instance activated last. It is kept by an application watcher and, at load,
-seeded from the windows on screen, so nothing walks every app; the price is
-that such an app with no window on screen when Hammerspoon loads is found only
-after its next activation. Activated last rather than first because a
-windowless mpv from days earlier sat beside the one in use.
+without a bundle ID under the ID its bundle's `Info.plist` names, newest
+activation first. It is kept by an application watcher and, at load, seeded
+from the windows on screen, so nothing walks every app; the price is that such
+an app with no window on screen when Hammerspoon loads is found only after its
+next activation. Only regular apps (`kind()` 1, with a Dock icon) are taken:
+an mpv playing audio alone has no window and runs as an accessory app
+(`kind()` 0), so hyper+m passes it over for the mpv showing a video.
 
 Every press prints one console line, so a slow switch can be traced to where
 the time went: `appHotkey: <app>: activated N ms after the handler started
