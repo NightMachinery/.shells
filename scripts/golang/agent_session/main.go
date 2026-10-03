@@ -12,6 +12,7 @@ package main
 import (
 	"bufio"
 	"context"
+	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
@@ -100,6 +101,20 @@ func main() {
 		} else {
 			err = handoff.ValidateCompactResult(argv[0], argv[1], os.Stderr)
 		}
+	case "completion-context":
+		if len(argv) != 1 {
+			err = errors.New("completion-context requires one transcript")
+		} else if ca, ok := ad.(interface {
+			CompletionContext(string) (session.Completion, error)
+		}); ok {
+			var c session.Completion
+			c, err = ca.CompletionContext(argv[0])
+			if err == nil {
+				err = json.NewEncoder(os.Stdout).Encode(c)
+			}
+		} else {
+			err = session.ErrUnsupported
+		}
 	case "render":
 		err = cmdRender(ad, argv)
 	case "list":
@@ -135,6 +150,7 @@ func usage() {
        agent_session agents                          #: the known agents, one per line
        agent_session live-all <agent>=<root>...      #: every agent's live sessions, concurrently
 
+  agent_session <agent> completion-context <transcript> #: bounded plain conversation JSON
   agent_session <agent> render [flags] <transcript>   #: transcript -> markdown/org on stdout
   agent_session <agent> list   [flags] <root>...      #: TSV of sessions, one per transcript
   agent_session <agent> name           <transcript>   #: session name, empty if unnamed

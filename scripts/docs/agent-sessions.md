@@ -1027,3 +1027,11 @@ the encoding whatever emacs would have sniffed. Either one alone is enough.
 For a file this pipeline did not write, `inhibit-null-byte-detection` set to
 `t` makes emacs stop treating a NUL as a reason to open something as binary,
 and `C-x RET r utf-8 RET` re-reads the buffer you already have.
+
+## Terminal completion corpus
+
+`agent_session <claude|codex> completion-context <transcript>` exposes a bounded
+plain-text conversation corpus and the latest assistant reply to the terminal
+completer. It scans at most 512 KiB, newest first, excludes thinking and tool
+records, and leaves reply newlines intact. Consumers invoke the binary and
+cache by file mtime rather than depending on its internal Go packages.

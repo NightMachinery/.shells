@@ -2011,3 +2011,13 @@ depends on whatever =PATH= fzf happens to have.
 command, because the overlay picker reaches it by name through the garden and
 because it is the convenient way to see a session's preview by hand; the
 pickers themselves no longer go through it.
+
+* Completion context
+
+=agent_session claude completion-context <transcript>= and its Codex twin
+emit JSON with =corpus= (newest plain conversation messages first) and
+=last_reply= (verbatim assistant text). The final 512 KiB are scanned,
+partial first records discarded, and malformed or incomplete records skipped.
+Thinking, encrypted reasoning, tool calls and metadata are excluded. This
+bounded interface lets other binaries cache by transcript mtime and avoid
+importing the adapter internals. It never needs pandoc or a network call.
