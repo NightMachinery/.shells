@@ -44,3 +44,14 @@ is cached by transcript mtime and size. The worker refreshes this cache after
 insertion, so the first expansion can use screen and paths immediately and a
 later press has transcript text ready. A cache miss never waits for the session
 resolver on the insertion path. Git path lookup has a 15 ms deadline.
+
+In tmux, `prefix /` invokes dabbrev and replaces the default describe-key
+binding. It runs in the background and accepts only Claude Code or Codex panes.
+Copy mode refuses completion. Other panes of the current window contribute
+text before the transcript corpus. The tmux `@agent_session` option identifies
+the transcript when hooks have recorded it.
+
+The worker reads both physical and joined tmux captures to retain soft-wrap
+information and uses the real pane caret. Insertion uses a private tmux buffer
+and deletes it after pasting, keeping prompt text out of argv. Backspaces are
+sent only for validated ASCII cycling remainders. Errors use display-message.

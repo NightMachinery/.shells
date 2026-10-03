@@ -41,15 +41,29 @@ func cachedContext(r TerminalRequest) ContextCorpus {
 }
 func loadContext(r TerminalRequest) ContextCorpus {
 	var c ContextCorpus
-	listing, err := kitty(r, "", "ls")
-	if err != nil {
-		return c
+	var transcript string
+	var err error
+	if r.Source == "tmux" {
+		identity, e := tmux(r, "", "display-message", "-p", "-t", r.Target, "#{@agent_session}")
+		if e != nil {
+			return c
+		}
+		f := strings.Split(strings.TrimSpace(identity), "\t")
+		if len(f) != 3 || f[0] != r.Screen.Agent {
+			return c
+		}
+		transcript = f[2]
+	} else {
+		listing, e := kitty(r, "", "ls")
+		if e != nil {
+			return c
+		}
+		transcript, err = child(2*time.Second, listing, filepath.Join(rootDir(), "bin/agent-completion-session.zsh"), r.Target, fmtInt(r.KittyPID))
+		if err != nil {
+			return c
+		}
+		transcript = strings.TrimSpace(transcript)
 	}
-	transcript, err := child(2*time.Second, listing, filepath.Join(rootDir(), "bin/agent-completion-session.zsh"), r.Target, fmtInt(r.KittyPID))
-	if err != nil {
-		return c
-	}
-	transcript = strings.TrimSpace(transcript)
 	st, err := os.Stat(transcript)
 	if err != nil {
 		return c

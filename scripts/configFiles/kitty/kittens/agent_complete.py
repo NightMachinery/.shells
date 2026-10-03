@@ -15,7 +15,7 @@ def agent_name(window):
     # Titles select mappings; foreground binaries decide whether insertion is safe.
     for process in window.child.foreground_processes:
         names = [os.path.basename(x) for x in process.get('cmdline', [])[:3]]
-        if any(re.fullmatch(r'claude(?:-.*)?', x) for x in names):
+        if any(re.fullmatch(r'claude(?:\.exe|-.*)?', x) for x in names):
             return 'claude'
         if any(x == 'codex' for x in names):
             return 'codex'

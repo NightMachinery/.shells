@@ -33,7 +33,15 @@ func run(args []string, in io.Reader, out, errs io.Writer) int {
 	switch args[0] {
 	case "terminal":
 		var r TerminalRequest
-		if err := decode(in, &r); err != nil {
+		if len(args) == 5 && args[2] == "tmux" {
+			r.Source = "tmux"
+			r.Socket = args[3]
+			r.Target = args[4]
+			if err := prepareTmux(&r); err != nil {
+				notify(r, err.Error())
+				return 1
+			}
+		} else if err := decode(in, &r); err != nil {
 			fmt.Fprintln(errs, "llm_complete: invalid terminal request")
 			return 1
 		}

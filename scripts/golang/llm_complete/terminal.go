@@ -66,6 +66,9 @@ func kittyScreen(text, agent string) (Screen, error) {
 	return s, nil
 }
 func capture(r TerminalRequest) (Screen, error) {
+	if r.Source == "tmux" {
+		return captureTmux(r)
+	}
 	raw, err := kitty(r, "", "get-text", "--match", "id:"+r.Target, "--add-cursor", "--add-wrap-markers")
 	if err != nil {
 		return Screen{}, err
@@ -73,6 +76,13 @@ func capture(r TerminalRequest) (Screen, error) {
 	return kittyScreen(raw, r.Screen.Agent)
 }
 func notify(r TerminalRequest, msg string) {
+	if r.Source == "tmux" {
+		_, err := tmux(r, "", "display-message", "-t", r.Target, sanitise(msg))
+		if err != nil {
+			fmt.Fprintln(os.Stderr, "llm_complete:", sanitise(msg))
+		}
+		return
+	}
 	// The no-UI status handler opens kitty's existing error overlay.
 	_, err := kitty(r, "", "kitten", "--match", "id:"+r.Target, r.Kitten, "status", sanitise(msg))
 	if err != nil {
@@ -125,6 +135,9 @@ func sameInput(a, b Screen) bool {
 	return ea == nil && eb == nil && a.Agent == b.Agent && ia.Prefix == ib.Prefix && ia.Suffix == ib.Suffix
 }
 func insert(r TerminalRequest, text string, backspaces int) error {
+	if r.Source == "tmux" {
+		return insertTmux(r, text, backspaces)
+	}
 	if backspaces > 0 {
 		keys := []string{"send-key", "--match", "id:" + r.Target}
 		for i := 0; i < backspaces; i++ {
