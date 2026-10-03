@@ -59,8 +59,8 @@ parse the text into entities before sending it.
 - **Telethon** (`TSEND_BACKEND=1`) sends a raw `messages.sendMessage` with an
   empty text plus `InputRichMessageMarkdown`, and edits with a raw
   `messages.editMessage`, because Telethon's `send_message` and `edit_message`
-  take no rich message. This needs **Telethon 1.44 or newer**. On an older one
-  (the shared environment has 1.43.2), tsend exits 1 before connecting, naming
+  take no rich message. This needs **Telethon 1.44 or newer**. On an older one,
+  tsend exits 1 before connecting, naming
   the Python and its Telethon version and the two ways out: run under a newer
   Telethon, or use the Bot API backend. tsend's shebang is `/usr/bin/env
   python`, so putting another environment's `bin` first in `PATH` is enough to
