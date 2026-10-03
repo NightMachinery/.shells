@@ -1,0 +1,41 @@
+#+TITLE: llm_complete
+
+Stdlib-only completion for interactive coding agents. The transport and terminal
+workers share one binary; input text is always JSON on stdin, never argv.
+
+* Install
+
+The launchers use [agfi:go-local-dep] to install and rebuild this module on
+first use. For a manual build, run =go install= in this directory. Go 1.21
+or newer suffices; no modules need downloading.
+
+* Dabbrev
+
+=llm_complete dabbrev= reads ={screen, corpora, state}= on stdin and emits
+={text, backspaces, state}=. A screen contains =agent= (claude or codex),
+=cursor_x= and =cursor_y= (zero-based terminal cells), and =lines= containing
+=text= and a =wrapped= boolean. Wrapped says the next physical row continues
+this one. The state is returned only after a valid expansion.
+
+Candidates begin with the word or path fragment before the caret. The current
+screen is searched by distance, then supplied corpora in order, with stable
+deduplication. Repeating completion replaces the previous remainder only when
+the complete input and caret still match. Non-ASCII remainders expand once;
+they cannot cycle because deletion counts depend on the CLI's grapheme editor.
+Claude's NORMAL and VISUAL indicators refuse insertion.
+
+=terminal dabbrev= is the detached kitty worker. The no-UI kitten captures
+physical rows and returns immediately. The worker re-reads the prompt before
+inserting and stores private cycling state under the XDG state directory.
+Failures use kitty's existing error overlay. Only inert, single-line text can
+be inserted. State files contain prompt text and are mode 0600 in a 0700 folder.
+
+* Test
+
+#+begin_src sh
+ go test ./...
+ go vet ./...
+#+end_src
+
+All automated fixtures contain fabricated text. Live checks and bindings are
+documented in =docs/agent-completion.md= in the shell repository.
