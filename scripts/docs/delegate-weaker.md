@@ -1,9 +1,11 @@
 # Weaker delegation compatibility
 
 The former standalone `delegate-weaker` workflow is merged into the shared
-`delegate` skill in `~/code/skills/tmux-subagents/skills/`. It supports
-weaker, peer, and stronger workers with separate model/account/backend choices.
-See [delegation modes and backends](delegate.md) for current usage and policy.
+`delegate` skill in [NightMachinery/delegate](https://github.com/NightMachinery/delegate)
+(locally `~/code/skills/delegate/skills/`). It supports weaker, peer, and
+stronger workers with separate model/account/backend choices. See the
+[delegation guide](delegate.md), which points to the canonical copy, for
+current usage and policy.
 
 `/delegate-weaker` and `/weaker` still select weaker mode; `$delegate-weaker`
 and `$weaker` are the corresponding Codex entrypoints. Both are forwarding
