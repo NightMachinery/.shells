@@ -18,6 +18,8 @@
 
 - Before asking a question from the user, always explain (in normal conversation text) all the choices and their tradeoffs and THEN ask the question normally. This way the user can read the conversation history to get a more detailed understanding of the choices before choosing. The explanation must remain readable in the history.
 
+- Whenever you list questions still waiting on the user, restate each one completely: its context, every option with its tradeoffs, and your recommendation. Never point back to an earlier message ("see above", "the choices from my last reply"); the user should not have to search the transcript for them.
+
 - Before showing an updated plan, always provide a quick conversational response at the top. Answer any questions the user asked, and highlight the specific changes made so they don't have to re-read the entire plan.
 
 - Always analyze and discuss trade-offs of different solutions.
