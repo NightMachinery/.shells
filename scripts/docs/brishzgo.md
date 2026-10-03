@@ -183,18 +183,32 @@ Fallbacks, when nothing ran:
 Each fallback resends all of stdin, as above.
 
 **Interrupting.** SIGHUP, SIGINT or SIGTERM while a command streams closes
-the connection. The garden sees the client go away and kills the command
-(SIGINT to its worker first, then SIGTERM and SIGKILL to what is left), and
-`brishzgo` then dies of the same signal, so a shell reports 129, 130 or 143.
-(With `brishz_debug=y`, the debug line about it is written after the
-connection is closed, and dropped if stderr does not take it within 0.1 s.)
-A closed stdout does the same through SIGPIPE: `brishzgo yes | head -1`
-ends at once, and the garden kills `yes`. This is the one transport where
-interrupting `brishzgo` stops the command. The raw and JSON APIs run it to
-its end whatever happens to the client, since their garden never looks at
-the connection until it has the whole reply. A signal that was ignored when
-`brishzgo` started stays ignored here too, so a script's background job that
-streams is not stopped by the Ctrl-C meant for the script.
+the connection at once, and `brishzgo` then dies of the same signal, so a
+shell reports 129, 130 or 143. (With `brishz_debug=y`, the debug line about
+it is written after the connection is closed, and dropped if stderr does not
+take it within 0.1 s.) A closed stdout does the same through SIGPIPE:
+`brishzgo yes | head -1` ends at once, and the garden kills `yes`. This is
+the one transport where interrupting `brishzgo` stops the command. The raw
+and JSON APIs run it to its end whatever happens to the client, since their
+garden never looks at the connection until it has the whole reply. A signal
+that was ignored when `brishzgo` started stays ignored here too, so a
+script's background job that streams is not stopped by the Ctrl-C meant for
+the script.
+
+The garden sees the client go away and kills the command. A request that
+still waits for its worker (its `brishz_session` runs another command, the
+session's worker is still starting, or every pool worker is busy) runs
+nothing. A running command gets SIGINT first, which ends most commands at
+once, with status 130, and the worker keeps its state, so a session keeps
+its variables, functions and directory. A command that traps or ignores
+SIGINT in the worker itself goes on: its processes get SIGTERM about 2 s
+later and SIGKILL 2 s after that, and each time one dies, the command runs
+its next statement. It ends only when the garden kills its worker, about
+4.5 s after the interrupt (about 8.5 s while it keeps writing). The worker
+then dies, and Brish replaces it, so a session loses its state, and its next
+request waits for a new worker to start. These later steps also stop
+background jobs that earlier commands left on that worker. BrishGarden's
+readme ("Streaming API", "Disconnects") has the details.
 
 A reader that stops reading without going away (a full pipe whose reader
 sleeps) holds the command: the garden queues at most 256 KiB for it, past

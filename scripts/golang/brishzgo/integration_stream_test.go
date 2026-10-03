@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"fmt"
 	"io"
 	"os"
 	"os/exec"
@@ -133,6 +134,47 @@ func TestITStreamInterrupt(t *testing.T) {
 	got := e.run(t, nil, []string{"print", "-rn", "--", "next"}, "brishz_stream", "y")
 	if got.code != 0 || string(got.out) != "next" {
 		t.Errorf("after the kill: exit %d, out %q, err %q", got.code, got.out, got.errOut)
+	}
+}
+
+// TestITStreamInterruptWhileWaiting: SIGINT to a client whose request
+// still waits for its session (another command runs there) runs nothing:
+// the garden gives the request up when the connection closes, and the
+// session goes on with the same worker. (Our commands run in a subshell,
+// so the worker's PID, $$, is the state we can see.)
+func TestITStreamInterruptWhileWaiting(t *testing.T) {
+	e := integration(t)
+	if !e.streamP() {
+		t.Skip("no streaming API")
+	}
+	session := fmt.Sprintf("brishzgo-it-wait-%d", time.Now().UnixNano())
+	kv := []string{"brishz_session", session}
+	set := e.run(t, nil, []string{"eval", "print -rn -- $$"}, append(kv, "brishz_stream", "y")...)
+	if set.code != 0 {
+		t.Fatalf("setup: exit %d, err %q", set.code, set.errOut)
+	}
+	holder := e.start(t, []string{"eval", "print -r -- holding; sleep 3"}, kv...)
+	holder.firstByte(t)
+	sentinel := filepath.Join(t.TempDir(), "sentinel")
+	waiter := e.start(t, []string{"eval", "print -r -- ran >> " + quoteSingle(sentinel) + "; print -r -- waited"}, kv...)
+	time.Sleep(time.Second)
+	waiter.cmd.Process.Signal(syscall.SIGINT)
+	waiter.cmd.Wait()
+	ws := waiter.cmd.ProcessState.Sys().(syscall.WaitStatus)
+	if !(ws.Signaled() && ws.Signal() == syscall.SIGINT) {
+		t.Errorf("the waiting client did not die of SIGINT: %v", waiter.cmd.ProcessState)
+	}
+	io.ReadAll(holder.out)
+	if err := holder.cmd.Wait(); err != nil {
+		t.Errorf("holder: %v", err)
+	}
+	time.Sleep(time.Second)
+	if _, err := os.Stat(sentinel); err == nil {
+		t.Errorf("the interrupted request ran")
+	}
+	got := e.run(t, nil, []string{"eval", "print -rn -- $$"}, append(kv, "brishz_stream", "y")...)
+	if got.code != 0 || string(got.out) != string(set.out) {
+		t.Errorf("after: exit %d, worker %q (want %q), err %q", got.code, got.out, set.out, got.errOut)
 	}
 }
 
