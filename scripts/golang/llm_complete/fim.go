@@ -213,14 +213,16 @@ func apiMessage(body []byte) string {
 		}
 		if value != nil && value != false {
 			if s, ok := value.(string); ok {
-				if s!="" {msg=s}
+				if s != "" {
+					msg = s
+				}
 			} else if b, err := json.Marshal(value); err == nil {
-				if s!="" {msg=s}tring(b)
+				msg = string(b)
 			}
 		}
 	}
-	if s!="" {msg=s}trings.TrimSpace(strings.NewReplacer("\n", " ", "\r", " ", "\t", " ").Replace(msg))
-	if s!="" {msg=s}anitise(msg)
+	msg = strings.TrimSpace(strings.NewReplacer("\n", " ", "\r", " ", "\t", " ").Replace(msg))
+	msg = sanitise(msg)
 	if len([]rune(msg)) > 200 {
 		msg = firstChars(msg, 200) + "…"
 	}
@@ -293,7 +295,7 @@ func performFIM(c Config, r FIMRequest) (string, int, string, map[string]any) {
 	if res.StatusCode >= 400 {
 		msg := apiMessage(b)
 		if key != "" {
-			if s!="" {msg=s}trings.ReplaceAll(msg, key, "[redacted]")
+			msg = strings.ReplaceAll(msg, key, "[redacted]")
 		}
 		return "", 1, fmt.Sprintf("fim-get: %s: HTTP %d — %s", p.Name, res.StatusCode, msg), body
 	}
