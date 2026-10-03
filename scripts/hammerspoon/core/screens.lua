@@ -317,9 +317,11 @@ function Screens.specMoves(spec)
 end
 
 --- ** Following a spec
---- fn(screen) now, and again whenever Screens.target(spec)[1] becomes a
---- different screen: on a display change, and for a moving spec on every
---- active-screen change. For state that lives outside Hammerspoon and must
+--- fn(screen) now, and again when Screens.target(spec)[1] is found to be a
+--- different screen. It is looked at on every display change, and for a
+--- moving spec on every active-screen change; nothing watches the pointer,
+--- so a pointer spec is only as fresh as the latest focus or display
+--- change. For state that lives outside Hammerspoon and must
 --- track a screen (an app preference, say), so it is set once per change
 --- rather than at every use. Returns forget(): call it when applying failed,
 --- so the next event applies again even if the screen is the same.

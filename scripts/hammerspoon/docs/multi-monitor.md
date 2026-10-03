@@ -180,8 +180,9 @@ Each is documented with its feature in `docs/hammerspoon.md`:
   hotkey, a hide's return, kitty's return), a focused window above layer 0,
   such as a Picture-in-Picture video, hands focus to the app's front normal
   window (`appFocusOffFloating`). ("App hotkeys".)
-- **Maccy's hyper+v popup** opens on the active screen: its `popupScreen`
-  setting is rewritten whenever the active screen changes. ("App hotkeys".)
+- **Maccy's hyper+v popup** opens on the screen named by
+  `maccy_popup_screens`: its `popupScreen` setting is rewritten when that
+  screen changes, one write at a time. ("App hotkeys".)
 
 ### Windows on a screen
 
@@ -206,9 +207,13 @@ bounds and layer, in 19 to 40 ms, asking no app anything. Accessibility's
   list afresh otherwise.
 - `Screens.moveHandlers`: windows that hyper+shift+; must move some other
   way than Accessibility. The kitty panel registers one.
-- `Screens.onTargetChange(spec, fn)`: calls `fn(screen)` whenever a spec
-  resolves to a different screen, for state outside Hammerspoon that has to
-  follow one (Maccy's setting).
+- `Screens.onTargetChange(spec, fn)`: calls `fn(screen)` now, then rechecks
+  the spec on every display change and, for a moving spec
+  (`Screens.specMoves`), on every active-screen change, calling `fn` again
+  when the answer is a different screen. Nothing watches the pointer, so a
+  pointer spec follows the mouse only at the next focus or display change.
+  For state outside Hammerspoon that has to follow a screen (Maccy's
+  setting).
 
 ### Checking it from the console
 

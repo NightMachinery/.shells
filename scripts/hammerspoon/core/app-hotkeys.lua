@@ -875,17 +875,21 @@ end)
 -- hyper+v passes ctrl+alt+cmd+shift+v through to Maccy (core/hyper-mode.lua),
 -- and Maccy places its popup itself. Set to "screen center", Maccy 0.31
 -- reads its `popupScreen' setting at every popup (Maccy/Menu/PopupLocation.swift
--- and Extensions/NSScreen+ForPopup.swift upstream): 0 means NSScreen.main
--- inside Maccy, which has no key window when its hotkey fires, and the popup
--- opened on the laptop while you worked on the monitor; n means
--- NSScreen.screens[n - 1], the order hs.screen.allScreens() lists them in.
--- Its "window center" setting is no better: it centres on the front app's
--- first CoreGraphics window at any layer, which for Brave is a 24 px strip.
+-- and Extensions/NSScreen+ForPopup.swift upstream): 0 falls back to
+-- NSScreen.main inside Maccy, and with 0 the popup opened on the laptop
+-- while you worked on the monitor (why NSScreen.main answered the laptop is
+-- unmeasured); n means NSScreen.screens[n - 1], the order
+-- hs.screen.allScreens() lists them in. Its "window center" setting is no
+-- better: it centres on the front app's first CoreGraphics window at any
+-- layer, which for Brave is a 24 px strip.
 --
 -- So popupScreen is kept pointing at the screen named by the spec
 -- `maccy_popup_screens' (default "active"; false leaves Maccy alone),
--- rewritten through `defaults' whenever that screen changes, and a press
--- costs nothing extra.
+-- rewritten through `defaults' when Screens.onTargetChange sees that screen
+-- change (on a focus or display change; nothing watches the pointer), and a
+-- press costs nothing extra. One write runs at a time, and a change that
+-- arrives meanwhile is written after it, newest only: two writes running at
+-- once could finish in either order and leave the older screen.
 --
 -- Maccy is sandboxed, so its settings live in its container, and on macOS
 -- 14 the first write there from a process Hammerspoon starts makes macOS ask
@@ -897,19 +901,37 @@ if maccy_popup_screens == nil then maccy_popup_screens = "active" end
 local maccyBundleID = "org.p0deje.Maccy"
 
 if maccy_popup_screens and Screens then
+    -- written: the index Maccy was last given; wanted: the newest asked for;
+    -- running: a write is under way.
+    local written, wanted, running = nil, nil, false
     local forget
-    forget = Screens.onTargetChange(maccy_popup_screens, function(screen)
-        if not screen then return end
-        local index = nil
-        for i, s in ipairs(hs.screen.allScreens()) do
-            if s:id() == screen:id() then index = i break end
-        end
-        if not index then return end
+    local function pump()
+        if running or wanted == nil or wanted == written then return end
+        local index = wanted
+        running = true
         gardenTask("/usr/bin/defaults", { "write", maccyBundleID, "popupScreen", "-int", tostring(index) },
                    function(code, _, err)
-                       if code == 0 then return end
-                       print("Maccy popupScreen: defaults exited " .. code .. ": " .. err)
-                       if forget then forget() end
+                       running = false
+                       if code == 0 then
+                           written = index
+                       else
+                           print("Maccy popupScreen: defaults exited " .. tostring(code) .. ": " .. tostring(err))
+                           written = nil
+                           -- Not retried here, where a write that keeps
+                           -- failing would loop; the next change tries again.
+                           if wanted == index then wanted = nil end
+                           if forget then forget() end
+                       end
+                       pump()
                    end, 120, nil, "maccy-popup-screen")
+    end
+    forget = Screens.onTargetChange(maccy_popup_screens, function(screen)
+        if not screen then return end
+        for i, s in ipairs(hs.screen.allScreens()) do
+            if s:id() == screen:id() then
+                wanted = i
+                return pump()
+            end
+        end
     end)
 end

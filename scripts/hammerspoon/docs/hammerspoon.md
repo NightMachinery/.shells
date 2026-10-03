@@ -188,16 +188,20 @@ any earlier window-list read saw at layer 0 ends it there
 one window-list read, and only a floating window pays for more.
 
 Maccy places its hyper+v popup itself. Set to "screen center", Maccy 0.31
-reads its `popupScreen` setting at every popup: 0, the default, means
-`NSScreen.main` inside Maccy, which has no key window when its hotkey fires,
-so the popup opened on the laptop while you worked on the monitor; n means the
-n-th of `NSScreen.screens`, the order `hs.screen.allScreens()` lists them in.
+reads its `popupScreen` setting at every popup: 0, the default, falls back to
+`NSScreen.main` inside Maccy (its source), and with 0 the popup opened on the
+laptop while you worked on the monitor; why `NSScreen.main` answered the
+laptop there is unmeasured. n means the n-th of `NSScreen.screens`, the order
+`hs.screen.allScreens()` lists them in.
 Its "window center" setting would be no better: it centres on the front app's
 first CoreGraphics window at any layer, which for Brave is a 24 px strip. So
 `core/app-hotkeys.lua` keeps `popupScreen` pointing at the screen named by the
 spec `maccy_popup_screens` (`false` leaves Maccy alone),
-rewriting it with `defaults write` whenever that screen changes
-(`Screens.onTargetChange`), so a press costs nothing extra. Maccy is
+rewriting it with `defaults write` when `Screens.onTargetChange` sees that
+screen change, on a focus or display change, so a press costs nothing extra.
+One write runs at a time, and a change that arrives meanwhile is written after
+it, newest only: two writes running at once could finish in either order and
+leave the older screen. Maccy is
 sandboxed and its settings live in its container, so on macOS 14 the first
 such write made macOS ask whether Hammerspoon may access data from other apps
 (seen 2026-10-03); the write waits for the answer, and a failed one is retried
