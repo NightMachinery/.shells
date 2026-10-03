@@ -52,11 +52,13 @@ fresh for every command. Two pieces:
   snapshot's opening `unalias -a` runs after `.zshenv` and would delete every
   alias it just defined. Under `CLAUDECODE`, `unalias` is a function that converts
   current global aliases to ordinary aliases without evaluating their bodies,
-  retains the current ordinary aliases, and skips
-  exactly that call, and only for a *lean* snapshot: one whose `# Functions`
-  header is followed directly by the next header. Every other call, including
-  the snapshot's own `unalias grep` before Claude Code's `grep` wrapper, goes
-  to the builtin.
+  retains the current ordinary aliases, and skips only the verified opening
+  call of a *lean* snapshot. It matches the current generator's exact first
+  five lines, ending with `# Functions` immediately followed by
+  `# Shell Options`, and derives the opening call's line from that scan.
+  Every other call, including a second `unalias -a` in the same snapshot and
+  `unalias grep` before Claude Code's `grep` wrapper, goes to the builtin.
+  Work-profile directories and paths containing spaces or colons work too.
 
 The lean check matters. A snapshot written before this change still holds
 every function body, and those are parsed as it is sourced. With our aliases
@@ -64,8 +66,11 @@ still live, a definition such as `ls () {` expands `ls` and becomes a parse
 error, which stops the file there: the remaining functions, Claude Code's
 helpers and its `PATH` line are all lost. The first version of the wrapper did
 exactly that to every running session for a few minutes on 2026-10-03. A
-snapshot whose layout the check does not recognise gets the real `unalias -a`,
-so the worst case is a command with no aliases, never a half-read snapshot.
+snapshot whose preamble or next header the check does not recognise gets the
+real `unalias -a`. A comment before function bodies or an unknown header is
+rejected, so those files keep the old parsing path. Changed layouts may lose
+aliases until explicitly supported; the current generator format is the
+compatibility contract.
 
 So in a session started after the change, a command has the functions,
 options and current alias bodies `.zshenv` loads from disk. Previously global
@@ -88,8 +93,11 @@ since a child `zsh` loads `.zshenv` fresh and proves nothing about its parent.
 That check predates the ordinary-alias correction. The correction is checked
 with isolated shell fixtures in `zshlang/tests/claude-code-shell.zsh`: current
 literal alias bodies, file reading, bare and quoted arguments, compiled return
-macros, inherited agent markers and both lean and old snapshots. No new
-headless measurement is claimed here.
+macros, inherited agent markers, rejected layouts, later unalias calls and
+profile paths. When the repository's `.zshrc` is present, the tests also run
+its actual cleanup with inert public preloads and reproduce the generator's
+empty function/alias sections, sole `login` option and removed ZERR handler.
+No new headless measurement is claimed here.
 
 ## What no setting changes
 

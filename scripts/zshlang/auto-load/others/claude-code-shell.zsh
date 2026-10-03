@@ -4,21 +4,28 @@
 #: just defined. ~/.zshrc keeps aliases out of the snapshot, so without this a
 #: command there has none at all. See =docs/claude-code-shell.md=.
 function h-claude-code-snapshot-lean-p {
-    #: Whether snapshot file $1 carries no function bodies: the line after its
-    #: `# Functions' header is already the next header. Only such a snapshot
-    #: may keep our aliases, since the bodies in an older one are parsed as it
-    #: is sourced, and an alias of a function's name (`ls', say) turns its
-    #: definition into a parse error that stops the rest of the file. Reads a
-    #: few lines, not the file; any other layout answers no.
-    local file="${1}" line
-    local -i n=0
+    #: Match the current generator's exact preamble and empty function section.
+    #: An older snapshot must clear aliases before parsing function bodies,
+    #: since an alias of a function name can stop the file with a parse error.
+    #: The same bounded scan verifies the opening call's line when supplied;
+    #: a later unalias call or any unknown layout must use the builtin.
+    local file="${1}" caller_line="${2:-}" line expected
+    local -i n=0 opening_line=0
     {
-        while IFS= read -r line ; do
-            (( ++n > 20 )) && return 1
-            [[ "${line}" == '# Functions' ]] && break
+        for expected in \
+            '# Snapshot file' \
+            '# Unset all aliases to avoid conflicts with functions' \
+            'unalias -a 2>/dev/null || true' \
+            '# Functions' \
+            '# Shell Options' ; do
+            (( ++n ))
+            IFS= read -r line || return 1
+            [[ "${line}" == "${expected}" ]] || return 1
+            if [[ "${line}" == 'unalias -a 2>/dev/null || true' ]] ; then
+                opening_line=${n}
+            fi
         done
-        IFS= read -r line || return 1
-        [[ "${line}" == '# '* ]]
+        [[ -z "${caller_line}" || "${caller_line}" == "${opening_line}" ]]
     } < "${file}"
 }
 
@@ -29,8 +36,9 @@ if [[ -n "${CLAUDECODE:-}" ]] ; then
         #: builtin.
         if [[ "$*" == '-a' ]] ; then
             local caller="${funcfiletrace[1]%:*}"
+            local caller_line="${funcfiletrace[1]##*:}"
             if [[ "${caller}" == */shell-snapshots/snapshot-*.sh ]] &&
-                h-claude-code-snapshot-lean-p "${caller}" 2>/dev/null ; then
+                h-claude-code-snapshot-lean-p "${caller}" "${caller_line}" 2>/dev/null ; then
                 local name body
                 for name in "${(@k)galiases}" ; do
                     body="${galiases[$name]}"
