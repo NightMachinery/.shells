@@ -297,6 +297,18 @@ end
 -- runs after the show, and after the focus too, so it never holds them up.
 local kPanelFitSlack = 2
 
+-- The panel's entry in a Screens.windowStack() (`stack', or a fresh read),
+-- or nil when it is not on screen: kitty's one big window off layer 0.
+function kittyPanelEntry(stack)
+    local app = getApp(kittyBundleID)
+    if not app then return nil end
+    local pid = app:pid()
+    for _, e in ipairs(stack or Screens.windowStack()) do
+        if e.pid == pid and e.layer ~= 0 and e.frame.w > 200 and e.frame.h > 200 then return e end
+    end
+    return nil
+end
+
 local function kittyPanelFitNow(label, screen)
     local app = getApp(kittyBundleID)
     if not (app and screen) then return nil end
@@ -305,28 +317,24 @@ local function kittyPanelFitNow(label, screen)
         return math.abs(f.x - want.x) <= kPanelFitSlack and math.abs(f.y - want.y) <= kPanelFitSlack
            and math.abs(f.w - want.w) <= kPanelFitSlack and math.abs(f.h - want.h) <= kPanelFitSlack
     end
-    local pid = app:pid()
-    for _, e in ipairs(Screens.windowStack()) do
-        if e.pid == pid and e.layer ~= 0 and e.frame.w > 200 and e.frame.h > 200 then
-            local f = e.frame
-            if near(f) then return "ok" end
-            local w = Screens.entryWindow(e)
-            if not w then
-                print("kittyPanel: " .. label .. ": could not fetch the panel window to fit it")
-                return "moved"
-            end
-            pcall(function() w:setFrame(want, 0) end)
-            local okg, g = pcall(function() return w:frame() end)
-            g = okg and g or f
-            -- %g, not %d: Accessibility frames can be fractional, and
-            -- Lua 5.4's %d raises on 1056.5.
-            print(string.format("kittyPanel: %s: %s the panel to %s: %gx%g@%g,%g -> %gx%g@%g,%g", label,
-                                near(g) and "fitted" or "could not fit", screen:name() or "?",
-                                f.w, f.h, f.x, f.y, g.w, g.h, g.x, g.y))
-            return "moved"
-        end
+    local e = kittyPanelEntry()
+    if not e then return false end
+    local f = e.frame
+    if near(f) then return "ok" end
+    local w = Screens.entryWindow(e)
+    if not w then
+        print("kittyPanel: " .. label .. ": could not fetch the panel window to fit it")
+        return "moved"
     end
-    return false
+    pcall(function() w:setFrame(want, 0) end)
+    local okg, g = pcall(function() return w:frame() end)
+    g = okg and g or f
+    -- %g, not %d: Accessibility frames can be fractional, and
+    -- Lua 5.4's %d raises on 1056.5.
+    print(string.format("kittyPanel: %s: %s the panel to %s: %gx%g@%g,%g -> %gx%g@%g,%g", label,
+                        near(g) and "fitted" or "could not fit", screen:name() or "?",
+                        f.w, f.h, f.x, f.y, g.w, g.h, g.x, g.y))
+    return "moved"
 end
 
 -- kittyPanelFitNow with any error printed, not raised. "ok": the panel is
@@ -882,6 +890,20 @@ function kittyPanelShow(label, opts)
     end, mark)
 end
 
+-- Focuses the shown panel's active window, without showing or moving it.
+function kittyPanelFocus(label)
+    local path = kittySocketPath()
+    if not path then return end
+    kittyPanelFastState(path, function(st, why)
+        if not (st and st.active) then
+            return print("kittyPanel: " .. label .. ": focus: " .. tostring(why or "no active window"))
+        end
+        kittyRC(path, "focus-window", { match = kittyMatchID(st.active) }, function(ok, err)
+            if not ok then print("kittyPanel: " .. label .. ": focus: " .. tostring(err)) end
+        end)
+    end)
+end
+
 -- Hides the panel. No kitty, no panel: nothing to do. A stray normal window
 -- is left alone here; the next show folds its tabs in if configured to.
 function kittyPanelHide(label)
@@ -924,6 +946,21 @@ function kittyPanelMoveTo(screen, label, done)
         return done(false, ": kitty has no remote-control socket")
     end
     kittyPanelShow(label, { screen = screen, focusSpace = true, done = done })
+end
+
+-- hyper+; onto the screen the shown panel is on focuses the panel: it
+-- floats over that screen's windows, so it is what you see there, but it is
+-- not a normal window, and focusing the window under it would hide it
+-- (kittyFocusWatcher).
+if Screens and Screens.focusHandlers then
+    Screens.focusHandlers.kittyPanel = function(screen, stack)
+        if kitty_hotkey_mode ~= "panel" then return nil end
+        local e = kittyPanelEntry(stack)
+        local s = e and Screens.screenOfFrame(e.frame)
+        if not (s and s:id() == screen:id()) then return nil end
+        kittyPanelFocus("focusNext")
+        return e.frame
+    end
 end
 
 if Screens and Screens.moveHandlers then

@@ -492,8 +492,14 @@ end
 -- other than hyper+z (an app hotkey, Cmd-Tab, a click): a panel floats above
 -- fullscreen windows, so unlike a normal window it cannot be put behind the
 -- app you just switched to. kitty's own hide-on-focus-loss would do this too,
--- but it also hides on Maccy and Handy. The check is one Accessibility query
--- to kitty alone; a hidden panel has no visible windows.
+-- but it also hides on Maccy and Handy.
+--
+-- With two screens the panel stays up when the app coming forward is on the
+-- other screen, since it covers only its own: hyper+/, hyper+z, hyper+x used
+-- to hide it from the monitor while Emacs came up on the laptop. Where that
+-- app is comes from the window list, or, for an app whose window is in a
+-- Space not showing yet (a fullscreen Emacs), from its focused window over
+-- Accessibility; when neither says, the panel is hidden as before.
 --
 -- Global, not local: Hammerspoon only keeps a watcher alive while something
 -- references it, and a file-level local is gone once the file has loaded.
@@ -508,11 +514,26 @@ kittyFocusWatcher = hs.application.watcher.new(function(_, event, app)
     -- purpose while it shows the panel; see kittyPanelShowingUntil there.
     if hs.timer.secondsSinceEpoch() < (kittyPanelShowingUntil or 0) then return end
 
-    if kitty_hotkey_mode == "panel" then
+    if kitty_hotkey_mode == "panel" and kittyPanelEntry then
+        -- One Accessibility query to kitty (1.6 ms) first: a hidden panel has
+        -- no windows there, and most activations happen with it hidden.
         local kitty = getApp(kittyBundleID)
-        if kitty and kittyPanelWindow(kitty) then
-            kittyPanelHide("kittyFocusWatcher")
+        if not (kitty and kittyPanelWindow(kitty)) then return end
+        local stack = Screens.windowStack()
+        local panel = kittyPanelEntry(stack)
+        -- Up but not on screen: lost in a Space that is not showing.
+        if not panel then return kittyPanelHide("kittyFocusWatcher") end
+        local panelScreen = Screens.screenOfFrame(panel.frame)
+        local appScreen = Screens.windowScreenOf(app:pid(), stack)
+        if not appScreen then
+            local ok, s = pcall(function()
+                local w = app:focusedWindow()
+                return w and w:screen()
+            end)
+            appScreen = ok and s or nil
         end
+        if panelScreen and appScreen and panelScreen:id() ~= appScreen:id() then return end
+        kittyPanelHide("kittyFocusWatcher")
     end
 end)
 kittyFocusWatcher:start()

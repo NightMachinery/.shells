@@ -336,7 +336,8 @@ both screens on yet (see "Still unmeasured" below):
   on the screen named by `maccy_popup_screens`. Why Maccy's own choice was the
   laptop is unmeasured. The first write made macOS 14 ask whether Hammerspoon may
   access data from other apps, because Maccy's settings live in its sandbox
-  container.
+  container. In real use since the focus fix below, the popup follows focus
+  between the screens.
 
 Found in real use on 2026-10-03, after the round above:
 
@@ -389,14 +390,20 @@ Found in real use on 2026-10-03, after the round above:
   app being hidden was fullscreen. Now the app's own focused window, asked
   over Accessibility (1.4 ms for Emacs), counts too; the same sequence,
   scripted, returned to Emacs.
+- **Focus moving to the laptop took kitty off the monitor.** hyper+/, hyper+z,
+  hyper+x left the panel hidden, because the panel was hidden on every app
+  activation, wherever that app was. Now only an activation on the panel's
+  own screen hides it, and hyper+; can focus the panel. Scripted: the panel
+  stayed up on the monitor while Emacs was activated on the laptop, hyper+;
+  then landed in kitty, and activating Brave on the monitor hid it.
 
 Still unmeasured:
 
 - **What is still untested on two screens.** Since the second round, real
   presses and scripted runs have covered the panel fit (the panel takes the
   new frame, read back afterwards), hyper+shift+; on windowed and fullscreen
-  windows, per-screen returns across both screens, and hyper+;. Maccy
-  following focus, a fullscreen move that fails, and a Picture-in-Picture
+  windows, per-screen returns across both screens, hyper+; and Maccy
+  following focus. A fullscreen move that fails and a Picture-in-Picture
   redirect still wait for one.
 - **Does kitty keep a fitted frame?** The panel takes one, but whether kitty
   puts it back at its next re-layout is unobserved.

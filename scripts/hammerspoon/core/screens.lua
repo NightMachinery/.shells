@@ -622,14 +622,20 @@ end
 --- The frontmost normal window on `screen' as an hs.window, or nil. It used
 --- to be hs.window.orderedWindows() filtered by screen, which asks every app
 --- over Accessibility (see "Windows on a screen" above).
-function Screens.frontWindowOn(screen)
-    for _, e in ipairs(Screens.normalWindowsOn(screen)) do
+function Screens.frontWindowOn(screen, stack)
+    for _, e in ipairs(Screens.normalWindowsOn(screen, nil, stack)) do
         local w = Screens.entryWindow(e)
         if w then return w end
     end
     return nil
 end
 local frontWindowOn = Screens.frontWindowOn
+
+--- What focusNext focuses before a screen's front normal window, by name:
+---   fn(screen, stack) -> the frame it focused, or nil to pass.
+--- The kitty panel registers one (core/kitty-panel.lua): it floats over its
+--- screen's windows but is not a normal window.
+Screens.focusHandlers = Screens.focusHandlers or {}
 
 --- Focus the frontmost window on the next screen. With no window there,
 --- nothing can take focus -- macOS focuses windows, not screens -- so the
@@ -649,7 +655,18 @@ function Screens.focusNext(delta)
     -- back to the app being left (core/app-hotkeys.lua).
     if appFloatingSupersede then appFloatingSupersede() end
 
-    local w = frontWindowOn(to)
+    local stack = Screens.windowStack()
+    for _, handler in pairs(Screens.focusHandlers) do
+        local ok, frame = pcall(handler, to, stack)
+        if ok and frame then
+            Screens.recheckFocus()
+            hs.mouse.absolutePosition(centreOf(frame))
+            focusBand(to, "\u{2192} " .. name)
+            return
+        end
+    end
+
+    local w = frontWindowOn(to, stack)
     if w then
         w:focus()
         -- Two windows of one app activate nothing.

@@ -255,6 +255,14 @@ read from the window list. It used to be `hs.screen.mainScreen()`, which lags
 one focus change behind, so hyper+; kept switching to the screen it had just
 left (see "Where focus is" in `docs/multi-monitor.md`).
 
+In panel mode the kitty panel counts as a window of its screen, so hyper+;
+from the other screen lands in kitty. The panel is not a normal window (it
+sits above layer 0), so `Screens.focusNext` first offers the target screen to
+`Screens.focusHandlers`, a table of functions that modules fill in; the first
+to return a frame has taken the focus. `core/kitty-panel.lua` registers one
+that focuses the panel's active window (`kittyPanelFocus`) when the panel is
+on that screen (`kittyPanelEntry`).
+
 The frontmost window on a screen comes from CoreGraphics' window list
 (`hs.window.list`, wrapped as `Screens.windowStack`): every on-screen window,
 front to back, with its owner's pid, bounds and layer, in 19 to 40 ms, asking
@@ -1950,9 +1958,14 @@ app on the screen kitty is on, chosen by `screenReturnTarget` in
 at press time, before the hide, because the activation the hide causes would
 change the lists. `kittyFocusAfterHide` then carries it out through
 `screenReturnFocus`, inside `pcall`. In panel mode `kittyFocusWatcher`, an
-`hs.application.watcher`, also hides the panel when any non-transient app is
-activated, by an app hotkey, Cmd-Tab or a click, because an overlay cannot go
-behind the app you switch to.
+`hs.application.watcher`, also hides the panel when a non-transient app is
+activated on the panel's own screen, by an app hotkey, Cmd-Tab or a click,
+because an overlay cannot go behind the app you switch to. An app activated
+on the other screen leaves the panel up where it is: it covers nothing there,
+and hiding it took kitty off the monitor whenever focus moved to the laptop.
+The app's screen is that of its frontmost window in the window list, or of its
+focused window when the list has none. A panel that is up but not on any
+screen (lost in a Space that is not showing) is still hidden.
 
 Every press logs one line to the Hammerspoon console, `kittyHandler: press
 (<mode>); kitty <frontmost|running|not running>; frontmost=<app>; ->
