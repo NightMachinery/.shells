@@ -299,7 +299,7 @@ local kPanelFitSlack = 2
 
 local function kittyPanelFitNow(label, screen)
     local app = getApp(kittyBundleID)
-    if not (app and screen) then return end
+    if not (app and screen) then return nil end
     local want = kittyPanelFrameOn(screen)
     local function near(f)
         return math.abs(f.x - want.x) <= kPanelFitSlack and math.abs(f.y - want.y) <= kPanelFitSlack
@@ -309,9 +309,12 @@ local function kittyPanelFitNow(label, screen)
     for _, e in ipairs(Screens.windowStack()) do
         if e.pid == pid and e.layer ~= 0 and e.frame.w > 200 and e.frame.h > 200 then
             local f = e.frame
-            if near(f) then return end
+            if near(f) then return "ok" end
             local w = Screens.entryWindow(e)
-            if not w then return print("kittyPanel: " .. label .. ": could not fetch the panel window to fit it") end
+            if not w then
+                print("kittyPanel: " .. label .. ": could not fetch the panel window to fit it")
+                return "moved"
+            end
             pcall(function() w:setFrame(want, 0) end)
             local okg, g = pcall(function() return w:frame() end)
             g = okg and g or f
@@ -320,18 +323,147 @@ local function kittyPanelFitNow(label, screen)
             print(string.format("kittyPanel: %s: %s the panel to %s: %gx%g@%g,%g -> %gx%g@%g,%g", label,
                                 near(g) and "fitted" or "could not fit", screen:name() or "?",
                                 f.w, f.h, f.x, f.y, g.w, g.h, g.x, g.y))
-            return
+            return "moved"
         end
     end
-    print("kittyPanel: " .. label .. ": no panel window to fit")
+    return false
 end
 
--- kittyPanelFitNow with any error printed, not raised: kittyPanelMoveTo
--- calls it before done(), and an error there would leave hyper+shift+;
--- saying "still moving a window" until the move's watchdog fires.
+-- kittyPanelFitNow with any error printed, not raised. "ok": the panel is
+-- on screen where kitty's layout puts it; "moved": it was elsewhere and was
+-- set there (or that was tried); false: it is not on screen; nil: no screen
+-- to check, or an error.
 local function kittyPanelFit(label, screen)
-    local ok, err = pcall(kittyPanelFitNow, label, screen)
-    if not ok then print("kittyPanel: " .. label .. ": fit: " .. tostring(err)) end
+    local ok, res = pcall(kittyPanelFitNow, label, screen)
+    if not ok then
+        print("kittyPanel: " .. label .. ": fit: " .. tostring(res))
+        return nil
+    end
+    return res
+end
+
+--- ** Which Space the panel joins
+--
+-- kitty marks the panel CanJoinAllSpaces but not FullScreenAuxiliary, so by
+-- itself it never appears over a fullscreen app. To get it there anyway,
+-- kitty's show (_glfwPlatformShowWindow in its cocoa_window.m, the same in
+-- 0.48.2 and in master on 2026-10-03) adds the panel to one Space:
+-- CGSGetActiveSpace(), the focused Space, which Hammerspoon reads as
+-- hs.spaces.focusedSpace(). Measured 2026-10-03 with two displays:
+--
+-- - The panel comes up only when that Space is on the display the panel is
+--   on. Shown onto the laptop while the monitor's Space was focused, it
+--   stayed off screen; shown onto the monitor with the monitor's fullscreen
+--   Space focused, it came up over the fullscreen app.
+-- - Moving a shown panel to another display with output-name put it in
+--   that display's desktop Space, behind the fullscreen Space the display
+--   was showing: off screen.
+-- - hs.spaces.moveWindowToSpace(panel, thatFullscreenSpace, true) answered
+--   true and changed nothing.
+--
+-- kitty counts a panel sitting in a Space that is not showing as visible,
+-- and answers ok to a `show' of a visible panel without doing anything
+-- (toggle_os_window_visibility in its glfw.c). So once the panel was lost
+-- this way, every hyper+z "showed" it and nothing appeared, until the user
+-- went to that Space by hand.
+--
+-- Hence: every show hides first, which kitty skips for a hidden panel and
+-- which makes a lost one showable again; after the show, a panel that is
+-- not on screen is put right (kittyPanelAfterShow); and a move to another
+-- screen focuses that screen's Space before the show (kittyPanelFocusSpaceOn).
+
+-- The Space `screen' is showing and its type ("user" or "fullscreen"), or
+-- nil. Both calls read the Dock's Space list, 8 to 17 ms each (measured
+-- 2026-10-03), so only moves and repairs ask, never a plain show.
+local function kittySpaceOn(screen)
+    local ok, sid = pcall(hs.spaces.activeSpaceOnScreen, screen)
+    if not (ok and sid) then return nil end
+    local okt, kind = pcall(hs.spaces.spaceType, sid)
+    return sid, okt and kind or nil
+end
+
+-- kittyFocusWatcher (core/window-media-bindings.lua) hides the panel when
+-- another app comes to the front. While a show is under way it must not:
+-- the hide before the show makes kitty hand focus back to the app it came
+-- from, and focusing a Space activates that Space's app, and either
+-- watcher hide could reach kitty after the show and hide the panel again.
+-- The watcher skips activations before this time.
+kittyPanelShowingUntil = 0
+local kShowGuardSeconds, kShowGuardTailSeconds = 5, 0.3
+
+local kSpaceFocusWaitSeconds, kSpaceFocusPollSeconds = 0.5, 0.02
+-- How long after a show, or a Space move, the window list is read again.
+local kRecheckSeconds = 0.15
+
+-- Makes the Space `screen' shows the focused one, by focusing the front
+-- window there, then cb(ok, note) once hs.spaces.focusedSpace() agrees, or
+-- once the wait runs out. The show goes ahead either way.
+local function kittyPanelFocusSpaceOn(screen, cb)
+    local sid = kittySpaceOn(screen)
+    if not sid then return cb(false, "no Space found for " .. tostring(screen:name())) end
+    if hs.spaces.focusedSpace() == sid then return cb(true) end
+    local okw, w = pcall(Screens.frontWindowOn, screen)
+    if not (okw and w) then return cb(false, "no window on " .. tostring(screen:name()) .. " to focus") end
+    pcall(function() w:focus() end)
+    local deadline = hs.timer.secondsSinceEpoch() + kSpaceFocusWaitSeconds
+    local function poll()
+        local now = hs.spaces.focusedSpace()
+        if now == sid then return cb(true) end
+        if hs.timer.secondsSinceEpoch() > deadline then
+            return cb(false, string.format("the focused Space is still %s, not %d", tostring(now), sid))
+        end
+        hsAfter(kSpaceFocusPollSeconds, poll)
+    end
+    poll()
+end
+
+-- A panel that is not on screen after its show. A desktop Space takes it
+-- with moveWindowToSpace; a fullscreen Space does not (see above), so there
+-- the show is redone with that Space focused first. `st.platformId' is the
+-- panel's window number, from the state kitten; `ls' has no such field
+-- here, so after a slow show only the redo is possible.
+local function kittyPanelRepairSpace(label, screen, st)
+    local sid, kind = kittySpaceOn(screen)
+    local id = st and st.platformId
+    local okh, have = pcall(function() return id and hs.spaces.windowSpaces(id) end)
+    local where = string.format("it is in Space %s, %s shows %s Space %s, the focused Space is %s",
+                                (okh and type(have) == "table") and table.concat(have, ",") or "?",
+                                screen:name() or "?", tostring(kind), tostring(sid), tostring(hs.spaces.focusedSpace()))
+    if sid and kind == "user" and id then
+        local okm, res, err = pcall(hs.spaces.moveWindowToSpace, id, sid)
+        hsAfter(kRecheckSeconds, function()
+            local found = kittyPanelFit(label, screen)
+            print(string.format("kittyPanel: %s: the panel was not on screen (%s); %s", label, where,
+                                found and "moved it into that Space"
+                                      or ("could not move it there: " .. tostring(okm and (err or res) or res))))
+        end)
+        return
+    end
+    print(string.format("kittyPanel: %s: the panel was not on screen (%s); showing it again with that Space focused",
+                        label, where))
+    kittyPanelShow(label .. " (again)", { screen = screen, focusSpace = true, again = true })
+end
+
+-- After a show: fit the panel, or put it right if it is not on screen. The
+-- window list is read again after a moment before anything is repaired, so
+-- a panel that is merely late is not shown twice. A panel the fit had to
+-- move is checked again too: kitty sometimes lays it out at the new
+-- screen's size but on the old screen (see the fit above), and moving it
+-- across over Accessibility put it in the new screen's desktop Space,
+-- behind the fullscreen Space that screen was showing (measured
+-- 2026-10-03). `again' marks the second show, which only reports.
+local function kittyPanelAfterShow(label, screen, st, again)
+    local first = kittyPanelFit(label, screen)
+    if first == nil or first == "ok" then return end
+    hsAfter(kRecheckSeconds, function()
+        if kittyPanelFit(label, screen) ~= false then return end
+        if again then
+            return print(string.format("kittyPanel: %s: the panel is still not on screen (the focused Space is %s)",
+                                       label, tostring(hs.spaces.focusedSpace())))
+        end
+        local ok, err = pcall(kittyPanelRepairSpace, label, screen, st)
+        if not ok then print("kittyPanel: " .. label .. ": repair: " .. tostring(err)) end
+    end)
 end
 
 -- `edge=center' covers the display; the window level comes from
@@ -475,7 +607,7 @@ local function kittyPanelShowSlow(done)
         -- over Accessibility, while kitty keeps its old output-name until a
         -- later show's move gets through.
         local output, outScreen = kittyPanelWantedOutput()
-        local function fit() kittyPanelFit("kittyPanelShowSlow", outScreen) end
+        local function fit() kittyPanelAfterShow("kittyPanelShowSlow", outScreen, st) end
         if not output then return show() end
         kitten(sock, { "resize-os-window", "--match", kittyMatchID(st.win), "--action=os-panel",
                        "--incremental", "output-name=" .. output }, function(ok, _, err2)
@@ -618,16 +750,25 @@ end
 -- step never calls back (a launch alone may take 20 s).
 local kittyPanelShowBusy = nil
 
--- Shows the panel and focuses its active window.
-function kittyPanelShow(label)
+-- Shows the panel and focuses its active window. opts, all optional:
+--   screen      the screen to show it on, instead of kitty_panel_screens
+--   focusSpace  focus that screen's Space before the show
+--               (kittyPanelFocusSpaceOn); moves ask for it
+--   again       this is the redo after a show left the panel off screen
+--   done        fn(ok, note) once shown, as Screens.moveHandlers expects;
+--               failures then go to it rather than to a band
+function kittyPanelShow(label, opts)
     label = label or "kittyPanelShow"
+    opts = opts or {}
     if kittyPanelShowBusy then
         print("kittyPanel: " .. label .. ": a show is already in progress")
+        if opts.done then opts.done(false, ": a show of the panel is already in progress") end
         return
     end
 
     local token = {}
     kittyPanelShowBusy = token
+    kittyPanelShowingUntil = hs.timer.secondsSinceEpoch() + kShowGuardSeconds
     local t0 = hs.timer.absoluteTime()
     local route = "fast"
     local steps = {}
@@ -639,6 +780,8 @@ function kittyPanelShow(label)
     local watchdog = hsAfter(30, function()
         if kittyPanelShowBusy == token then
             kittyPanelShowBusy = nil
+            kittyPanelShowingUntil = 0
+            if opts.done then opts.done(false, ": the show did not finish within 30 s") end
             kittyPanelFail(label .. ": show did not finish within 30 s")
         end
     end)
@@ -646,15 +789,27 @@ function kittyPanelShow(label)
     local function done(err)
         if kittyPanelShowBusy ~= token then return end
         kittyPanelShowBusy = nil
+        -- The tail lets the activations this show caused arrive first.
+        kittyPanelShowingUntil = hs.timer.secondsSinceEpoch() + kShowGuardTailSeconds
         hsCancel(watchdog)
-        if err then return kittyPanelFail(label .. ": " .. err) end
+        if err then
+            if opts.done then
+                print("kittyPanel: " .. label .. ": " .. err)
+                return opts.done(false, ": " .. err)
+            end
+            return kittyPanelFail(label .. ": " .. err)
+        end
         print(string.format("kittyPanel: %s: shown in %.1f ms (%s%s)%s", label,
                             (hs.timer.absoluteTime() - t0) / 1e6, route,
                             #steps > 0 and (": " .. table.concat(steps, ", ")) or "",
                             kittySincePress()))
+        if opts.done then opts.done(true) end
     end
 
+    -- The slow path only knows kitty_panel_screens, so a show for one
+    -- given screen (a move) fails instead.
     local function slow(why)
+        if opts.screen then return done("the panel needs the slow path (" .. (why or "stray tabs to fold") .. ")") end
         if why and why ~= "no panel" then
             print("kittyPanel: " .. label .. ": fast show failed (" .. why .. "); using kitten")
         end
@@ -670,8 +825,15 @@ function kittyPanelShow(label)
         if not st then return slow(why) end
         if kitty_panel_fold_strays and #st.strays > 0 then return slow() end
 
-        -- `after' (the fit) runs once the panel is up and focused, so it
-        -- is not in the timing line.
+        local output, outScreen
+        if opts.screen then
+            output, outScreen = opts.screen:name(), opts.screen
+        else
+            output, outScreen = kittyPanelWantedOutput()
+        end
+
+        -- `after' (the fit and the Space check) runs once the panel is up
+        -- and focused, so it is not in the timing line.
         local function show(after)
             local function finish()
                 done()
@@ -688,20 +850,34 @@ function kittyPanelShow(label)
                 end)
             end)
         end
+        local function after() kittyPanelAfterShow(label, outScreen, st, opts.again) end
 
         -- The payload `kitten @ resize-os-window --action=os-panel
         -- --incremental output-name=X' sends (captured on a fake socket).
         -- A failed move is only printed; the fit still runs (see
         -- kittyPanelShowSlow).
-        local output, outScreen = kittyPanelWantedOutput()
-        local function fit() kittyPanelFit(label, outScreen) end
-        if not output then return show() end
-        kittyPanelCheckOutput(label, st, output)
-        kittyRC(path, "resize-os-window", { match = kittyMatchID(st.win), action = "os-panel", incremental = true,
-                                            os_panel = { "output-name=" .. output } }, function(ok, err)
-            mark("move")
-            if not ok then print("kittyPanel: " .. label .. ": move to " .. output .. ": " .. tostring(err)) end
-            show(fit)
+        local function moveAndShow()
+            if not output then return show(after) end
+            kittyPanelCheckOutput(label, st, output)
+            kittyRC(path, "resize-os-window", { match = kittyMatchID(st.win), action = "os-panel", incremental = true,
+                                                os_panel = { "output-name=" .. output } }, function(ok, err)
+                mark("move")
+                if not ok then print("kittyPanel: " .. label .. ": move to " .. output .. ": " .. tostring(err)) end
+                show(after)
+            end)
+        end
+
+        -- Hide first (see "Which Space the panel joins"). A failed hide is
+        -- only printed.
+        kittyRC(path, "resize-os-window", { match = kittyMatchID(st.win), action = "hide" }, function(okh, errh)
+            mark("hide")
+            if not okh then print("kittyPanel: " .. label .. ": hide before the show: " .. tostring(errh)) end
+            if not (opts.focusSpace and outScreen) then return moveAndShow() end
+            kittyPanelFocusSpaceOn(outScreen, function(okf, note)
+                mark("space")
+                if not okf then print("kittyPanel: " .. label .. ": " .. tostring(note) .. "; showing anyway") end
+                moveAndShow()
+            end)
         end)
     end, mark)
 end
@@ -738,22 +914,16 @@ end
 -- the panel behind kitty's back: kitty keeps the panel's output-name and
 -- lays it out on that screen again at its next re-layout (a display, DPI or
 -- font-size change), so the panel would jump back. So the panel is moved
--- here, through kitty, and then fitted like after a show. done(ok, note)
--- as Screens.moveHandlers expects.
+-- here, through kitty. It is shown again rather than moved while shown: a
+-- shown panel moved onto a screen that shows a fullscreen Space lands
+-- behind that Space (see "Which Space the panel joins"), so the show
+-- focuses the new screen's Space first. done(ok, note) as
+-- Screens.moveHandlers expects.
 function kittyPanelMoveTo(screen, label, done)
-    local path = kittySocketPath()
-    local name = screen and screen:name()
-    if not (path and name) then return done(false, ": kitty has no remote-control socket") end
-    kittyPanelFastState(path, function(st, why)
-        if not st then return done(false, ": " .. tostring(why)) end
-        kittyPanelCheckOutput(label, st, name)
-        kittyRC(path, "resize-os-window", { match = kittyMatchID(st.win), action = "os-panel", incremental = true,
-                                            os_panel = { "output-name=" .. name } }, function(ok, err)
-            if not ok then return done(false, ": " .. tostring(err)) end
-            kittyPanelFit(label, screen)
-            done(true)
-        end)
-    end)
+    if not (kittySocketPath() and screen and screen:name()) then
+        return done(false, ": kitty has no remote-control socket")
+    end
+    kittyPanelShow(label, { screen = screen, focusSpace = true, done = done })
 end
 
 if Screens and Screens.moveHandlers then

@@ -18,6 +18,9 @@ The fields, all optional:
   strays    the tabs of every other OS window, in order
   output    the output-name kitty has stored for the panel (its screen)
   monitors  the screen names kitty knows, which output-name must match
+  platformId  the panel's macOS window number (CGWindowID), the id
+            hs.spaces takes; the same value `ls' reports as
+            platform_window_id
 
 output and monitors come from undocumented fast_data_types getters (the
 ones kitty's own resize-os-window uses), so a kitty that drops them only
@@ -33,6 +36,15 @@ PANEL_CLASS = "kitty-panel"
 
 def main(args):
     pass
+
+
+def _platform_id(os_window_id):
+    try:
+        from kitty.utils import platform_window_id
+        wid = platform_window_id(os_window_id)
+        return {"platformId": wid} if wid else {}
+    except Exception:
+        return {}
 
 
 def _screen_fields(os_window_id):
@@ -63,6 +75,7 @@ def handle_result(args, answer, target_window_id, boss):
             if active_window is not None:
                 state["active"] = active_window.id
             state.update(_screen_fields(tm.os_window_id))
+            state.update(_platform_id(tm.os_window_id))
         elif tm.wm_class != PANEL_CLASS:
             state["strays"].extend(tab.id for tab in tabs)
     return json.dumps(state)

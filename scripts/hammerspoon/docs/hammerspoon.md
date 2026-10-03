@@ -1864,10 +1864,64 @@ not, the fallback is to recreate the panel on the new screen, which means
 moving its tabs out and back in.
 
 hyper+shift+; on the shown panel moves it to the next screen through kitty
-(`kittyPanelMoveTo`, registered in `Screens.moveHandlers`), then fits it the
-same way. An Accessibility move would leave kitty's stored name behind, and
-kitty would put the panel back on that screen at its next re-layout (a
-display, DPI or font-size change).
+(`kittyPanelMoveTo`, registered in `Screens.moveHandlers`). An Accessibility
+move would leave kitty's stored name behind, and kitty would put the panel
+back on that screen at its next re-layout (a display, DPI or font-size
+change). The move hides the panel and shows it again on the new screen,
+rather than moving it while shown, for the reason in the next paragraphs.
+
+**Which Space the panel joins.** kitty marks the panel `CanJoinAllSpaces`
+but not `FullScreenAuxiliary`, so on its own it never appears over a
+fullscreen app. Its show (`_glfwPlatformShowWindow` in kitty's
+`cocoa_window.m`, the same in 0.48.2 and in master on 2026-10-03) works
+around that by adding the panel to one Space, `CGSGetActiveSpace()`, the
+focused Space, which Hammerspoon reads as `hs.spaces.focusedSpace()`. With two
+displays that goes wrong in three ways, all measured 2026-10-03:
+
+- The panel comes up only when the focused Space is on the display the panel
+  is on. Shown onto the laptop while the monitor's Space was focused, it
+  stayed off screen.
+- A shown panel moved to the other display with `output-name` lands in that
+  display's desktop Space, behind the fullscreen Space the display is
+  showing. The fit's Accessibility move across displays does the same. A
+  forced `hs.spaces.moveWindowToSpace` into the fullscreen Space answered true
+  and changed nothing.
+- kitty counts a panel in a Space that is not showing as visible, and answers
+  ok to a `show` of a visible panel without doing anything
+  (`toggle_os_window_visibility` in kitty's `glfw.c`). Once lost this way,
+  every hyper+z "showed" the panel and nothing appeared, until the user went
+  to that Space through Mission Control. That was the "pressed hyper+z a lot
+  of times, kitty was not shown" report.
+
+kitty has no option, remote-control argument or kitten that sets the
+collection behaviour or picks the Space. So `kittyPanelShow` now:
+
+- hides the panel before every show. kitty skips that for a hidden panel, and
+  it makes a lost one showable again;
+- for a move, focuses the front window on the new screen first and waits
+  until `hs.spaces.focusedSpace()` is that screen's Space
+  (`kittyPanelFocusSpaceOn`). On a screen with no window this cannot work;
+  the show goes ahead and the check below takes over;
+- after the show, checks that the panel is on screen (`kittyPanelAfterShow`),
+  and checks again after a moment when the fit had to move it, since kitty
+  sometimes lays the panel out at the new screen's size but on the old
+  screen. A panel that is not on screen is put right by
+  `kittyPanelRepairSpace`: into a desktop Space with
+  `hs.spaces.moveWindowToSpace`, which works between desktop Spaces, and for
+  a fullscreen Space by showing it once more with that Space focused. The
+  console line says where the panel was and what was done.
+
+The state kitten reports the panel's window number (`platformId`, the
+`platform_window_id` that `ls` reports), which `hs.spaces` takes. While a show
+is running, `kittyFocusWatcher` leaves the panel alone
+(`kittyPanelShowingUntil`): the hide before the show makes kitty hand focus
+back to the app it came from, and focusing a Space activates that Space's
+app, and either one's watcher-hide could reach kitty after the show.
+
+A repaired show costs a few hundred ms more than a plain one. The clean fix
+is in kitty: use the current Space of the panel's own display rather than
+`CGSGetActiveSpace()`, and add `FullScreenAuxiliary`. That is worth an
+upstream issue, with the reproduction above.
 
 In window mode `kittyWindowToggle` shows kitty's normal window maximized on
 the screen the mouse is on, and hides it on the next press. From a fullscreen

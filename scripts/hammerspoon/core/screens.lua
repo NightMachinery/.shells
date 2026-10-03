@@ -622,13 +622,14 @@ end
 --- The frontmost normal window on `screen' as an hs.window, or nil. It used
 --- to be hs.window.orderedWindows() filtered by screen, which asks every app
 --- over Accessibility (see "Windows on a screen" above).
-local function frontWindowOn(screen)
+function Screens.frontWindowOn(screen)
     for _, e in ipairs(Screens.normalWindowsOn(screen)) do
         local w = Screens.entryWindow(e)
         if w then return w end
     end
     return nil
 end
+local frontWindowOn = Screens.frontWindowOn
 
 --- Focus the frontmost window on the next screen. With no window there,
 --- nothing can take focus -- macOS focuses windows, not screens -- so the

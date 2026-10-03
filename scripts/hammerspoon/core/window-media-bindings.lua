@@ -504,6 +504,10 @@ kittyFocusWatcher = hs.application.watcher.new(function(_, event, app)
     local bid = app:bundleID()
     if bid == kittyBundleID or recentAppsTransient[bid] then return end
 
+    -- kittyPanelShow (core/kitty-panel.lua) activates other apps on
+    -- purpose while it shows the panel; see kittyPanelShowingUntil there.
+    if hs.timer.secondsSinceEpoch() < (kittyPanelShowingUntil or 0) then return end
+
     if kitty_hotkey_mode == "panel" then
         local kitty = getApp(kittyBundleID)
         if kitty and kittyPanelWindow(kitty) then

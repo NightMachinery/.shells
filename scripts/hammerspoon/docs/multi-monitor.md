@@ -375,6 +375,13 @@ Found in real use on 2026-10-03, after the round above:
   itself to the other display, as a Mission Control drag does, which needs
   the Dock's private calls (yabai's scripting addition, with SIP partly
   off). Untested; no newer macOS adds a public way either.
+- **hyper+z showed nothing, however often it was pressed.** The kitty panel
+  had been lost in a Space that was not showing; see "Which Space the panel
+  joins" in `docs/hammerspoon.md` for the mechanism, measured with scripted
+  moves between the laptop and Brave fullscreen on the monitor, and the
+  fix. With the fix, a show from fullscreen Brave, a move onto the
+  fullscreen monitor and a recovery from a lost panel all ended with the
+  panel on screen; two of them needed the repair show.
 - **hyper+x, hyper+l, hyper+l returned to kitty, not Emacs.** Emacs was
   filed under the laptop correctly, but it was fullscreen in its own Space,
   so once Telegram's Space showed, its window was not in the on-screen list,
