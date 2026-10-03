@@ -241,9 +241,12 @@ laptop panel plus one monitor):
 - **kitty accepts the move.** kitty 0.48.2 answered ok to the incremental
   `os-panel` call on a live panel, in about 20 ms.
 
-Bugs found in real use the same night, each pinned down with a runtime probe
-(installed through `hs -c`, logging to a file, gone at the next reload), as
-"When a hyper chord does nothing" in `docs/hammerspoon.md` recommends:
+Bugs found in real use the same night. The first two were pinned down with a
+runtime probe (installed through `hs -c`, logging to a file, gone at the next
+reload), as "When a hyper chord does nothing" in `docs/hammerspoon.md`
+recommends; the other three were diagnosed from the symptom, and Maccy's from
+its upstream source. Each is addressed, but no fix has had a real press with
+both screens on yet (see "Still unmeasured" below):
 
 - **The kitty panel came out at the wrong size.** Shown from the laptop after
   living on the monitor, it came out 1920×1056, the monitor's size, at the
@@ -255,17 +258,19 @@ Bugs found in real use the same night, each pinned down with a runtime probe
   frame when it is still off.
 - **hyper+shift+; did nothing.** The key arrived with shift and hyper
   entered, and the handler ran without error, but the window was Thunderbird
-  in native fullscreen, whose `AXPosition` is not settable. Fixed by leaving
-  fullscreen, moving, and going fullscreen again, and by checking every move.
-- **hyper+/ focused Brave's Picture-in-Picture window.** Fixed by the
+  in native fullscreen, whose `AXPosition` is not settable. Addressed by
+  leaving fullscreen, moving, and going fullscreen again (where it was, when
+  the move fails), and by checking every move.
+- **hyper+/ focused Brave's Picture-in-Picture window.** Addressed by the
   floating-window check above. Its first version skipped any window that
   called itself standard, and a Chromium PiP window does (AeroSpace's
   recorded Accessibility dumps, upstream), so it would never have fired; it
   now goes by the layer alone.
-- **A hide returned to an app on the other monitor.** Fixed by the per-screen
-  lists.
-- **Maccy's popup opened on the laptop.** Fixed by keeping `popupScreen` on
-  the active screen. The first write made macOS 14 ask whether Hammerspoon may
+- **A hide returned to an app on the other monitor.** Addressed by the
+  per-screen lists.
+- **Maccy's popup opened on the laptop.** Addressed by keeping `popupScreen`
+  on the screen named by `maccy_popup_screens`. Why Maccy's own choice was the
+  laptop is unmeasured. The first write made macOS 14 ask whether Hammerspoon may
   access data from other apps, because Maccy's settings live in its sandbox
   container.
 
@@ -274,9 +279,10 @@ Still unmeasured:
 - **Do the second-round fixes work on two screens?** They loaded cleanly and
   their read-only parts were exercised from the console (the window list in
   20 ms, a return target chosen in 12 ms), but the laptop panel was off by
-  then, so the panel fit, a fullscreen move, a per-screen return across two
-  screens, Maccy following focus, and a Picture-in-Picture redirect all wait
-  for a real press with both screens on.
+  then, so the panel fit, hyper+shift+; (a windowed move, a fullscreen move,
+  and a fullscreen move that fails), a per-screen return across two screens
+  (also out of fullscreen), Maccy following focus, and a Picture-in-Picture
+  redirect all wait for a real press with both screens on.
 - **Does the panel take a fitted frame, and keep it?** It is a borderless
   window, which may refuse a new size over Accessibility; the console line
   says `could not fit` then. If kitty fights the fit, the panel has to be
@@ -284,15 +290,20 @@ Still unmeasured:
 - **Brave's Picture-in-Picture window, measured here.** The layer-3 figure
   comes from Chromium's source and AeroSpace's dumps. No PiP video has been
   open since the probes were armed.
+- **What layer an app-modal dialog reads at.** The floating-window check
+  leaves alone windows at or above the modal-panel level, and any window whose
+  subrole says it is a dialog, on the strength of AppKit's constants. No real
+  dialog's layer has been read right after its app was activated.
 - **The new blackout restore.** The blackout that ended before the reload was
   restored by the old code, so the UUID rows, the last-good fallback and the
   floors (see `docs/external-display-brightness.md`) have been tested only
   against fake m1ddc and brightness binaries. One F1/F2 cycle would settle
   it.
-- **The keys that move focus and the pointer**: hyper+; and hyper+shift+;,
-  `cursorHide` and avy on the monitor, an app-mode overlay following focus.
-  They were left for a real press, because driving them from a script takes
-  over the screen.
+- **The keys that move focus and the pointer**: hyper+;, `cursorHide` and
+  avy on the monitor, and an app-mode overlay following focus have not been
+  pressed for real, because driving them from a script takes over the screen.
+  hyper+shift+; has had one real press, the fullscreen bug above, and only
+  before the fix (see the first bullet).
 
 Known gaps:
 
