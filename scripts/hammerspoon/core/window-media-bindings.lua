@@ -594,6 +594,10 @@ function kittyHandler()
     -- For the "since press" figure that core/kitty-panel.lua prints.
     kittyPressAt = hs.timer.absoluteTime()
 
+    -- A floating-window check still waiting for its timer would pull focus
+    -- back to the app being left (core/app-hotkeys.lua).
+    if appFloatingSupersede then appFloatingSupersede() end
+
     -- getApp (core/app-hotkeys.lua) is a bundle-ID lookup that never
     -- enumerates every running process.
     local app = getApp(kittyBundleID)

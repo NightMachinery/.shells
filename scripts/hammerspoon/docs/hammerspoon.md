@@ -141,22 +141,35 @@ one: Brave's Picture-in-Picture video floats above its browser windows, so
 hyper+/ handed the keyboard to the video. So every activation this config
 causes, an app hotkey's, a hide's return, or kitty's return, is marked
 (`appCheckFloatingOnActivation`), and when it arrives `appFocusOffFloating`
-checks the app's focused window. When that sits above CoreGraphics layer 0,
-the app's front normal window is focused instead, and the console says so. A
-dialog or a sheet stays, since those are layer 0, and so does the kitty panel,
-which floats on purpose (`appFloatingIntended`). A mark lapses after
-`kFloatingPendingSeconds`, so clicking the video yourself later is left alone.
+checks the app's focused window. When that floats above CoreGraphics layer 0,
+the app's front normal window is focused instead, and the console says whether
+it took focus. The kitty panel floats on purpose and stays
+(`appFloatingIntended`). A mark lapses after `kFloatingPendingSeconds`, so
+clicking the video yourself later is left alone. A check does nothing once its
+app is no longer frontmost, or once a newer switch has started
+(`appFloatingSupersede`, which hyper+z and hyper+; call too): it would pull
+you back to an app you had just left.
 
-The layer is the only test. A Chromium PiP window calls itself an
+The layer is the test. A Chromium PiP window calls itself an
 `AXStandardWindow`, with the usual window buttons, so `isStandard()` passes it.
 That is from AeroSpace's recorded Accessibility dumps of the Brave, Chrome and
 Edge PiP windows, upstream; the first version of this check relied on
 `isStandard()` and would never have fired. Its layer is 3 (Chromium maps its
 floating z-order to `kCGFloatingWindowLevel`), and its title is localized and
-spelled differently by each browser. The check costs one Accessibility query
-to that app alone, after the activation rather than in the key handler, plus
-`Screens.layerOf`, which is free for a window seen before and one window-list
-read for a new one.
+spelled differently by each browser.
+
+Dialogs are left alone. A sheet should be, since Accessibility treats it as a
+child of its window and reports the parent as focused (unmeasured here). An
+app-modal dialog sits at the modal-panel level while its app runs the modal
+session (`NSModalPanelWindowLevel` in AppKit; what layer a real one reads at
+here is unmeasured), so windows at or above `kModalPanelLayer` are left alone,
+and so is any window whose subrole says it is a dialog, at any layer.
+
+The check costs one Accessibility query to that app alone (its focused
+window), after the activation rather than in the key handler. A window that
+any earlier window-list read saw at layer 0 ends it there
+(`Screens.layerOf`, which keeps every layer it has seen); anything else costs
+one window-list read, and only a floating window pays for more.
 
 Maccy places its hyper+v popup itself. Set to "screen center", Maccy 0.31
 reads its `popupScreen` setting at every popup: 0, the default, means

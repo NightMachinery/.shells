@@ -200,9 +200,10 @@ bounds and layer, in 19 to 40 ms, asking no app anything. Accessibility's
   to back.
 - `Screens.entryWindow(e)`: the `hs.window` for an entry, asking only its
   owning app.
-- `Screens.layerOf(id)`: a window's layer, from the last read when that saw
-  the window, else from a fresh one. The floating-window check uses it, so
-  asking about the same windows again costs nothing.
+- `Screens.layerOf(id)`: a window's layer at the latest read that listed it,
+  kept across reads so a hidden app's windows are still known; it reads
+  nothing itself. The floating-window check trusts only its 0 and reads the
+  list afresh otherwise.
 - `Screens.moveHandlers`: windows that hyper+shift+; must move some other
   way than Accessibility. The kitty panel registers one.
 - `Screens.onTargetChange(spec, fn)`: calls `fn(screen)` whenever a spec

@@ -369,55 +369,109 @@ end
 -- floating one: a browser's Picture-in-Picture video floats above its
 -- normal windows, so hyper+/ handed the keyboard to the video rather than
 -- to Brave. So once an app this file (or kitty's toggle) brought forward
--- has activated, if its focused window sits above CoreGraphics layer 0,
+-- has activated, if its focused window floats above CoreGraphics layer 0,
 -- the app's front normal window (Screens.isNormalEntry) is focused instead.
--- A dialog or a sheet stays: those are layer 0.
 --
--- The layer is the only test. Chromium's PiP window reports itself as an
+-- The layer is the test. Chromium's PiP window reports itself as an
 -- AXStandardWindow with the usual buttons (AeroSpace's recorded
 -- Accessibility dumps of Brave, Chrome and Edge PiP windows, upstream), so
 -- isStandard() passes it; its layer is 3 (Chromium's kFloatingWindow maps to
 -- kCGFloatingWindowLevel). Its title is localized and differs between
 -- browsers, so that is no test either.
 --
--- It costs one Accessibility query to that app alone (its focused window),
--- after the activation and not in the key handler, plus Screens.layerOf,
--- which is free for a window seen before and one CoreGraphics read for a
--- new one. Only a floating window pays for the rest.
+-- Dialogs are left alone. A sheet should be: Accessibility treats it as a
+-- child of its window, so the focused window is the parent (unmeasured
+-- here). An app-modal dialog sits at the modal-panel level while its app
+-- runs the modal session (NSModalPanelWindowLevel in AppKit; what layer a
+-- real one reads at here is unmeasured), so windows at or above
+-- kModalPanelLayer are left alone, and so is any window whose subrole says
+-- it is a dialog, whatever its layer.
+--
+-- A check runs only while its app is still frontmost and no newer switch
+-- has started (appFloatingSupersede): otherwise it would pull focus back to
+-- an app the user has just left. Then it costs one Accessibility query to
+-- that app alone (its focused window), after the activation and not in the
+-- key handler. A window any earlier window-list read saw at layer 0 ends it
+-- there; anything else costs one CoreGraphics read, and only a floating
+-- window pays for more.
 --
 -- The delay lets the app settle its key window after macOS reports it
 -- active.
 local kFloatingCheckDelay = 0.05
 
+-- kCGModalPanelWindowLevel, from the SDK's CGWindowLevel.h.
+local kModalPanelLayer = 8
+
 -- Apps whose floating window is the point: the kitty panel floats on purpose
 -- (core/kitty-panel.lua), and a hide can return to it.
 appFloatingIntended = appFloatingIntended or { ["net.kovidgoyal.kitty"] = true }
 
-function appFocusOffFloating(app, label)
+-- Bumped by every switch this config starts; a check scheduled under an
+-- older value is dropped.
+local appFloatingGen = 0
+
+--- Drops every floating check still waiting: call it when a key moves focus
+--- some other way (hyper+z, hyper+;).
+function appFloatingSupersede()
+    appFloatingGen = appFloatingGen + 1
+end
+
+-- Focuses `w' and says whether `app''s focused window is now `w', trying
+-- once more after raising it: the floating window may keep the keyboard.
+local function appFocusWindowChecked(app, w)
+    local id = w:id()
+    local function took()
+        local ok, fw = pcall(function() return app:focusedWindow() end)
+        return ok and fw ~= nil and fw:id() == id
+    end
+    pcall(function() w:focus() end)
+    if took() then return true end
+    pcall(function() w:raise() w:focus() end)
+    return took()
+end
+
+--- `gen' is appFloatingGen when the check was scheduled; nil (from the
+--- console) checks regardless.
+function appFocusOffFloating(app, label, gen)
+    if gen ~= nil and gen ~= appFloatingGen then return end
+    -- NSRunningApplication's own flag: asks the app nothing.
+    local okf, front = pcall(function() return app:isFrontmost() end)
+    if not (okf and front) then return end
     local okb, bid = pcall(function() return app:bundleID() end)
     if not okb or appFloatingIntended[bid] then return end
     local ok, fw = pcall(function() return app:focusedWindow() end)
     if not ok or not fw then return end
     local id = fw:id()
-    local layer = Screens.layerOf(id)
-    if not layer or layer == 0 then return end
+    if Screens.layerOf(id) == 0 then return end
+
+    local stack = Screens.windowStack()
+    local layer = nil
+    for _, e in ipairs(stack) do
+        if e.id == id then layer = e.layer break end
+    end
+    if not layer or layer == 0 or layer >= kModalPanelLayer then return end
+    local oks, sub = pcall(function() return fw:subrole() end)
+    if oks and (sub == "AXDialog" or sub == "AXSystemDialog") then return end
 
     local pid = app:pid()
-    for _, e in ipairs(Screens.windowStack()) do
+    for _, e in ipairs(stack) do
         if e.pid == pid and e.id ~= id and Screens.isNormalEntry(e) then
             local w = Screens.entryWindow(e)
-            if w and pcall(function() w:focus() end) then
-                print(string.format("%s: %s: focus was on a floating window (layer %d); moved to its front normal window",
-                                    label, app:name() or "?", layer))
+            if w then
+                local took = appFocusWindowChecked(app, w)
+                print(string.format("%s: %s: focus was on a floating window (layer %d); %s", label,
+                                    app:name() or "?", layer,
+                                    took and "moved to its front normal window"
+                                         or "its front normal window would not take focus"))
                 return
             end
         end
     end
 end
 
--- pid -> { label, by }: activations this file caused, to check once they
--- arrive. An entry lapses after a second, so a later activation of the same
--- app (the user clicking its PiP video, say) is left alone.
+-- pid -> { label, gen, by }: activations this file caused, to check once
+-- they arrive. An entry lapses after a second, so a later activation of the
+-- same app (the user clicking its PiP video, say) is left alone.
 local appFloatingPending = {}
 local kFloatingPendingSeconds = 1
 
@@ -426,14 +480,16 @@ local kFloatingPendingSeconds = 1
 --- straight away: kitty's own hide hands focus to the app that was in front
 --- before kitty, which is often the one its toggle then returns to.
 function appCheckFloatingOnActivation(app, label)
+    appFloatingSupersede()
+    local gen = appFloatingGen
     local ok, pid = pcall(function() return app:pid() end)
     if not ok or not pid then return end
     local okf, front = pcall(function() return hs.application.frontmostApplication():pid() end)
     if okf and front == pid then
-        hsAfter(kFloatingCheckDelay, function() appFocusOffFloating(app, label) end)
+        hsAfter(kFloatingCheckDelay, function() appFocusOffFloating(app, label, gen) end)
         return
     end
-    appFloatingPending[pid] = { label = label, by = hs.timer.secondsSinceEpoch() + kFloatingPendingSeconds }
+    appFloatingPending[pid] = { label = label, gen = gen, by = hs.timer.secondsSinceEpoch() + kFloatingPendingSeconds }
 end
 
 -- Global, so it is not collected.
@@ -444,7 +500,7 @@ appFloatingWatcher = hs.application.watcher.new(function(_, event, app)
     if not p then return end
     appFloatingPending[pid] = nil
     if hs.timer.secondsSinceEpoch() > p.by then return end
-    hsAfter(kFloatingCheckDelay, function() appFocusOffFloating(app, p.label) end)
+    hsAfter(kFloatingCheckDelay, function() appFocusOffFloating(app, p.label, p.gen) end)
 end)
 appFloatingWatcher:start()
 

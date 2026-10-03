@@ -348,21 +348,25 @@ end
 --- app whose window is picked is then asked for its hs.window.
 ---
 --- Layer 0 holds normal windows. Floating ones sit above it: the kitty panel
---- at 4, Brave's 24 px strip at 26, the menu bar and Hammerspoon's canvases
---- higher still.
+--- at 4 and Brave's 24 px strip at 26 (both measured), and Hammerspoon's
+--- alert canvases at the overlay level (alert/render.lua), higher still.
 
 --- Smallest normal window worth focusing; layer-0 helper strips are smaller.
 local kMinNormalW, kMinNormalH = 100, 60
 
---- Window id -> layer, from the latest windowStack(): every read replaces it
---- whole, so closed windows drop out.
-local layerOfId = {}
+--- Window id -> layer, merged from every windowStack() read, so a window
+--- seen once is still known after it leaves the screen: an app hidden by its
+--- hotkey's second press is off screen at any read before its next
+--- activation. Reset to the latest read once it holds more than
+--- kLayerCacheMax ids, so closed windows do not pile up.
+local layerOfId, layerOfCount = {}, 0
+local kLayerCacheMax = 1000
 
 --- Every on-screen window, front to back:
 ---   { id, pid, layer, alpha, frame = hs.geometry rect }
 --- CG bounds are global, top-left origin, the same space as hs.screen:frame().
 function Screens.windowStack()
-    local out, layers = {}, {}
+    local out = {}
     local ok, list = pcall(hs.window.list, false)
     if not ok or type(list) ~= "table" then return out end
     for _, w in ipairs(list) do
@@ -376,25 +380,29 @@ function Screens.windowStack()
                 frame = hs.geometry.rect(b.X, b.Y, b.Width, b.Height),
             }
             out[#out + 1] = e
-            layers[e.id] = e.layer
+            if layerOfId[e.id] == nil then layerOfCount = layerOfCount + 1 end
+            layerOfId[e.id] = e.layer
         end
     end
-    layerOfId = layers
+    if layerOfCount > kLayerCacheMax then
+        layerOfId, layerOfCount = {}, 0
+        for _, e in ipairs(out) do
+            layerOfId[e.id] = e.layer
+            layerOfCount = layerOfCount + 1
+        end
+    end
     return out
 end
 
---- The CoreGraphics layer of window `id', or nil when it is not on screen.
---- Answered from the last windowStack() when that saw the window, so asking
---- about the same windows again costs nothing; a window it has not seen
---- costs one fresh read. A window that changes layer while staying open
---- keeps its old answer until the next read, which also replaces every
---- other answer, so an id is only ever answered for the window that held it
---- at the last read.
+--- The CoreGraphics layer window `id' had at the latest windowStack() that
+--- listed it, or nil when none has. It reads nothing, so it is a hint: a
+--- window that changes layer keeps its old answer until it is listed again,
+--- and whether the window server ever reuses an id within a session is
+--- unmeasured. The floating-window check (core/app-hotkeys.lua) therefore
+--- trusts only a 0, where a wrong answer just skips the check, and reads the
+--- list afresh for anything else.
 function Screens.layerOf(id)
     if id == nil then return nil end
-    local l = layerOfId[id]
-    if l ~= nil then return l end
-    Screens.windowStack()
     return layerOfId[id]
 end
 
@@ -494,6 +502,10 @@ function Screens.focusNext(delta)
     end
     local r = Screens.record(to)
     local name = r and r.name or "?"
+
+    -- A floating-window check still waiting for its timer would pull focus
+    -- back to the app being left (core/app-hotkeys.lua).
+    if appFloatingSupersede then appFloatingSupersede() end
 
     local w = frontWindowOn(to)
     if w then
