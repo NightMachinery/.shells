@@ -136,6 +136,28 @@ the working screen, since kitty activating shows nothing by itself. With no
 target the app is simply hidden. The kitty toggle's own hide returns the same
 way.
 
+Bringing an app forward raises its front window, and that can be a floating
+one: Brave's Picture-in-Picture video floats above its browser windows, so
+hyper+/ handed the keyboard to the video. So every activation this config
+causes, an app hotkey's, a hide's return, or kitty's return, is marked
+(`appCheckFloatingOnActivation`), and when it arrives `appFocusOffFloating`
+checks the app's focused window. When that sits above CoreGraphics layer 0,
+the app's front normal window is focused instead, and the console says so. A
+dialog or a sheet stays, since those are layer 0, and so does the kitty panel,
+which floats on purpose (`appFloatingIntended`). A mark lapses after
+`kFloatingPendingSeconds`, so clicking the video yourself later is left alone.
+
+The layer is the only test. A Chromium PiP window calls itself an
+`AXStandardWindow`, with the usual window buttons, so `isStandard()` passes it.
+That is from AeroSpace's recorded Accessibility dumps of the Brave, Chrome and
+Edge PiP windows, upstream; the first version of this check relied on
+`isStandard()` and would never have fired. Its layer is 3 (Chromium maps its
+floating z-order to `kCGFloatingWindowLevel`), and its title is localized and
+spelled differently by each browser. The check costs one Accessibility query
+to that app alone, after the activation rather than in the key handler, plus
+`Screens.layerOf`, which is free for a window seen before and one window-list
+read for a new one.
+
 
 ### Moving between screens: hyper+; and hyper+shift+;
 

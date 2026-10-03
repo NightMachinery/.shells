@@ -363,6 +363,91 @@ local function appSwitchHyperNote(t0)
     return note .. ")"
 end
 
+--- ** Not landing on a floating window
+--
+-- Bringing an app forward raises its front window, and that can be a
+-- floating one: a browser's Picture-in-Picture video floats above its
+-- normal windows, so hyper+/ handed the keyboard to the video rather than
+-- to Brave. So once an app this file (or kitty's toggle) brought forward
+-- has activated, if its focused window sits above CoreGraphics layer 0,
+-- the app's front normal window (Screens.isNormalEntry) is focused instead.
+-- A dialog or a sheet stays: those are layer 0.
+--
+-- The layer is the only test. Chromium's PiP window reports itself as an
+-- AXStandardWindow with the usual buttons (AeroSpace's recorded
+-- Accessibility dumps of Brave, Chrome and Edge PiP windows, upstream), so
+-- isStandard() passes it; its layer is 3 (Chromium's kFloatingWindow maps to
+-- kCGFloatingWindowLevel). Its title is localized and differs between
+-- browsers, so that is no test either.
+--
+-- It costs one Accessibility query to that app alone (its focused window),
+-- after the activation and not in the key handler, plus Screens.layerOf,
+-- which is free for a window seen before and one CoreGraphics read for a
+-- new one. Only a floating window pays for the rest.
+--
+-- The delay lets the app settle its key window after macOS reports it
+-- active.
+local kFloatingCheckDelay = 0.05
+
+-- Apps whose floating window is the point: the kitty panel floats on purpose
+-- (core/kitty-panel.lua), and a hide can return to it.
+appFloatingIntended = appFloatingIntended or { ["net.kovidgoyal.kitty"] = true }
+
+function appFocusOffFloating(app, label)
+    local okb, bid = pcall(function() return app:bundleID() end)
+    if not okb or appFloatingIntended[bid] then return end
+    local ok, fw = pcall(function() return app:focusedWindow() end)
+    if not ok or not fw then return end
+    local id = fw:id()
+    local layer = Screens.layerOf(id)
+    if not layer or layer == 0 then return end
+
+    local pid = app:pid()
+    for _, e in ipairs(Screens.windowStack()) do
+        if e.pid == pid and e.id ~= id and Screens.isNormalEntry(e) then
+            local w = Screens.entryWindow(e)
+            if w and pcall(function() w:focus() end) then
+                print(string.format("%s: %s: focus was on a floating window (layer %d); moved to its front normal window",
+                                    label, app:name() or "?", layer))
+                return
+            end
+        end
+    end
+end
+
+-- pid -> { label, by }: activations this file caused, to check once they
+-- arrive. An entry lapses after a second, so a later activation of the same
+-- app (the user clicking its PiP video, say) is left alone.
+local appFloatingPending = {}
+local kFloatingPendingSeconds = 1
+
+--- Check `app' with appFocusOffFloating once it has activated. An app that
+--- is in front already gets no activation to wait for, so it is checked
+--- straight away: kitty's own hide hands focus to the app that was in front
+--- before kitty, which is often the one its toggle then returns to.
+function appCheckFloatingOnActivation(app, label)
+    local ok, pid = pcall(function() return app:pid() end)
+    if not ok or not pid then return end
+    local okf, front = pcall(function() return hs.application.frontmostApplication():pid() end)
+    if okf and front == pid then
+        hsAfter(kFloatingCheckDelay, function() appFocusOffFloating(app, label) end)
+        return
+    end
+    appFloatingPending[pid] = { label = label, by = hs.timer.secondsSinceEpoch() + kFloatingPendingSeconds }
+end
+
+-- Global, so it is not collected.
+appFloatingWatcher = hs.application.watcher.new(function(_, event, app)
+    if event ~= hs.application.watcher.activated or not app then return end
+    local pid = app:pid()
+    local p = appFloatingPending[pid]
+    if not p then return end
+    appFloatingPending[pid] = nil
+    if hs.timer.secondsSinceEpoch() > p.by then return end
+    hsAfter(kFloatingCheckDelay, function() appFocusOffFloating(app, p.label) end)
+end)
+appFloatingWatcher:start()
+
 appSwitchWatcher = hs.application.watcher.new(function(_, event, app)
     local p = appSwitchPending
     if not p or event ~= hs.application.watcher.activated or not app or app:pid() ~= p.pid then return end
@@ -394,10 +479,12 @@ end
 
 --- Carries out a screenReturnTarget: the kitty panel through kittyPanelShow,
 --- a window on the screen through hs.window:focus (one app's Accessibility),
---- and otherwise the app through appBringForward, which asks it nothing.
+--- and otherwise the app through appBringForward, which asks it nothing and
+--- so may raise a floating window: that is checked once the app activates.
 function screenReturnFocus(t, label)
     if t.kittyPanel then return kittyPanelShow(label) end
     if t.window and pcall(function() t.window:focus() end) then return end
+    appCheckFloatingOnActivation(t.app, label)
     appBringForward(t.app)
 end
 
@@ -475,6 +562,7 @@ local function toggleFocusApp(app)
         return
     end
 
+    appCheckFloatingOnActivation(app, "appHotkey")
     appBringForward(app)
     local pending = { pid = app:pid(), name = app:name() or "?", t0 = t0,
                       handlerMs = appSwitchMs(t0, hs.timer.absoluteTime()), hyperNote = hyperNote }
