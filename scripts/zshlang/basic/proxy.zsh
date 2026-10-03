@@ -176,12 +176,10 @@ function v2-on {
         ecerr "$0: Xray config must be an existing readable file"
         return 2
     fi
-    #: A fresh shell loads [agfi:loop]. Pass the config and delay as argv,
-    #: so paths with spaces or quotes stay data. [agfi:v2-off] and
-    #: [agfi:tmux-job-stop] terminate the whole session's process tree.
-    tmuxnew v2ray-genrouter "${commands[zsh]}" -c \
-        'lo_s="$1" loop command "$2" -config "$3"' \
-        v2-on "${delay}" "${commands[xray]}" "${config}"
+    #: [agfi:tmuxnewsh2] loads [agfi:loop] in a fresh shell and quotes argv.
+    #: [agfi:v2-off] and [agfi:tmux-job-stop] stop the whole process tree.
+    tmuxnewsh2 v2ray-genrouter "lo_s=${delay}" \
+        loop command "${commands[xray]}" -config "${config}"
 }
 
 function v2-off {
