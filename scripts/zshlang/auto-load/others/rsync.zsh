@@ -1,9 +1,62 @@
 ##
 #: `-r` is `--recursive` like `cp -r`
 
-aliasfn rsp-dl rsync --protect-args --human-readable --xattrs --times --info=progress2 --append -r --fuzzy # append assumes files only grow and do not otherwise change
+function h-rsync-optional-xattrs {
+    : "rsync with extended attributes by default, retrying once when unsupported"
+    setopt localoptions nomultios
+    ensure-cmd rsync tee mktemp cat @RET
 
-aliasfn rsp-safe rsync --verbose --checksum --protect-args --human-readable --xattrs --times --info=progress2 --partial-dir=.rsync-partial -r --fuzzy # partial-dir supports resume
+    local args=("$@") err_file stdin_file='' errors
+    local -i ret=0 i
+    err_file="$(command mktemp)" @TRET
+    {
+        #: Filter lists can be consumed before the remote rejects --xattrs.
+        #: Give both attempts a file to reopen, including [agfi:rsp-notes].
+        for (( i=1; i <= ${#args}; i++ )) ; do
+            [[ "${args[i]}" == -- ]] && break
+            if [[ "${args[i]}" == --(include|exclude|files)-from=- ]] ||
+                { [[ "${args[i]}" == --(include|exclude|files)-from ]] && [[ "${args[i+1]}" == - ]] ; } ; then
+                if [[ -z "${stdin_file}" ]] ; then
+                    stdin_file="$(command mktemp)" @TRET
+                    command cat > "${stdin_file}" @RET
+                fi
+                if [[ "${args[i]}" == *=* ]] ; then
+                    args[i]="${args[i]%=*}=${stdin_file}"
+                else
+                    (( i++ ))
+                    args[i]="${stdin_file}"
+                fi
+            fi
+        done
+
+        #: Pipe stderr through tee, keeping stdout (and its tty) untouched.
+        #: A foreground pipeline waits for tee, unlike process substitution.
+        {
+            if command rsync --xattrs "${args[@]}" 2>&1 1>&3 3>&- |
+                command tee -- "${err_file}" >&2 ; then
+                ret=0
+            else
+                ret=${pipestatus[1]}
+            fi
+        } 3>&1
+
+        errors=$'\n'"$(<"${err_file}")"$'\n'
+        if (( ret != 0 )) &&
+            [[ "${errors}" == *$'\nrsync: extended attributes are not supported on this '(server|client)$'\n'* ]] ; then
+            ecerr 'rsp: extended attributes unavailable; retrying without them.'
+            ret=0
+            command rsync --no-xattrs "${args[@]}" || ret=$?
+        fi
+    } always {
+        command rm -f -- "${err_file}"
+        [[ -z "${stdin_file}" ]] || command rm -f -- "${stdin_file}"
+    }
+    return "${ret}"
+}
+
+aliasfn rsp-dl h-rsync-optional-xattrs --protect-args --human-readable --times --info=progress2 --append -r --fuzzy # append assumes files only grow and do not otherwise change
+
+aliasfn rsp-safe h-rsync-optional-xattrs --verbose --checksum --protect-args --human-readable --times --info=progress2 --partial-dir=.rsync-partial -r --fuzzy # partial-dir supports resume
 #: @toFuture/1406 add =--mkpath=, currently most installed rsync are too old to support it
 
 aliasfn rsp-safe2 enh_dest_shift_e=(rsp-safe) enh-dest-shift
