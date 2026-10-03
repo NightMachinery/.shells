@@ -146,3 +146,10 @@ assistant reply were exercised with fabricated text. Parser parity fixtures and
 transcript rendering parity use fabricated data. Observed end-to-end dabbrev
 latency was roughly 150 to 320 ms including remote control and terminal redraw;
 the tens-of-milliseconds aim remains unmet. Non-ASCII cycling remains disabled.
+
+Git path queries have a 15 ms keypress deadline. A detached helper also caches
+tracked paths, validated against the Git index's modification time and size.
+A cold command that exceeds the deadline does not lose the corpus permanently;
+the next press uses the warmed cache. A live scratch completion used tracked
+paths from an existing repository; tests also cover inherited vcsh environment
+removal and invalidation after an index change.

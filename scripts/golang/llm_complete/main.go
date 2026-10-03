@@ -64,7 +64,10 @@ func run(args []string, in io.Reader, out, errs io.Writer) int {
 			return 1
 		}
 		if len(args) > 1 && args[1] == "warm" {
-			loadContext(r)
+			if cachedContext(r).Transcript == "" {
+				loadContext(r)
+			}
+			warmGit(r.Cwd)
 			return 0
 		}
 		configureVim(&r)

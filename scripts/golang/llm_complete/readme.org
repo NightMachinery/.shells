@@ -117,3 +117,10 @@ Full-width editor rows also join when the CLI wraps them without a terminal
 continuation flag. A hard newline exactly at that margin is ambiguous, as are
 intentional trailing spaces versus terminal padding. Internal blank hard lines
 remain in the prompt. The opt-in live harness accepts =--multiline-only=.
+
+Git path queries have a 15 ms keypress deadline. A detached helper also caches
+tracked paths, validated against the Git index's modification time and size.
+A cold command that exceeds the deadline does not lose the corpus permanently;
+the next press uses the warmed cache. A live scratch completion used tracked
+paths from an existing repository; tests also cover inherited vcsh environment
+removal and invalidation after an index change.
