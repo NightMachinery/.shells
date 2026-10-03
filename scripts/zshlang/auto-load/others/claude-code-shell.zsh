@@ -31,6 +31,12 @@ if [[ -n "${CLAUDECODE:-}" ]] ; then
             local caller="${funcfiletrace[1]%:*}"
             if [[ "${caller}" == */shell-snapshots/snapshot-*.sh ]] &&
                 h-claude-code-snapshot-lean-p "${caller}" 2>/dev/null ; then
+                local name body
+                for name in "${(@k)galiases}" ; do
+                    body="${galiases[$name]}"
+                    builtin unalias -- "${name}"
+                    builtin alias -- "${name}=${body}"
+                done
                 return 0
             fi
         fi

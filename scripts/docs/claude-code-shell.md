@@ -50,7 +50,9 @@ fresh for every command. Two pieces:
   syntax highlighting, fzf-tab) never reached commands usefully anyway.
 - **`unalias` (`zshlang/auto-load/others/claude-code-shell.zsh`).** The
   snapshot's opening `unalias -a` runs after `.zshenv` and would delete every
-  alias it just defined. Under `CLAUDECODE`, `unalias` is a function that skips
+  alias it just defined. Under `CLAUDECODE`, `unalias` is a function that converts
+  current global aliases to ordinary aliases without evaluating their bodies,
+  retains the current ordinary aliases, and skips
   exactly that call, and only for a *lean* snapshot: one whose `# Functions`
   header is followed directly by the next header. Every other call, including
   the snapshot's own `unalias grep` before Claude Code's `grep` wrapper, goes
@@ -66,17 +68,28 @@ snapshot whose layout the check does not recognise gets the real `unalias -a`,
 so the worst case is a command with no aliases, never a half-read snapshot.
 
 So in a session started after the change, a command has the functions,
-options and aliases `.zshenv` loads from disk. Global aliases (`@RET`, `...`)
-stay global, so an unquoted `...` word in a command is expanded too. Claude
-Code's own wrappers are unchanged: their bodies parse the same with our
-aliases live (compared against a bare `zsh -f`).
+options and current alias bodies `.zshenv` loads from disk. Previously global
+names are ordinary aliases: they can expand in command position, while bare
+argument tokens such as `...`, `MAGIC`, `@f` and `@RET` stay literal. This keeps
+`cat payload.txt MAGIC` from piping file contents into `eval` and keeps search
+patterns and filenames intact. Quoted arguments remain literal too.
 
-Checked with a headless session (`claude -p --permission-mode default
---allowedTools Bash`, having it `source` a probe script, since a child `zsh`
-loads `.zshenv` fresh and proves nothing): its snapshot had no function bodies
-and no aliases, and its shell had 878 aliases, the 12 global ones, and the
-resolver from disk. `zshlang/tests/claude-code-shell.zsh` covers the wrapper
-against a lean and an old snapshot.
+Helper functions compiled earlier with a global `@RET` retain that return
+behavior because their bodies already expanded it. Direct global macros in
+command arguments no longer expand automatically. When explicitly requested,
+a tool command can source the current macro definitions or invoke a helper
+that intentionally restores them, for example by sourcing
+`"$NIGHTDIR/zshlang/basic/magicmacros.zsh"` in that same shell. Ordinary shells
+and calls outside the snapshot interception keep their existing behavior.
+Claude Code's own wrappers are unchanged.
+
+The original headless check sourced a probe in the actual Bash-tool shell,
+since a child `zsh` loads `.zshenv` fresh and proves nothing about its parent.
+That check predates the ordinary-alias correction. The correction is checked
+with isolated shell fixtures in `zshlang/tests/claude-code-shell.zsh`: current
+literal alias bodies, file reading, bare and quoted arguments, compiled return
+macros, inherited agent markers and both lean and old snapshots. No new
+headless measurement is claimed here.
 
 ## What no setting changes
 
