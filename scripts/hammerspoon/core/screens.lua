@@ -699,7 +699,8 @@ local function moveTo(w, to)
 end
 
 --- Apps, by name, whose windows refuse to leave their screen over
---- Accessibility but can be dragged there by their middle. mpv takes a new
+--- Accessibility. They are moved into the other screen's Space instead
+--- (spaceMoveTo), and failing that dragged there by their middle. mpv takes a new
 --- size but keeps every position write inside its current screen (x stops
 --- at the screen's right edge less the window's width; y is taken), in 0.37
 --- and 0.41 alike, and it goes back to its old windowed frame on the old
@@ -709,7 +710,20 @@ end
 --- only brought it forward (measured 2026-10-03 on a test mpv). Only apps
 --- named here are dragged, since a press in the middle of most windows does
 --- something (a browser's would land on the page, or pull a tab out).
-Screens.dragMoveApps = Screens.dragMoveApps or { mpv = true }
+Screens.screenBoundApps = Screens.screenBoundApps or { mpv = true }
+
+--- Where moveToScreen would put frame `f' (on a screen of frame
+--- `fromFrame') on a screen of frame `toFrame': the same place relative to
+--- the screen, scaled, and kept inside it.
+local function scaledFrame(f, fromFrame, toFrame)
+    local sx, sy = toFrame.w / fromFrame.w, toFrame.h / fromFrame.h
+    local w, h = math.min(f.w * sx, toFrame.w), math.min(f.h * sy, toFrame.h)
+    local x = toFrame.x + (f.x - fromFrame.x) * sx
+    local y = toFrame.y + (f.y - fromFrame.y) * sy
+    x = math.max(toFrame.x, math.min(x, toFrame.x + toFrame.w - w))
+    y = math.max(toFrame.y, math.min(y, toFrame.y + toFrame.h - h))
+    return hs.geometry.rect(x, y, w, h)
+end
 
 -- The drag's steps: how many, and the seconds between them and around the
 -- press, so the app sees an ordinary drag rather than a jump.
@@ -719,11 +733,11 @@ local kDragSteps, kDragStepSeconds, kDragHoldSeconds = 30, 0.02, 0.15
 --- put it on `to', by the middle of its frame, then lets moveToScreen scale
 --- it there; done(onScreen). Not when something else covers that point
 --- (the kitty panel would get the drag), or the app is not in
---- dragMoveApps.
+--- screenBoundApps.
 local function dragTo(w, to, done)
     local app = w:application()
     local name = app and app:name()
-    if not (name and Screens.dragMoveApps[name]) then return done(false) end
+    if not (name and Screens.screenBoundApps[name]) then return done(false) end
     local f, fromFrame, toFrame = w:frame(), w:screen():frame(), to:frame()
     local grab = { x = math.floor(f.x + f.w / 2), y = math.floor(f.y + f.h / 2) }
     for _, e in ipairs(Screens.windowStack()) do
@@ -736,12 +750,8 @@ local function dragTo(w, to, done)
             break
         end
     end
-    -- Where moveToScreen would put the top left, kept inside `to'.
-    local x = toFrame.x + (f.x - fromFrame.x) / fromFrame.w * toFrame.w
-    local y = toFrame.y + (f.y - fromFrame.y) / fromFrame.h * toFrame.h
-    x = math.max(toFrame.x, math.min(x, toFrame.x + toFrame.w - math.min(f.w, toFrame.w)))
-    y = math.max(toFrame.y, math.min(y, toFrame.y + toFrame.h - math.min(f.h, toFrame.h)))
-    local drop = { x = math.floor(grab.x + x - f.x), y = math.floor(grab.y + y - f.y) }
+    local t = scaledFrame(f, fromFrame, toFrame)
+    local drop = { x = math.floor(grab.x + t.x - f.x), y = math.floor(grab.y + t.y - f.y) }
 
     local T, P = hs.eventtap.event.types, hs.eventtap.event.properties
     pcall(function() app:activate() end)
@@ -781,7 +791,7 @@ local function dragTo(w, to, done)
     end)
 end
 
--- How long a dragMoveApps window's frame must hold still after it leaves
+-- How long a screenBoundApps window's frame must hold still after it leaves
 -- fullscreen, and the most to wait for that. mpv animates out of
 -- fullscreen toward a frame it remembers, rests there for about 0.2 s,
 -- then jumps to its windowed frame (mpv 0.41, 2026-10-03: on the monitor
@@ -804,24 +814,109 @@ local function whenStill(w, done)
     poll()
 end
 
---- moveTo, and when the window refused to leave its screen, dragTo;
---- done(moved, how), `how' naming the drag when one did it. With
---- `settle', a window of a dragMoveApps app is first left to hold still
+--- The desktop Space of `screen': the one it shows when that is a desktop
+--- Space, else the first it has.
+local function userSpaceOn(screen)
+    local ok, shown = pcall(hs.spaces.activeSpaceOnScreen, screen)
+    if ok and shown and hs.spaces.spaceType(shown) == "user" then return shown, true end
+    for _, sid in ipairs(hs.spaces.spacesForScreen(screen) or {}) do
+        if hs.spaces.spaceType(sid) == "user" then return sid, false end
+    end
+    return nil
+end
+
+-- How long to wait for a window moved into another Space to be listed on
+-- its new screen, how often to look, and how long before moving it again.
+local kSpaceMoveWait, kSpaceMovePoll, kSpaceMoveRetry = 2, 0.05, 0.25
+
+--- Moves `w' into `to''s desktop Space with hs.spaces.moveWindowToSpace,
+--- a window-server move the app is not asked about, showing that Space
+--- first when a fullscreen one covers it, then gives it the frame
+--- moveToScreen would have; done(onScreen). mpv lets this through where it
+--- keeps every Accessibility move inside its screen; going fullscreen afterwards happens on
+--- the new screen, and so does coming back out (mpv 0.37 with the user's
+--- config, 2026-10-03). A move into a fullscreen Space does nothing (see
+--- core/kitty-panel.lua), hence the desktop Space.
+local function spaceMoveTo(w, to, done)
+    local sid, shown = userSpaceOn(to)
+    if not sid then return done(false) end
+    local want = scaledFrame(w:frame(), w:screen():frame(), to:frame())
+    local id = w:id()
+    local function inSpace()
+        local ok, sids = pcall(hs.spaces.windowSpaces, id)
+        if not (ok and sids) then return false end
+        for _, x in ipairs(sids) do if x == sid then return true end end
+        return false
+    end
+    -- The call answers true and yet, now and then right after a window
+    -- has left fullscreen, does nothing (two of four moves to the laptop,
+    -- 2026-10-03; a bare move, made two seconds after, joined the Space in
+    -- 52 ms). So it is made again until the window is listed in the Space.
+    local function move()
+        local okm, moved = pcall(hs.spaces.moveWindowToSpace, id, sid)
+        return okm and moved
+    end
+    if not move() then return done(false) end
+    if not shown then pcall(hs.spaces.gotoSpace, sid) end
+    local deadline = hs.timer.secondsSinceEpoch() + kSpaceMoveWait
+    local nextTry = hs.timer.secondsSinceEpoch() + kSpaceMoveRetry
+    local tries = 1
+    local function poll()
+        local now = hs.timer.secondsSinceEpoch()
+        if not inSpace() and now >= nextTry then
+            move()
+            tries = tries + 1
+            nextTry = now + kSpaceMoveRetry
+        end
+        if inSpace() and onScreen(w, to) then
+            if tries > 1 then
+                print(string.format("Screens.moveWindowNext: the Space move took %d tries", tries))
+            end
+            -- It keeps its frame as the window server left it, which can
+            -- hang off the edge (x -76 on the laptop, seen); on its new
+            -- screen it takes a frame there.
+            pcall(function() w:setFrame(want, 0) end)
+            return done(true)
+        end
+        if now > deadline then
+            print(string.format("Screens.moveWindowNext: the Space move did not take after %d tries", tries))
+            return done(false)
+        end
+        hsAfter(kSpaceMovePoll, poll)
+    end
+    poll()
+end
+
+--- moveTo; when the window refused to leave its screen and its app is in
+--- screenBoundApps, spaceMoveTo, then dragTo; done(moved, how), `how'
+--- naming the way that did it. With
+--- `settle', a window of a screenBoundApps app is first left to hold still
 --- (see kDragSettleStill), for the move out of fullscreen.
 local function moveOrDrag(w, to, done, settle)
     local app = w:application()
     local name = app and app:name()
-    if settle and name and Screens.dragMoveApps[name] then
+    if settle and name and Screens.screenBoundApps[name] then
         return whenStill(w, function() moveOrDrag(w, to, done) end)
     end
     local okm, moved = pcall(moveTo, w, to)
     if okm and moved then return done(true) end
-    local okd, err = pcall(dragTo, w, to, function(landed)
-        done(landed, landed and ", dragged" or nil)
+    if not (name and Screens.screenBoundApps[name]) then return done(false) end
+    local function drag()
+        local okd, err = pcall(dragTo, w, to, function(landed)
+            done(landed, landed and ", dragged" or nil)
+        end)
+        if not okd then
+            print("Screens.moveWindowNext: drag: " .. tostring(err))
+            done(false)
+        end
+    end
+    local oks, err = pcall(spaceMoveTo, w, to, function(landed)
+        if landed then return done(true, ", moved to its Space") end
+        drag()
     end)
-    if not okd then
-        print("Screens.moveWindowNext: drag: " .. tostring(err))
-        done(false)
+    if not oks then
+        print("Screens.moveWindowNext: Space move: " .. tostring(err))
+        drag()
     end
 end
 

@@ -329,48 +329,55 @@ lays the panel out there again at its next re-layout, so an Accessibility move
 would be undone. hyper+shift+; on the panel therefore moves it through kitty
 (`kittyPanelMoveTo`, see "kitty: hyper+z").
 
-#### mpv: moved by a drag
+#### mpv: moved into the other screen's Space
 
 mpv would not move at all, windowed or fullscreen (five presses on
 2026-10-03, each "could not move mpv (it is fullscreen again where it
 was)"). Measured on a separate test mpv playing a generated test pattern,
-in 0.37 and 0.41 alike:
+in 0.37 (the one in use, with its config) and 0.41:
 
 - mpv takes a new size over Accessibility but keeps every position inside
   the screen it is on: `x` stops at the screen's right edge less the
   window's width, whatever is asked, and `y` is taken as given.
   `moveToScreen`, `setTopLeft` and a raw `AXPosition` write all stop there.
+  (From the laptop to the monitor the plain move did work in later tests,
+  so the clamp is not the whole story; the fallback below covers both.)
 - Leaving fullscreen, mpv goes back to the windowed frame it last set
-  itself, on whichever screen that was, so the fullscreen dance always met
-  a window that could not leave the old screen.
-- A drag moves it, as one by hand does: mpv drags its window by the video.
-  A synthetic drag works once mpv is the active app; while it is not, the
-  press only brings it forward.
+  itself, on whichever screen that was, so the fullscreen dance met a window
+  that could not leave the old screen.
+- `hs.spaces.moveWindowToSpace` into the other screen's desktop Space moves
+  it: a window-server move that mpv is not asked about. mpv then goes
+  fullscreen on the new screen, and comes back out onto it.
 
 So when the Accessibility move leaves a window on its old screen, and its app
-is named in `Screens.dragMoveApps` (only mpv so far), `dragTo` drags it by
-the middle of its frame to where the move would have put it, then lets
-`moveToScreen` scale it there. It refuses when another window covers that
-point. The drag runs on timers, so other hotkeys stay live during it. Only
-listed apps are dragged, because a press in the middle of most windows does
-something: in a browser it would land on the page, or pull a tab out. The
-console line says ", dragged" when a drag did the move.
+is named in `Screens.screenBoundApps` (only mpv so far), `spaceMoveTo` moves
+it into the target screen's desktop Space (showing that Space first if a
+fullscreen one covers it), waits until the window server lists it there, and
+gives it the frame `moveToScreen` would have: left alone, it kept a frame
+hanging off the screen's edge. The move call sometimes answers true and does
+nothing right after the window has left fullscreen, so it is made again until
+the window is listed in the Space; the console says when that took more than
+one try. Out of fullscreen, a listed app is first left to hold still for
+`kDragSettleStill`, since mpv animates toward the frame it remembers, rests
+there, and may then jump to another; the first version took that rest for
+the end.
 
-Leaving fullscreen, mpv animates toward the frame it remembers, rests there
-for about 0.2 s, and may then jump to another. `whenSettled`'s one still poll
-took that rest for the end, and the move counted as done because the window
-happened to be on the target screen. For listed apps the move out of
-fullscreen therefore first waits until the frame has held still for
-`kDragSettleStill`.
+If the Space move does not take either, the window is dragged by the middle of
+its frame (`dragTo`), as one by hand would: mpv drags its window by the video,
+and a synthetic drag works once mpv is the active app. The drag refuses when
+another window covers the grab point, runs on timers, and prints its grab and
+drop points and where the window ended up. It is the last resort because it
+proved unreliable: it moved the 0.41 test mpv, but not the user's 0.37 mpv.
+Only listed apps get either fallback, because neither has been tried on
+anything else, and a press in the middle of most windows does something.
 
-Measured with the test mpv, through `Screens.moveWindowNext` itself:
-windowed moves both ways, by drag, in about 1.2 s; a fullscreen move from the
-laptop to the monitor, fullscreen again there, in about 2.2 s. The first
-fullscreen attempt after a string of test moves failed: mpv left fullscreen
-onto a stale frame on the monitor, and went fullscreen again on the laptop.
-The second, straight after, worked. mpv's own record of its frame does not
-follow moves it did not make, which is the likely cause; a second press is
-the remedy until that is pinned down.
+Measured through `Screens.moveWindowNext` with the 0.37 test mpv and the
+user's config (2026-10-03, after the retry went in): six fullscreen moves,
+alternating direction, all landed fullscreen on the target screen with no
+drag, in about 2.3 to 2.7 s; one needed the second Space move. Windowed
+moves: monitor to laptop by Space move in about 0.2 s, laptop to monitor by
+the plain move. Before the retry, two of four moves to the laptop fell
+through to the drag.
 
 Dead ends, for the record:
 
@@ -385,9 +392,9 @@ Dead ends, for the record:
 - The first synthetic drags "failed" only because the kitty panel was
   covering mpv and took them; hence the covering check.
 
-The installed mpv was 0.37 (`/opt/homebrew/bin/mpv` is a hand-made link to
+The installed mpv is 0.37 (`/opt/homebrew/bin/mpv` is a hand-made link to
 `/Applications/mpv.app`); Homebrew's 0.41 is installed but not linked. The
-drag works with both.
+Space move needs neither changed.
 
 ## The ipc print recursion fix
 
