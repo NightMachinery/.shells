@@ -369,3 +369,22 @@ Read the delegate skill when delegating work or requesting an independent agent
 opinion. If you are an expensive model (e.g., Fable or Astra), start by reading
 it to route substantial mechanical work to the preferred weaker workers. It
 also covers peer and stronger modes, account boundaries, and backend selection.
+
+Inside Paseo (`PASEO_AGENT_ID` is set), pick the Paseo skill by job:
+
+- `paseo`: create, prompt, update and archive agents; workspaces, worktrees,
+  workspace scripts, schedules and heartbeats.
+- `paseo-help`: questions about Paseo itself, such as setup, providers,
+  connectivity, logs and troubleshooting.
+- `paseo-advisor`: one agent's read-only second opinion on the current task.
+- `paseo-committee`: two high-reasoning agents for root-cause analysis and a
+  plan when you are stuck or the plan is hard.
+- `paseo-handoff`: transfer the task, with a full briefing and its ownership,
+  to another agent.
+- `paseo-model-update`: report which model and effort you are running, or
+  switch them. A switch stays within your current CLI, such as Claude to
+  another Claude model or effort; moving to another one, such as Claude to
+  GPT, means handing the task to a new agent.
+- `paseo-plugin`: build or troubleshoot Paseo plugins.
+
+`delegate` still decides worker model, account and backend.
