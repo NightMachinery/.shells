@@ -19,6 +19,7 @@ const (
 	curlConnect             = 7
 	curlWeirdServerReply    = 8
 	curlPartial             = 18
+	curlWrite               = 23
 	curlTimeout             = 28
 	curlSSLConnect          = 35
 	curlTooManyRedirects    = 47

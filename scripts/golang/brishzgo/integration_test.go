@@ -20,17 +20,27 @@ import (
 //
 //	BRISHZGO_IT_ENDPOINT  the garden, such as http://127.0.0.1:7288
 //	BRISHZGO_IT_KIND      what the garden is:
-//	                      binary      the raw API, in binary mode (the default)
-//	                      legacy      the raw API, with BRISH_BINARY=0
-//	                      old-binary  no raw API (such as 42ddc9d), binary mode
-//	                      old-legacy  the same with BRISH_BINARY=0
-//	                      pre-binary  no binary mode at all (such as cc390bc)
+//	                      binary           the raw and streaming APIs, in
+//	                                       binary mode
+//	                      legacy           the same with BRISH_BINARY=0
+//	                      nostream-binary  the raw API but no streaming API
+//	                                       (such as 0fd2752), binary mode
+//	                      nostream-legacy  the same with BRISH_BINARY=0
+//	                      old-binary       no raw API (such as 42ddc9d),
+//	                                       binary mode
+//	                      old-legacy       the same with BRISH_BINARY=0
+//	                      pre-binary       no binary mode at all (such as
+//	                                       cc390bc)
 //	BRISHZGO_IT_HOME      a HOME whose .keys/brishgarden is the garden's key
+//	BRISHZGO_IT_STREAM    y to run every test with brishz_stream=y, which
+//	                      falls back on a garden without the streaming API
 //
-// Every command is inert: cat, print, true, typeset, od, shasum.
+// Every command is inert: cat, print, true, typeset, od, shasum, sleep, and
+// appending to a file in a test's temp dir.
 
 type itEnv struct {
 	endpoint, kind, home, bin string
+	stream                    bool
 }
 
 var (
@@ -49,7 +59,8 @@ func TestMain(m *testing.M) {
 
 func integration(t *testing.T) itEnv {
 	t.Helper()
-	e := itEnv{os.Getenv("BRISHZGO_IT_ENDPOINT"), os.Getenv("BRISHZGO_IT_KIND"), os.Getenv("BRISHZGO_IT_HOME"), ""}
+	e := itEnv{os.Getenv("BRISHZGO_IT_ENDPOINT"), os.Getenv("BRISHZGO_IT_KIND"), os.Getenv("BRISHZGO_IT_HOME"), "",
+		boolP(os.Getenv("BRISHZGO_IT_STREAM"))}
 	if e.endpoint == "" || e.kind == "" || e.home == "" {
 		t.Skip("BRISHZGO_IT_ENDPOINT, BRISHZGO_IT_KIND and BRISHZGO_IT_HOME are not all set")
 	}
@@ -79,20 +90,27 @@ func builtBinary(t *testing.T) string {
 	return builtBin
 }
 
-func (e itEnv) binaryP() bool { return e.kind == "binary" || e.kind == "old-binary" }
+func (e itEnv) binaryP() bool { return strings.HasSuffix(e.kind, "binary") && e.kind != "pre-binary" }
 
 // oldP: a garden without the raw API.
 func (e itEnv) oldP() bool { return strings.HasPrefix(e.kind, "old") || e.kind == "pre-binary" }
 
+// streamP: a garden with the streaming API.
+func (e itEnv) streamP() bool { return e.kind == "binary" || e.kind == "legacy" }
+
 // legacyModeP: a garden whose workers use brish's legacy transport.
 func (e itEnv) legacyModeP() bool {
-	return e.kind == "legacy" || e.kind == "old-legacy" || e.kind == "pre-binary"
+	return strings.HasSuffix(e.kind, "legacy") || e.kind == "pre-binary"
 }
 
-// exactP: whether output bytes come back exact. Only the raw API of a
-// binary-mode garden carries them all; elsewhere, either the garden's
-// text or the JSON API's text reply escapes invalid UTF-8.
-func (e itEnv) exactP(data []byte) bool { return e.kind == "binary" || utf8.Valid(data) }
+// exactAPIP: the client runs commands through an API that carries any
+// bytes: the raw or streaming API of a binary-mode garden.
+func (e itEnv) exactAPIP() bool { return e.kind == "binary" || e.kind == "nostream-binary" }
+
+// exactP: whether output bytes come back exact. Only the raw and streaming
+// APIs of a binary-mode garden carry them all; elsewhere, either the
+// garden's text or the JSON API's text reply escapes invalid UTF-8.
+func (e itEnv) exactP(data []byte) bool { return e.exactAPIP() || utf8.Valid(data) }
 
 type itResult struct {
 	code        int
@@ -106,6 +124,9 @@ func (e itEnv) run(t *testing.T, stdin []byte, args []string, kv ...string) itRe
 	cmd := exec.Command(e.bin, args...)
 	cmd.Dir = t.TempDir()
 	cmd.Env = []string{"PATH=" + os.Getenv("PATH"), "HOME=" + e.home, "PWD=" + cmd.Dir, "bshEndpoint=" + e.endpoint}
+	if e.stream {
+		cmd.Env = append(cmd.Env, "brishz_stream=y")
+	}
 	for i := 0; i+1 < len(kv); i += 2 {
 		cmd.Env = append(cmd.Env, kv[i]+"="+kv[i+1])
 	}
@@ -211,7 +232,7 @@ func TestITCommandBytes(t *testing.T) {
 	e := integration(t)
 	got := e.run(t, nil, []string{"print", "-rn", "--", "\xff\xfe"})
 	want := "\xff\xfe"
-	if e.kind != "binary" {
+	if !e.exactAPIP() {
 		want = "\ufffd\ufffd"
 	}
 	if got.code != 0 || string(got.out) != want {
@@ -225,7 +246,7 @@ func TestITMiB(t *testing.T) {
 	rand.Read(data)
 	var kv []string
 	switch e.kind {
-	case "binary":
+	case "binary", "nostream-binary":
 	case "old-binary":
 		kv = []string{"brishz_binary", "y"}
 	default:
@@ -322,6 +343,10 @@ func TestITFallback(t *testing.T) {
 	if fellBack != e.oldP() {
 		t.Errorf("fell back: %v, kind %s", fellBack, e.kind)
 	}
+	toRaw := strings.Contains(string(got.errOut), "no streaming API (HTTP 404); falling back to the raw API")
+	if toRaw != (e.stream && !e.streamP()) {
+		t.Errorf("fell back from the streaming API: %v, kind %s, stream %v", toRaw, e.kind, e.stream)
+	}
 	if e.oldP() && !strings.Contains(string(got.errOut), "stdin: 2 bytes, 0 of them already read") {
 		t.Errorf("the raw request consumed stdin before the 404:\n%s", got.errOut)
 	}
@@ -340,8 +365,8 @@ func TestITFallback(t *testing.T) {
 	// A legacy-mode garden refuses a NUL, with X-Brish-Refused: 1 and
 	// nothing run; the JSON API then runs it, with all of stdin.
 	got = e.run(t, []byte("a\x00b"), []string{"od", "-An", "-c"}, "brishz_in", "MAGIC_READ_STDIN", "brishz_debug", "y")
-	refused := strings.Contains(string(got.errOut), "the raw request was refused")
-	if refused != (e.kind == "legacy") || got.code != 0 || !strings.Contains(string(got.out), `a  \0   b`) {
+	refused := strings.Contains(string(got.errOut), "request was refused")
+	if refused != (e.kind == "legacy" || e.kind == "nostream-legacy") || got.code != 0 || !strings.Contains(string(got.out), `a  \0   b`) {
 		t.Errorf("NUL stdin: refused %v, exit %d, out %q\n%s", refused, got.code, got.out, got.errOut)
 	}
 	if refused && !strings.Contains(string(got.errOut), "stdin: 3 bytes, 3 of them already read") {

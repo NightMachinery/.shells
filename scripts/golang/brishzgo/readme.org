@@ -1,8 +1,8 @@
 #+TITLE: brishzgo
 
 A Go drop-in for =zshlang/wrappers/brishz/brishzq.zsh=: it runs one zsh command
-in a BrishGarden over the garden's raw API, with the same argv, environment
-variables and exit statuses. What it does, how it differs from =brishzq.zsh=
+in a BrishGarden over the garden's raw API (or with =brishz_stream=y= its
+streaming API), with the same argv, environment variables and exit statuses. What it does, how it differs from =brishzq.zsh=
 and how fast it is are in [[NIGHTDIR:docs/brishzgo.md][docs/brishzgo.md]]; this readme is about building and
 testing it.
 
@@ -18,12 +18,15 @@ That puts =brishzgo= in =~/go/bin=. It is registered in =setup/setup_go=.
 * Layout
 - =main.go=: the environment, the configuration and the dispatch.
 - =command.go= and =quote.go=: the command text, as =brishzq.zsh= builds it.
-- =stdin.go=: streamed stdin, with the copy a fallback needs.
+- =stdin.go=: streamed stdin, with the copy a fallback needs; each request
+  reads it through its own reader, which replays what earlier ones read.
 - =tempfile.go=: the temp file that carries stdin to the JSON API, removed on
   exit and on signals.
 - =signals.go=: SIGHUP, SIGINT and SIGTERM run the cleanups, then end us with
   the same signal; one ignored at start stays ignored.
 - =transport.go=: the raw API, the JSON fallback and the replies.
+- =stream.go=: the streaming API: the frame reader, its fallbacks, and the
+  connection closed on a signal.
 - =jqtext.go=: invalid UTF-8 replaced the way jq replaces it, for the JSON
   API's strings.
 - =proxy.go=: the proxy from the environment, as curl picks it.
@@ -45,6 +48,15 @@ zsh tests are skipped where zsh is missing. Run them with =-race= as well:
 =TestFallbackKeepsStdinOrder= has the HTTP transport's goroutine and ours
 reading stdin at the same time.
 
+The streaming API's frame reader is checked against a reference decoder
+with the reply split at every offset, one byte at a time and cut short at
+every offset, and by a fuzz target that splits any body anywhere:
+#+begin_src zsh :eval never
+go test -run '^$' -fuzz FuzzReadFrames -fuzztime 60s
+#+end_src
+=TestStreamSignals= builds the binary and checks that SIGINT, SIGTERM and
+SIGHUP mid stream close the connection and kill it with the same signal.
+
 Two more are skipped unless pointed at something:
 
 - the parity test runs =brishzq.zsh= and =brishzgo= on a corpus of argv lists
@@ -56,11 +68,16 @@ Two more are skipped unless pointed at something:
   #+end_src
 - the integration tests run the built binary against a real garden, never
   the one Hammerspoon uses: a smoke garden on its own port, with a throwaway
-  key. =BRISHZGO_IT_KIND= says what the garden is: =binary= (the raw API,
-  binary mode), =legacy= (the raw API, =BRISH_BINARY=0=), =old-binary= /
-  =old-legacy= (no raw API, such as =42ddc9d=), or =pre-binary= (no binary
-  mode at all, such as =cc390bc=). Every kind runs every command; the
-  output is compared exactly where that garden can carry it:
+  key. =BRISHZGO_IT_KIND= says what the garden is: =binary= (the raw and
+  streaming APIs, binary mode), =legacy= (the same with =BRISH_BINARY=0=),
+  =nostream-binary= / =nostream-legacy= (the raw API but no streaming API,
+  such as =0fd2752=), =old-binary= / =old-legacy= (no raw API, such as
+  =42ddc9d=), or =pre-binary= (no binary mode at all, such as =cc390bc=).
+  Every kind runs every command; the output is compared exactly where that
+  garden can carry it. =BRISHZGO_IT_STREAM=y= runs them all with
+  =brishz_stream=y= as well; the =TestITStream= ones set it themselves, and
+  one of them sends a real Ctrl-C (SIGINT) mid command and checks that the
+  command never finishes:
   #+begin_src zsh :eval never
   BRISHZGO_IT_ENDPOINT=http://127.0.0.1:<port> BRISHZGO_IT_KIND=binary \
       BRISHZGO_IT_HOME=<a HOME whose .keys/brishgarden is that garden's key> \

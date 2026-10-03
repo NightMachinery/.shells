@@ -6,7 +6,10 @@ stderr and exit status. It takes the same argv and environment variables as
 the same statuses, but it is one static binary: no `zsh -f` start, no `jq`,
 no `base64`, no `curl`. It talks to the garden's **raw API**
 (`POST /zsh/raw/`, bytes as bytes), and falls back to the JSON API for a
-garden that has none or refuses the request.
+garden that has none or refuses the request. With `brishz_stream=y` it uses
+the **streaming API** (`POST /zsh/stream/`) instead, which passes the output
+on while the command runs, and stops the command when `brishzgo` is
+interrupted.
 
 The source is `golang/brishzgo/`; its `readme.org` covers building and the
 tests. Nothing calls it yet: Hammerspoon, `lua/pipe.lua`, the agent hooks and
@@ -72,6 +75,9 @@ only joined by spaces, with no wrapping and no forwarding.
   parsed like the scripts' `bool`. See "Transport" for what it changes here.
 - `brishz_raw`: the raw API, on unless set to a false value (`n`, `no`, `0`).
   `brishz_raw=n` uses the JSON API directly.
+- `brishz_stream`: the streaming API, off unless set to a true value (parsed
+  like the scripts' `bool`). See "The streaming API" below. `brishzq.zsh`
+  has no such mode, and ignores the variable.
 - `brishz_debug`: a true value prints the request and reply headers and the
   command text to stderr. The values of the API key file's headers and of
   `Authorization` are printed as `<redacted>`.
@@ -122,11 +128,11 @@ that a Ctrl-C meant for the script leaves it running. Invalid UTF-8 in
 `cmd` or `stdin` becomes U+FFFD, the way jq replaces it.
 
 The fallback has all of stdin even though the raw request streamed it. A
-refusing garden read all of it, and the raw request keeps a copy of what it
-sent, in memory up to 16 MiB and in a temp file beyond that, which the
-fallback resends first, in order; the transport stops reading our stdin the
-moment the fallback starts. A garden without the raw API normally gets none
-of it: the raw request carries `Expect: 100-continue` and
+refusing garden read all of it, and each request keeps a copy of what it
+sent, in memory up to 16 MiB and in a temp file beyond that, which the next
+request resends first, in order; the transport stops reading our stdin for
+a request the moment the next one starts. A garden without the raw API
+normally gets none of it: the raw request carries `Expect: 100-continue` and
 `Connection: close`, so that garden answers 404 before any of stdin is
 sent, and Go's transport sends none afterwards (to keep a connection open,
 it would send the body after the 404). Some can still go out first, to a
@@ -140,7 +146,54 @@ extra round trip, 1 to 2 ms at p50 on this machine (see "Measurements").
 runs nothing, and the raw API cannot keep the promise: a garden in legacy
 mode serves it, runs the command through text, and only says so in its
 `X-Brish-Binary: 0` reply header. Without the opt-in, the raw API of a
-binary-mode garden (the default) is exact anyway.
+binary-mode garden (the default) is exact anyway. The streaming API has the
+same limit, so `brishz_binary=y` wins over `brishz_stream=y` too
+(`brishz_debug=y` says so).
+
+### The streaming API
+
+`brishz_stream=y` sends the raw request, unchanged, to `/zsh/stream/` (or
+`/zsh/stream/nolog/`). The garden answers at once with its headers and then
+sends the output in **frames** while the command runs: a type byte (1
+stdout, 2 stderr, 3 exit), the payload's length as 4 bytes big-endian, and
+the payload. The body ends with exactly one exit frame, whose payload is
+the retcode in ASCII. BrishGarden's readme ("Streaming API") has the whole
+protocol.
+
+`brishzgo` writes each payload to stdout or stderr as it reads it, with no
+buffer of its own in between, so a line reaches a pipe or a terminal when
+the command prints it, not when the command ends. It exits with the exit
+frame's retcode (its low 8 bits, as for the raw API). A frame of an unknown
+type is skipped. A notice (`X-Brish-Notice: 1`) is printed as the other APIs'
+notices are, and exits 200; so is a 200 reply that is not a streaming reply
+at all.
+
+Fallbacks, when nothing ran:
+
+- HTTP 404 or 405, from a garden older than the streaming API: the raw API
+  next (and the JSON API after it, if that is missing too), or the JSON API
+  with `brishz_raw=n`;
+- `X-Brish-Refused: 1`: the JSON API next, as for the raw API, since the
+  raw API would refuse the same request.
+
+Each fallback resends all of stdin, as above.
+
+**Interrupting.** SIGHUP, SIGINT or SIGTERM while a command streams closes
+the connection. The garden sees the client go away and kills the command
+(SIGINT to its worker first, then SIGTERM and SIGKILL to what is left), and
+`brishzgo` then dies of the same signal, so a shell reports 129, 130 or 143.
+A closed stdout does the same through SIGPIPE: `brishzgo yes | head -1`
+ends at once, and the garden kills `yes`. This is the one transport where
+interrupting `brishzgo` stops the command. The raw and JSON APIs run it to
+its end whatever happens to the client, since their garden never looks at
+the connection until it has the whole reply. A signal that was ignored when
+`brishzgo` started stays ignored here too, so a script's background job that
+streams is not stopped by the Ctrl-C meant for the script.
+
+A reader that stops reading without going away (a full pipe whose reader
+sleeps) holds the command: the garden queues at most 256 KiB for it, past
+the sockets' own buffers, and then the command blocks on its own output and
+keeps its worker, as a local command would.
 
 ## Exit statuses
 
@@ -164,6 +217,10 @@ As `brishzq.zsh`'s, except where "Where it differs" below says otherwise:
   other transport failure exits 56, curl's code for a failed receive, which
   for some broken servers is not the code curl itself would give. Like
   `curl --silent`, these print nothing; `brishz_debug=y` shows the error.
+- With `brishz_stream=y`, also: 18 a reply that ends before its exit frame
+  (after the output that arrived has been written), 8 an exit frame without
+  a number, 23 a failed write of our own output (as curl's write error); and
+  on SIGHUP, SIGINT or SIGTERM, death by that signal.
 
 ## Where it differs from `brishzq.zsh`
 
@@ -199,6 +256,7 @@ As `brishzq.zsh`'s, except where "Where it differs" below says otherwise:
   `brishzgo` decodes it whole.
 - A JSON reply that is valid JSON but not a command's result is a notice
   (exit 200); `brishzq.zsh` would print its `.out` as `null`.
+- `brishz_stream=y`, the streaming API, is `brishzgo`'s alone; see above.
 
 ## Measurements
 
@@ -232,3 +290,17 @@ every one exact:
 - `brishzgo` with `brishz_binary=y` (JSON binary): p50 1040 ms, p90 1470 ms;
 - `brishzq.zsh` with `brishz_binary=y`: p50 2417 ms, p90 3671 ms;
 - `brishz2.dash` with `brishz_binary=y`: p50 1314 ms, p90 1765 ms.
+
+On 2026-10-03, against smoke gardens of BrishGarden's `output-streaming`
+branch with 24 workers, at a load average of about 2:
+
+- per call, `brishzgo true` with the `mark-me` wrapper, 100 runs: the
+  streaming API 8.4 ms on a binary-mode garden and 8.6 ms on a legacy-mode
+  one, against 9.1 ms and 8.1 ms for the raw API, so the same within noise;
+- `print -r -- one; sleep 1; print -r -- two`: the first byte reaches our
+  stdout after a median 36 to 38 ms with the streaming API (the garden sends
+  the first frame about 6 ms after the request), against 1.10 to 1.16 s, at
+  the very end, with the raw API;
+- Ctrl-C (SIGINT) to `brishzgo` during `sleep 5; print -r -- ran >> file`:
+  `brishzgo` dies of SIGINT and the file is never written; with the raw API
+  the file appears 5 s later.

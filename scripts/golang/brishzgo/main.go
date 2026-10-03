@@ -2,7 +2,9 @@
 // stdout, stderr and exit status: a faster drop-in for brishzq.zsh, with the
 // same argv, environment variables and exit statuses. It talks to the
 // garden's raw API, and falls back to the JSON API for a garden without one.
-// See docs/brishzgo.md in the scripts repository.
+// With brishz_stream=y it uses the streaming API instead, which passes the
+// output on as the command makes it. See docs/brishzgo.md in the scripts
+// repository.
 package main
 
 import (
@@ -38,6 +40,7 @@ type config struct {
 
 	binary bool // brishz_binary
 	raw    bool // brishz_raw, on unless set to a false value
+	stream bool // brishz_stream, off unless set to a true value
 	debug  bool // brishz_debug
 
 	// The endpoint is on this machine (apikeyEndpointRe), so the garden
@@ -84,6 +87,7 @@ func newConfig(args []string, env lookupEnv, pwd, home string) config {
 	c.binary = boolP(env.get("brishz_binary"))
 	rawOpt := env.get("brishz_raw")
 	c.raw = rawOpt == "" || boolP(rawOpt)
+	c.stream = boolP(env.get("brishz_stream"))
 	c.debug = boolP(env.get("brishz_debug"))
 
 	// As in brishzq.zsh: local requests send the API key file's header
@@ -115,11 +119,30 @@ func run(args []string, env lookupEnv, pwd, home string, stdin io.Reader, stdout
 	cl := newClient(cfg, stdout, stderr)
 	in := newStdinSource(cfg, stdin)
 	// brishz_binary=y promises that nothing ran on a garden without binary
-	// mode. The raw API cannot keep that promise: a legacy-mode garden runs
-	// the command (with text decoding) and only says so in its reply. So
-	// that opt-in takes the JSON API's binary transport, as brishzq.zsh
-	// does; without it, the raw API is exact on a binary-mode garden anyway.
-	if cfg.raw && !cfg.binary {
+	// mode. The raw and streaming APIs cannot keep that promise: a
+	// legacy-mode garden runs the command (with text decoding) and only
+	// says so in its reply. So that opt-in takes the JSON API's binary
+	// transport, as brishzq.zsh does, even with brishz_stream=y; without
+	// it, the raw and streaming APIs are exact on a binary-mode garden.
+	tryRaw := cfg.raw && !cfg.binary
+	if cfg.stream && cfg.binary {
+		cl.debugf("brishz_binary=y takes the JSON API, so brishz_stream=y does nothing")
+	}
+	if cfg.stream && !cfg.binary {
+		code, fb := cl.stream(in)
+		switch fb {
+		case noFallback:
+			return code
+		case fallbackJSON:
+			tryRaw = false
+		}
+		next := "JSON"
+		if tryRaw {
+			next = "raw"
+		}
+		cl.debugf("%s; falling back to the %s API", cl.fallbackWhy, next)
+	}
+	if tryRaw {
 		if code, fallback := cl.raw(in); !fallback {
 			return code
 		}
