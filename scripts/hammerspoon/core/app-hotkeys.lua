@@ -110,13 +110,15 @@ end
 
 --- * Recent apps
 --
--- The apps activated most recently, newest first, one entry per process:
--- where a hide returns you to. The app hotkeys (the second press hides) and
--- the kitty toggle (core/window-media-bindings.lua) both read it. An
--- application watcher feeds it on every activation, so it follows every
--- switch, whatever made it, and nothing here enumerates windows:
--- hs.window.orderedWindows asks every process through Accessibility, and the
--- "Handy Web Content" processes take 1.5 s each to answer.
+-- The apps activated most recently, newest first, one entry per process,
+-- across every screen. A hide chooses where to return per screen
+-- (screenReturnTarget, below, for the app hotkeys' second press and the
+-- kitty toggle); this list is its last resort, and recentAppsByScreen keeps
+-- the same kind of list per screen. An application watcher feeds it on
+-- every activation, so it follows every switch, whatever made it, and
+-- keeping it asks no app anything: hs.window.orderedWindows asks every
+-- process through Accessibility, and the "Handy Web Content" processes take
+-- 1.5 s each to answer.
 --
 -- Apps that take focus for a moment and give it back are left out, so they
 -- never become a return target: Maccy's popup (hyper+v is a passthrough
@@ -271,15 +273,19 @@ end
 --- instead, and an app whose window cannot be fetched is passed over. The
 --- kitty panel is never on screen while another app is frontmost, so in
 --- panel mode kitty is taken on its record alone and comes back through
---- kittyPanelShow, which shows on the working screen.
+--- kittyPanelShow, which shows it on the screen kitty_panel_screens names.
 --- `skipBid' rejects one more bundle id (kitty's own toggle passes kitty).
 --- `snap', from screenReturnSnapshot, stands in for the recent-apps lists
 --- as they were when it was taken, for a choice made after a switch has
 --- updated them.
 --- One CoreGraphics read (Screens.windowStack) per call. A window in that
 --- list belongs to a running app that is not hidden, so steps 1 and 2 ask
---- no app anything until they pick one.
-function screenReturnTarget(screen, skipPid, skipBid)
+--- an app over Accessibility only about the one they settle on: for its
+--- windows (Screens.entryWindow) when its front window is on another
+--- screen, and in the fullscreen case whether it is hidden. Checking for
+--- the fullscreen case costs the queries in leavingFullscreen, below. Step 3
+--- asks each candidate whether it is hidden until one is not.
+function screenReturnTarget(screen, skipPid, skipBid, snap)
     local function skip(pid, bid) return pid == skipPid or (skipBid and bid == skipBid) end
     local stack = Screens.windowStack()
     local key = screen and screenKey(screen)

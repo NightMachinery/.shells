@@ -77,12 +77,14 @@ The second press of a hotkey hides its app and returns you to the app you were
 in before. Left to itself, macOS activates an app of its own choosing when the
 frontmost app hides: hyper+x, hyper+k, hyper+k landed in Telegram rather than
 Emacs. The "recent apps" list, `recentApps`, holds the apps activated most
-recently, newest first, one entry per process; `recentAppsWatcher`, an
-`hs.application.watcher`, feeds it on every activation, so it follows every
-switch whatever made it, and nothing enumerates windows
-(`hs.window.orderedWindows` asks every process through Accessibility, and the
-"Handy Web Content" processes take 1.5 s each to answer; see
-`axLatencyReport`). The "transient apps" in `recentAppsTransient` never enter
+recently, newest first, one entry per process, across every screen;
+`recentAppsWatcher`, an `hs.application.watcher`, feeds it on every
+activation, so it follows every switch whatever made it, and keeping it asks
+no app anything (`hs.window.orderedWindows` asks every process through
+Accessibility, and the "Handy Web Content" processes take 1.5 s each to
+answer; see `axLatencyReport`). A hide chooses its target per screen (below),
+and falls back to this list only when nothing else is on that screen. The
+"transient apps" in `recentAppsTransient` never enter
 it, since they take focus for a moment and give it back: Hammerspoon itself,
 for choosers and the Secure Input webview; Maccy, whose popup is the hyper+v
 passthrough key; and Handy, whose dictation overlay is cmd+'. A password
@@ -117,20 +119,24 @@ order:
   screen, since focus has to go somewhere.
 
 A window in the on-screen list belongs to an app that is running and not
-hidden, so the first two rules ask no app anything until they have picked one.
-Whether the hidden app is fullscreen costs two Accessibility queries to it,
-asked only when the first rule meets an app with no window on screen;
-`hs.spaces.spaceType` would answer too, but took 21 to 37 ms when measured on
-2026-10-03.
+hidden, so the first two rules ask an app over Accessibility only about the
+one they settle on: for its windows (`Screens.entryWindow`) when its front
+window is on the other screen, and in the fullscreen case whether it is
+hidden. Checking for the fullscreen case costs two or three Accessibility queries
+to the frontmost app, asked only when the first rule meets an app with no
+window on the screen; `hs.spaces.spaceType` would answer too, but took 21 to
+37 ms when measured on 2026-10-03. The last rule asks each candidate whether
+it is hidden until one is not.
 
 "Normal window" means CoreGraphics layer 0, visible, and no smaller than
 `kMinNormalW` by `kMinNormalH` (`Screens.isNormalEntry`), read from `hs.window.list` rather than
 Accessibility (see "Moving between screens" below). When the target's front
 window is on the other screen, bringing the app forward would land there, so
 its window on this screen is focused instead (`screenReturnFocus`), and an
-app whose window cannot be fetched is passed over. Choosing
-costs one window-list read: 12 ms measured on 2026-10-03, and the press's
-"returning to" line says which rule chose and how long it took. The target is
+app whose window cannot be fetched is passed over. Choosing reads the window
+list once (its cost is under "Moving between screens" below; one choice took
+12 ms on 2026-10-03, with only one screen on), and the press's "returning to"
+line says which rule chose and how long it took. The target is
 brought forward first, and the app is hidden only once the target's activation
 arrives (`appHideWatcher`), or after a second if it never does: hiding the app
 while it is still frontmost would let macOS choose again. When the target is
