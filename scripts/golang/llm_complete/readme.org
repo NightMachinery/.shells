@@ -39,3 +39,9 @@ be inserted. State files contain prompt text and are mode 0600 in a 0700 folder.
 
 All automated fixtures contain fabricated text. Live checks and bindings are
 documented in =docs/agent-completion.md= in the shell repository.
+
+Transcript corpus comes from =agent_session completion-context=, cached by
+file mtime and size and refreshed after insertion. Other kitty windows are
+captured by the kitten; tracked paths come from a time-boxed =git ls-files=.
+The current screen stays first. A cold transcript cache costs no insertion
+latency; press again after the first worker has warmed it.

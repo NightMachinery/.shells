@@ -16,13 +16,14 @@ import (
 )
 
 type TerminalRequest struct {
-	Screen   Screen `json:"screen"`
-	Socket   string `json:"socket"`
-	Target   string `json:"target"`
-	KittyPID int    `json:"kitty_pid"`
-	Source   string `json:"source"`
-	Cwd      string `json:"cwd"`
-	Kitten   string `json:"kitten"`
+	Others   []string `json:"others"`
+	Screen   Screen   `json:"screen"`
+	Socket   string   `json:"socket"`
+	Target   string   `json:"target"`
+	KittyPID int      `json:"kitty_pid"`
+	Source   string   `json:"source"`
+	Cwd      string   `json:"cwd"`
+	Kitten   string   `json:"kitten"`
 }
 
 func child(timeout time.Duration, input string, name string, args ...string) (string, error) {
@@ -145,7 +146,7 @@ func terminalDabbrev(r TerminalRequest) error {
 	if b, err := os.ReadFile(filename); err == nil {
 		_ = json.Unmarshal(b, &old)
 	}
-	e, err := expand(r.Screen, nil, old)
+	e, err := expand(r.Screen, terminalCorpora(r), old)
 	if err != nil {
 		return err
 	}
@@ -159,5 +160,9 @@ func terminalDabbrev(r TerminalRequest) error {
 	if err = insert(r, e.Text, e.Backspaces); err != nil {
 		return err
 	}
-	return writePrivate(filename, e.State)
+	if err = writePrivate(filename, e.State); err != nil {
+		return err
+	}
+	loadContext(r)
+	return nil
 }

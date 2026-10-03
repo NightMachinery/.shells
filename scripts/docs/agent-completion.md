@@ -35,3 +35,12 @@ fabricated from CLI layouts, with no real session text.
 In kitty, `alt+/` invokes dabbrev only when a Claude Code or Codex command
 line is in the foreground. The kitten checks the foreground process again,
 so an old agent title never steals zsh bindings. Reload kitty.conf with Cmd+F5.
+
+The corpus order is current screen, other windows in the same kitty OS window,
+the agent's transcript, then tracked git paths in the foreground cwd. The
+transcript is resolved with [agfi:h-agent-session-of-kitty-window], and parsed
+by `agent_session completion-context` as a separate binary. Its bounded result
+is cached by transcript mtime and size. The worker refreshes this cache after
+insertion, so the first expansion can use screen and paths immediately and a
+later press has transcript text ready. A cache miss never waits for the session
+resolver on the insertion path. Git path lookup has a 15 ms deadline.

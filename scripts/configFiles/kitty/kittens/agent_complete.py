@@ -42,6 +42,8 @@ def handle_result(args, answer, target_window_id, boss):
                    'lines': [{'text': str(w.screen.line(i)),
                               'wrapped': w.screen.line(i).last_char_has_wrapped_flag()}
                              for i in range(w.screen.lines)]},
+        'others': [other.as_text() for other in boss.window_id_map.values()
+                   if other.id != w.id and other.os_window_id == w.os_window_id],
         'source': 'kitty', 'target': str(w.id), 'kitty_pid': os.getpid(),
         'socket': 'unix:' + os.path.expanduser(f'~/.local/state/kitty-{os.getpid()}.sock'),
         'cwd': w.child.foreground_cwd or w.child.current_cwd,
