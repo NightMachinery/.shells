@@ -1,13 +1,18 @@
 #: Claude Code builds its shell snapshot by sourcing this file and dumping
 #: every function into a file that each of its commands sources *after*
 #: .zshenv. .zshenv already loads the library fresh for every command, so the
-#: dump only replaced current functions and options with their session-start
-#: copies. Give it neither (`emulate -R zsh' leaves only zsh's defaults, which
-#: the dump omits), and skip this file's interactive setup. Aliases stay: the
-#: snapshot opens with `unalias -a', so without them a command has none at
-#: all. See =~/scripts/docs/claude-code-shell.md=.
+#: dump only replaced current functions, options and aliases with their
+#: session-start copies. Give it none of them (`emulate -R zsh' leaves only
+#: zsh's defaults, which the dump omits), and skip this file's interactive
+#: setup. The aliases .zshenv defines reach commands because
+#: [agfi:unalias] skips the snapshot's opening `unalias -a'. The ZERR trap goes
+#: first: it calls a function this removes. See
+#: =~/scripts/docs/claude-code-shell.md=.
 if [[ -n "${CLAUDECODE:-}" && "${SNAPSHOT_FILE:-}" == */shell-snapshots/snapshot-* ]] ; then
+    trap - ZERR
     unfunction -m '*'
+    unalias -m '*'
+    unalias -s -m '*'
     emulate -R zsh
     return 0
 fi

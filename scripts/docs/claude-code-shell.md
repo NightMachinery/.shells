@@ -1,7 +1,7 @@
 # Claude Code's shell
 
 How Claude Code runs a Bash-tool command (and a `!` line typed at its prompt),
-what that does to our zsh library, and what `.zshrc` does about it. Read from
+what that does to our zsh library, and what we do about it. Read from
 Claude Code 2.1.280.
 
 ## How a command runs
@@ -37,25 +37,46 @@ session started, and sourcing the file added about 0.15s to every command.
 `2paseo` from a `!` line kept failing after its resolver had been fixed for
 exactly this reason.
 
-## What `.zshrc` does
+## What we do about it
 
-When `CLAUDECODE` is set and `SNAPSHOT_FILE` names a snapshot, `.zshrc`
-removes every function, resets options with `emulate -R zsh`, and returns
-before its interactive setup. The snapshot then holds no functions and no
-options except `login`, so every command runs the functions and options
-`.zshenv` loads from disk. The interactive setup (completion, zle widgets,
-syntax highlighting, fzf-tab) never reached commands usefully anyway.
+The snapshot now carries nothing of ours, and `.zshenv` supplies everything
+fresh for every command. Two pieces:
 
-Aliases stay in the snapshot. Its `unalias -a` runs after `.zshenv`, so the
-aliases `.zshenv` defines never survive into a command; the snapshot's copies
-are the only aliases a command can have. They are session-start copies, and a
-global alias such as `@RET` comes back as a plain one, so it only expands in
-command position. Function bodies are unaffected: their aliases were expanded
-when `.zshenv` defined them.
+- **`.zshrc`.** When `CLAUDECODE` is set and `SNAPSHOT_FILE` names a snapshot,
+  it drops the ZERR trap (its handler is about to go), removes every function
+  and every alias, resets options with `emulate -R zsh`, and returns before its
+  interactive setup. The snapshot then holds no functions, no aliases and no
+  options except `login`. The interactive setup (completion, zle widgets,
+  syntax highlighting, fzf-tab) never reached commands usefully anyway.
+- **`unalias` (`zshlang/auto-load/others/claude-code-shell.zsh`).** The
+  snapshot's opening `unalias -a` runs after `.zshenv` and would delete every
+  alias it just defined. Under `CLAUDECODE`, `unalias` is a function that skips
+  exactly that call, and only for a *lean* snapshot: one whose `# Functions`
+  header is followed directly by the next header. Every other call, including
+  the snapshot's own `unalias grep` before Claude Code's `grep` wrapper, goes
+  to the builtin.
 
-Checked with a headless session (`claude -p`): its snapshot had 0 function
-bodies, one `setopt` and 891 aliases (78 KB), and its shell ran the resolver
-from disk.
+The lean check matters. A snapshot written before this change still holds
+every function body, and those are parsed as it is sourced. With our aliases
+still live, a definition such as `ls () {` expands `ls` and becomes a parse
+error, which stops the file there: the remaining functions, Claude Code's
+helpers and its `PATH` line are all lost. The first version of the wrapper did
+exactly that to every running session for a few minutes on 2026-10-03. A
+snapshot whose layout the check does not recognise gets the real `unalias -a`,
+so the worst case is a command with no aliases, never a half-read snapshot.
+
+So in a session started after the change, a command has the functions,
+options and aliases `.zshenv` loads from disk. Global aliases (`@RET`, `...`)
+stay global, so an unquoted `...` word in a command is expanded too. Claude
+Code's own wrappers are unchanged: their bodies parse the same with our
+aliases live (compared against a bare `zsh -f`).
+
+Checked with a headless session (`claude -p --permission-mode default
+--allowedTools Bash`, having it `source` a probe script, since a child `zsh`
+loads `.zshenv` fresh and proves nothing): its snapshot had no function bodies
+and no aliases, and its shell had 878 aliases, the 12 global ones, and the
+resolver from disk. `zshlang/tests/claude-code-shell.zsh` covers the wrapper
+against a lean and an old snapshot.
 
 ## What no setting changes
 
@@ -68,6 +89,7 @@ from disk.
   `git show HEAD^`.
 - The snapshot itself. Only an internal flag skips it; the Bash tool never
   sets it.
-- A session that started before this change keeps its old snapshot until it
-  ends. There, `setopt bareglobqual ; <command>` gets past the glob bug, and a
-  nested `zsh -c '<command>'` runs the current functions.
+- A session that started before this change keeps its old snapshot, and its
+  session-start functions and aliases, until it ends. There,
+  `setopt bareglobqual ; <command>` gets past the glob bug, and a nested
+  `zsh -c '<command>'` runs the current functions.
