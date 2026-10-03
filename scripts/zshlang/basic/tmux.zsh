@@ -169,9 +169,14 @@ function tmuxnew {
     #: skips them. See =docs/tmux-kitty-tcc.md=.
     #:
     #: A job [agfi:tmux2kitty] moved into kitty comes back here, so stop the
-    #: kitty copy first, or the two would fight over its port or files.
+    #: kitty copy first, or the two would fight over its port or files. A copy
+    #: that could not be stopped is still running, so start nothing: a missing
+    #: job is plain to see and fix, two at once are not.
     if (( ${+functions[h-tmux2kitty-reclaim]} )) ; then
-        h-tmux2kitty-reclaim "$1" || true
+        if ! h-tmux2kitty-reclaim "$1" ; then
+            ecerr "$0: not starting ${(qq)1}: its kitty copy could not be stopped (see tmux2kitty-ls)"
+            return 1
+        fi
     fi
 
     #: A server started by this very call would hand its macOS permission

@@ -547,17 +547,26 @@ function tmux2kitty-stop {
     local rows
     rows="$(h-tmux2kitty-windows "${sock}")" @RET
 
-    local row
+    local row ret=0
     local -a f
     for row in ${(f)rows} ; do
         f=( "${(@ps:\t:)row}" )
         [[ "${f[2]}" == "${id}" ]] || continue
 
         ecgray "$0: stopping ${name} (kitty window ${f[1]}, pid ${f[3]})"
-        h-tmux2kitty-kill-tree "${f[3]}" || continue
+        if ! h-tmux2kitty-kill-tree "${f[3]}" ; then
+            ret=1
+            continue
+        fi
         kitty @ --to "${sock}" close-window --match "id:${f[1]}" &>/dev/null || true
     done
 
+    #: A job still running keeps its marker, so that [agfi:tmuxnew] still
+    #: knows to stop it before starting another copy.
+    if (( ret )) ; then
+        ecerr "$0: ${name} is still running in kitty"
+        return "${ret}"
+    fi
     command rm -f -- "${marker}"
 }
 

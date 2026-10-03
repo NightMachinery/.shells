@@ -174,7 +174,10 @@ runs.
 - It leaves a marker under the state directory. When [agfi:tmuxnew] starts a
   session of the same name, for instance when `brishgarden-boot` is re-run, it
   stops the kitty copy first. Otherwise the two would fight over the port.
-  Without a marker, the check is one `test -e`.
+  Without a marker, the check is one `test -e`. If the kitty copy cannot be
+  stopped, `tmuxnew` starts nothing and fails, and `tmux2kitty-stop` keeps
+  the marker so the next attempt tries again. A missing job is plain to see
+  and fix; two copies at once are not.
 - It refuses a pane whose loss would be more than a restart, because moving it
   would kill whatever runs in it and leave only a fresh prompt.
   `tmux2kitty_force_p=y` overrides all of these, in `tmux2kitty-fz` as well:
