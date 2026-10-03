@@ -263,6 +263,11 @@ to return a frame has taken the focus. `core/kitty-panel.lua` registers one
 that focuses the panel's active window (`kittyPanelFocus`) when the panel is
 on that screen (`kittyPanelEntry`).
 
+hyper+z with the panel up on the other screen still moves it to the working
+screen rather than focusing it where it is. That is deliberate, and was chosen
+over focusing in place: hyper+z means "kitty here", and hyper+; is the key
+that goes to the panel where it is.
+
 The frontmost window on a screen comes from CoreGraphics' window list
 (`hs.window.list`, wrapped as `Screens.windowStack`): every on-screen window,
 front to back, with its owner's pid, bounds and layer, in 19 to 40 ms, asking

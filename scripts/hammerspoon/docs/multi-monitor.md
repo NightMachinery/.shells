@@ -421,8 +421,9 @@ Still unmeasured:
   floors (see `docs/external-display-brightness.md`) have been tested only
   against fake m1ddc and brightness binaries. One F1/F2 cycle would settle
   it.
-- **The pointer keys**: `cursorHide` and avy on the monitor, and an
-  app-mode overlay following focus, have not been pressed for real.
+- **The pointer keys**: avy on the monitor, and an app-mode overlay
+  following focus, have not been pressed for real. `cursorHide` has: since
+  it passes over every screen, it puts away a stuck bar in real use.
 
 Known gaps:
 
