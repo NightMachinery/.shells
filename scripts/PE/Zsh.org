@@ -422,6 +422,26 @@ input_volume_cached_del
 
 The redis-backed variables should be used when some state needs to be shared between multiple shell instances.
 
+- Reuse [agfi:tmuxnewsh2] (alias =tsh=) to run shell functions in a detached
+  tmux session: =tmuxnewsh2 <session> [VAR=val ...] <cmd ...>=. It starts a fresh
+  =zsh -c= in the caller's directory, quotes arguments and forwards leading
+  assignments. It replaces an existing session of the same name.
+
+  Use [agfi:loop] to repeat after every command exit, including success;
+  =lo_s= sets the delay between runs (default one second). Use [agfi:retry]
+  to repeat only failures until success; =retry_sleep= sets its delay (default
+  0.5 seconds). =retry= has no attempt limit; [agfi:retry-limited] takes a
+  maximum attempt count before the command.
+
+#+begin_src zsh :eval never
+tmuxnewsh2 worker lo_s=3 loop command my-worker --config "${config_file}"
+retry_sleep=2 retry command my-one-shot-task
+#+end_src
+
+  Stop the session with =tmux-job-stop worker= so the loop and its children
+  are terminated together. Interrupting only the running command can let
+  =loop= start it again.
+
 - Stoppable background jobs (the =mark-me= pattern):
 
 A job that has to be stopped from somewhere else — another shell, a keybinding, a hook — needs a name that survives the fork. =mark-me= gives it one by rewriting the subshell's own argv, so =pgrep= can find it again later:
