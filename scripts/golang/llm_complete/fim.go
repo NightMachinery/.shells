@@ -329,6 +329,10 @@ func runFIM(args []string, in io.Reader, out, errs io.Writer) int {
 		fmt.Fprintln(errs, "fim-get:", err)
 		return 1
 	}
+	if len(args) == 1 && args[0] == "default-provider" {
+		fmt.Fprintln(out, c.DefaultProvider)
+		return 0
+	}
 	if len(args) > 0 && args[0] == "providers" {
 		names := providerNames(c)
 		if len(args) > 1 && args[1] == "--json" {
@@ -345,7 +349,13 @@ func runFIM(args []string, in io.Reader, out, errs io.Writer) int {
 		return 0
 	}
 	var r FIMRequest
-	if decode(in, &r) != nil {
+	var requestErr error
+	if len(args) == 1 && args[0] == "--shell" {
+		r, requestErr = shellRequest(in)
+	} else {
+		requestErr = decode(in, &r)
+	}
+	if requestErr != nil {
 		fmt.Fprintln(errs, "fim-get: invalid JSON request")
 		return 1
 	}
@@ -361,4 +371,43 @@ func runFIM(args []string, in io.Reader, out, errs io.Writer) int {
 		}
 	}
 	return 0
+}
+
+// The shell adapter uses NUL-separated field/value pairs on stdin. Shell
+// builtins write the buffer; neither a serializer nor an HTTP tool sees argv.
+func shellRequest(in io.Reader) (FIMRequest, error) {
+	var r FIMRequest
+	b, err := io.ReadAll(io.LimitReader(in, 16<<20))
+	if err != nil {
+		return r, err
+	}
+	fields := bytes.Split(b, []byte{0})
+	if len(fields) == 0 || len(fields[len(fields)-1]) != 0 {
+		return r, errors.New("missing delimiter")
+	}
+	fields = fields[:len(fields)-1]
+	if len(fields)%2 != 0 {
+		return r, errors.New("missing value")
+	}
+	m := map[string]any{}
+	for i := 0; i < len(fields); i += 2 {
+		k, v := string(fields[i]), string(fields[i+1])
+		switch k {
+		case "prefix", "suffix", "provider", "model", "source", "target", "stop":
+			m[k] = v
+		case "max_tokens", "temperature", "timeout", "strip_space", "log":
+			var x any
+			if json.Unmarshal(fields[i+1], &x) != nil {
+				return r, errors.New("invalid parameter")
+			}
+			m[k] = x
+		default:
+			return r, errors.New("unknown field")
+		}
+	}
+	b, err = json.Marshal(m)
+	if err == nil {
+		err = json.Unmarshal(b, &r)
+	}
+	return r, err
 }

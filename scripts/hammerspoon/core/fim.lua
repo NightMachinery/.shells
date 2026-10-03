@@ -1019,7 +1019,7 @@ local function request(st, runId, provider, prefix, suffix)
         end
 
         showGhost(st, completion)
-    end, { provider, prefix, suffix })
+    end, {})
 
     if not task then
         teardown(st, true)
@@ -1038,6 +1038,10 @@ local function request(st, runId, provider, prefix, suffix)
     end
     fimBand(waiting, "default", kRequestBandSeconds)
 
+    task:setInput(hs.json.encode({
+        provider = provider, prefix = prefix, suffix = suffix,
+        source = "hammerspoon",
+    }))
     task:start()
 
     -- Only now, with every synthetic keystroke of the capture already sent, so

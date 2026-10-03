@@ -7,49 +7,45 @@
 #: =zshlang/interactive/auto-load/FIM.zsh= and is only loaded in interactive
 #: shells.
 #:
-#: The Emacs twin is =night/fim-get= in
-#: =~/doom.d/autoload/night-mistral-fim.el=. Both speak the same request body
-#: to the same three providers, so a change to one wants the same change to
-#: the other.
+#: The shared transport and provider table live in =golang/llm_complete=.
+#: Emacs and Hammerspoon use the same binary.
 #:
 #: See =docs/fim.md=.
 ##
 #: Every native FIM API takes an identical body -- model, prompt, suffix,
 #: max_tokens, stop, temperature -- so a provider is just four strings.
 ##
-typeset -gA fim_provider_endpoint=(
-    codestral      "https://codestral.mistral.ai/v1/fim/completions"
-    deepseek       "https://api.deepseek.com/beta/completions"
-    deepseek-flash "https://api.deepseek.com/beta/completions"
-)
+typeset -gA fim_provider_endpoint fim_provider_model fim_provider_key_var fim_provider_extract
 
-typeset -gA fim_provider_model=(
-    codestral      codestral-latest
-    deepseek       deepseek-v4-pro
-    deepseek-flash deepseek-v4-flash
-)
+function h-llm-complete-dep {
+    go-local-dep llm_complete "${NIGHTDIR:-$HOME/scripts}/golang/llm_complete"
+}
 
-#: The name of the global holding the key, not the key itself, so that no key
-#: material is ever an argument and `ps' cannot see it.
-typeset -gA fim_provider_key_var=(
-    codestral      codestral_api_key
-    deepseek       deepseek_api_key
-    deepseek-flash deepseek_api_key
-)
+function h-fim-providers-refresh {
+    h-llm-complete-dep || return
+    local row name model endpoint key extract
+    local metadata="$(command llm_complete fim providers --json)" || return
+    fim_provider_endpoint=() fim_provider_model=() fim_provider_key_var=() fim_provider_extract=()
+    while IFS=$'\t' read -r name model endpoint key extract ; do
+        fim_provider_endpoint[$name]="$endpoint"
+        fim_provider_model[$name]="$model"
+        fim_provider_key_var[$name]="${key:#-}"
+        if [[ "$extract" == chat ]] ; then
+            fim_provider_extract[$name]='.choices[0].message.content'
+        else
+            fim_provider_extract[$name]='.choices[0].text'
+        fi
+    done < <(print -r -- "$metadata" | command jq -r '.[] | [.name,.model,.endpoint,(if .key_env == "" then "-" else .key_env end),.extract] | @tsv')
+}
 
-#: Mistral answers at .choices[0].message.content; DeepSeek's /beta endpoint is
-#: OpenAI-shaped and answers at .choices[0].text.
-typeset -gA fim_provider_extract=(
-    codestral      ".choices[0].message.content"
-    deepseek       ".choices[0].text"
-    deepseek-flash ".choices[0].text"
-)
-
-typeset -g fim_provider="${fim_provider:-codestral}"
+#: The widget reads these metadata arrays; the provider definitions live in Go.
+h-fim-providers-refresh
+typeset -g fim_provider="${fim_provider:-$(command llm_complete fim default-provider)}"
 ##
 function fim-providers {
     #: Names usable as `fim_provider'.
-    print -rl -- "${(@ok)fim_provider_endpoint}"
+    h-llm-complete-dep || return
+    command llm_complete fim providers
 }
 
 function fim-provider-show {
@@ -110,7 +106,7 @@ function h-fim-error-message {
     print -r -- "${msg}"
 }
 ##
-function fim-get {
+function fim-get-v1 {
     #: Usage: fim-get <prefix> [<suffix>]
     #:
     #: Prints the completion with no trailing newline (unless stdout is a tty),
@@ -247,5 +243,40 @@ function fim-get {
         print -rn -- "${out}"
     fi
 }
-@opts-setprefix fim-get fim
+@opts-setprefix fim-get-v1 fim
 ##
+
+function h-fim-shell-request {
+    local field name value
+    print -rn -- "prefix"$'\0'"$1"$'\0'"suffix"$'\0'"$2"$'\0'
+    print -rn -- "provider"$'\0'"${fim_provider-}"$'\0'"source"$'\0'"${fim_source:-zsh}"$'\0'
+    for field in model max_tokens stop temperature timeout ; do
+        name="fim_${field}"
+        if (( ${+parameters[$name]} )) ; then
+            print -rn -- "$field"$'\0'"${(P)name}"$'\0'
+        fi
+    done
+    for field in strip_space log ; do
+        name="fim_${field}_p"
+        if (( ${+parameters[$name]} )) ; then
+            value=false
+            if bool "${(P)name}" ; then value=true ; fi
+            print -rn -- "$field"$'\0'"$value"$'\0'
+        fi
+    done
+}
+
+function fim-get {
+    #: [agfi:fim-get-v1] is the historical curl rollback, with argv exposure.
+    h-fim-providers-refresh || return
+    local provider="${fim_provider:-$(command llm_complete fim default-provider)}"
+    local key_var="${fim_provider_key_var[$provider]}"
+    (
+        if [[ -n "$key_var" ]] ; then
+            typeset -x "$key_var=${(P)key_var}"
+        fi
+        if bool "${fim_proxy_p:-y}" && should-proxy-p ; then pxa-local ; fi
+        h-fim-shell-request "$1" "$2" | command llm_complete fim --shell
+    )
+}
+@opts-setprefix fim-get fim

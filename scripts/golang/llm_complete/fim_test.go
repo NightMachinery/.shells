@@ -146,3 +146,15 @@ func TestCLIContract(t *testing.T) {
 		t.Fatal(out.String())
 	}
 }
+
+func TestShellRequest(t *testing.T) {
+	r, err := shellRequest(strings.NewReader("prefix\x00quote\"\nسلام\x00suffix\x00tail\x00max_tokens\x007\x00stop\x00\x00strip_space\x00true\x00"))
+	if err != nil || r.Prefix != "quote\"\nسلام" || *r.MaxTokens != 7 || string(r.Stop) != "\"\"" || !*r.StripSpace {
+		t.Fatalf("%+v %v", r, err)
+	}
+	for _, s := range []string{"prefix\x00x", "prefix\x00", "temperature\x00oops\x00"} {
+		if _, err := shellRequest(strings.NewReader(s)); err == nil {
+			t.Fatal("accepted malformed shell request")
+		}
+	}
+}

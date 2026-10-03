@@ -6,7 +6,9 @@ chat models are not: you hand over the text *before* the cursor and the text
 that means `alt+.` completes the line you are halfway through writing, with the
 rest of it still standing to the right of the cursor.
 
-Two files, split along the interactive boundary:
+The shared transport is `golang/llm_complete`. Its provider table, HTTP client,
+error parsing and leading-space option serve every front end. The shell keeps
+two files, split along the interactive boundary:
 
 - `zshlang/auto-load/others/fim.zsh` — [agfi:fim-get], the request. Loaded in
   every shell, so it works in a pipe, in a script and over brish.
@@ -14,9 +16,9 @@ Two files, split along the interactive boundary:
   the bindings. `zshlang/interactive/` is only sourced from `.zshrc`, so none
   of this exists in a non-interactive shell.
 
-The Emacs twin is `night/fim-get` in `~/doom.d/autoload/night-mistral-fim.el`,
-documented at `~/doom.d/docs/mistral-fim.md`. It speaks the same body to the
-same providers, so the two want changing together.
+The Emacs front end is `night/llm-fim-get` in
+`~/doom.d/autoload/night-llm-fim.el`, documented at
+`~/doom.d/docs/llm-fim.md`. Context selection and insertion stay in Emacs.
 
 Outside a terminal it is `hammerspoon/core/fim.lua`, on `hyper+shift+right` —
 the same request, at the cursor of whatever text field is focused. See
@@ -26,8 +28,10 @@ the same request, at the cursor of whatever text field is focused. See
 
 Every native FIM API takes an *identical* request body — `model`, `prompt`,
 `suffix`, `max_tokens`, `stop`, `temperature` — so a provider here is four
-strings, held in four parallel assoc arrays: `fim_provider_endpoint`,
-`fim_provider_model`, `fim_provider_key_var` and `fim_provider_extract`.
+fields in the Go provider table. The four shell assoc arrays
+`fim_provider_endpoint`, `fim_provider_model`, `fim_provider_key_var` and
+`fim_provider_extract` are compatibility metadata populated from
+`llm_complete fim providers --json`, rather than separate definitions.
 
 Configured, with measured round-trips for a one-line completion:
 
@@ -44,8 +48,26 @@ whole of `fim_provider_extract`.
 
 `fim_provider_key_var` holds the *name* of the global holding the key
 (`codestral_api_key`, `deepseek_api_key`, both from `~/.privateShell`), never
-the key. Nothing puts key material in argv, where `ps` would show it to every
-local user — the same reasoning as `./docs/api-keys.md`.
+the key. The Go transport receives JSON on stdin and the key through its
+child environment. Neither the key nor buffer text is an argument. The old
+curl implementation did expose both: its Authorization header and JSON body
+were arguments to curl, and jq received the prefix through `--arg`. The former
+claim that it never put keys in argv was incorrect. [agfi:fim-get-v1] preserves
+that implementation for explicit rollback, including that exposure.
+
+Non-zsh front ends use `bin/llm-complete.zsh`. It sources the private key and
+proxy environment at runtime, exports the key variables named by Go metadata,
+and execs the same binary. Hammerspoon writes its request through
+`hs.task:setInput`, with no prefix or suffix in the launcher's argument list.
+Go honors HTTP_PROXY, HTTPS_PROXY and NO_PROXY, including the HTTP proxy
+exported by [agfi:pxa-local]; ALL_PROXY alone is not supported.
+
+Optional configuration lives in `~/.config/llm_complete/providers.json`.
+Provider entries merge over built-ins. Per-call overrides take precedence over
+a provider's settings, then Go defaults. The schema and examples are in
+`golang/llm_complete/readme.org`. Shell variables are sent only when set, so
+provider defaults remain effective. `default_provider` applies when
+`fim_provider` has not been set.
 
 [agfi:fim-provider-select] changes the default for the current shell,
 [agfi:fim-provider-show] echoes it, [agfi:fim-providers] lists them. There is
@@ -131,9 +153,9 @@ OpenAI-shaped `error.message` — so [agfi:h-fim-error-message] tries all three
 before falling back to the raw body, and collapses the result to one line
 because that is all `zle -M` shows.
 
-`curl --fail-with-body` is deliberately *not* used. The status code comes back
-on its own last line via `--write-out` instead, so both halves of a failure,
-the code and the API's own words, are available to report.
+Go reads the status and response body separately, preserving the existing
+one-line HTTP error format and curl-compatible network exit codes. The
+`curl --write-out` details below describe the preserved v1 implementation.
 
 Note that after editing either file you must `brishz-restart` before the garden
 — and therefore Emacs's `z` — sees the change. The Hammerspoon hotkey does not
@@ -268,7 +290,7 @@ to be focused:
 - `hyper+ctrl+right` — `deepseek`, for when the output matters more than the
   1.4s.
 
-The request runs `hammerspoon/bin/fim-get.zsh <provider> <prefix> <suffix>`, a
+The request runs `hammerspoon/bin/fim-get.zsh` with request JSON on stdin, a
 standalone script that sources the minimal basic stack, `~/.privateShell` for
 the keys (as `brishzq.zsh` does), and this `fim.zsh`, then calls `fim-get`.
 It used to be `brishzq.zsh` asking BrishGarden, which meant no completion
@@ -663,7 +685,7 @@ group, so killing the group takes the *replacement* request down along with the
 one being cancelled — and the replacement then reports nothing at all, which
 reads exactly like a race in the fd handling. It failed two times in five
 against a real endpoint and every single time with the network stubbed out.
-[agfi:h-fim-zle-cancel] kills the pid alone; nothing is orphaned, because curl
+[agfi:h-fim-zle-cancel] kills the pid alone; nothing is orphaned, because the Go request process
 is writing into the pipe that child holds and takes SIGPIPE as soon as it dies.
 
 All of these were found by driving a real line editor through `zsh/zpty`
@@ -737,3 +759,9 @@ must wait for the prompt (`\e[?2004h`, bracketed-paste on) before typing, not
 for a fixed number of seconds. A five-second guess was enough until the
 machine got busy, and then every scenario went intermittent in a way that
 looked exactly like a bug in the widget.
+
+The maintained stub harness is `golang/llm_complete/tests/shell-contract.py`.
+It starts a local HTTP server, checks stdout bytes and key/buffer argv privacy,
+and drives the real vi-keymap widget through zsh/zpty. It waits for the prompt
+and bracketed-paste readiness, checks insertion including the leading space,
+and checks a deliberately unknown provider. Its fixtures are inert.
