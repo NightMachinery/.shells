@@ -762,6 +762,11 @@ local function dragTo(w, to, done)
         hs.eventtap.event.newMouseEvent(T.leftMouseUp, drop):post()
         hsAfter(kDragHoldSeconds, function()
             local landed = onScreen(w, to)
+            local okf, g = pcall(function() return w:frame() end)
+            print(string.format("Screens.moveWindowNext: dragged %s from %d,%d to %d,%d; window now %s, %s",
+                                name, grab.x, grab.y, drop.x, drop.y,
+                                okf and string.format("%gx%g@%g,%g", g.w, g.h, g.x, g.y) or "?",
+                                landed and "on the target screen" or "still on its old screen"))
             if landed then pcall(moveTo, w, to) end
             done(landed)
         end)
