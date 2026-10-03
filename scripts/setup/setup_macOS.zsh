@@ -60,4 +60,7 @@ if isDarwin ; then
     ##
     brew install --cask hammerspoon && ln -s /Applications/Hammerspoon.app/Contents/Frameworks/hs/hs ~/bin/ 
     ##
+    #: Ends stale SSH rows in utmpx; idempotent. See docs/utmpx-stale-ssh.md.
+    utmpx-clean-daemon-install
+    ##
 fi

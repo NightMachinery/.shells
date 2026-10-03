@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.user.utmpx-clean</string>
+
+    <!-- Ends stale remote-login rows in /var/run/utmpx; see
+         ~/scripts/docs/utmpx-stale-ssh.md. Installed by
+         utmpx-clean-daemon-install, not by hand.
+
+         The binary is a snapshot compiled from ~/scripts/c/utmpx_clean_stale.c
+         and installed root:wheel 755 in /usr/local/libexec. A root
+         LaunchDaemon executing a user-writable file would be a
+         privilege-escalation path, so this must never point into the
+         repository. -->
+    <key>ProgramArguments</key>
+    <array>
+        <string>/usr/local/libexec/utmpx-clean-stale</string>
+        <string>--apply</string>
+    </array>
+
+    <key>RunAtLoad</key>
+    <true/>
+
+    <!-- Every 15 minutes. A dead session writes nothing we could watch for,
+         so polling is the only trigger; a pass costs a few syscalls. -->
+    <key>StartInterval</key>
+    <integer>900</integer>
+
+    <key>StandardOutPath</key>
+    <string>/var/log/com.user.utmpx-clean.log</string>
+    <key>StandardErrorPath</key>
+    <string>/var/log/com.user.utmpx-clean.log</string>
+</dict>
+</plist>
