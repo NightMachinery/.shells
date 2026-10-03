@@ -335,6 +335,39 @@ Found in real use on 2026-10-03, after the round above:
 
 - **The `mainScreen` lag** behind hyper+z, Maccy, hyper+; and the hide
   return; see "Where focus is".
+- **hyper+shift+; left a still picture of the window behind.** After a
+  fullscreen Brave window was moved, a Brave window the exact size of the
+  screen it had left stayed there, showing the page as it had been. It was
+  reproduced with a scratch Brave window and read through `hs.window.list`
+  every few tenths of a second. While macOS animates a window out of or
+  into fullscreen, the window itself is not in the on-screen list, and the
+  app shows a stand-in, a full-screen-sized layer-0 window, on each screen
+  involved. The old wait (fullscreen state and frame steady for one poll)
+  ended while both stand-ins were still up, the move cut the animation
+  short, and the stand-in on the screen left behind leaked. It outlived the
+  scratch window, and the two seen were still up 5 and 20 minutes later. It
+  is an `AXUnknown` window with no close button and no action but
+  `AXRaise`, and macOS lets only the owning app close a window, so nothing
+  outside Brave can destroy it; quitting Brave does. Its position can be
+  set, though, and a position outside every screen hides it. Now the wait
+  also needs the window back in the list and no stand-in newer than the
+  move left (window ids grow over time, so "newer" means a higher id than
+  any listed before the move; a list of the app's own windows would miss a
+  leftover in a Space not showing). Any leftover that still appears is
+  moved out of sight a second after the move, and
+  `Screens.parkStandIns("com.brave.Browser")` does the same from the
+  console for the Spaces showing. Re-run on the new code, the wait ended
+  1.9 s after the press and nothing leaked. Every move's console line now
+  ends with the milliseconds from the press to each step.
+- **hyper+shift+; on a fullscreen window is slow.** It is two macOS
+  animations, out of fullscreen and back in. A research pass found no
+  setting that shortens them on 14.3.1: Reduce Motion is on already, and the
+  Dock keys people quote (`expose-animation-duration`,
+  `workspaces-swoosh-animation-off`) are not in this build's binaries at
+  all. The only way around both animations is to move the fullscreen Space
+  itself to the other display, as a Mission Control drag does, which needs
+  the Dock's private calls (yabai's scripting addition, with SIP partly
+  off). Untested; no newer macOS adds a public way either.
 - **hyper+x, hyper+l, hyper+l returned to kitty, not Emacs.** Emacs was
   filed under the laptop correctly, but it was fullscreen in its own Space,
   so once Telegram's Space showed, its window was not in the on-screen list,
@@ -345,17 +378,14 @@ Found in real use on 2026-10-03, after the round above:
 
 Still unmeasured:
 
-- **Do the second-round fixes work on two screens?** They loaded cleanly and
-  their read-only parts were exercised from the console (the window list in
-  20 ms, a return target chosen in 12 ms), but the laptop panel was off by
-  then, so the panel fit, hyper+shift+; (a windowed move, a fullscreen move,
-  and a fullscreen move that fails), a per-screen return across two screens
-  (also out of fullscreen), Maccy following focus, and a Picture-in-Picture
-  redirect all wait for a real press with both screens on.
-- **Does the panel take a fitted frame, and keep it?** It is a borderless
-  window, which may refuse a new size over Accessibility; the console line
-  says `could not fit` then. If kitty fights the fit, the panel has to be
-  recreated on the new screen instead.
+- **What is still untested on two screens.** Since the second round, real
+  presses and scripted runs have covered the panel fit (the panel takes the
+  new frame, read back afterwards), hyper+shift+; on windowed and fullscreen
+  windows, per-screen returns across both screens, and hyper+;. Maccy
+  following focus, a fullscreen move that fails, and a Picture-in-Picture
+  redirect still wait for one.
+- **Does kitty keep a fitted frame?** The panel takes one, but whether kitty
+  puts it back at its next re-layout is unobserved.
 - **Brave's Picture-in-Picture window, measured here.** The layer-3 figure
   comes from Chromium's source and AeroSpace's dumps. No PiP video has been
   open since the probes were armed.
@@ -368,11 +398,8 @@ Still unmeasured:
   floors (see `docs/external-display-brightness.md`) have been tested only
   against fake m1ddc and brightness binaries. One F1/F2 cycle would settle
   it.
-- **The keys that move focus and the pointer**: hyper+;, `cursorHide` and
-  avy on the monitor, and an app-mode overlay following focus have not been
-  pressed for real, because driving them from a script takes over the screen.
-  hyper+shift+; has had one real press, the fullscreen bug above, and only
-  before the fix (see the first bullet).
+- **The pointer keys**: `cursorHide` and avy on the monitor, and an
+  app-mode overlay following focus, have not been pressed for real.
 
 Known gaps:
 

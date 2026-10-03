@@ -283,6 +283,21 @@ time; a watchdog frees the key if a step of the fullscreen dance never calls
 back, so a crash in the middle cannot leave every later press saying "still
 moving a window".
 
+Each step of the fullscreen dance waits for the animation to finish, not
+just for `isFullScreen()` to change. During the animation the app shows a
+still picture of the window on each screen involved, a window exactly the
+screen's size, and cutting the animation short (the first version moved as
+soon as the flag flipped) left one of those behind for good: an AXUnknown
+window with no close button that stays until the app quits. `whenSettled`
+therefore waits until the flag has changed, the frame has held still, and
+none of the app's new full-screen-sized windows is left. One second after a
+move, any leftover is moved far off screen (`Screens.parkStandIns`, also
+callable from the console for older ones), since nothing outside the app can
+close it. The success line in the console ends with the milliseconds each
+step took since the press, which is where to look when a move feels slow. A
+move out of and back into fullscreen is two macOS animations, which no
+setting found so far shortens; see `docs/multi-monitor.md`.
+
 Windows that have to move some other way register in `Screens.moveHandlers`.
 The kitty panel is one: kitty keeps its own record of the panel's screen and
 lays the panel out there again at its next re-layout, so an Accessibility move

@@ -680,20 +680,118 @@ local function moveTo(w, to)
     return onScreen(w, to)
 end
 
---- done(true) once w:isFullScreen() == want and the frame has held still
---- for one poll, or done(false) after kSettleSeconds. macOS animates the
---- way in and out of fullscreen; the move waits for that to finish rather
---- than racing it (whether a move made mid-animation fails is untested).
+--- The newest window id CoreGraphics lists now, taken before a fullscreen
+--- change so that its stand-ins (below) can be told apart from windows made
+--- before it. The window server hands ids out in increasing order: every id
+--- in the traces behind this grew with time (2026-10-03). A list of the
+--- app's ids would not do, since it holds only the Spaces showing at the
+--- time, and a leftover in another Space comes into view when the window
+--- leaves fullscreen (seen: the wait then ran its full kSettleSeconds).
+local function newestWindowId()
+    local newest = 0
+    for _, e in ipairs(Screens.windowStack()) do
+        if e.id > newest then newest = e.id end
+    end
+    return newest
+end
+
+--- The stand-ins listed now: windows of `pid' newer than `sinceId', at
+--- layer 0 and the exact size of a whole screen. While macOS animates a
+--- window into or out of fullscreen, CoreGraphics does not list the window
+--- itself on screen and the app shows such a stand-in on each screen
+--- involved (measured on Brave 2026-10-03). Also whether the window itself
+--- is listed.
+local function standInsNow(w, pid, sinceId)
+    local id = w:id()
+    local seen, found = false, {}
+    for _, e in ipairs(Screens.windowStack()) do
+        if e.id == id then
+            seen = true
+        elseif e.pid == pid and e.id > sinceId and e.layer == 0 and e.alpha > 0 then
+            for _, r in ipairs(Screens.list()) do
+                if e.frame:equals(r.fullFrame) then found[#found + 1] = { id = e.id, screen = r.screen } break end
+            end
+        end
+    end
+    return found, seen
+end
+
+--- Where a leaked stand-in is put: outside every screen. Its position is
+--- the one thing it lets be set, and it stayed where it was put (measured
+--- 2026-10-03).
+local kParkAt = { x = -20000, y = -20000 }
+
+local function parkIfStandIn(w)
+    local ok, sub = pcall(function() return w:subrole() end)
+    if not (ok and sub == "AXUnknown") then return false end
+    return (pcall(function()
+        hs.axuielement.windowElement(w):setAttributeValue("AXPosition", kParkAt)
+    end))
+end
+
+--- Moves `app''s leaked fullscreen stand-ins (see whenSettled) out of
+--- sight: windows with the AXUnknown subrole, at layer 0, the exact size of
+--- a whole screen. Only the Spaces showing now are searched: Brave lists
+--- no window of the others over Accessibility, so a stand-in elsewhere
+--- waits until its Space is shown. Returns how many it moved. For the
+--- console, as Screens.parkStandIns("com.brave.Browser").
+function Screens.parkStandIns(app)
+    if type(app) == "string" then app = hs.application.get(app) end
+    if not app then return 0 end
+    local pid, n = app:pid(), 0
+    for _, e in ipairs(Screens.windowStack()) do
+        if e.pid == pid and e.layer == 0 then
+            for _, r in ipairs(Screens.list()) do
+                if e.frame:equals(r.fullFrame) then
+                    local w = Screens.entryWindow(e)
+                    if w and parkIfStandIn(w) then n = n + 1 end
+                    break
+                end
+            end
+        end
+    end
+    return n
+end
+
+--- done(true) once w:isFullScreen() == want, the frame has held still for
+--- one poll, and the animation is over: the window is listed again and no
+--- stand-in newer than `sinceId' (newestWindowId) is. done(false) after
+--- kSettleSeconds, unless only the animation was left, which is printed and
+--- then taken as done.
+---
+--- The animation is waited for because cutting it short leaks its stand-in.
+--- With only the first two conditions, the move came 0.3 to 0.6 s after
+--- leaving fullscreen while both stand-ins were still up, and the one on
+--- the screen left behind stayed there, a still picture of the window, after
+--- the window itself had been closed (measured 2026-10-03, a scratch Brave
+--- window; leaving and entering fullscreen with nothing in between leaked
+--- nothing). Such a leftover stays in its Space until the app quits
+--- (assumed; the two seen here were still up 5 and 20 minutes later). It
+--- has the AXUnknown subrole, no close button and no action but AXRaise,
+--- so nothing here can close it, but its position can be set: see
+--- Screens.parkStandIns.
 local kSettlePoll, kSettleSeconds = 0.1, 3
-local function whenSettled(w, want, done)
+local function whenSettled(w, want, pid, sinceId, done)
     local deadline = hs.timer.secondsSinceEpoch() + kSettleSeconds
     local last = nil
     local function poll()
         local ok, f = pcall(function() return w:isFullScreen() == want and w:frame() or nil end)
         if not ok then return done(false) end
-        if f and last and f:equals(last) then return done(true) end
+        local still = f ~= nil and last ~= nil and f:equals(last)
+        local animating = false
+        if still then
+            local okt, standIns, seen = pcall(standInsNow, w, pid, sinceId)
+            animating = okt and (#standIns > 0 or not seen)
+        end
+        if still and not animating then return done(true) end
         last = f
-        if hs.timer.secondsSinceEpoch() > deadline then return done(false) end
+        if hs.timer.secondsSinceEpoch() > deadline then
+            if still then
+                print("Screens.moveWindowNext: the fullscreen animation still seemed to run after "
+                      .. kSettleSeconds .. " s; going on")
+            end
+            return done(still)
+        end
         hsAfter(kSettlePoll, poll)
     end
     hsAfter(kSettlePoll, poll)
@@ -725,6 +823,13 @@ function Screens.moveWindowNext(delta)
         focusBand(Screens.focusedScreen(), "still moving a window")
         return
     end
+    -- Milliseconds since the press at each step, for the console line, so a
+    -- slow move can be traced to the step that took the time.
+    local t0 = hs.timer.absoluteTime()
+    local marks = {}
+    local function mark(step)
+        marks[#marks + 1] = string.format("%s %.0f", step, (hs.timer.absoluteTime() - t0) / 1e6)
+    end
     local w = hs.window.focusedWindow()
     if not w then
         focusBand(Screens.focusedScreen(), "no focused window")
@@ -749,21 +854,29 @@ function Screens.moveWindowNext(delta)
             print("Screens.moveWindowNext: moving " .. appName .. " did not finish; key freed")
         end
     end)
+    local function timings()
+        return " (ms since the press: " .. table.concat(marks, ", ") .. ")"
+    end
     local function finish(ok, note, how)
         if moving ~= token then return end
         moving = nil
         hsCancel(watchdog)
         if not ok then
             focusBand(from, "could not move " .. appName .. " to " .. toName .. (note or ""))
-            print("Screens.moveWindowNext: could not move " .. appName .. (note or ""))
+            mark("gave up")
+            print("Screens.moveWindowNext: could not move " .. appName .. (note or "") .. timings())
             return
         end
         pcall(function()
             w:focus()
             hs.mouse.absolutePosition(centreOf(w:frame()))
         end)
+        mark("focused")
+        -- The window changed screens under the same frontmost app.
+        Screens.recheckFocus()
         focusBand(to, "\u{2192} " .. toName .. "  (moved " .. appName .. ")")
-        print("Screens.moveWindowNext: moved " .. appName .. " to " .. toName .. (how or ""))
+        mark("band")
+        print("Screens.moveWindowNext: moved " .. appName .. " to " .. toName .. (how or "") .. timings())
     end
 
     for name, handler in pairs(Screens.moveHandlers) do
@@ -773,23 +886,31 @@ function Screens.moveWindowNext(delta)
     end
 
     local okf, full = pcall(function() return w:isFullScreen() end)
+    mark("read")
     if not (okf and full) then
         local okm, moved = pcall(moveTo, w, to)
+        mark("moved")
         return finish(okm and moved)
     end
 
     focusBand(from, "leaving fullscreen to move " .. appName)
+    local pid = app and app:pid()
+    local sinceId = newestWindowId()
     if not pcall(function() w:setFullScreen(false) end) then
         return finish(false, ": it would not leave fullscreen")
     end
-    whenSettled(w, false, function(left)
+    whenSettled(w, false, pid, sinceId, function(left)
+        mark("out of fullscreen")
         if not left then return finish(false, ": it did not leave fullscreen") end
         local okm, moved = pcall(moveTo, w, to)
         moved = okm and moved
+        mark("moved")
         -- Back into fullscreen whether or not it moved, so a failed move
         -- leaves the window fullscreen where it was, as it was found.
+        local sinceBack = newestWindowId()
         pcall(function() w:setFullScreen(true) end)
-        whenSettled(w, true, function(back)
+        whenSettled(w, true, pid, sinceBack, function(back)
+            mark("fullscreen again")
             if not moved then
                 return finish(false, back and " (it is fullscreen again where it was)"
                                           or " after leaving fullscreen, and it did not go fullscreen again")
@@ -799,6 +920,22 @@ function Screens.moveWindowNext(delta)
             local oks, there = pcall(onScreen, w, to)
             if not (oks and there) then return finish(false, ": it ended up on another screen") end
             finish(true, nil, back and ", fullscreen again" or ", but it did not go fullscreen again")
+            -- Should a stand-in leak anyway, move it out of sight, and say
+            -- so when that fails, rather than leave a still picture of the
+            -- window to pass for a second window. Older leftovers of the
+            -- same app that this move brought into view go too.
+            hsAfter(1, function()
+                local okl, left = pcall(standInsNow, w, pid, sinceId)
+                local leaked = okl and #left or 0
+                local okp, parked = pcall(Screens.parkStandIns, app)
+                parked = okp and parked or 0
+                if leaked == 0 and parked == 0 then return end
+                print(string.format("Screens.moveWindowNext: %d stand-in window(s) of %s left by this move; "
+                                    .. "%d stand-in(s) moved out of sight", leaked, appName, parked))
+                if leaked > parked then
+                    focusBand(left[1].screen, "a leftover picture of " .. appName .. " stayed here")
+                end
+            end)
         end)
     end)
 end
