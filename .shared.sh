@@ -148,13 +148,11 @@ addToPATH "${HOME}/.config/guix/current/bin"
 GUIX_PROFILE="${HOME}/.guix-profile"
 psource "$GUIX_PROFILE/etc/profile"
 
-# psource ~/anaconda/etc/profile.d/conda.sh
-# silence conda deactivate #this is necessary try sbing and you'll see
-# silence conda activate base
-# PS1="$(echo $PS1 | sed 's/(base) //') "
-# PS1="$(strip "$PS1" ' +') "
-addToPATH ~/anaconda/bin
-addToPATH ~/miniconda3/bin
+#: Python: libraries in this conda env, CLI tools as uv tools in ~/.local/bin.
+#: condabin holds only conda/mamba, so base's python never shadows the env's.
+#: See [[NIGHTDIR:docs/python-envs.md]].
+addToPATH ~/miniforge3/condabin
+addToPATH ~/miniforge3/envs/py314/bin
 addToPATH ~/.cargo/bin/
 
 addToPATH ~/google-cloud-sdk/bin/
