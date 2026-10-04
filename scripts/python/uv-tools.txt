@@ -41,6 +41,7 @@ pdfcropmargins
 piep
 pix2tex
 pixcat
+poetry
 py-spy
 pypyp
 pytube
