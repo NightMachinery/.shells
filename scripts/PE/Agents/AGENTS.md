@@ -286,9 +286,9 @@ my windows, anything where me touching the keyboard would corrupt your result â€
 do not ask me to stay away and do not silently steal focus. Put up a banner:
 
 ```
-hs -q -c 'agentBannerOn("what you are doing", 900)'   # seconds; omit for 30 min
-hs -q -c 'agentBannerOff()'                            # as soon as you are done
-hs -q -c 'return agentBannerActive()'
+hs -q -c 'agentBannerOn("what you are doing", 900)' </dev/null   # seconds; omit for 30 min
+hs -q -c 'agentBannerOff()' </dev/null                            # as soon as you are done
+hs -q -c 'return agentBannerActive()' </dev/null
 ```
 
 This only applies if your work actively interferes with me using the machine. If you are using, e.g., a headless browser to take screenshots, that wonâ€™t disturb me, so you shouldn't put up a banner.
@@ -297,6 +297,11 @@ This only applies if your work actively interferes with me using the machine. If
 back to you for the duration of the command, so an unrelated hotkey logging a
 line lands in the middle of your output. It has to come before `-c`. (From zsh
 the `hammerspoon` function passes it for you, but your shell is not zsh.)
+
+`</dev/null` because `hs -c` still reads stdin to its end whenever stdin is
+not a terminal. In a background shell, whose stdin never closes, the call
+hangs until something kills it, and its answer is lost. Give every `hs -c`
+an empty stdin.
 
 It covers every screen for a moment so I cannot miss it, then collapses to a
 strip across the top of each one, on every space. It never takes focus and
