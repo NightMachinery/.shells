@@ -1,6 +1,7 @@
 ##
 # https://github.com/ytdl-org/youtube-dl#format-selection-examples
-aliassafe ybase="noglob youtube-dl --no-playlist --write-sub --sub-lang en"
+#: Include automatic English captions and variants such as en-orig.
+aliassafe ybase="noglob youtube-dl --no-playlist --write-subs --write-auto-subs --sub-langs 'en.*'"
 
 aliassafe y="ybase --embed-subs --add-metadata --downloader aria2c --downloader-args 'aria2c:--check-certificate=false --continue --max-concurrent-downloads=30 --max-connection-per-server=16 --split=30 --min-split-size=1M'" #  --embed-thumbnail errs: Only mp3 and m4a/mp4 are supported for thumbnail embedding for now. Causes only the first URL to be downloaded (possibly because of the error.)
 #: -x, --max-connection-per-server=NUM The maximum number of connections to one  server for each download. (Possible Values: 1-16)
