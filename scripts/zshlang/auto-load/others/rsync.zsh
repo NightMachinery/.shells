@@ -61,6 +61,9 @@ aliasfn rsp-safe h-rsync-optional-xattrs --verbose --checksum --protect-args --h
 
 aliasfn rsp-safe2 enh_dest_shift_e=(rsp-safe) enh-dest-shift
 
+#: Move successfully synchronized files; leave source directories in place.
+aliasfn rsp-mv rsp-safe --remove-source-files
+
 aliasfn rsp rsp-safe --delete-after --force-delete # --ignore-errors will delete even if there are IO errors on sender's side.
 aliasfn rspm rsp --crtimes
 aliasfn rspb rsp --backup --backup-dir=.rsync-backup

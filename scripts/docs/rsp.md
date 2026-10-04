@@ -4,11 +4,14 @@
 These options delete extraneous files on the receiving side when synchronizing
 directories. They do not remove the source files after copying them.
 
-To move files, use `rsp-safe --remove-source-files SOURCE DESTINATION`.
+To move files, use `rsp-mv SOURCE DESTINATION`. [agfi:rsp-mv] wraps
+`rsp-safe --remove-source-files`.
 Rsync removes source files only after successfully duplicating them at the
 destination; source directories remain. `rsp-safe` keeps the checksum and
 resume options without enabling destination cleanup. Use this with finished
 files that are no longer being written.
+
+`rspm` preserves creation times (`--crtimes`); it is not a move variant.
 
 ## Optional extended attributes
 
