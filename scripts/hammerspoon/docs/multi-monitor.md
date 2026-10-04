@@ -466,6 +466,42 @@ Found in real use on 2026-10-04:
   `hammerspoon_cli_log_file`. See `core/ipc-fix.lua` for the earlier IPC
   problem.
 
+### Which display macOS counts as active
+
+The active display is the one with the lit menu bar. It is where Maccy
+opens and what `hs.screen.mainScreen()` answers in Hammerspoon, which has no
+key window of its own. With the kitty panel shown on the monitor it was
+sometimes the laptop.
+
+- **When it happens:** only while the laptop shows its empty desktop Space
+  and the monitor shows a fullscreen app (Brave). With the laptop on
+  Paseo's fullscreen Space it did not happen. A probe that logged every app
+  activation and active-display change (the window server's own value, read
+  with `SLSCopyActiveMenuBarDisplayIdentifier`) showed the active display
+  flipping to the laptop at the moment kitty activated, with the pointer and
+  the panel both on the monitor.
+- **Hypothesis, not yet tested:** kitty's panels are marked to join all
+  Spaces, stationary and out of the window cycle, but not
+  fullscreen-auxiliary. kitty pushes the panel into the current Space with a
+  private call when it shows it (its workaround for kitty issue 8740), so it
+  is drawn over the fullscreen app, but macOS may still treat kitty as an
+  app that cannot be active there and move the active display to a desktop
+  Space it can use. A stand-in panel app that differs only in that flag
+  would settle it.
+- **Dead end: setting the active display directly.**
+  `SLSSetActiveMenuBarDisplayIdentifier`, which yabai calls since March 2025
+  to focus an empty display, returned success and changed nothing on macOS
+  14.3.1. That held from Python, from a C helper, from a helper run by
+  Hammerspoon (which holds the Accessibility permission), with the pointer
+  warped onto the target display, and after a real mouse-moved event put it
+  there. Whether it works on newer macOS is untested.
+- **Dead end: yabai's window focus.** `_SLPSSetFrontProcessWithOptions`
+  with the panel's window number, plus the two "make key" event records,
+  left the active display on the laptop while kitty was already frontmost.
+  It was not tried during the switch from another app.
+- **Clicking the monitor's menu bar** made it active again, but brought
+  Brave back and hid the panel, so a synthetic click is no fix.
+
 Still unmeasured:
 
 - **What is still untested on two screens.** Since the second round, real
