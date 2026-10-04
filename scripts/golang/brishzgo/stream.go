@@ -112,14 +112,15 @@ type fallback int
 
 const (
 	noFallback   fallback = iota
-	fallbackRaw           // no streaming API: the raw API next
+	fallbackRaw           // no streaming API: the raw API next (see run)
 	fallbackJSON          // refused: the JSON API next, as for the raw API
 )
 
 // stream runs the command through POST /zsh/stream/, writing its stdout and
 // stderr as they arrive. The fallback is set when nothing ran: the garden
 // has no streaming API (HTTP 404 or 405) or refused the request
-// (X-Brish-Refused: 1).
+// (X-Brish-Refused: 1). With brishz_binary=y it passes on only a reply with
+// exact bytes (X-Brish-Binary: 1), which the headers say before any output.
 //
 // SIGHUP, SIGINT or SIGTERM while it runs closes the connection, which
 // makes the garden kill the command, and then kills us with the same signal
@@ -184,7 +185,25 @@ func (c *client) stream(in *stdinSource) (int, fallback) {
 		c.fallbackWhy = fmt.Sprintf("the streaming request was refused (%q)", msg.Bytes())
 		return 0, fallbackJSON
 	}
-	if strings.TrimSpace(h.Get("X-Brish-Stream")) != "1" {
+	streamP := strings.TrimSpace(h.Get("X-Brish-Stream")) == "1"
+	if c.cfg.binary && !exactReply(h) {
+		// The garden ignored binary=1 and runs the command in text mode.
+		// The reply is read to its exit frame, its output dropped, so that
+		// the command is not killed half way by our closing the connection.
+		retcode := "unknown"
+		if streamP {
+			rc, err := readFrames(resp.Body, io.Discard, io.Discard)
+			if err != nil {
+				dying()
+				c.debugf("stream: %v", err)
+			} else {
+				retcode = strconv.Itoa(rc)
+			}
+		}
+		// Streams came after X-Brish-Refused, so a 9000 here ran.
+		return c.textModeRan(retcode, h.Get("X-Brish-Notice") == "1", false), noFallback
+	}
+	if !streamP {
 		// Not a streaming reply at all.
 		data, err := io.ReadAll(resp.Body)
 		if err != nil {
@@ -205,8 +224,8 @@ func (c *client) stream(in *stdinSource) (int, fallback) {
 		return c.printNotice(notice.Bytes()), noFallback
 	}
 
-	// X-Brish-Binary: 0 is a legacy-mode garden; its output is printed all
-	// the same, as for the raw API.
+	// Without the opt-in, X-Brish-Binary: 0 (a legacy-mode garden) is
+	// printed all the same, as for the raw API.
 	rc, err := readFrames(resp.Body, c.stdout, c.stderr)
 	if err != nil {
 		dying()

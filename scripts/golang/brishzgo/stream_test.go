@@ -441,17 +441,6 @@ func TestStreamFailures(t *testing.T) {
 	}
 }
 
-// TestStreamBinaryOptIn: brishz_binary=y takes the JSON API even with
-// brishz_stream=y, since only that API runs nothing on a garden without
-// binary mode.
-func TestStreamBinaryOptIn(t *testing.T) {
-	g := jsonGarden(t, echoReply)
-	got := runWith(t, g, "", []string{"true"}, "brishz_stream", "y", "brishz_binary", "y", "brishz_debug", "y")
-	if len(g.reqs) != 1 || g.reqs[0].path != "/zsh/" || !strings.Contains(got.errOut, "brishz_stream=y does nothing") {
-		t.Errorf("got %+v, requests %+v", got, g.reqs)
-	}
-}
-
 func TestStreamKeyRedacted(t *testing.T) {
 	home := t.TempDir()
 	os.MkdirAll(home+"/.keys", 0o700)

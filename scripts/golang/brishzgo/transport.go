@@ -27,6 +27,17 @@ const (
 
 const noBinaryMessage = "brishzgo: garden lacks binary support (no X-Brish-Binary header); it predates binary mode or runs with BRISH_BINARY=0"
 
+// textModeMessage takes what the garden did (one of the textMode* phrases)
+// and the command's retcode, or "unknown". brishzq.zsh and brishz.dash print
+// the same line.
+const textModeMessage = "brishzgo: garden %s (no X-Brish-Binary: 1); it predates the binary=1 option and runs with BRISH_BINARY=0; output withheld; retcode %s\n"
+
+const (
+	textModeRanPhrase    = "ran the command in text mode"
+	textModeNoticePhrase = "answered in text mode with a notice, not a command's output"
+	textModeMaybePhrase  = "ran the command in text mode, or refused it and ran nothing"
+)
+
 // maxRedirects is curl's default for --location.
 const maxRedirects = 50
 
@@ -164,6 +175,34 @@ func (c *client) do(req *http.Request) (*http.Response, int) {
 	return resp, 0
 }
 
+// exactReply reports whether a raw or streaming reply carries exact bytes:
+// X-Brish-Binary: 1, from a garden in binary mode.
+func exactReply(h http.Header) bool {
+	return strings.TrimSpace(h.Get("X-Brish-Binary")) == "1"
+}
+
+// textModeRan is brishz_binary=y's answer to a reply of the raw or streaming
+// API that is not a refusal, a 404 or another HTTP error, and lacks
+// X-Brish-Binary: 1: a legacy-mode garden older than binary=1 ignored that
+// option and ran the command in text mode. Its output may have lost bytes
+// on the way, so none of it is passed on as the command's; the retcode goes
+// in the message. notice is a reply marked X-Brish-Notice: 1 (an empty or
+// magic command), where no command ran. maybeRefused is a raw reply with
+// retcode 9000: a garden with the raw API but older than X-Brish-Refused
+// (BrishGarden d0a9514 until 0fd2752) refuses a NUL or invalid UTF-8 that
+// way, unmarked, which we cannot tell from a command that ran and ended so.
+func (c *client) textModeRan(retcode string, notice, maybeRefused bool) int {
+	what := textModeRanPhrase
+	switch {
+	case notice:
+		what = textModeNoticePhrase
+	case maybeRefused:
+		what = textModeMaybePhrase
+	}
+	fmt.Fprintf(c.stderr, textModeMessage, what, retcode)
+	return exitNoBinary
+}
+
 // printNotice prints a reply that is not a command's result as brishzq.zsh
 // does, with `ec "$out"`: its trailing newlines replaced by one.
 func (c *client) printNotice(body []byte) int {
@@ -192,6 +231,11 @@ func (c *client) rawRequest(route string, in *stdinSource) (*http.Request, int) 
 		if kv[1] != "" {
 			q.Set(kv[0], "1")
 		}
+	}
+	// brishz_binary=y: exact bytes, or a legacy-mode garden refuses the
+	// request before running anything.
+	if c.cfg.binary {
+		q.Set("binary", "1")
 	}
 	u := endpointURL(c.cfg.endpoint, sub)
 	if len(q) > 0 {
@@ -233,7 +277,8 @@ func (c *client) rawRequest(route string, in *stdinSource) (*http.Request, int) 
 
 // raw runs the command through POST /zsh/raw/. fallback is true when the
 // garden has no raw API (HTTP 404 or 405) or refused the request
-// (X-Brish-Refused: 1); then nothing ran.
+// (X-Brish-Refused: 1); then nothing ran. With brishz_binary=y it passes on
+// only a reply with exact bytes (X-Brish-Binary: 1).
 func (c *client) raw(in *stdinSource) (code int, fallback bool) {
 	req, code := c.rawRequest("raw/", in)
 	if req == nil {
@@ -258,18 +303,29 @@ func (c *client) raw(in *stdinSource) (code int, fallback bool) {
 	if strings.TrimSpace(h.Get("X-Brish-Refused")) == "1" {
 		// The garden ran nothing: a legacy-mode garden refuses a command
 		// or stdin that is not valid UTF-8 or holds a NUL, which the JSON
-		// API's request carries (stdin in a temp file), and any garden
-		// refuses a malformed request. Only a refusal has this header, so
-		// a command that ran and returned 9000 is never run again.
+		// API's request carries (stdin in a temp file), and binary=1, which
+		// the JSON API's binary transport asks for again (so it refuses
+		// that too); any garden refuses a malformed request. Only a
+		// refusal has this header, so a command that ran and returned 9000
+		// is never run again.
 		msg, _ := io.ReadAll(io.LimitReader(resp.Body, 4096))
 		c.fallbackWhy = fmt.Sprintf("the raw request was refused (%q)", msg)
 		return 0, true
 	}
 
-	// X-Brish-Binary: 0 means a legacy-mode garden, whose bytes went
-	// through text; the reply is printed all the same, as brishzq.zsh's
-	// text path does. brishz_binary=y never comes here; see run.
-	retcode, errRet := strconv.Atoi(strings.TrimSpace(h.Get("X-Brish-Retcode")))
+	retcodeText := strings.TrimSpace(h.Get("X-Brish-Retcode"))
+	retcode, errRet := strconv.Atoi(retcodeText)
+	if c.cfg.binary && !exactReply(h) {
+		// The garden ignored binary=1. The reply comes when the command
+		// has ended, so there is nothing to wait for.
+		if errRet != nil {
+			retcodeText = "unknown"
+		}
+		return c.textModeRan(retcodeText, h.Get("X-Brish-Notice") == "1", retcodeText == "9000"), false
+	}
+	// Without the opt-in, X-Brish-Binary: 0 (a legacy-mode garden, whose
+	// bytes went through text) is printed all the same, as brishzq.zsh's
+	// text path does.
 	outLen, errLen := strconv.ParseInt(strings.TrimSpace(h.Get("X-Brish-Out-Length")), 10, 64)
 	if h.Get("X-Brish-Notice") == "1" || errRet != nil || errLen != nil || outLen < 0 {
 		// A notice (a magic command's log), or not a raw reply at all.

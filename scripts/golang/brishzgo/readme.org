@@ -43,7 +43,11 @@ The unit tests need no garden. They check the quoters against zsh itself
 the U+FFFD replacement against jq itself, the proxy choice against curl
 itself, the command assembly, the request
 shapes, the temp file's removal on SIGTERM, and the replies, fallback and
-transport failures against fake gardens built on =net/http/httptest=. The
+transport failures against fake gardens built on =net/http/httptest=.
+=binary_test.go= runs =brishz_binary=y= over the raw and streaming APIs
+against a fake of each garden generation: binary mode, legacy mode with and
+without the =binary=1= option, binary mode without it, no raw API (404 or
+405), and no binary fields at all. The
 zsh tests are skipped where zsh is missing. Run them with =-race= as well:
 =TestFallbackKeepsStdinOrder= has the HTTP transport's goroutine and ours
 reading stdin at the same time.
@@ -70,6 +74,8 @@ Two more are skipped unless pointed at something:
   the one Hammerspoon uses: a smoke garden on its own port, with a throwaway
   key. =BRISHZGO_IT_KIND= says what the garden is: =binary= (the raw and
   streaming APIs, binary mode), =legacy= (the same with =BRISH_BINARY=0=),
+  =preopt-binary= / =preopt-legacy= (the raw and streaming APIs, but older
+  than their =binary=1= option, such as =7de4a42=),
   =nostream-binary= / =nostream-legacy= (the raw API but no streaming API,
   such as =0fd2752=), =old-binary= / =old-legacy= (no raw API, such as
   =42ddc9d=), or =pre-binary= (no binary mode at all, such as =cc390bc=).

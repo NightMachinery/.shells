@@ -3,8 +3,9 @@
 // same argv, environment variables and exit statuses. It talks to the
 // garden's raw API, and falls back to the JSON API for a garden without one.
 // With brishz_stream=y it uses the streaming API instead, which passes the
-// output on as the command makes it. See docs/brishzgo.md in the scripts
-// repository.
+// output on as the command makes it. brishz_binary=y asks either API for
+// exact bytes, and falls back to the JSON API's binary transport. See
+// docs/brishzgo.md in the scripts repository.
 package main
 
 import (
@@ -128,22 +129,20 @@ func run(args []string, env lookupEnv, pwd, home string, stdin io.Reader, stdout
 	defer temps.removeAll()
 	cl := newClient(cfg, stdout, stderr)
 	in := newStdinSource(cfg, stdin)
-	// brishz_binary=y promises that nothing ran on a garden without binary
-	// mode. The raw and streaming APIs cannot keep that promise: a
-	// legacy-mode garden runs the command (with text decoding) and only
-	// says so in its reply. So that opt-in takes the JSON API's binary
-	// transport, as brishzq.zsh does, even with brishz_stream=y; without
-	// it, the raw and streaming APIs are exact on a binary-mode garden.
-	tryRaw := cfg.raw && !cfg.binary
-	if cfg.stream && cfg.binary {
-		cl.debugf("brishz_binary=y takes the JSON API, so brishz_stream=y does nothing")
-	}
-	if cfg.stream && !cfg.binary {
+	// brishz_binary=y asks the raw and streaming APIs for exact bytes with
+	// binary=1, which a legacy-mode garden refuses before running anything.
+	// Every fallback of that opt-in goes to the JSON API's binary
+	// transport, as brishzq.zsh's does, also after a 404 from the streaming
+	// API: a garden without that API predates binary=1, so in legacy mode
+	// its raw API would run the command in text mode, where its JSON API
+	// refuses it.
+	tryRaw := cfg.raw
+	if cfg.stream {
 		code, fb := cl.stream(in)
-		switch fb {
-		case noFallback:
+		switch {
+		case fb == noFallback:
 			return code
-		case fallbackJSON:
+		case fb == fallbackJSON, cfg.binary:
 			tryRaw = false
 		}
 		next := "JSON"

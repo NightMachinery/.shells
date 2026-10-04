@@ -18,12 +18,14 @@ import (
 // TestParityWithBrishzq sends a corpus of argv lists through brishzq.zsh and
 // through brishzgo to a recording fake garden, and compares what each sent:
 //
-//   - the command's exact bytes: brishzq.zsh with brishz_binary=y (its
-//     cmd_b64), against brishzgo's raw request and its brishz_binary=y one;
-//   - brishzq.zsh's JSON text request, against brishzgo's with brishz_raw=n:
-//     every field and their order, so invalid UTF-8 must become the same
-//     U+FFFD; with MAGIC_READ_STDIN, the temp file's path aside, and the
-//     file must hold stdin exactly.
+//   - the command's exact bytes: brishzq.zsh's JSON binary request
+//     (brishz_binary=y brishz_raw=n, its cmd_b64), against brishzgo's raw
+//     request, its brishz_binary=y one (the raw API's, with binary=1) and
+//     its JSON binary one;
+//   - brishzq.zsh's JSON text request, against brishzgo's, both with
+//     brishz_raw=n: every field and their order, so invalid UTF-8 must
+//     become the same U+FFFD; with MAGIC_READ_STDIN, the temp file's path
+//     aside, and the file must hold stdin exactly.
 //
 // Point BRISHZGO_TEST_BRISHZQ at brishzq.zsh to run it:
 //
@@ -37,6 +39,7 @@ func TestParityWithBrishzq(t *testing.T) {
 
 	type parityReq struct {
 		path   string
+		query  string
 		header http.Header
 		body   []byte
 		stdin  []byte // the temp file the command reads, if any
@@ -44,7 +47,7 @@ func TestParityWithBrishzq(t *testing.T) {
 	var mu sync.Mutex
 	var reqs []parityReq
 	g := newFakeGarden(t, func(w http.ResponseWriter, r *http.Request, body []byte) {
-		pr := parityReq{r.URL.Path, r.Header.Clone(), body, nil}
+		pr := parityReq{r.URL.Path, r.URL.RawQuery, r.Header.Clone(), body, nil}
 		var req map[string]any
 		json.Unmarshal(body, &req)
 		if cmd, ok := req["cmd"].(string); ok {
@@ -138,18 +141,27 @@ func TestParityWithBrishzq(t *testing.T) {
 			for _, args := range corpus {
 				kv := append([]string{"bshEndpoint", ep}, extra...)
 
-				// The command's exact bytes.
-				zq := runZq(args, nil, append(kv, "brishz_binary", "y")...)
+				// The command's exact bytes. brishz_raw=n keeps brishzq.zsh's
+				// opt-in on the JSON API, before and after it learned binary=1.
+				zq := runZq(args, nil, append(kv, "brishz_binary", "y", "brishz_raw", "n")...)
 				want := b64Field(t, zq.body, "cmd_b64")
-				for _, raw := range []string{"n", "y"} {
+				for _, mode := range []string{"json binary", "raw", "raw binary"} {
 					n++
 					var got []byte
-					if raw == "y" {
-						r := runGo(args, nil, append(kv, "brishz_raw", "y")...)
+					switch mode {
+					case "json binary":
+						got = b64Field(t, runGo(args, nil, append(kv, "brishz_binary", "y", "brishz_raw", "n")...).body, "cmd_b64")
+					default:
+						kv2 := append(kv, "brishz_raw", "y")
+						if mode == "raw binary" {
+							kv2 = append(kv2, "brishz_binary", "y")
+						}
+						r := runGo(args, nil, kv2...)
 						l, _ := strconv.Atoi(r.header.Get("X-Brish-Cmd-Length"))
 						got = r.body[:l]
-					} else {
-						got = b64Field(t, runGo(args, nil, append(kv, "brishz_binary", "y")...).body, "cmd_b64")
+						if !strings.HasPrefix(r.path, "/zsh/raw/") || strings.Contains(r.query, "binary=1") != (mode == "raw binary") {
+							t.Errorf("%s %q %q %s: request %s?%s", epName, extra, args, mode, r.path, r.query)
+						}
 					}
 					if bytes.Equal(got, want) {
 						continue
@@ -158,7 +170,7 @@ func TestParityWithBrishzq(t *testing.T) {
 						pending++
 						continue
 					}
-					t.Errorf("%s %q %q raw=%s:\n got %q\nwant %q", epName, extra, args, raw, got, want)
+					t.Errorf("%s %q %q %s:\n got %q\nwant %q", epName, extra, args, mode, got, want)
 				}
 
 				// The JSON text request, with and without MAGIC_READ_STDIN.
@@ -173,7 +185,7 @@ func TestParityWithBrishzq(t *testing.T) {
 						kv2 = append(append([]string{}, kv...), "brishz_in", "MAGIC_READ_STDIN")
 					}
 					n++
-					zq := runZq(args, stdin, kv2...)
+					zq := runZq(args, stdin, append(kv2, "brishz_raw", "n")...)
 					gr := runGo(args, stdin, append(kv2, "brishz_raw", "n")...)
 					zf, zk := jsonFields(t, zq.body)
 					gf, gk := jsonFields(t, gr.body)

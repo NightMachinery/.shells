@@ -158,18 +158,22 @@ func TestRawNotARawReply(t *testing.T) {
 	if got := runWith(t, g, "", []string{"true"}); got.code != 200 || got.out != "hello\n" {
 		t.Errorf("got %+v", got)
 	}
-	// brishz_binary=y goes to the JSON API, which this fake answers the
-	// same way, without X-Brish-Binary.
-	if got := runWith(t, g, "", []string{"true"}, "brishz_binary", "y"); got.code != 201 || got.out != "" || !strings.Contains(got.errOut, "lacks binary support") {
+	// With brishz_binary=y, a reply without X-Brish-Binary: 1 is withheld,
+	// and has no retcode to tell.
+	g.reqs = nil
+	want := result{201, "", fmt.Sprintf(textModeMessage, textModeRanPhrase, "unknown")}
+	if got := runWith(t, g, "", []string{"true"}, "brishz_binary", "y"); got != want {
 		t.Errorf("binary: got %+v", got)
 	}
-	if p := g.reqs[len(g.reqs)-1].path; p != "/zsh/" {
-		t.Errorf("brishz_binary=y used %s", p)
+	if len(g.reqs) != 1 || g.reqs[0].path != "/zsh/raw/" {
+		t.Errorf("brishz_binary=y sent %d requests, first to %s", len(g.reqs), g.reqs[0].path)
 	}
 }
 
-// TestRawLegacyGarden: a legacy-mode reply is printed; brishz_binary=y never
-// uses the raw API, so that a legacy garden runs nothing.
+// TestRawLegacyGarden: a legacy-mode reply is printed. With brishz_binary=y,
+// such a reply without a refusal comes from a garden older than binary=1,
+// which ran the command in text mode: its output is withheld, and the exit
+// is 201. (TestBinaryOptInGenerations has every garden generation.)
 func TestRawLegacyGarden(t *testing.T) {
 	g := newFakeGarden(t, func(w http.ResponseWriter, r *http.Request, body []byte) {
 		if r.URL.Path == "/zsh/" {
@@ -182,10 +186,11 @@ func TestRawLegacyGarden(t *testing.T) {
 		t.Errorf("got %+v", got)
 	}
 	g.reqs = nil
-	if got := runWith(t, g, "", []string{"true"}, "brishz_binary", "1"); got.code != 201 || got.out != "" {
+	want := result{201, "", fmt.Sprintf(textModeMessage, textModeRanPhrase, "0")}
+	if got := runWith(t, g, "", []string{"true"}, "brishz_binary", "1"); got != want {
 		t.Errorf("binary: got %+v", got)
 	}
-	if len(g.reqs) != 1 || g.reqs[0].path != "/zsh/" {
+	if len(g.reqs) != 1 || g.reqs[0].path != "/zsh/raw/" {
 		t.Errorf("brishz_binary=y sent %d requests, first to %s", len(g.reqs), g.reqs[0].path)
 	}
 }
@@ -195,9 +200,14 @@ func TestHTTPErrors(t *testing.T) {
 		g := newFakeGarden(t, func(w http.ResponseWriter, r *http.Request, body []byte) {
 			w.WriteHeader(status)
 		})
-		for _, raw := range []string{"y", "n"} {
-			if got := runWith(t, g, "", []string{"true"}, "brishz_raw", raw); got.code != 22 || got.out != "" {
-				t.Errorf("HTTP %d, raw %s: got %+v", status, raw, got)
+		for _, kv := range [][]string{
+			{"brishz_raw", "y"},
+			{"brishz_raw", "n"},
+			{"brishz_binary", "y"},
+			{"brishz_binary", "y", "brishz_stream", "y"},
+		} {
+			if got := runWith(t, g, "", []string{"true"}, kv...); got.code != 22 || got.out != "" || got.errOut != "" {
+				t.Errorf("HTTP %d, %q: got %+v", status, kv, got)
 			}
 		}
 	}
@@ -278,13 +288,8 @@ func TestFallbackToJSON(t *testing.T) {
 		if got.code != c.code || got.out != c.out || got.errOut != c.errOut {
 			t.Errorf("%s: got %d %q %q", c.name, got.code, trunc(got.out), got.errOut)
 		}
-		// A 404 from the raw API, then the JSON API; brishz_binary=y goes
-		// to the JSON API directly.
-		want := 2
-		if c.name == "binary" {
-			want = 1
-		}
-		if len(g.reqs) != want || g.reqs[want-1].path != "/zsh/" {
+		// A 404 from the raw API, then the JSON API.
+		if len(g.reqs) != 2 || g.reqs[1].path != "/zsh/" {
 			t.Errorf("%s: requests %d", c.name, len(g.reqs))
 		}
 	}
@@ -673,5 +678,19 @@ func TestBrokenReplies(t *testing.T) {
 	ep := strings.Replace(g.URL, "http://", "https://", 1)
 	if got := run([]string{"true"}, envOf("bshEndpoint", ep), "/x", "", strings.NewReader(""), &out, &errb); got != 35 {
 		t.Errorf("https to an http garden: exit %d, want 35", got)
+	}
+}
+
+// TestRawTextModeUnmarked9000: a garden with the raw API but older than
+// X-Brish-Refused refuses input that text mode cannot carry with an
+// unmarked 9000, so brishz_binary=y's line for a raw 9000 says it may have
+// run nothing. A stream's 9000 ran: streams came after X-Brish-Refused.
+func TestRawTextModeUnmarked9000(t *testing.T) {
+	g := newFakeGarden(t, func(w http.ResponseWriter, r *http.Request, body []byte) {
+		rawReply(w, "", "brishgarden: refused", 9000, "0")
+	})
+	want := result{201, "", fmt.Sprintf(textModeMessage, textModeMaybePhrase, "9000")}
+	if got := runWith(t, g, "", []string{"true"}, "brishz_binary", "y"); got != want {
+		t.Errorf("got %+v, want %+v", got, want)
 	}
 }

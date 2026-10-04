@@ -23,6 +23,10 @@ import (
 //	                      binary           the raw and streaming APIs, in
 //	                                       binary mode
 //	                      legacy           the same with BRISH_BINARY=0
+//	                      preopt-binary    the raw and streaming APIs, but
+//	                                       older than their binary=1 option
+//	                                       (such as 7de4a42), binary mode
+//	                      preopt-legacy    the same with BRISH_BINARY=0
 //	                      nostream-binary  the raw API but no streaming API
 //	                                       (such as 0fd2752), binary mode
 //	                      nostream-legacy  the same with BRISH_BINARY=0
@@ -36,7 +40,7 @@ import (
 //	                      falls back on a garden without the streaming API
 //
 // Every command is inert: cat, print, true, typeset, od, shasum, sleep, and
-// appending to a file in a test's temp dir.
+// appending to or touching a file in a test's temp dir.
 
 type itEnv struct {
 	endpoint, kind, home, bin string
@@ -96,7 +100,9 @@ func (e itEnv) binaryP() bool { return strings.HasSuffix(e.kind, "binary") && e.
 func (e itEnv) oldP() bool { return strings.HasPrefix(e.kind, "old") || e.kind == "pre-binary" }
 
 // streamP: a garden with the streaming API.
-func (e itEnv) streamP() bool { return e.kind == "binary" || e.kind == "legacy" }
+func (e itEnv) streamP() bool {
+	return e.kind == "binary" || e.kind == "legacy" || strings.HasPrefix(e.kind, "preopt-")
+}
 
 // legacyModeP: a garden whose workers use brish's legacy transport.
 func (e itEnv) legacyModeP() bool {
@@ -105,7 +111,14 @@ func (e itEnv) legacyModeP() bool {
 
 // exactAPIP: the client runs commands through an API that carries any
 // bytes: the raw or streaming API of a binary-mode garden.
-func (e itEnv) exactAPIP() bool { return e.kind == "binary" || e.kind == "nostream-binary" }
+func (e itEnv) exactAPIP() bool {
+	return e.kind == "binary" || e.kind == "nostream-binary" || e.kind == "preopt-binary"
+}
+
+// textModeP: a legacy-mode garden whose raw API predates binary=1, so it
+// ignores that option and runs a brishz_binary=y command in text mode
+// (unless brishz_stream=y finds no streaming API there).
+func (e itEnv) textModeP() bool { return e.kind == "nostream-legacy" || e.kind == "preopt-legacy" }
 
 // exactP: whether output bytes come back exact. Only the raw and streaming
 // APIs of a binary-mode garden carry them all; elsewhere, either the
@@ -244,17 +257,19 @@ func TestITMiB(t *testing.T) {
 	e := integration(t)
 	data := make([]byte, 1<<20)
 	rand.Read(data)
-	var kv []string
-	switch e.kind {
-	case "binary", "nostream-binary":
-	case "old-binary":
-		kv = []string{"brishz_binary", "y"}
-	default:
+	if !e.binaryP() {
 		t.Skip("random bytes need binary mode")
 	}
-	got := e.run(t, data, []string{"cat"}, append(kv, "brishz_in", "MAGIC_READ_STDIN")...)
-	if got.code != 0 || !bytes.Equal(got.out, data) {
-		t.Errorf("1 MiB: exit %d, %d bytes back, equal %v", got.code, len(got.out), bytes.Equal(got.out, data))
+	// Without the opt-in only the raw and streaming APIs carry them.
+	kvs := [][]string{{"brishz_binary", "y"}}
+	if e.exactAPIP() {
+		kvs = append(kvs, nil)
+	}
+	for _, kv := range kvs {
+		got := e.run(t, data, []string{"cat"}, append(kv, "brishz_in", "MAGIC_READ_STDIN")...)
+		if got.code != 0 || !bytes.Equal(got.out, data) {
+			t.Errorf("1 MiB %q: exit %d, %d bytes back, equal %v", kv, got.code, len(got.out), bytes.Equal(got.out, data))
+		}
 	}
 }
 
@@ -321,18 +336,68 @@ func TestITNotice(t *testing.T) {
 	t.Logf("notice: %q", got.out)
 }
 
+// TestITBinaryOptIn: brishz_binary=y goes to the raw API (or with
+// brishz_stream=y the streaming API) with binary=1, and to the JSON API's
+// binary transport after a 404 or a refusal. A binary-mode garden gives the
+// exact bytes; a legacy-mode garden that knows binary=1 and a garden older
+// than binary mode run nothing (a sentinel file stays absent) and exit 201;
+// a legacy-mode garden older than binary=1 runs the command in text mode,
+// and the client withholds its output and exits 201.
 func TestITBinaryOptIn(t *testing.T) {
 	e := integration(t)
 	data := allBytes()
-	got := e.run(t, data, []string{"cat"}, "brishz_in", "MAGIC_READ_STDIN", "brishz_binary", "y")
+	got := e.run(t, data, []string{"cat"}, "brishz_in", "MAGIC_READ_STDIN", "brishz_binary", "y", "brishz_debug", "y")
+	errOut := string(got.errOut)
+	api := "raw"
+	if e.stream {
+		api = "stream"
+	}
+	if !strings.Contains(errOut, "/zsh/"+api+"/?binary=1") {
+		t.Errorf("no binary=1 request to the %s API:\n%s", api, errOut)
+	}
+	// After a 404 the JSON API, never the raw API after the streaming one.
+	// textRun: the API asked for exists, and ignores binary=1.
+	hasAPI := !e.oldP() && (!e.stream || e.streamP())
+	textRun := hasAPI && e.textModeP()
+	if fellBack := strings.Contains(errOut, "(HTTP 404); falling back to the JSON API"); fellBack == hasAPI {
+		t.Errorf("fell back after a 404: %v, kind %s, stream %v:\n%s", fellBack, e.kind, e.stream, errOut)
+	}
+	// The bytes hold a NUL, which a legacy-mode garden with the raw API
+	// refuses even when it predates binary=1; the JSON API then refuses
+	// binary: 1.
+	if refused := strings.Contains(errOut, "request was refused"); refused != (e.kind == "legacy" || textRun) {
+		t.Errorf("refused: %v, kind %s:\n%s", refused, e.kind, errOut)
+	}
 	if e.binaryP() {
 		if got.code != 0 || !bytes.Equal(got.out, data) {
 			t.Errorf("exit %d, %q", got.code, got.out)
 		}
-		return
-	}
-	if got.code != 201 || len(got.out) != 0 || !strings.Contains(string(got.errOut), "lacks binary support") {
+	} else if got.code != 201 || len(got.out) != 0 || !strings.Contains(errOut, "lacks binary support") {
 		t.Errorf("exit %d, out %q, err %q", got.code, got.out, got.errOut)
+	}
+
+	// Whether the command ran, and its status and stderr: a legacy-mode
+	// garden older than binary=1 runs a command in valid UTF-8.
+	sentinel := filepath.Join(t.TempDir(), "ran")
+	cmd := "touch " + quoteSingle(sentinel) + "; print -rn -- out; print -rn -- err >&2; return 300"
+	got = e.run(t, nil, []string{cmd}, "brishz_binary", "y", "brishz_noquote", "y", "brishz_failure_expected", "y")
+	_, err := os.Stat(sentinel)
+	if ran := err == nil; ran != (e.binaryP() || textRun) {
+		t.Errorf("the command ran: %v, kind %s", ran, e.kind)
+	}
+	switch {
+	case e.binaryP():
+		if got.code != 44 || string(got.out) != "out" || string(got.errOut) != "err" {
+			t.Errorf("return 300: exit %d, out %q, err %q", got.code, got.out, got.errOut)
+		}
+	case textRun:
+		if got.code != 201 || len(got.out) != 0 || !strings.HasSuffix(string(got.errOut), "; retcode 300\n") {
+			t.Errorf("return 300: exit %d, out %q, err %q", got.code, got.out, got.errOut)
+		}
+	default:
+		if got.code != 201 || len(got.out) != 0 {
+			t.Errorf("return 300: exit %d, out %q, err %q", got.code, got.out, got.errOut)
+		}
 	}
 }
 
@@ -366,7 +431,7 @@ func TestITFallback(t *testing.T) {
 	// nothing run; the JSON API then runs it, with all of stdin.
 	got = e.run(t, []byte("a\x00b"), []string{"od", "-An", "-c"}, "brishz_in", "MAGIC_READ_STDIN", "brishz_debug", "y")
 	refused := strings.Contains(string(got.errOut), "request was refused")
-	if refused != (e.kind == "legacy" || e.kind == "nostream-legacy") || got.code != 0 || !strings.Contains(string(got.out), `a  \0   b`) {
+	if refused != (e.legacyModeP() && !e.oldP()) || got.code != 0 || !strings.Contains(string(got.out), `a  \0   b`) {
 		t.Errorf("NUL stdin: refused %v, exit %d, out %q\n%s", refused, got.code, got.out, got.errOut)
 	}
 	if refused && !strings.Contains(string(got.errOut), "stdin: 3 bytes, 3 of them already read") {

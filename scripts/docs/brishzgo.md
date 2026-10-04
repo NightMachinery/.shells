@@ -76,7 +76,8 @@ only joined by spaces, with no wrapping and no forwarding.
   are false, and anything else is true, `false` included, as in
   `brishzq.zsh`. See "Transport" for what it changes here.
 - `brishz_raw`: the raw API, on unless set to a false value (`n`, `no`, `0`).
-  `brishz_raw=n` uses the JSON API directly.
+  `brishz_raw=n` uses the JSON API directly, unless `brishz_stream=y`
+  sends the request to the streaming API first.
 - `brishz_stream`: the streaming API, off unless set to a true value, parsed
   like the `bool` of `zshlang/basic/core.zsh`: empty, `n`, `no`, `0` and
   `false` (in any case) are false, and anything else is true. See "The
@@ -144,15 +145,72 @@ server that asks for the body before answering 404 (a buffering proxy), or
 past the transport's 2 s wait for a 100 Continue. The fallback costs one
 extra round trip, 1 to 2 ms at p50 on this machine (see "Measurements").
 
-`brishz_binary=y` goes straight to the JSON API's binary transport (`cmd_b64`,
-`stdin_b64`, `binary: 1`, and `b64_only: 1` for the smaller reply), as
-`brishzq.zsh` does. That opt-in promises that a garden without binary mode
-runs nothing, and the raw API cannot keep the promise: a garden in legacy
-mode serves it, runs the command through text, and only says so in its
-`X-Brish-Binary: 0` reply header. Without the opt-in, the raw API of a
-binary-mode garden (the default) is exact anyway. The streaming API has the
-same limit, so `brishz_binary=y` wins over `brishz_stream=y` too
-(`brishz_debug=y` says so).
+### `brishz_binary=y`
+
+The opt-in sends the same request with the query option `binary=1`, which
+asks for exact bytes: to the raw API, or with `brishz_stream=y` to the
+streaming API. The command and stdin travel as bytes, with no base64. Each
+garden generation answers it in its own way:
+
+- A binary-mode garden (the default) replies exactly anyway, so the option
+  changes nothing there. Its reply has `X-Brish-Binary: 1`, and is handled
+  exactly as without the opt-in: stdout, stderr, the retcode, notices (exit
+  200), and every exit status below.
+- A legacy-mode garden (`BRISH_BINARY=0`) from BrishGarden 8571467 on
+  refuses the request before running anything (`X-Brish-Refused: 1`).
+- A garden without the API asked for answers 404 or 405, and runs nothing.
+- A legacy-mode garden older than the option (BrishGarden before 8571467)
+  ignores it, as gardens ignore unknown query parameters, runs the command
+  in text mode, and replies with `X-Brish-Binary: 0`.
+
+After a refusal, a 404 or a 405, the request goes to the JSON API's binary
+transport (`cmd_b64`, `stdin_b64`, `binary: 1`, and `b64_only: 1` for the
+smaller reply), as `brishzq.zsh` sends it, with all of stdin, as for the
+fallback above. That is also the next step after the streaming API's 404,
+rather than the raw API: a garden without the streaming API predates
+`binary=1`, so in legacy mode its raw API would run the command in text
+mode, where its JSON API refuses it. The JSON reply must carry
+`X-Brish-Binary: 1`. Without it, `brishzgo` prints the message
+`brishzq.zsh` prints there (see [brishz-binary](brishz-binary.md)), under
+its own name, and exits 201, and the garden has run nothing: a legacy-mode
+garden refuses `binary: 1`, and a garden older than the binary fields
+(`ec61c63`, say) gets an empty command. A garden older than the raw API but
+with those fields (`42ddc9d`) runs it exactly.
+
+A 200 reply of the raw or streaming API that is not a refusal and lacks
+`X-Brish-Binary: 1` comes from the last kind of garden, which has run the
+command through text. Its output may have lost bytes, so `brishzgo` passes
+none of it on. It prints one line on stderr instead, with the command's
+retcode, and exits 201:
+
+```
+brishzgo: garden ran the command in text mode (no X-Brish-Binary: 1); it predates the binary=1 option and runs with BRISH_BINARY=0; output withheld; retcode 3
+```
+
+A notice from such a garden (an empty command, a `%GARDEN_` magic command)
+is withheld the same way, and the line opens with `garden answered in text
+mode with a notice, not a command's output` instead. A raw reply with
+retcode 9000 opens with `garden ran the command in text mode, or refused it
+and ran nothing`: a legacy-mode garden older than `X-Brish-Refused`
+(BrishGarden d0a9514 until 0fd2752) refuses input that text mode cannot
+carry with that retcode and no refusal header. `brishzq.zsh` and
+`brishz.dash` print the same lines (see [brishz-binary](brishz-binary.md)).
+
+The streaming API's headers come before any output, so `brishzgo` writes
+none there either. It reads such a reply to its exit frame first, dropping
+the output, since closing the connection earlier would make the garden
+kill the command half way. A reply that ends before its exit frame gives
+`retcode unknown`, and still exit 201. The streaming API came after
+`X-Brish-Refused`, so its replies never get the retcode 9000 opening.
+
+So under the opt-in, a garden without binary support runs nothing, or runs
+the command while `brishzgo` withholds its output and exits 201. Only a
+legacy-mode garden older than the `binary=1` option can still run the
+command, in text mode.
+
+`brishz_raw=n` keeps the opt-in on the JSON API's binary transport, as
+before. With `brishz_stream=y` too, the streaming API comes first, as it
+does without the opt-in, and the JSON API is its fallback.
 
 ### The streaming API
 
@@ -176,7 +234,7 @@ Fallbacks, when nothing ran:
 
 - HTTP 404 or 405, from a garden older than the streaming API: the raw API
   next (and the JSON API after it, if that is missing too), or the JSON API
-  with `brishz_raw=n`;
+  with `brishz_raw=n` or `brishz_binary=y`;
 - `X-Brish-Refused: 1`: the JSON API next, as for the raw API, since the
   raw API would refuse the same request.
 
@@ -225,8 +283,12 @@ As `brishzq.zsh`'s, except where "Where it differs" below says otherwise:
 - 200: a reply that is not a command's result, such as a notice (an empty
   command, a `%GARDEN_` magic command), printed with its trailing newlines
   replaced by one;
-- 201: `brishz_binary=y` and no `X-Brish-Binary: 1` in the reply, with the
-  same message on stderr; nothing ran;
+- 201: `brishz_binary=y` and no `X-Brish-Binary: 1` in the reply, with a
+  message on stderr. From the JSON API, the message of
+  [brishz-binary](brishz-binary.md) under `brishzgo`'s name; nothing ran.
+  From the raw or streaming API, the one in "`brishz_binary=y`" above,
+  with the command's retcode; the command ran in text mode, and its output
+  was withheld;
 - curl's exit codes for a failed request, which `brishzq.zsh` passes on:
   7 connection refused (and an unsupported proxy scheme), 6 host not
   resolved, 28 timeout (curl's default connect timeout of 300 s, no overall
@@ -325,3 +387,18 @@ branch with 24 workers, at a load average of about 2:
 - Ctrl-C (SIGINT) to `brishzgo` during `sleep 5; print -r -- ran >> file`:
   `brishzgo` dies of SIGINT and the file is never written; with the raw API
   the file appears 5 s later.
+
+On 2026-10-04, `brishz_binary=y` before and after it moved from the JSON API
+to the raw and streaming APIs, against a binary-mode smoke garden of
+BrishGarden `af16f49` with 2 workers, at a load average of 3 to 4,
+interleaved, after 10 warm-up rounds, with the `mark-me` wrapper:
+
+- `print -rn -- ok`, 200 rounds: p50 10.6 ms (p90 15.6 ms) over the JSON
+  API's binary transport, against 10.4 ms (15.8 ms) over the raw API and
+  10.5 ms (15.8 ms) over the streaming API, so the same within noise, since
+  `brishzgo` encodes the JSON request itself;
+- 1 MiB of random bytes through `cat`, 30 rounds, every one exact: p50
+  125 ms (p90 140 ms) over the JSON API, against 93 ms (104 ms) over the raw
+  API and 30 ms (32 ms) over the streaming API. Without the opt-in, 20
+  rounds took 92 ms over the raw API and 33 ms over the streaming API, so
+  `binary=1` itself costs nothing measurable.
