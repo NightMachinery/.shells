@@ -52,7 +52,7 @@ function md5-file-first-bytes {
 }
 ##
 ##
-setopt autocd multios re_match_pcre extendedglob pipefail interactivecomments hash_executables_only # hash_executables_only will not hash dirs instead of executables, but it can be slow.
+setopt autocd multios re_match_pcre extendedglob bareglobqual pipefail interactivecomments hash_executables_only # hash_executables_only will not hash dirs instead of executables, but it can be slow.
 setopt long_list_jobs complete_in_word always_to_end
 setopt append_history extended_history hist_expire_dups_first hist_ignore_dups hist_ignore_space hist_verify inc_append_history share_history
 setopt TYPESET_SILENT # Without this, the local/typeset commands display the value of any variable which is already defined.
