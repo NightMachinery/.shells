@@ -131,6 +131,24 @@ Source: `./hammerspoon/core/reload.lua` and [agfi:hs-reload-hold].
 - `hs -c 'return hammerspoonReloadHeldBy()'` answers "why did my save not do
   anything" — suppression is silent by default.
 
+### Calling Hammerspoon from a shell
+
+From zsh, use [agfi:hammerspoon] (`hammerspoon -c '...'`). It passes `-q`,
+gives `hs` an empty stdin, puts a timeout around it, and logs slow or failed
+calls. Anywhere else, call the binary as `hs -q -c '...' </dev/null`:
+
+- `</dev/null`, because with `-c` the client still reads stdin to its end
+  when stdin is not a terminal. A background shell's stdin never ends, so
+  the call hangs until killed and its answer is lost. This was most of the
+  "Hammerspoon stopped answering" stalls; see
+  `hammerspoon/docs/multi-monitor.md`.
+- Wrap it in `timeout`. Right after a reload, the first calls can go
+  unanswered for several seconds; retry rather than conclude Hammerspoon is
+  wedged.
+- A call the client gave up on may still run later, once Hammerspoon gets to
+  it, so do not resend an action that has side effects just because the
+  first call timed out. Check its effect first.
+
 ## Plugins
 ### Loading
 
