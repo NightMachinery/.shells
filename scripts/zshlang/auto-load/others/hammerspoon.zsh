@@ -342,7 +342,9 @@ function hs-alert-v1 {
     local msg="$*" dur="${alert_dur:-5}"
 
     msg="$(ecn $msg | text-wrap 90 | sdlit $'\n' '\n' | sdlit '"' '\"')" @TRET
-    sout hammerspoon -c "hs.alert (\"$msg\", ${dur})" # outputs a UUID thingy
+    #: One hs.alert per screen: on its own it shows on the focused screen only.
+    #: hs.alert.show(str, style, screen, seconds); {} keeps the default style.
+    sout hammerspoon -c "for _, s in ipairs(Screens.target('all')) do hs.alert.show(\"$msg\", {}, s, ${dur}) end"
     # https://www.hammerspoon.org/docs/hs.alert.html
 }
 ##
