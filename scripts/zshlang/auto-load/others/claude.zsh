@@ -160,7 +160,11 @@ function claude-install {
     #: npm for now, because pnpm cannot install claude-code at all; see
     #: [agfi:claude-install-pnpm].
     ##
-    claude-install-npm "$@"
+    claude update
+    #: @todo add native installer when not installed already
+    ##
+    # claude-install-npm "$@"
+    ##
 }
 ##
 function claude-autocommit {
