@@ -401,11 +401,13 @@ Found in real use on 2026-10-03, after the round above:
 - **mpv would not move to the other screen.** mpv keeps every position
   written over Accessibility inside its current screen, and leaving
   fullscreen it returns to a frame it remembers. hyper+shift+; now moves
-  windows of apps listed in `Screens.screenBoundApps` (mpv) into the other
-  screen's desktop Space when the plain move is refused, and drags them only
-  if that fails too; see "mpv: moved into the other screen's Space" in
+  any window whose plain move is refused into the other screen's desktop
+  Space, and drags it only if that fails too and its app is listed in
+  `Screens.screenBoundApps` (mpv); see "mpv: moved into the other screen's Space" in
   `docs/hammerspoon.md`. Six fullscreen moves of a test mpv, both
-  directions, all worked; the user's own mpv has not been moved with it yet.
+  directions, all worked. The user's own mpv moved, but stayed windowed on
+  the new screen; the fullscreen request now waits and is retried, untested
+  on a real press.
 
 Still unmeasured:
 

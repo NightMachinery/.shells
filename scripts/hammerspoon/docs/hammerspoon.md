@@ -354,18 +354,26 @@ in 0.37 (the one in use, with its config) and 0.41:
   it: a window-server move that mpv is not asked about. mpv then goes
   fullscreen on the new screen, and comes back out onto it.
 
-So when the Accessibility move leaves a window on its old screen, and its app
-is named in `Screens.screenBoundApps` (only mpv so far), `spaceMoveTo` moves
-it into the target screen's desktop Space (showing that Space first if a
+So when the Accessibility move leaves a window on its old screen,
+`spaceMoveTo` moves it into the target screen's desktop Space (showing that Space first if a
 fullscreen one covers it), waits until the window server lists it there, and
 gives it the frame `moveToScreen` would have: left alone, it kept a frame
 hanging off the screen's edge. The move call sometimes answers true and does
 nothing right after the window has left fullscreen, so it is made again until
 the window is listed in the Space; the console says when that took more than
-one try. Out of fullscreen, a listed app is first left to hold still for
-`kDragSettleStill`, since mpv animates toward the frame it remembers, rests
-there, and may then jump to another; the first version took that rest for
-the end.
+one try. This applies to every app, since it presses nothing and asks the
+app nothing; it has been measured on mpv only. Out of fullscreen, an app
+named in `Screens.screenBoundApps` (only mpv so far) is first left to hold
+still for `kDragSettleStill`, since mpv animates toward the frame it
+remembers, rests there, and may then jump to another; the first version took
+that rest for the end. Other apps are not made to wait, as the plain move
+works for them.
+
+After a Space move, the window is asked to go fullscreen again only once it
+holds still, and asked once more (`kFullscreenTries`) if the first request is
+lost. Asked straight away, while macOS was still showing the new Space, mpv
+stayed windowed on the new screen (2026-10-04, "but it did not go fullscreen
+again"). This retry has not yet been seen at work.
 
 If the Space move does not take either, the window is dragged by the middle of
 its frame (`dragTo`), as one by hand would: mpv drags its window by the video,
@@ -373,8 +381,8 @@ and a synthetic drag works once mpv is the active app. The drag refuses when
 another window covers the grab point, runs on timers, and prints its grab and
 drop points and where the window ended up. It is the last resort because it
 proved unreliable: it moved the 0.41 test mpv, but not the user's 0.37 mpv.
-Only listed apps get either fallback, because neither has been tried on
-anything else, and a press in the middle of most windows does something.
+Only listed apps get the drag, because a press in the middle of most windows
+does something.
 
 Measured through `Screens.moveWindowNext` with the 0.37 test mpv and the
 user's config (2026-10-03, after the retry went in): six fullscreen moves,

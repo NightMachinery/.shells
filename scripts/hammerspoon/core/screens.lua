@@ -799,6 +799,8 @@ end
 -- took the rest for the end, the move counted as done because the window
 -- happened to be on the target screen, and mpv then jumped back.
 local kDragSettleStill, kDragSettleMax, kDragSettlePoll = 0.5, 3, 0.1
+-- How many times a window is asked to go fullscreen again after a move.
+local kFullscreenTries = 2
 
 local function whenStill(w, done)
     local deadline = hs.timer.secondsSinceEpoch() + kDragSettleMax
@@ -887,9 +889,11 @@ local function spaceMoveTo(w, to, done)
     poll()
 end
 
---- moveTo; when the window refused to leave its screen and its app is in
---- screenBoundApps, spaceMoveTo, then dragTo; done(moved, how), `how'
---- naming the way that did it. With
+--- moveTo; when the window refused to leave its screen, spaceMoveTo, and
+--- for an app in screenBoundApps then dragTo; done(moved, how), `how'
+--- naming the way that did it. The Space move is tried for every app: it
+--- presses nothing and asks the app nothing. The drag presses in the middle
+--- of the window, so only listed apps get it. With
 --- `settle', a window of a screenBoundApps app is first left to hold still
 --- (see kDragSettleStill), for the move out of fullscreen.
 local function moveOrDrag(w, to, done, settle)
@@ -900,8 +904,9 @@ local function moveOrDrag(w, to, done, settle)
     end
     local okm, moved = pcall(moveTo, w, to)
     if okm and moved then return done(true) end
-    if not (name and Screens.screenBoundApps[name]) then return done(false) end
+    local listed = name and Screens.screenBoundApps[name]
     local function drag()
+        if not listed then return done(false) end
         local okd, err = pcall(dragTo, w, to, function(landed)
             done(landed, landed and ", dragged" or nil)
         end)
@@ -1147,9 +1152,24 @@ function Screens.moveWindowNext(delta)
             mark("moved")
             -- Back into fullscreen whether or not it moved, so a failed move
             -- leaves the window fullscreen where it was, as it was found.
+            -- After a Space move, only once the window holds still: asked
+            -- while macOS was still showing the new Space, mpv stayed
+            -- windowed (2026-10-04, "it did not go fullscreen again").
+            -- Asked twice for the same reason should the first be lost.
             local sinceBack = newestWindowId()
-            pcall(function() w:setFullScreen(true) end)
-            whenSettled(w, true, pid, sinceBack, function(back)
+            local function enter(triesLeft, cb)
+                pcall(function() w:setFullScreen(true) end)
+                whenSettled(w, true, pid, sinceBack, function(back)
+                    if back or triesLeft <= 1 then return cb(back) end
+                    print("Screens.moveWindowNext: " .. appName .. " did not go fullscreen again; asking once more")
+                    enter(triesLeft - 1, cb)
+                end)
+            end
+            local function settled(fn)
+                if how == ", moved to its Space" then return whenStill(w, fn) end
+                fn()
+            end
+            settled(function() enter(kFullscreenTries, function(back)
                 mark("fullscreen again")
                 if not moved then
                     return finish(false, back and " (it is fullscreen again where it was)"
@@ -1176,7 +1196,7 @@ function Screens.moveWindowNext(delta)
                         focusBand(left[1].screen, "a leftover picture of " .. appName .. " stayed here")
                     end
                 end)
-            end)
+            end) end)
         end, true)
     end)
 end
