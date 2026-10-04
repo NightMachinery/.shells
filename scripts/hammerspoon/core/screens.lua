@@ -1222,9 +1222,10 @@ end
 --- kept per row count and screen across reloads. Only a chooser's first show
 --- is recorded: ten rows measured 621 pt on a new chooser's first show and
 --- 514 on its next, on the same screen (2026-10-04), and every chooser here
---- is made afresh per press. Until a height is seen, the native show() runs
---- when the target is the primary screen anyway, and a guess places it
---- elsewhere.
+--- is made afresh per press. Both screens gave 621, so a screen with no
+--- height of its own borrows another screen's for the same row count. Until
+--- any is seen, the native show() runs when the target is the primary screen
+--- anyway, and a guess places it elsewhere.
 -- The metatable exists once the lazily loaded extension is.
 require("hs.chooser")
 local chooserMeta = hs.getObjectMetatable("hs.chooser")
@@ -1261,6 +1262,19 @@ local function chooserHeights()
     return ok and type(t) == "table" and t or {}
 end
 
+--- The height to place a chooser of `rows' rows by on `screen': its own, else
+--- one seen on another screen, else nil.
+function Screens.chooserHeightFor(rows, screen)
+    local t = chooserHeights()
+    local own = t[chooserHeightKey(rows, screen)]
+    if own then return own end
+    local prefix = tostring(rows) .. "@"
+    for k, v in pairs(t) do
+        if k:sub(1, #prefix) == prefix then return v end
+    end
+    return nil
+end
+
 -- Record under `key' the height of the chooser window just shown, `w' wide:
 -- the only window of ours that wide above the normal layer.
 local function chooserMeasure(key, w)
@@ -1287,7 +1301,7 @@ chooserMeta.show = function(self, topLeft)
 
     local f, w, rows = target:frame(), chooserWidth(self), self:rows()
     local key = chooserHeightKey(rows, target)
-    local h = chooserHeights()[key]
+    local h = Screens.chooserHeightFor(rows, target)
     local x = math.floor(f.x + (f.w - w) / 2)
     if h == nil and target:id() == hs.screen.primaryScreen():id() then
         native(self)

@@ -1839,11 +1839,12 @@ The point needs the window's size:
   (`kChooserHeightsKey`), so it survives reloads. Only a chooser's first show
   is recorded: a new chooser's ten rows measured 621 pt on its first show and
   514 on its next, on the same screen, and every chooser here is made afresh
-  per press. Before a height has been
-  seen, a chooser bound for the primary screen takes the native `show()`,
-  which records it, and one bound elsewhere is placed with a guessed height
-  (`kChooserHeightGuess`): on the right screen, but possibly a little off
-  vertically, once per row count and screen.
+  per press. Both screens gave 621, so a screen with no height of its own
+  borrows another screen's for the same row count. Before a height has been
+  seen on any screen, a chooser bound for the primary screen takes the
+  native `show()`, which records it, and one bound elsewhere is placed with a
+  guessed height (`kChooserHeightGuess`): on the right screen, but possibly a
+  little off vertically, once per row count.
 
 `hs.screen.mainScreen()` lags the focused screen (see "Where focus is" in
 `docs/multi-monitor.md`), so right after focus moves screens the width can

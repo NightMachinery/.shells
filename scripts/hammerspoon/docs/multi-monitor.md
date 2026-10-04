@@ -432,7 +432,19 @@ Found in real use on 2026-10-04:
   came back within a point of its frame.
 - **Choosers on the monitor,** now primary: a first native show and a fresh
   wrapped one both landed a quarter of the way down the free height (0.251,
-  0.249). The laptop, no longer primary, has not had one yet.
+  0.249). On the laptop, with no height of its own yet, the first sat at
+  0.383 on the guess and the next at 0.248; both screens gave the same
+  height, so a screen now borrows another's before guessing.
+- **Fullscreen moves after the switch:** a scratch Finder window went from
+  fullscreen on the laptop to fullscreen on the monitor and back, about 1.6 s
+  each, with no stand-in left behind.
+- **hyper+; with nothing on the monitor's Space** moved the pointer there and
+  showed "no windows", as designed; finding that out took 20 ms for the
+  focused screen and 15 for the window list.
+- **`hs -c` stalls.** Several `hs -c` calls from a shell got no answer within
+  20 to 30 s while Hammerspoon went on running its own timers, and a press
+  sent through one arrived about a minute late. Not investigated; see
+  `core/ipc-fix.lua` for the earlier IPC problem.
 
 Still unmeasured:
 
