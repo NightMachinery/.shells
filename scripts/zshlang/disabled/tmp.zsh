@@ -1,5 +1,8 @@
 ##
-function fz-rtl1() {
+function fz-rtl1 {
+    #: @test5.5/sth6
+    #: hi
+    ##
     local input="$(cat)" q="$1" opts=("${@[2,-1]}")
 
     local sels_i="$(echo "$input" |

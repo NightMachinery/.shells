@@ -67,7 +67,7 @@ in [agfi:ffz-get] got copied twice before fzf even started."
     { print -r -- "$first" ; command cat } | fzf-gateway "$@"
 }
 
-function fzf-gateway() {
+function fzf-gateway {
     local -x SHELL="${FZF_SHELL:-${commands[dash]}}"
 
     bella_zsh_disable1
