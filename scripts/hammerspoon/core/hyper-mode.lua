@@ -302,7 +302,7 @@ function bindToKey(params)
     }
 end
 
-for _, key in ipairs({"[", "-"}) do
+for _, key in ipairs({"["}) do -- "-" is no longer used by our AltTab config after it made having more than one shortcut a Pro feature.
     -- AltTab Window Switcher:
     -- Its proper functions needs the modifier keys to be kept pressed while the hyper mode is active. I.e., it really needs the hyper mode to be the same thing as having the modifiers pressed.
     -- I don't know of a way to do that (see [[id:6fcee871-a0f9-46b5-af2f-a9b767c48422][@me How can I make Hammerspoon press modifier keys? · Issue #3582 · Hammerspoon/hammerspoon]]), but we could add `hyper_modality.press_on_exit = {"space"}`. This would make the common usage of the window switcher painless, but it might break the more advanced usage of it; like pressing =w= to close a window.
