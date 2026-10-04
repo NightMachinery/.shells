@@ -487,9 +487,9 @@ fullscreen apps on the monitor eight times each way:
 
 So it would only add latency here. It might compare better with Reduce
 Motion off, which was not measured. Run straight from Homebrew, the CLI was
-still quarantined and took 1.5 to 19 s per call until
-`/usr/bin/xattr -dr com.apple.quarantine` was run on the app; the anaconda
-`xattr` earlier on PATH has no `-r`.
+still quarantined and took 1.5 to 19 s per call until the quarantine
+attribute was removed from the app (`/usr/bin/xattr -dr`; another `xattr`
+earlier on PATH may lack `-r`).
 
 ### Which display macOS counts as active
 
@@ -524,6 +524,19 @@ sometimes the laptop.
     this would need a change in kitty. With it, kitty would no longer be
     the frontmost app while the panel has the keyboard, which the hooks
     here that hide the panel when another app comes forward assume it is.
+- **What the other display has to show (2026-10-04),** with the stand-in
+  panel over a fullscreen app on the monitor:
+  - the laptop on its empty desktop: the active display flips to it;
+  - the laptop's desktop with a normal window on it (a borderless window
+    from another process, confirmed on screen): it still flips;
+  - Finder's desktop turned on (`CreateDesktop`), icons hidden: it still
+    flips. Finder also listed only one desktop window over Accessibility,
+    on the monitor, so there was no laptop desktop for hyper+; to focus;
+  - the laptop on a fullscreen Space (another app's): no flip.
+
+  So the active display goes to a display showing a desktop Space, with
+  windows on it or not. A fullscreen window on the laptop prevents it; a
+  plain window or the Finder desktop does not.
 - **Dead end: setting the active display directly.**
   `SLSSetActiveMenuBarDisplayIdentifier`, which yabai calls since March 2025
   to focus an empty display, returned success and changed nothing on macOS
