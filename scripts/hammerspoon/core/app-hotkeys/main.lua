@@ -237,6 +237,9 @@ recentAppsTransient = {
     ["org.hammerspoon.Hammerspoon"] = true,
     ["org.p0deje.Maccy"] = true,
     ["com.pais.handy"] = true,
+    -- Screen Decor (core/screen-decor.lua) takes focus for a moment while it
+    -- covers an empty desktop before a kitty panel show.
+    ["night.screen-decor"] = true,
 }
 
 recentApps = {}
