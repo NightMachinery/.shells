@@ -74,7 +74,7 @@ comp-set '=eval' ruu reval reval-to llm-run reval-to-llm reval-to-flash reval-to
 #: See `docs/zsh-completion-aliases.md'.
 # @todo8 '@opts' needs a custom completor that feeds the items after '@' to the evil completor
 ##
-comp-set '=rsync' rsp-safe rsp-safe2 rsp-dl
+comp-set '=rsync' rsp rspb rspbm rspm rsp-safe rsp-safe2 rsp-dl
 ##
 rexa "compdef _=ls" pbadd mv # mv had a bug I think?
 # rexa "compdef _=man" mn # @alt =eval
