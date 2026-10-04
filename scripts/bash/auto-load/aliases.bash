@@ -158,16 +158,19 @@ function uv-pip {
 function pip-install {
     #: @duplicateCode/47062dbd66e1829f2778ed5684a5e8ff
     ##
-    local opts
-    opts=(--native-tls)
+    local opts=()
 
     if [[ "$1" =~ '^git\+' ]] ; then
         #: =uv= doesn't support =git= links
         ##
-        pip install "${opts[@]}" "$@"
-        pip install "${opts[@]}" --no-deps --force-reinstall "$@"
+        pip install "$@"
+        pip install --no-deps --force-reinstall "$@"
     else
-        uv-pip install "${opts[@]}" -U "$@"
+        #: Certificate-store flags are uv-only, not pip options.
+        if isdefined-cmd uv ; then
+            opts+=(--system-certs)
+        fi
+        uv-pip install "${opts[@]}" --upgrade "$@"
     fi
 }
 alias pi='\noglob pip-install'

@@ -58,7 +58,10 @@ that env cannot break a tool.
 - A tool that Homebrew already ships (`ocrmypdf`, `googler`,
   `speedtest-cli`) stays a brew formula, not a uv tool.
 - `pi` ([agfi:pip-install]) installs into the env that owns the `python3`
-  on `PATH`, through [agfi:uv-pip].
+  on `PATH`, through [agfi:uv-pip]. Its uv installs use `--system-certs` to
+  trust the platform certificate store. This replaces uv's deprecated
+  `--native-tls` option; the pip fallback and Git-install path receive no
+  uv-specific certificate flags.
 
 ## Upgrading Python
 
