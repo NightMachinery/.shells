@@ -9,16 +9,18 @@
 ---
 --- It is an hs.eventtap. Taps run before Carbon hotkeys and before any app, so
 --- a callback returning true drops the event for everyone -- every other hyper
---- binding included. The allowlist is four things: F18, the physical hyper
+--- binding included. The allowlist is five things: F18, the physical hyper
 --- key, so the hyper modal can still be entered; F2 with shift while hyper
 --- mode is entered, which ends the blackout; F1 with shift and cmd while hyper
 --- mode is entered, which marks the blackout lock-first; and F1 with cmd alone
---- while hyper mode is entered, which locks the session on the spot. The last
---- two act *without* ending the blackout, and can only make the way out
---- stricter. None of the three chords reaches an app: the lock tap only passes
---- them, and the chord tap below swallows them itself.
+--- while hyper mode is entered, which locks the session on the spot; and F10
+--- alone while hyper mode is entered, which mutes the output (after a short
+--- cue) if it is not muted already. The last three act *without* ending the
+--- blackout: two can only make the way out stricter, and the mute can only
+--- quieten, never unmute. None of the four chords reaches an app: the lock
+--- tap only passes them, and the chord tap below swallows them itself.
 ---
---- Those four are the allowlist for a *person*. Software is not held to it:
+--- Those five are the allowlist for a *person*. Software is not held to it:
 --- this lock is here to stop another person physically using the machine, and
 --- it was never meant to stop local tools. Every event carries the state id of
 --- the source that made it, and anything that made a source of its own -- this
@@ -138,6 +140,12 @@ if blackoutUpgradeSound == nil then blackoutUpgradeSound = "Submarine" end
 --- still lit and the band is the confirmation, for the moment it lasts.
 if blackoutLockNowSound == nil then blackoutLockNowSound = "Glass" end
 
+--- The cue hyper+F10 plays while the lock is up, just before it mutes the
+--- output: the screen is black, so the sound is the only acknowledgement. It
+--- plays on the device about to be muted, and the mute waits for it to end.
+--- A name from /System/Library/Sounds, or false to mute silently.
+if blackoutMuteSound == nil then blackoutMuteSound = "Tink" end
+
 --- Whether hs.caffeinate.lockScreen() is really called. Locking the session is
 --- the one thing this module does that a test cannot undo -- it lands the
 --- tester on the login screen, where Secure Input hides the very chords that
@@ -248,6 +256,8 @@ local kEscapeKeyCode = hs.keycodes.map.f2 or 120
 --- is already up, and with cmd alone it locks the session now -- the two
 --- other things the lock lets by.
 local kBlackKeyCode = hs.keycodes.map.f1 or 122
+--- hyper+F10, the mute key; under the lock it may only mute (see chordFor).
+local kMuteKeyCode = hs.keycodes.map.f10 or 109
 
 local types = hs.eventtap.event.types
 local properties = hs.eventtap.event.properties
@@ -313,6 +323,38 @@ local function playCue(key, name)
 
     if st.sounds[key] then st.sounds[key]:play() end
     return st.sounds[key] ~= nil
+end
+
+--- hyper+F10 under the lock: mute the default output if it is not muted
+--- already, after playing blackoutMuteSound on it so the press is heard
+--- before the black screen goes quiet. Already muted, it does nothing, sound
+--- included. Never unmutes: the lock is there for whoever is not you, and
+--- the most such a press can do is quieten the room. The device is taken at
+--- the press, so a default that changes during the cue does not get muted in
+--- its place. Returns whether it muted (or will, once the cue ends).
+function blackoutMuteAcknowledged()
+    local dev = hs.audiodevice.defaultOutputDevice()
+    if not dev then
+        print("blackout-lock: hyper+F10: no default output device")
+        return false
+    end
+    if dev:outputMuted() then return false end
+
+    local wait = 0
+    if playCue("mute", blackoutMuteSound) then
+        local snd = blackoutLockState.sounds["mute"]
+        local d = snd and snd:duration()
+        wait = (type(d) == "number" and d > 0) and d or 0.3
+    end
+
+    local st = blackoutLockState
+    if st.muteTimer then st.muteTimer:stop() end
+    st.muteTimer = hs.timer.doAfter(wait, function()
+        st.muteTimer = nil
+        if not dev:outputMuted() then dev:setOutputMuted(true) end
+        print("blackout-lock: hyper+F10 muted the output")
+    end)
+    return true
 end
 
 --- The one place this module locks the session, so that one knob can stand
@@ -414,10 +456,11 @@ local function handleEvent(event)
             return false
         end
 
-        --- The three chords that may act while the lock is up: F2 with shift
-        --- ends the blackout, F1 with shift and cmd marks it lock-first, and
-        --- F1 with cmd alone locks the session now. Passed rather than acted
-        --- on here -- the chord dispatch tap owns all three and swallows them
+        --- The four chords that may act while the lock is up: F2 with shift
+        --- ends the blackout, F1 with shift and cmd marks it lock-first, F1
+        --- with cmd alone locks the session now, and F10 alone mutes. Passed
+        --- rather than acted on here -- the chord dispatch tap owns all four
+        --- and swallows them
         --- itself, so none ever reaches an app. That tap runs exactly while
         --- hyper mode is entered, which is what makes hyperEntered() the
         --- right guard: nothing is let by that has no tap waiting to eat it.
@@ -439,6 +482,11 @@ local function handleEvent(event)
             --- readable. Falling through to the `return true' below is what
             --- drops them, so this reads as an omission unless said out loud.
             if not flags.alt and not flags.ctrl then
+                --- Plain hyper+F10 mutes, and under the lock it can only
+                --- mute, never unmute: like the rungs, it only goes one way.
+                if keyCode == kMuteKeyCode and not flags.shift and not flags.cmd then
+                    return false
+                end
                 if flags.shift then
                     if keyCode == kBlackKeyCode and flags.cmd then
                         return false
@@ -1196,6 +1244,7 @@ end
 local kChordKeys = {
     [kBlackKeyCode] = "f1",
     [kEscapeKeyCode] = "f2",
+    [kMuteKeyCode] = "f10",
 }
 
 --- Which chord this event is, or nil for anything the tap must not touch.
@@ -1212,6 +1261,14 @@ local function chordFor(keyName, flags)
     --- else, because F2 has no other meaning here. The F1 rungs stay strict,
     --- since there the modifiers are what tells the rungs apart.
     if keyName == "f2" and flags.shift then return "restore" end
+
+    --- Plain hyper+F10: "mute", which handleChordEvent claims only while the
+    --- lock is up. Otherwise the press is left to the ordinary hyper+F10
+    --- binding (core/window-media-bindings.lua), which toggles.
+    if keyName == "f10" then
+        if flags.shift or flags.cmd or flags.alt or flags.ctrl then return nil end
+        return "mute"
+    end
 
     --- Contrast, on ctrl. Placed after the escape above so the way out of a
     --- blackout keeps winning over everything, and before the blanket reject
@@ -1282,6 +1339,8 @@ local kChordExitsMode = {
     ["black-lock-first"] = true,
     ["black-lock-now"] = true,
     ["restore"] = true,
+    --- As the ordinary hyper+F10 binding does (bindV1 auto-triggers).
+    ["mute"] = true,
 }
 
 --- What a chord actually does, once the note gate in blackoutChordRun below
@@ -1311,6 +1370,8 @@ local function runChordNow(chord)
         blackoutLockNow()
     elseif kChordRung[chord] then
         if blackoutChordBegin then blackoutChordBegin(chord == "black-lock-first") end
+    elseif chord == "mute" then
+        blackoutMuteAcknowledged()
     elseif chord == "contrast-dec" or chord == "contrast-inc" then
         --- Explicit, and before the brightness arm below, which is a catch-all:
         --- anything reaching it is assumed to be a brightness step.
@@ -1507,10 +1568,11 @@ local function handleChordEvent(event)
     --: Anything with no chord of its own is left alone entirely.
     if not chord then return false end
 
-    --- While the lock is up three chords still do something: the one that
-    --- ends the blackout, and the two that tighten it -- hyper+shift+cmd+F1
+    --- While the lock is up four chords still do something: the one that
+    --- ends the blackout, the two that tighten it -- hyper+shift+cmd+F1
     --- marks a blackout already up as lock-first, and hyper+cmd+F1 locks the
-    --- session outright. Nothing goes the other way, and plain hyper+shift+F1
+    --- session outright -- and hyper+F10, which can only mute. Nothing goes
+    --- the other way, and plain hyper+shift+F1
     --- stays swallowed, since re-blacking a black screen would only restart
     --- the garden's loop.
     ---
@@ -1521,10 +1583,15 @@ local function handleChordEvent(event)
     --- once at black-on, so this one is almost always asked first. Almost.
     --- Edit the two together, or the ladder acquires a rung that works only
     --- when nothing is black.
+    ---
+    --- "mute" is the one chord that exists only under the lock: without it,
+    --- hyper+F10 belongs to its ordinary binding, which toggles.
+    if chord == "mute" and not blackoutLockActive() then return false end
     if blackoutLockActive()
         and chord ~= "restore"
         and chord ~= "black-lock-first"
-        and chord ~= "black-lock-now" then
+        and chord ~= "black-lock-now"
+        and chord ~= "mute" then
         return true
     end
 

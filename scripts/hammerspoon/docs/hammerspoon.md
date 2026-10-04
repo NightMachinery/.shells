@@ -1161,8 +1161,8 @@ hyper+shift+F1 blanks every display, but on its own that changes nothing about
 input: whatever had focus still has it, so a brushed key types into a window
 you cannot see, a hardware brightness key raises the level you just cut, and
 any other hyper chord fires blind. While the blackout is up, the lock swallows
-all of that. Three chords still do something: the one that ends the blackout,
-and the two that tighten it.
+all of that. Four chords still do something: the one that ends the blackout,
+the two that tighten it, and hyper+F10, which mutes.
 
 It is an `hs.eventtap`, which runs before Carbon hotkeys and before any app, so
 returning `true` from its callback drops an event for everyone at once — every
@@ -1172,7 +1172,7 @@ and `systemDefined` (the hardware brightness and media keys), and with
 are left alone: a lone modifier is harmless, and the escape chord's modifiers
 are read off the F2 event itself.
 
-Exactly four things pass through from a keyboard. F18, the physical hyper key,
+Exactly five things pass through from a keyboard. F18, the physical hyper key,
 so the hyper modal can still be entered; F2 with shift while hyper mode is entered —
 whatever else is down with it, since Sticky Keys is on and a modifier left
 stuck must not turn the one way out into a dropped press — which goes through
@@ -1184,6 +1184,13 @@ leaves it up; and F1 with cmd *alone* while hyper mode is entered, which locks
 the macOS session on the spot and leaves the blackout up as well. Those last
 two are the inputs the lock passes that do not end the blackout, and neither
 can do anything but make the way out stricter.
+
+The fifth is hyper+F10 with no other modifier. Outside the lock it toggles mute
+as always. Under the lock it only mutes: if the default output is not muted, it
+plays `blackoutMuteSound` on it (the screen is black, so a sound is the only
+acknowledgement) and mutes once the cue has played. If the output is already
+muted it does nothing, so a stranger at the keyboard can quieten the room but
+never unmute it.
 
 The contrast keys, hyper+ctrl+F1/F2, are deliberately *not* among them, for the
 same reason the brightness keys are not: a screen that has been blacked must
