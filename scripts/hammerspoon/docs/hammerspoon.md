@@ -2009,7 +2009,8 @@ display that shows a desktop Space. So when the Lua global
 on an empty desktop with Screen Decor (`core/screen-decor.lua`), a fullscreen
 window painted with that screen's desktop picture, gives focus back to the
 window you were in, and only then shows the panel, on the screen resolved
-before the cover. The first cover after login launches the app; later ones
+before the cover (`screen_decor_cover_with` can bring forward an app already
+fullscreen on that screen instead). The first cover after login launches the app; later ones
 cost a Space slide on the covered screen, and only when it has gone back to
 its desktop. See "Which display macOS counts as active" in
 `docs/multi-monitor.md`.

@@ -6,8 +6,9 @@
 --- before such a show, ScreenDecor.coverFor puts every other screen that
 --- sits on an empty desktop into a fullscreen Space of Screen Decor's own:
 --- one window painted with that screen's desktop picture, which looks like
---- the desktop it covers. See docs/multi-monitor.md, "Which display macOS
---- counts as active", for the measurements behind this.
+--- the desktop it covers. screen_decor_cover_with can instead bring forward
+--- an app already fullscreen on that screen. See docs/multi-monitor.md,
+--- "Which display macOS counts as active", for the measurements behind this.
 ---
 --- Screen Decor is the small Cocoa app in screen-decor/ next to this file.
 --- It is built on demand into screen_decor_app (screen-decor/build.sh),
@@ -27,6 +28,15 @@ local kCoverNote = "night.screen-decor.cover"
 
 -- Where the app is built and run from.
 if screen_decor_app == nil then screen_decor_app = os.getenv("HOME") .. "/Applications/ScreenDecor.app" end
+
+-- What covers a screen. An enum:
+--   "decor"           always Screen Decor, so the screen keeps looking like
+--                     the desktop it was left on
+--   "fullscreen-app"  bring forward an app that is already fullscreen in
+--                     another Space of that screen (the newest one,
+--                     screenAppWindowOn in core/app-hotkeys/main.lua), and
+--                     use Screen Decor only when there is none
+if screen_decor_cover_with == nil then screen_decor_cover_with = "decor" end
 
 local srcDir = nightdir .. "/hammerspoon/screen-decor"
 local kSources = { "ScreenDecor.m", "Info.plist", "build.sh" }
@@ -118,18 +128,43 @@ local function waitFor(pred, seconds, cb)
     tick()
 end
 
+-- An app already fullscreen in another Space of `screen', as a
+-- screenReturnTarget-shaped table, or nil.
+local function fullscreenAppOn(screen)
+    if not screenAppWindowOn then return nil end
+    local ok, t = pcall(screenAppWindowOn, screen, function(w) return w:isFullScreen() end)
+    return ok and t or nil
+end
+
 -- Covers `screens' and calls cb(ok) once every one shows a fullscreen Space.
+-- Each is covered as screen_decor_cover_with says.
 function ScreenDecor.cover(screens, cb)
     if #screens == 0 then return cb(true) end
+    local decorScreens = {}
+    for _, s in ipairs(screens) do
+        local t = screen_decor_cover_with == "fullscreen-app" and fullscreenAppOn(s)
+        if t then
+            print("screen-decor: covering " .. tostring(s:name()) .. " with " .. tostring(t.app:bundleID()))
+            screenReturnFocus(t, "screen-decor")
+        else
+            decorScreens[#decorScreens + 1] = s
+        end
+    end
+    if screen_decor_cover_with ~= "decor" and screen_decor_cover_with ~= "fullscreen-app" then
+        print("screen-decor: unknown screen_decor_cover_with " .. tostring(screen_decor_cover_with) .. "; using the decor")
+    end
+
     local app = hs.application.get(kBundleID)
     local wait = kWarmWaitSeconds
-    if app then
-        for _, s in ipairs(screens) do
+    if #decorScreens == 0 then
+        -- Every screen got an app; nothing for the decor to do.
+    elseif app then
+        for _, s in ipairs(decorScreens) do
             hs.distributednotifications.post(kCoverNote, s:getUUID())
         end
     else
         local argv = { "-a", screen_decor_app, "--args" }
-        for _, s in ipairs(screens) do
+        for _, s in ipairs(decorScreens) do
             argv[#argv + 1] = "--cover"
             argv[#argv + 1] = s:getUUID()
         end
@@ -159,7 +194,8 @@ local function windowToRestore(target, stack)
 end
 
 --- Prepares a show on `target' (an hs.screen) of a panel that activates its
---- app: covers what ScreenDecor.wanted names, gives focus back to the window
+--- app: covers what ScreenDecor.wanted names (with the decor or a
+--- fullscreen app, per screen_decor_cover_with), gives focus back to the window
 --- the user was in on `target', and then calls cb(covered), where covered
 --- says whether anything was covered. Nothing to cover calls cb(false) at
 --- once, and so does a cover skipped while the app builds; a cover that

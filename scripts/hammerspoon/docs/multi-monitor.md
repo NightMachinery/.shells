@@ -575,6 +575,13 @@ on:
 2. Covering activates Screen Decor, which makes that screen active. So once
    every covered screen shows a fullscreen Space, the window the user was in
    on the panel's screen gets focus back.
+   By default every such screen gets the decor, so it keeps looking like
+   the desktop it was left on. With the enum `screen_decor_cover_with` set
+   to `fullscreen-app`, a screen with an app already fullscreen in another
+   of its Spaces gets that app brought forward instead (the newest such
+   app, found by `screenAppWindowOn`, the same search hyper+; falls back
+   on), and only a screen with none gets the decor. That costs no extra
+   Space, but a hyper+z on one screen changes which app the other shows.
 3. Then the panel is shown on the screen resolved in the first step
    (`kittyPanelShow`'s `target` option), not on whatever the working screen
    is by now.
