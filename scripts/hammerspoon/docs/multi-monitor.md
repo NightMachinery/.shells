@@ -444,8 +444,9 @@ Still unmeasured:
 
 Known gaps:
 
-- **The avy grid overhangs its screen** by one cell on every side, so next to
-  a second monitor the edge cells are drawn on the neighbour.
+- **The avy grid overhangs its screen** by one cell on every side, by its
+  frame. In real use on the monitor (2026-10-04) nothing of it showed on the
+  laptop, so this is left as it is.
 - **Window-mode kitty** shows on the `working` screen now, like the panel
   (changed 2026-10-04, untested: window mode is not in daily use). Its hide
   still hides kitty first and focuses the return
