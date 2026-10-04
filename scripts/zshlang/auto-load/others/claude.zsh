@@ -748,6 +748,8 @@ function claude-code-usage-all {
     #: whose stdout is a pipe rather than the terminal, and =--color auto= would
     #: then quietly resolve to "no colour" for the command run most often.
     ##
+    bella_zsh_disable1
+
     local profiles=("${claude_code_profile_order[@]}")
     assert-args profiles @RET
 

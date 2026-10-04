@@ -194,6 +194,8 @@ function tmuxnewsh2-attach-z {
     #: prints is what you type to come back. With a tag it attaches to the
     #: existing session if there is one.
     ##
+    bella_zsh_disable1
+
     local force_i="${tmuxnewsh2_attach_z_force_interactive:-y}"
     local spec="${1}"
     assert-args spec @RET

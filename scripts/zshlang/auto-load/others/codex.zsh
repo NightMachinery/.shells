@@ -201,6 +201,8 @@ function codex-clean-text {
 }
 ##
 function codex-status {
+    bella_zsh_disable1
+
     local codex_status_timeout_s="${codex_status_timeout_s:-60}"
     local codex_status_retries="${codex_status_retries:-10}"
     local codex_status_profile="${codex_status_profile:-}"

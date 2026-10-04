@@ -145,6 +145,8 @@ function h-agent-status-one {
 function agent-status {
     #: Every agent's quota at once. See =docs/agent-usage-armed.md=.
     ##
+    bella_zsh_disable1
+
     local color_mode="${agent_status_color:-auto}"
 
     #: Resolved before the pipeline below, so that =auto= tests *our* stdout
