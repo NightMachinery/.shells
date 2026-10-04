@@ -728,10 +728,24 @@ end
 --- for eleven apps and no match (2026-10-04).
 --- Panel-mode kitty is skipped, as in screenReturnTarget.
 function screenFocusFallback(screen, stack)
-    local panelKitty = kitty_hotkey_mode == "panel" and "net.kovidgoyal.kitty" or nil
-    local function skip(pid, bid) return panelKitty ~= nil and bid == panelKitty end
-    local t = screenReturnOnScreen(screen, skip, nil, stack or Screens.windowStack())
+    local t = screenReturnOnScreen(screen, screenSkipPanelKitty, nil, stack or Screens.windowStack())
     if t then return t end
+    return screenAppWindowOn(screen)
+end
+
+-- Whether to leave an app out of the searches above: panel-mode kitty.
+function screenSkipPanelKitty(pid, bid)
+    return kitty_hotkey_mode == "panel" and bid == "net.kovidgoyal.kitty"
+end
+
+--- Step 2 of screenFocusFallback on its own: the newest app (recent apps,
+--- then every other regular app) whose focused (or main) window is on
+--- `screen', not minimized, and passes accept(window) when given, as a
+--- screenReturnTarget-shaped table, or nil. Its window may be in a Space the
+--- screen is not showing. ScreenDecor (core/screen-decor.lua) uses it to
+--- find a fullscreen app there.
+function screenAppWindowOn(screen, accept)
+    local skip = screenSkipPanelKitty
     -- Recent apps first, then every other regular app: the recent lists
     -- start empty after a reload, and a fullscreen Paseo on the laptop was
     -- missed that way (2026-10-04).
@@ -747,7 +761,8 @@ function screenFocusFallback(screen, stack)
         if appReturnUsable(a) then
             local ok, w = pcall(function()
                 local w = a:focusedWindow() or a:mainWindow()
-                if w ~= nil and not w:isMinimized() and w:screen():id() == screen:id() then return w end
+                if w ~= nil and not w:isMinimized() and w:screen():id() == screen:id()
+                    and (accept == nil or accept(w)) then return w end
                 return nil
             end)
             if ok and w then return { app = a, window = w, why = "its window is here, in another Space" } end
