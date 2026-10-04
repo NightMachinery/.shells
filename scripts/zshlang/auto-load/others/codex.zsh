@@ -132,7 +132,7 @@ function codex-m {
     #: repeated Termux toasts. Thread-name generation can still briefly animate;
     #: TUI animations stay enabled. User arguments can override this default.
     #: See =docs/tmux-tty-title.md=.
-    $proxyenv reval-ec codex "${security_opts[@]}" -c model_reasoning_summary="detailed" -c 'tui.terminal_title=["project-name","thread-name"]' --search --approve-for-me "$@"
+    $proxyenv reval-ec codex "${security_opts[@]}" -c model_reasoning_summary="detailed" -c 'tui.terminal_title=["project-name","thread-name"]' -c tui.animations=true --search --approve-for-me "$@"
     # -c web_search="true"
     # -c model_verbosity="high"
     #
