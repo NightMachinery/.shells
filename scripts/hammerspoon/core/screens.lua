@@ -1200,4 +1200,82 @@ function Screens.moveWindowNext(delta)
         end, true)
     end)
 end
+
+--- ** Choosers open on the focused screen
+--- hs.chooser:show() with no point sizes its window at the origin and then
+--- calls NSWindow -center, which centres a window on the screen it is on:
+--- the primary screen, wherever focus is. So every chooser (the emoji one on
+--- hyper+a, the Wi-Fi one, ...) opened on the laptop while the user worked
+--- on the external monitor. Wrapping the shared `show' method fixes them all,
+--- Spoons included: a show() with no point gets one on the `typing' screen.
+---
+--- The point needs the window's size. The width follows HSChooser's own rule
+--- (-resizeWindow), which reads hs.screen.mainScreen(). The height cannot be
+--- read from Lua, so it is taken from the window list after each show and
+--- kept per row count across reloads; until one is seen, the native show()
+--- runs when the target is the primary screen anyway, and a guess places it
+--- elsewhere.
+-- The metatable exists once the lazily loaded extension is.
+require("hs.chooser")
+local chooserMeta = hs.getObjectMetatable("hs.chooser")
+Screens.chooserShowNative = Screens.chooserShowNative or chooserMeta.show
+
+-- The share of the free height above the window: -center puts a window
+-- "somewhat above centre".
+local kChooserTopShare = 1 / 3
+-- The guessed height, as a share of the screen's, before one is seen.
+local kChooserHeightGuess = 0.5
+-- How long after a show the window list is read for its height.
+local kChooserMeasureSeconds = 0.1
+local kChooserHeightsKey = "screens.chooserHeights"
+
+local function chooserWidth(c)
+    local main = hs.screen.mainScreen() or hs.screen.primaryScreen()
+    local w, pct = main:frame().w, c:width()
+    if pct >= 0 and pct <= 100 then return w * pct / 100 end
+    return math.max(400, math.min(w * 0.5, 800))
+end
+
+local function chooserHeights()
+    local ok, t = pcall(hs.settings.get, kChooserHeightsKey)
+    return ok and type(t) == "table" and t or {}
+end
+
+-- Record the height of the chooser window just shown, `w' wide: the only
+-- window of ours that wide above the normal layer.
+local function chooserMeasure(rows, w)
+    local pid = hs.processInfo.processID
+    hsAfter(kChooserMeasureSeconds, function()
+        for _, e in ipairs(Screens.windowStack()) do
+            if e.pid == pid and e.layer > 0 and math.abs(e.frame.w - w) < 2 then
+                local t = chooserHeights()
+                if t[tostring(rows)] ~= e.frame.h then
+                    t[tostring(rows)] = e.frame.h
+                    pcall(hs.settings.set, kChooserHeightsKey, t)
+                end
+                return
+            end
+        end
+    end)
+end
+
+chooserMeta.show = function(self, topLeft)
+    local native = Screens.chooserShowNative
+    if topLeft ~= nil then return native(self, topLeft) end
+    local ok, target = pcall(function() return Screens.target("typing")[1] end)
+    if not (ok and target) then return native(self) end
+
+    local f, w, rows = target:frame(), chooserWidth(self), self:rows()
+    local h = chooserHeights()[tostring(rows)]
+    local x = math.floor(f.x + (f.w - w) / 2)
+    if h == nil and target:id() == hs.screen.primaryScreen():id() then
+        native(self)
+        chooserMeasure(rows, w)
+        return self
+    end
+    h = h or f.h * kChooserHeightGuess
+    native(self, { x = x, y = math.floor(f.y + math.max(0, f.h - h) * kChooserTopShare) })
+    chooserMeasure(rows, w)
+    return self
+end
 --- @end

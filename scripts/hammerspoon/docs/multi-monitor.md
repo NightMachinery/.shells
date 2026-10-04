@@ -69,8 +69,11 @@ Every module picked its own screen, through `hs.screen` directly:
   origin, so on any screen but the primary the pointer landed on the primary.
 - **The avy grid** covered the active screen, with no way to reach another.
 - **The STT indicator** sat on the primary screen.
-- **The emoji tally** sat on the primary screen, next to a chooser that opens
-  on the active one.
+- **The emoji tally** sat on the primary screen.
+- **Every chooser** (`hs.chooser`: emoji on hyper+a, Wi-Fi, ...) opened on
+  the primary screen. `show()` with no point sizes the window at the origin
+  and then calls NSWindow `-center`, which centres it on the screen it is on
+  (read from upstream `HSChooser.m`).
 - **The kitty panel** appeared wherever kitty first created it.
 - **Window-mode kitty** followed the pointer screen. It still does.
 - **Blackout rows** were keyed by CG id, so a display that came back under a
@@ -188,6 +191,10 @@ Each is documented with its feature in `docs/hammerspoon.md`:
   hotkey, a hide's return, kitty's return), a focused window above layer 0,
   such as a Picture-in-Picture video, hands focus to the app's front normal
   window (`appFocusOffFloating`). ("App hotkeys".)
+- **Choosers** open on the `typing` screen: `core/screens.lua` wraps the
+  `show` method every `hs.chooser` shares, so a `show()` with no point gets
+  one there, Spoons included. ("Choosers on the focused screen" in
+  `docs/hammerspoon.md`.)
 - **Maccy's hyper+v popup** opens on the screen named by
   `maccy_popup_screens`: its `popupScreen` setting is rewritten when that
   screen changes, one write at a time. ("App hotkeys".)

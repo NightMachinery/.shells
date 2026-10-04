@@ -1808,6 +1808,42 @@ retired — wrapped in `if false then` rather than deleted — since purple mode
 bare arrows already cover keyboard mouse movement. The `purple_bind_v2` arrow
 bindings beside them are untouched.
 
+## Choosers on the focused screen
+
+Every `hs.chooser` (the emoji chooser on hyper+a, the Wi-Fi one, the URL and
+tag choosers, and any a Spoon makes) opens on the `typing` screen, the one
+keyboard focus is on. Upstream's `show()` with no point always put it on the
+primary screen: it sizes the window at the origin, then NSWindow `-center`
+centres it on the screen it is on.
+
+`core/screens.lua` replaces the `show` method in the chooser metatable once,
+so no caller changes. A `show()` with no point becomes `show(topLeft)` on the
+target screen, centred across it and set above centre (`kChooserTopShare`),
+which Apple's docs say is where `-center` puts a window; the share itself is
+not yet compared with a measured native placement. A caller that passes its own
+point is left alone. The upstream method stays reachable as
+`Screens.chooserShowNative`.
+
+The point needs the window's size:
+
+- **Width** follows HSChooser's own rule from `-resizeWindow`: `:width()` as
+  a percentage of `hs.screen.mainScreen()`'s width, or half of it within
+  fixed bounds. The rule reads `mainScreen`, so it does too.
+- **Height** cannot be read from Lua. After each show, the chooser's window
+  is found in the window list (ours, above layer 0, of that width) and its
+  height is kept per row count in `hs.settings`
+  (`kChooserHeightsKey`), so it survives reloads. Before a height has been
+  seen, a chooser bound for the primary screen takes the native `show()`,
+  which records it, and one bound elsewhere is placed with a guessed height
+  (`kChooserHeightGuess`): on the right screen, but possibly a little off
+  vertically, once per row count.
+
+`hs.screen.mainScreen()` lags the focused screen (see "Where focus is" in
+`docs/multi-monitor.md`), so right after focus moves screens the width can
+come from the old one. The position always comes from `Screens.target`.
+
+## Wi-Fi chooser: hyper+w
+
 `~/.hammerspoon/init.lua` includes a `hyper+w` Wi-Fi chooser.
 
 The chooser shows cached network names immediately when available, refreshes
