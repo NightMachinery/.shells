@@ -182,7 +182,10 @@ Each is documented with its feature in `docs/hammerspoon.md`:
 - **kitty panel** shows on the screen named by `kitty_panel_screens`. Every
   show asks kitty for a fresh layout on that screen, and fits the panel when
   it is still off; hyper+shift+; moves the shown panel through kitty, not
-  over Accessibility. ("kitty: hyper+z".)
+  over Accessibility. When the panel's screen shows a fullscreen Space,
+  Screen Decor first covers any other screen on an empty desktop, so the
+  active display stays with the panel (`kitty_panel_decor_p`; "Which display
+  macOS counts as active"). ("kitty: hyper+z".)
 - **Return after a hide**: the second press of an app hotkey, and hiding
   kitty, return to the previous app on the same screen
   (`screenReturnTarget`), not the newest app anywhere. The enum
@@ -550,6 +553,61 @@ sometimes the laptop.
   It was not tried during the switch from another app.
 - **Clicking the monitor's menu bar** made it active again, but brought
   Brave back and hid the panel, so a synthetic click is no fix.
+
+#### The workaround: Screen Decor
+
+Since a display showing a fullscreen Space is never chosen, the fix is to
+make sure no *other* display shows a desktop Space at the moment kitty
+activates. Screen Decor (`screen-decor/ScreenDecor.m`, driven by
+`core/screen-decor.lua`) is a small agent app (`LSUIElement`, so no Dock
+icon) whose window, one per covered screen, enters native fullscreen and is
+painted with that screen's desktop picture. On a laptop sitting on its empty
+desktop it looks like the desktop, but it is a fullscreen Space.
+
+Before hyper+z shows the panel, `kittyPanelToggle` resolves the panel's
+screen first, then calls `ScreenDecor.coverFor` when `kitty_panel_decor_p` is
+on:
+
+1. Nothing happens unless the panel's screen shows a fullscreen Space. Every
+   other screen that shows a desktop Space with no normal window on it is
+   covered. A desktop with windows is left alone, although it flips the
+   active display just the same, because covering it would hide them.
+2. Covering activates Screen Decor, which makes that screen active. So once
+   every covered screen shows a fullscreen Space, the window the user was in
+   on the panel's screen gets focus back.
+3. Then the panel is shown on the screen resolved in the first step
+   (`kittyPanelShow`'s `target` option), not on whatever the working screen
+   is by now.
+
+The first cover launches the app, which is then kept running. A later one
+asks it over a distributed notification, and its windows keep their
+fullscreen Spaces, so the cost is a Space slide on the covered screen, and
+only when that screen has gone back to its desktop. The app is built on
+demand into `screen_decor_app` with `screen-decor/build.sh`, at load and
+whenever a source is newer than the build; a press during a build shows the
+panel without a cover. Screen Decor is in `recentAppsTransient`, so it never
+becomes a return target and does not make the focus watcher hide the panel.
+hyper+; onto a covered screen focuses its window, which serves as the empty
+desktop there.
+
+Measured live on 2026-10-04, with Brave fullscreen on the monitor and the
+laptop on its empty desktop, a scripted hyper+z (the same call the key makes):
+
+- cold, launching the app: covered in 877 to 1259 ms over three runs, focus
+  back with Brave about 60 to 80 ms later, then the usual fast show;
+- warm, the app running and the laptop back on its desktop: covered in 544
+  to 585 ms, which is the Space slide;
+- every run: the panel on the monitor and the active display on the
+  monitor, read 4 s after the press, and in the last run every half second
+  for 5 s. Hiding returned focus to Brave.
+
+One run read the monitor as showing a desktop Space 4 s after the show; the
+next cold run, read every half second, never did, and the cause is unknown.
+
+Still open: the covered screen stays on the decor's Space until something
+else is brought up there, so Mission Control lists a "Screen Decor" Space
+per covered screen. A window moved onto that screen lands in its desktop
+Space, behind the decor.
 
 Still unmeasured:
 

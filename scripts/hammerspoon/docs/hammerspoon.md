@@ -2004,6 +2004,18 @@ afresh. A failed move is printed to the console, not banded. The panel is
 still shown, and the fit below then sets it to the wanted screen over
 Accessibility, behind kitty's back, until a later show's move gets through.
 
+Showing the panel over a fullscreen Space activates kitty, and macOS then
+hands the active display (the lit menu bar, where Maccy opens) to any other
+display that shows a desktop Space. So when the Lua global
+`kitty_panel_decor_p` is on, hyper+z first covers every other screen sitting
+on an empty desktop with Screen Decor (`core/screen-decor.lua`), a fullscreen
+window painted with that screen's desktop picture, gives focus back to the
+window you were in, and only then shows the panel, on the screen resolved
+before the cover. The first cover after login launches the app; later ones
+cost a Space slide on the covered screen, and only when it has gone back to
+its desktop. See "Which display macOS counts as active" in
+`docs/multi-monitor.md`.
+
 kitty answers ok to a name it does not know, and leaves the panel on the
 screen under its centre (`screen_for_name` in kitty's `cocoa_window.m`). A
 kitty running since before a display change can hold an outdated name, since

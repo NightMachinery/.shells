@@ -37,6 +37,13 @@ kitty_panel_fold_strays_p = kitty_panel_fold_strays_p or false
 -- "working", is the focused window's screen (see screens_working_policy).
 if kitty_panel_screens == nil then kitty_panel_screens = "working" end
 
+-- true: before hyper+z shows the panel over a fullscreen Space, cover every
+-- other screen that shows an empty desktop with Screen Decor
+-- (core/screen-decor.lua), so the active display (the lit menu bar, where
+-- Maccy opens) stays on the panel's screen instead of jumping to that
+-- desktop. See docs/multi-monitor.md, "Which display macOS counts as active".
+if kitty_panel_decor_p == nil then kitty_panel_decor_p = true end
+
 -- Running tasks, sockets and pending timers are pinned with hsPin and
 -- hsAfter (core/helpers.lua), so they are neither collected before their
 -- callbacks fire nor kept forever afterwards.
@@ -244,9 +251,14 @@ end
 -- the moves made here, while hyper+shift+; or a display change can move the
 -- panel too.
 
+-- The screen a show's opts.target named, for as long as that show runs
+-- (kittyPanelShowBusy keeps shows from overlapping).
+local kittyPanelPinnedScreen = nil
+
 -- The output name the panel should be on now, and its hs.screen, or nil to
 -- leave the panel alone.
 local function kittyPanelWantedOutput()
+    if kittyPanelPinnedScreen then return kittyPanelPinnedScreen:name(), kittyPanelPinnedScreen end
     if not (kitty_panel_screens and Screens) then return nil end
     local s = Screens.target(kitty_panel_screens)[1]
     return s and s:name(), s
@@ -760,6 +772,9 @@ local kittyPanelShowBusy = nil
 
 -- Shows the panel and focuses its active window. opts, all optional:
 --   screen      the screen to show it on, instead of kitty_panel_screens
+--   target      the same, resolved by the caller from kitty_panel_screens
+--               before it moved focus (ScreenDecor.coverFor does); unlike
+--               `screen', the slow path takes it too
 --   focusSpace  focus that screen's Space before the show
 --               (kittyPanelFocusSpaceOn); moves ask for it
 --   again       this is the redo after a show left the panel off screen
@@ -776,6 +791,7 @@ function kittyPanelShow(label, opts)
 
     local token = {}
     kittyPanelShowBusy = token
+    kittyPanelPinnedScreen = opts.target
     kittyPanelShowingUntil = hs.timer.secondsSinceEpoch() + kShowGuardSeconds
     local t0 = hs.timer.absoluteTime()
     local route = "fast"
@@ -788,6 +804,7 @@ function kittyPanelShow(label, opts)
     local watchdog = hsAfter(30, function()
         if kittyPanelShowBusy == token then
             kittyPanelShowBusy = nil
+            kittyPanelPinnedScreen = nil
             kittyPanelShowingUntil = 0
             if opts.done then opts.done(false, ": the show did not finish within 30 s") end
             kittyPanelFail(label .. ": show did not finish within 30 s")
@@ -797,6 +814,7 @@ function kittyPanelShow(label, opts)
     local function done(err)
         if kittyPanelShowBusy ~= token then return end
         kittyPanelShowBusy = nil
+        kittyPanelPinnedScreen = nil
         -- The tail lets the activations this show caused arrive first.
         kittyPanelShowingUntil = hs.timer.secondsSinceEpoch() + kShowGuardTailSeconds
         hsCancel(watchdog)

@@ -573,7 +573,16 @@ function kittyPanelToggle(app, front, shown)
     end
 
     kittyRemember(front)
-    kittyPanelShow("kittyPanelToggle")
+    -- The screen is resolved now: covering another screen with Screen Decor
+    -- activates the decor there, and the working screen follows focus until
+    -- coverFor has given it back.
+    local target = kitty_panel_screens and Screens.target(kitty_panel_screens)[1]
+    if not (kitty_panel_decor_p and target and ScreenDecor) then
+        return kittyPanelShow("kittyPanelToggle", { target = target })
+    end
+    ScreenDecor.coverFor(target, function()
+        kittyPanelShow("kittyPanelToggle", { target = target })
+    end)
 end
 
 --- ** Window mode
