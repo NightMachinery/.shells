@@ -662,9 +662,8 @@ function h-claude-code-usage-run {
         #: =--color= from the caller still wins (argparse is last-wins).
         [[ -t 1 ]] && color_opts=(--color always)
 
-        #: Non-ASCII survives the trip this way; the inline transport mangles
-        #: it, and the report is full of box drawing.
-        brishz_out_file_p=y brishzq.zsh claude_code_usage.py "${color_opts[@]}" "$@"
+        #: Exact-byte transport preserves the report's Unicode box drawing.
+        brishz_binary=y brishz claude_code_usage.py "${color_opts[@]}" "$@"
         return $?
     fi
 

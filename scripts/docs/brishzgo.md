@@ -399,6 +399,22 @@ The active shell/config callers now use the installed Go client:
 - Emacs, zopen, STT, lock/unlock/audio hooks, reminder notifications and the
   audio-guard launcher use the Go client. STT keeps its input file until the
   synchronous call finishes and then removes it, including on failure.
+- Scheduled alarms quote the absolute client path into the `at` job.
+- Claude Code and Antigravity report delegation, and Maccy image export, use
+  [agfi:brishz] with `brishz_binary=y`. This replaces the legacy output-file
+  workaround for Unicode with exact-byte transport. A garden without binary
+  support fails explicitly instead of returning potentially corrupted text.
+- Standalone `bsh.dash` and `bsh_old.dash` keep their persistent session and
+  raw shell-code interface. The source-file form removes its input file after
+  success, failure or interruption. `brishz_para.dash` keeps raw shell code
+  and cwd cleanup but streams stdout/stderr and returns the command's status
+  directly. `brishzrq.dash` keeps its endpoint and uses Go; remote password
+  authentication must be exported as `GARDEN_PASS0`, since Go sources no
+  private shell file. [agfi:brishz] forwards an already-loaded shell password
+  to Go even when the parent shell variable was not exported.
+- The PHP status/TLDR pages use a shared command builder, quoting both the
+  absolute Go path and each argument. Their server environment can set
+  `BRISHZGO_BIN` if its HOME differs from the shell's.
 - Kitty actions and Sioyek's PDF-location command use `/bin/sh` solely to
   expand the binary path, forwarding file paths as arguments. Sioyek's custom
   parser joins backslash-escaped spaces before macro substitution; the shell
@@ -411,15 +427,18 @@ this binary. Shell-generated fzf commands also accept the binary resolved in
 `$commands`. Re-run `brishz-restart` after changes to their garden functions.
 
 `python3 zshlang/tests/brishzgo-callers.py` verifies hook stdin, shell quoting,
-wrapper exit statuses, STT file lifetime, menu queries, picker actions and
-GUI command parsing using a recording client and a synthetic HOME.
+wrapper exit statuses, source/STT file lifetime, menu queries, picker actions,
+exact-byte report flags, scheduled-job quoting and GUI command parsing using
+a recording client and a synthetic HOME.
 
 Normal Lua helpers drain stdin/stdout/stderr concurrently. Hammerspoon helpers
 and the STT backend capture Go output in private temporary files, preserving
 Unicode and avoiding full pipes while retaining completion callbacks. See
 [Hammerspoon garden helpers](hammerspoon-garden.md) for their failure policy
-and tests. Explicit JSON-envelope and file-mode consumers retain their
-compatibility clients until those contracts are adapted.
+and tests. The JSON-envelope launcher now consumes Go's output/status
+directly. The original clients and [agfi:brishz-v1] remain available for
+compatibility, as do explicit Lua `evalFile`/`outFile` options; no normal
+active caller still depends on the old transports.
 
 ## Measurements
 

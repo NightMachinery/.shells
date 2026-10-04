@@ -302,8 +302,10 @@ is a worse answer than a slow one.
 
 So `h-agy-status-run`, the one place `agy -p` is invoked, delegates to the
 brish garden when `h-agy-status-garden-p` says so and the garden is alive. The
-garden's worker shells are attached to the GUI session, so the refresh
-succeeds there. `agy-status-run-garden` is what the garden runs on our behalf,
+client uses [agfi:brishz] (`brishzgo`) with `brishz_binary=y`, preserving
+Unicode output without the legacy file-output flag. The garden's worker
+shells are attached to the GUI session, so the refresh succeeds there.
+`agy-status-run-garden` is what the garden runs on our behalf,
 and it forces the guard off so a worker can never bounce the command on to
 another worker. The delegation is proactive rather than a retry, because a
 detached run *cannot* succeed; attempting it first would only buy a minute on

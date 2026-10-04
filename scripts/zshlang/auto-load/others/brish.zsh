@@ -59,6 +59,8 @@ function brishz {
     local -x brishz_nolog="${brishz_nolog}"
     local -x brishz_async="${brishz_async}"
     local -x brishz_copy="${brishz_copy:-${brishz_c}}"
+    #: Forward an already-loaded password without sourcing private files.
+    local -x GARDEN_PASS0="${GARDEN_PASS0}"
 
     go-local-dep brishzgo "${nightdir}/golang/brishzgo" @RET
     command brishzgo "$@"

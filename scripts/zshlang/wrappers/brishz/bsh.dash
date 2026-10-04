@@ -1,15 +1,15 @@
 #!/usr/bin/env dash
-##
-#: We need to find =gmktemp=.
+
+# Source stdin in the persistent bsh session. A local file preserves Unicode
+# source text and lets zsh update the session's variables and working directory.
 export PATH="${PATH}:/opt/homebrew/bin:/usr/local/bin"
-##
-tmp="$(gmktemp --suffix='.zsh')" || return $?
-cat > $tmp || return $?
-# @workaround Using a temp file protects against unicode corruption in brish
-
-brishz_session=bsh brishz_quote=y brishz.dash "$(command gprintf 'cd %q\nsource %q' "$PWD" "$tmp")"
-r=$?
-
-command rm -f "$tmp" &>/dev/null &
-
-return $r
+brishzgo="${BRISHZGO_BIN:-${HOME}/go/bin/brishzgo}"
+tmp="$(command mktemp)" || exit $?
+trap 'command rm -f "$tmp"' 0
+trap 'exit 129' HUP
+trap 'exit 130' INT
+trap 'exit 143' TERM
+command cat > "$tmp" || exit $?
+brishz_session=bsh brishz_noquote=y "$brishzgo" -- \
+    "$(command gprintf 'cd %q\nsource %q' "$PWD" "$tmp")"
+exit $?

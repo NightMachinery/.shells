@@ -11,7 +11,8 @@ both formats, it uses PNG.
 
 In an SSH session on the Mac, the function runs the export through the local
 BrishGarden service. BrishGarden must be running in the GUI session. The files
-still go to the directory where the command was invoked.
+still go to the directory where the command was invoked. [agfi:brishz] uses
+`brishzgo` with `brishz_binary=y`, so printed paths retain their exact bytes.
 
 Names follow `maccy-YYYYMMDD-HHMMSS-<history-id>.png` (or `.tiff`), using local
 time and the item's last-copy time. Existing files are skipped without being

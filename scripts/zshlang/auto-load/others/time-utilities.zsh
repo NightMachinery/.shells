@@ -126,7 +126,8 @@ function alarm-at {
 
     ecgray "now: $(datej-all-long-time)"
 
-    ec "${commands[brishzq.zsh]} awaysh-named ${marker_alarm_at} @opts msg $(gquote-sq "$msg") @ timer 0" | command at "${=at}"
+    local brishzgo="${BRISHZGO_BIN:-${commands[brishzgo]:-${HOME}/go/bin/brishzgo}}"
+    ec "$(gquote "$brishzgo" --) awaysh-named ${marker_alarm_at} @opts msg $(gquote-sq "$msg") @ timer 0" | command at "${=at}"
 }
 aliasfn unix-at alarm-at
 ##

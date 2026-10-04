@@ -4,6 +4,7 @@ import json
 import os
 from pathlib import Path
 import shlex
+import re
 import subprocess
 import tempfile
 
@@ -14,12 +15,19 @@ with tempfile.TemporaryDirectory(prefix="brishzgo-callers-") as tmp:
     mock = home / "client with spaces"
     log = home / "calls.jsonl"
     mock.write_text('''#!/usr/bin/env python3
-import json, os, sys
+import json, os, sys, shlex
 from pathlib import Path
 args=sys.argv[1:]
 assert args[0]=='--', args
 payload=sys.stdin.buffer.read() if os.environ.get('brishz_in')=='MAGIC_READ_STDIN' else b''
-record={'args':args, 'stdin':payload.hex(), 'async':os.environ.get('brishz_async','')}
+record={'args':args, 'stdin':payload.hex(), 'async':os.environ.get('brishz_async',''),
+ 'session':os.environ.get('brishz_session',''), 'noquote':os.environ.get('brishz_noquote',''),
+ 'binary':os.environ.get('brishz_binary',''),
+ 'password_test':os.environ.get('GARDEN_PASS0')=='synthetic password'}
+if record['session']=='bsh' and '\\nsource ' in args[1]:
+ path=shlex.split(args[1].split('\\nsource ',1)[1])[0]
+ record['source_path']=path
+ record['source_input']=Path(path).read_bytes().hex()
 if args[1]=='h-stt-filter': record['file_input']=Path(args[2]).read_bytes().hex()
 with open(os.environ['CALL_LOG'],'a') as f: f.write(json.dumps(record)+'\\n')
 outputs={'last-idle-get-min':'42','audio-input-glyph-get':'mic','datej':'date',
@@ -122,6 +130,86 @@ sys.exit(int(os.environ.get('CLIENT_STATUS','0')))
     run([strange if x == "${FILE_PATH}" else x for x in argv])
     assert calls()[0]["args"] == ["--", "zopen", strange]
 
+    # Compatibility launcher names now use Go with their old raw/session forms.
+    source_input = "printf '%s' '€ source'\n\n".encode()
+    run(["dash", str(ROOT / "zshlang/wrappers/brishz/bsh.dash")], source_input,
+        extra={"CLIENT_STATUS": "17"}, status=17)
+    row = calls()[0]
+    assert row["session"] == "bsh" and row["noquote"] == "y"
+    assert bytes.fromhex(row["source_input"]) == source_input
+    assert not Path(row["source_path"]).exists(), "bsh source file leaked"
+    run(["dash", str(ROOT / "zshlang/wrappers/brishz/bsh_old.dash")], source_input,
+        extra={"CLIENT_STATUS": "17"}, status=17)
+    row = calls()[0]
+    assert row["session"] == "bsh" and row["noquote"] == "y"
+    assert row["args"][1] == source_input.decode().rstrip("\n")
+    run(["dash", str(ROOT / "zshlang/wrappers/brishz/brishzrq.dash"), "printf", strange],
+        extra={"CLIENT_STATUS": "17"}, status=17)
+    assert calls()[0]["args"] == ["--", "printf", strange]
+    for prefix in ["--", "-c"]:
+        run(["dash", str(ROOT / "zshlang/wrappers/brishz/brishz_para.dash"), prefix,
+             "printf '%s'", "'quoted literal'"], extra={"CLIENT_STATUS": "17"}, status=17)
+        row = calls()[0]
+        assert row["noquote"] == "y" and row["args"][1].startswith("cd ")
+        assert row["args"][2:4] == ["printf '%s'", "'quoted literal'"]
+        assert row["args"][-1] == ' ; ret=$? ; cd /tmp ; return-code $ret'
+
+    def extract_function(path, name):
+        text = (ROOT / path).read_text()
+        return re.search(r"^function " + re.escape(name) + r"(?=\s|\()(?:\(\))?[^\n]*\n.*?^}",
+                         text, re.M | re.S)[0]
+
+    # Stub only dependencies, exercise the actual migrated report branches.
+    stub = home / "report-dependencies.zsh"
+    stub.write_text('''alias @RET='; return $?'
+function assert-args() { return 0 }
+function ensure-cmd() { return 0 }
+function brishz-alive-p() { return 0 }
+function isDarwin() { return 0 }
+function isSSH() { return 0 }
+function h-claude-code-usage-garden-p() { return 0 }
+function h-agy-status-garden-p() { return 0 }
+function brishz() { command "$BRISHZGO_BIN" -- "$@" }
+''')
+    for path, name, args, command in [
+        ("zshlang/auto-load/others/claude.zsh", "h-claude-code-usage-run", [strange], "claude_code_usage.py"),
+        ("zshlang/auto-load/others/agy-status.zsh", "h-agy-status-run", ["/usage"], "agy-status-run-garden"),
+        ("zshlang/auto-load/others/clipboard/images, pictures.zsh", "maccy-paste-images", ["2"], "python3"),
+    ]:
+        function_file = home / "report-function.zsh"
+        function_file.write_text(extract_function(path, name))
+        code = 'source "$1"; source "$2"; shift 2; name=$1; shift; "$name" "$@"'
+        run(["zsh", "-f", "-c", code, "test", str(stub), str(function_file), name, *args],
+            extra={"CLIENT_STATUS": "17", "NIGHTDIR": str(ROOT)}, status=17)
+        row = calls()[0]
+        assert row["binary"] == "y" and row["args"][1] == command
+        if command == "claude_code_usage.py": assert row["args"][2:] == [strange]
+        if command == "python3": assert row["args"][-1] == str(ROOT)
+
+    # The shell wrapper forwards an existing, unexported password to Go.
+    (home / "brishzgo").symlink_to(mock)
+    function_file = home / "brishz-function.zsh"
+    function_file.write_text(extract_function("zshlang/auto-load/others/brish.zsh", "brishz"))
+    code = 'source "$1"; source "$2"; function go-local-dep() { return 0 }; typeset -g GARDEN_PASS0="synthetic password"; brishz -- printf synthetic'
+    run(["zsh", "-f", "-c", code, "test", str(stub), str(function_file)],
+        extra={"CLIENT_STATUS": "17", "NIGHTDIR": str(ROOT)}, status=17)
+    assert calls()[0]["password_test"]
+
+    # Inspect and execute an alarm's generated at-job using literal arguments.
+    at = home / "at"
+    job = home / "at-job"
+    at.write_text('#!/bin/sh\ncommand cat > "$AT_JOB"\n')
+    at.chmod(0o700)
+    alarm = home / "alarm-function.zsh"
+    alarm.write_text(extract_function("zshlang/auto-load/others/time-utilities.zsh", "alarm-at"))
+    code = 'source "$1"; source "$2"; source "$3"; function ecgray() { : }; function datej-all-long-time() { : }; marker_alarm_at=ALARM_AT; alarm-at "now + 1 minute" "$4"'
+    run(["zsh", "-f", "-c", code, "test", str(stub), str(ROOT / "zshlang/basic/core.zsh"),
+         str(alarm), strange], extra={"AT_JOB": str(job)})
+    run(["/bin/sh", "-c", job.read_text()])
+    row = calls()[0]
+    assert row["args"] == ["--", "awaysh-named", "ALARM_AT", "@opts", "msg", strange,
+                           "@", "timer", "0"]
+
     # Exercise the picker with fzf as an inert row selector.
     fzf = home / "fzf"
     fzf.write_text('#!/usr/bin/env python3\nimport sys\nprint(sys.stdin.read().splitlines()[0])\n')
@@ -131,4 +219,4 @@ sys.exit(int(os.environ.get('CLIENT_STATUS','0')))
     rows = calls()
     assert rows[-1]["args"] == ["--", "agent-view-session-bg", "/path with quote's/transcript", "tab with spaces"]
 
-print("PASS: hooks, wrappers, binary STT input, menubar, picker, kitty and Sioyek launchers")
+print("PASS: hooks, wrappers, binary inputs, reports, alarms, menubar, picker, kitty and Sioyek launchers")

@@ -97,7 +97,7 @@ function h-agy-status-run {
     #: reporting. Delegating the whole command keeps the credential inside the
     #: GUI-attached process.
     if h-agy-status-garden-p && brishz-alive-p ; then
-        brishz_out_file_p=y brishzq.zsh agy-status-run-garden "${slash_cmd}"
+        brishz_binary=y brishz agy-status-run-garden "${slash_cmd}"
         return $?
     fi
 

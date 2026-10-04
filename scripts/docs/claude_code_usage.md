@@ -543,7 +543,9 @@ that helps. So there are exactly two ways round it.
 **Delegate to the garden.** BrishGarden's worker shells *are* attached to the GUI
 session, and they read the login keychain with no dialog even when the request
 comes from an ssh session. So the wrapper runs the whole report through
-`brishzq.zsh` instead. The whole report, not merely the Keychain read: that way
+[agfi:brishz] and `brishzgo` with `brishz_binary=y` instead. Exact-byte output
+preserves Unicode box drawing without a separate output-file transport.
+The whole report, not merely the Keychain read: that way
 the token never leaves the GUI-attached process and only the rendered output or
 the JSON payload comes back. This is proactive rather than a retry, because in a
 GUI-detached session the local read *cannot* succeed — attempting it first would

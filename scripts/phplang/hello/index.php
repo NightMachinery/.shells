@@ -14,7 +14,8 @@
 <h4><pre>cpu-usage-get</pre></h4>
 <pre>
 <?php
-          $cpu_usage = `brishz.dash cpu-usage-get`;
+          require_once __DIR__ . '/../brishzgo.php';
+          $cpu_usage = shell_exec(brishzgo_command(['cpu-usage-get']));
           echo htmlspecialchars($cpu_usage);
 ?>
 </pre>

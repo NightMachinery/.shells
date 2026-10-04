@@ -1,5 +1,4 @@
 #!/usr/bin/env dash
 
-# brishz.dash "$(cat)"
-
-brishz_session=bsh brishz_noquote=y brishzq.zsh "$(cat)"
+# Historical inline-source form, retaining the persistent bsh session.
+brishz_session=bsh brishz_noquote=y exec "${BRISHZGO_BIN:-${HOME}/go/bin/brishzgo}" -- "$(command cat)"
