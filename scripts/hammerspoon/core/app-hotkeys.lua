@@ -100,8 +100,15 @@ function bundlelessApp(id)
 end
 
 -- Global, so it is not collected.
+-- The watcher can hand over no app at all for such an app: on 2026-10-04 an
+-- mpv started from a shell was activated, Hammerspoon logged "Unable to
+-- fetch NSRunningApplication for pid" for it, and it never reached the list,
+-- so hyper+m went on to Paseo. An activated app is the frontmost one, which
+-- is then asked for instead (that lookup does find mpv).
 bundlelessWatcher = hs.application.watcher.new(function(_, event, app)
-    if event == hs.application.watcher.activated or event == hs.application.watcher.launched then
+    if event == hs.application.watcher.activated then
+        bundlelessNote(app or hs.application.frontmostApplication())
+    elseif event == hs.application.watcher.launched then
         bundlelessNote(app)
     end
 end)
@@ -117,7 +124,30 @@ do
             bundlelessNote(hs.application.applicationForPID(pid))
         end
     end
+    -- An app fullscreen in a Space not showing has no window in that list.
+    bundlelessNote(hs.application.frontmostApplication())
 end
+-- Nor is it activated before the first press that wants it, which left
+-- hyper+m going to Paseo after every reload while mpv played fullscreen. So
+-- the full list comes from LaunchServices too, through `lsappinfo list' in
+-- its own process (30 ms, measured 2026-10-04): never walking every app in
+-- here (see getApp), and never holding up the load. Each app is a block of
+-- lines; the ones wanted have `bundleID=[ NULL ]' and `type="Foreground"'.
+bundlelessSeedTask = hs.task.new("/usr/bin/lsappinfo", function(code, out)
+    if code ~= 0 or not out then return end
+    local noBundle = false
+    for line in out:gmatch("[^\n]+") do
+        if line:match("^%s*%d+%) ") then
+            noBundle = false
+        elseif line:find("bundleID=%[ NULL %]") then
+            noBundle = true
+        elseif noBundle and line:find('type="Foreground"') then
+            local pid = tonumber(line:match("pid = (%d+)"))
+            if pid then bundlelessNote(hs.application.applicationForPID(pid)) end
+        end
+    end
+end, { "list" })
+bundlelessSeedTask:start()
 
 -- Find which app is making app-switching slow.
 --
