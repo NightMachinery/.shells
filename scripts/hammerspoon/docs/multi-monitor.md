@@ -176,7 +176,8 @@ Each is documented with its feature in `docs/hammerspoon.md`:
   every other screen first, since a menu bar stuck down is put away only by
   the pointer passing over its own screen's top.
 - **Focus keys**: hyper+; focuses the frontmost window on the next screen,
-  and hyper+shift+; moves the focused window there. Both bring the pointer
+  or, with none showing, an app whose window is in another Space there, and
+  hyper+shift+; moves the focused window there. Both bring the pointer
   along. ("Moving between screens".)
 - **kitty panel** shows on the screen named by `kitty_panel_screens`. Every
   show asks kitty for a fresh layout on that screen, and fits the panel when
@@ -440,7 +441,14 @@ Found in real use on 2026-10-04:
   each, with no stand-in left behind.
 - **hyper+; with nothing on the monitor's Space** moved the pointer there and
   showed "no windows", as designed; finding that out took 20 ms for the
-  focused screen and 15 for the window list.
+  focused screen and 15 for the window list. That was too little when the
+  laptop's other Space held a fullscreen app, so hyper+; now falls back to
+  the apps that have a window there (`screenFocusFallback`). The Spaces
+  themselves were no help: `hs.spaces.windowsForSpace` listed window ids for
+  both of the laptop's Spaces, but not one of them came back from
+  `hs.window.get`, `hs.window.list` (with or without its `allWindows` flag)
+  or any regular app's Accessibility window list, so an id could not be
+  traced to its app. The fallback asks the recent apps instead.
 - **`hs -c` stalls.** Several `hs -c` calls from a shell got no answer within
   20 to 30 s while Hammerspoon went on running its own timers, and a press
   sent through one arrived about a minute late. Not investigated; see

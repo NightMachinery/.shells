@@ -637,10 +637,13 @@ local frontWindowOn = Screens.frontWindowOn
 --- screen's windows but is not a normal window.
 Screens.focusHandlers = Screens.focusHandlers or {}
 
---- Focus the frontmost window on the next screen. With no window there,
---- nothing can take focus -- macOS focuses windows, not screens -- so the
---- pointer goes over anyway and the band says so; faking it by focusing the
---- Finder desktop moves focus somewhere unpredictable.
+--- Focus the frontmost window on the next screen. With no window showing
+--- there, screenFocusFallback (core/app-hotkeys/main.lua) looks for an app
+--- whose window is in another Space of that screen, a fullscreen one most
+--- likely, and brings it forward, which switches the screen to that Space.
+--- With none, nothing can take focus -- macOS focuses windows, not screens
+--- -- so the pointer goes over anyway and the band says so; faking it by
+--- focusing the Finder desktop moves focus somewhere unpredictable.
 function Screens.focusNext(delta)
     local from = Screens.focusedScreen()
     local to = Screens.neighbour(from, delta or 1)
@@ -673,10 +676,24 @@ function Screens.focusNext(delta)
         Screens.recheckFocus()
         hs.mouse.absolutePosition(centreOf(w:frame()))
         focusBand(to, "\u{2192} " .. name)
-    else
-        hs.mouse.absolutePosition(centreOf(to:frame()))
-        focusBand(to, "no windows on " .. name)
+        return
     end
+
+    -- Defined by core/app-hotkeys/main.lua, which loads after this file.
+    local ok, t = pcall(function() return screenFocusFallback and screenFocusFallback(to, stack) end)
+    if ok and t then
+        local okn, app = pcall(function() return t.app:name() end)
+        app = okn and app or "?"
+        print(string.format("focusNext: nothing showing on %s, %s (%s)", name, app, t.why))
+        screenReturnFocus(t, "hyper+;")
+        hs.mouse.absolutePosition(centreOf(to:frame()))
+        focusBand(to, "\u{2192} " .. name .. ": " .. app)
+        return
+    end
+    if not ok then print("focusNext: fallback failed: " .. tostring(t)) end
+    print("focusNext: no windows on " .. name)
+    hs.mouse.absolutePosition(centreOf(to:frame()))
+    focusBand(to, "no windows on " .. name)
 end
 
 local function onScreen(w, screen)

@@ -266,9 +266,16 @@ focuses it there. Screens are taken left to right and wrap, so with two it is a
 toggle. Both move the pointer to the window too, because some of this config
 follows the focused screen and some follows the pointer, and leaving the
 pointer behind would send the next pointer-side action back. A short band on
-the target screen names it. A screen with no window cannot take focus (macOS
-focuses windows, not screens), so the pointer goes there anyway and the band
-says "no windows on" it. hyper+; used to be the Delta Chat / Excel app hotkey,
+the target screen names it. When the screen shows no normal window, hyper+;
+looks for an app whose window is in another Space of that screen (a
+fullscreen app, typically): first among the apps last used on that screen,
+then among all recent apps, asking each over Accessibility where its focused
+window is. Bringing that app forward switches the screen to its Space, and the
+band names the app. Only when none is found does the pointer go there alone
+with a band saying "no windows on" it: a screen with no window cannot take
+focus, since macOS focuses windows, not screens. The fallback is
+`screenFocusFallback` in `core/app-hotkeys/main.lua`, and every fallback press
+logs a `focusNext:` console line. hyper+; used to be the Delta Chat / Excel app hotkey,
 which is now hyper+y. The code is `Screens.focusNext` and
 `Screens.moveWindowNext` in `core/screens.lua`; see `docs/multi-monitor.md`.
 "The next screen" is counted from the focused screen, `Screens.focusedScreen()`,

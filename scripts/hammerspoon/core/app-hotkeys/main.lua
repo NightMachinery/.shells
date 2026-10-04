@@ -709,6 +709,50 @@ function screenReturnFocus(t, label)
     appBringForward(t.app)
 end
 
+--- What Screens.focusNext (hyper+;) focuses when `screen' shows no normal
+--- window, as a screenReturnTarget-shaped table, or nil:
+---   1. screenReturnOnScreen: the screen's own recent apps, including one
+---      whose window is in a Space the screen is not showing;
+---   2. the newest app anywhere (recent apps, then every other regular app)
+---      whose own focused (or main) window is on `screen' and not
+---      minimized, over Accessibility: a fullscreen app in another Space of
+---      that screen that was never filed under it.
+--- hs.spaces.windowsForSpace lists another Space's window ids, but neither
+--- CoreGraphics' list (hs.window.list, with or without its `allWindows'
+--- flag) nor any app's Accessibility windows returned one of them
+--- (2026-10-04), so the ids cannot be mapped to an app; step 2 asks the apps
+--- instead. It costs one or two queries per app until one matches: 53 ms
+--- for eleven apps and no match (2026-10-04).
+--- Panel-mode kitty is skipped, as in screenReturnTarget.
+function screenFocusFallback(screen, stack)
+    local panelKitty = kitty_hotkey_mode == "panel" and "net.kovidgoyal.kitty" or nil
+    local function skip(pid, bid) return panelKitty ~= nil and bid == panelKitty end
+    local t = screenReturnOnScreen(screen, skip, nil, stack or Screens.windowStack())
+    if t then return t end
+    -- Recent apps first, then every other regular app: the recent lists
+    -- start empty after a reload, and a fullscreen Paseo on the laptop was
+    -- missed that way (2026-10-04).
+    local candidates, seen = recentAppsCandidates(function(bid, pid) return skip(pid, bid) end), {}
+    for _, a in ipairs(candidates) do pcall(function() seen[a:pid()] = true end) end
+    for _, a in ipairs(hs.application.runningApplications()) do
+        local ok, pid, bid, kind = pcall(function() return a:pid(), a:bundleID(), a:kind() end)
+        if ok and kind == 1 and not seen[pid] and not skip(pid, bid) and not recentAppsTransient[bid] then
+            candidates[#candidates + 1] = a
+        end
+    end
+    for _, a in ipairs(candidates) do
+        if appReturnUsable(a) then
+            local ok, w = pcall(function()
+                local w = a:focusedWindow() or a:mainWindow()
+                if w ~= nil and not w:isMinimized() and w:screen():id() == screen:id() then return w end
+                return nil
+            end)
+            if ok and w then return { app = a, window = w, why = "its window is here, in another Space" } end
+        end
+    end
+    return nil
+end
+
 -- The second press of an app's hotkey hides the app and returns you to the
 -- app you were in before it on the same screen. Left to itself, macOS
 -- activates an app of its own choosing when the frontmost app hides:
