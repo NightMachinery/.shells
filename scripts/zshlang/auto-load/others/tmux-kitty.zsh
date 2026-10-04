@@ -415,7 +415,20 @@ function tmux2kitty {
     fi
     command tmux kill-pane -t "${pane}" &>/dev/null || true
 
-    local -a opts=( --type="${type}" --cwd="${cwd:-${HOME}}"
+    h-tmux2kitty-launch "${sock}" "${name}" "${type}" "${hide_p}" "${cwd:-${HOME}}" "${cmdv[@]}"
+}
+
+function h-tmux2kitty-launch {
+    : "usage: h-tmux2kitty-launch <socket> <name> <kitty type> <hide_p> <cwd> <command...>; starts a job in kitty and records it, for tmux2kitty and tmux2kitty-restart"
+    local sock="${1}" name="${2}" type="${3}" hide_p="${4}" cwd="${5}"
+    shift 5
+    local -a cmdv=( "$@" )
+    local caller="${funcstack[2]:-$0}"
+
+    h-tmux2kitty-id "${name}"
+    local id="${REPLY}"
+
+    local -a opts=( --type="${type}" --cwd="${cwd}"
         --var "tmux2kitty=${id}" --var "tmux2kitty_name=${name}" )
     if [[ "${type}" != (background|clipboard|primary) ]] ; then
         #: `--hold', so that a crash leaves its traceback readable rather than
@@ -429,7 +442,7 @@ function tmux2kitty {
     local win
     if ! win="$(kitty @ --to "${sock}" launch "${opts[@]}" \
             -- "${commands[zsh]}" -c 'exec "$@"' tmux2kitty "${cmdv[@]}")" ; then
-        ecerr "$0: kitty did not launch ${name}; it is now stopped. Start it again with its launcher."
+        ecerr "${caller}: kitty did not launch ${name}; it is now stopped. Start it again with its launcher."
         return 1
     fi
 
@@ -437,11 +450,75 @@ function tmux2kitty {
     h-tmux2kitty-marker "${id}"
     marker="${REPLY}"
     command mkdir -p -- "${marker:h}" && ec "${name}" >| "${marker}"
+    #: What [agfi:tmux2kitty-restart] runs again: the directory, then the
+    #: argv, each NUL-terminated. Owner-only, like the argv kitty already
+    #: shows to `ps`.
+    ( umask 077 ; print -rN -- "${cwd}" "${cmdv[@]}" >| "${marker}.cmd" )
 
-    ecgray "$0: ${name} now runs in kitty window ${win}. See it with: tmux2kitty-text $(gq "${name}"), tmux2kitty-focus $(gq "${name}")"
+    ecgray "${caller}: ${name} now runs in kitty window ${win}. See it with: tmux2kitty-text $(gq "${name}"), tmux2kitty-focus $(gq "${name}")"
     if bool "${hide_p}" ; then
         tmux2kitty-hide "${name}"
     fi
+}
+
+function tmux2kitty-restart {
+    : "usage: tmux2kitty-restart <name>; stops a job tmux2kitty moved into kitty and starts it there again, with the command it was moved with"
+    #: For a job that must reread something it reads only at start, such as
+    #: an API key ([agfi:api-key-rotate]). A job keeps its shown or hidden
+    #: state. Its command comes from the record [agfi:h-tmux2kitty-launch]
+    #: writes; a job moved before that record existed has none, and is then
+    #: left running.
+    ##
+    local name="${1}"
+    assert-args name @RET
+
+    h-tmux2kitty-id "${name}"
+    local id="${REPLY}"
+    h-tmux2kitty-marker "${id}"
+    local record="${REPLY}.cmd"
+
+    if ! test -s "${record}" ; then
+        ecerr "$0: ${name} has no recorded command (it was moved before tmux2kitty kept one); restart it with its launcher, which stops the kitty copy, then tmux2kitty it again"
+        return 1
+    fi
+    local data
+    data="$(<"${record}")" @RET
+    local -a rec=( "${(@0)data}" )
+    #: The terminator of the last field leaves one empty element behind.
+    if (( ${#rec} )) && [[ -z "${rec[-1]}" ]] ; then
+        rec[-1]=()
+    fi
+    if (( ${#rec} < 2 )) ; then
+        ecerr "$0: ${name}'s recorded command is malformed: ${record}"
+        return 1
+    fi
+    local cwd="${rec[1]}"
+    local -a cmdv=( "${(@)rec[2,-1]}" )
+
+    local sock
+    sock="$(kitty-socket-get)" @RET
+
+    local rows row state=''
+    local -a f
+    rows="$(h-tmux2kitty-windows "${sock}")" @RET
+    for row in ${(f)rows} ; do
+        f=( "${(@ps:\t:)row}" )
+        if [[ "${f[2]}" == "${id}" ]] ; then
+            state="${f[5]}"
+        fi
+    done
+    if test -z "${state}" ; then
+        ecerr "$0: ${name} does not run in kitty"
+        return 1
+    fi
+
+    tmux2kitty-stop "${name}" @RET
+
+    local type=tab hide_p=y
+    if [[ "${state}" == shown ]] ; then
+        hide_p=''
+    fi
+    h-tmux2kitty-launch "${sock}" "${name}" "${type}" "${hide_p}" "${cwd}" "${cmdv[@]}"
 }
 
 function tmux2kitty-ls {
@@ -567,17 +644,22 @@ function tmux2kitty-stop {
         ecerr "$0: ${name} is still running in kitty"
         return "${ret}"
     fi
-    command rm -f -- "${marker}"
+    command rm -f -- "${marker}" "${marker}.cmd"
+}
+
+function h-tmux2kitty-moved-p {
+    : "usage: h-tmux2kitty-moved-p <name>; true when tmux2kitty moved <name> into kitty and nothing has stopped it since"
+    #: A `test -e', cheap enough for every [agfi:tmuxnew].
+    h-tmux2kitty-id "${1}"
+    h-tmux2kitty-marker "${REPLY}"
+    test -e "${REPLY}"
 }
 
 function h-tmux2kitty-reclaim {
     : "usage: h-tmux2kitty-reclaim <session>; for tmuxnew: stops the kitty copy of <session>, if tmux2kitty made one"
-    #: A `test -e' when there is nothing to reclaim, which is every call but
-    #: the first after a move.
+    #: Nothing to reclaim is every call but the first after a move.
     ##
-    h-tmux2kitty-id "${1}"
-    h-tmux2kitty-marker "${REPLY}"
-    test -e "${REPLY}" || return 0
+    h-tmux2kitty-moved-p "${1}" || return 0
 
     tmux2kitty-stop "${1}"
 }

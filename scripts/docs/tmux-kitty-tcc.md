@@ -132,7 +132,15 @@ tmux2kitty-show BrishGarden      #: bring its hidden tab back, as the active tab
 tmux2kitty-hide BrishGarden      #: take its tab out of the tab bar; it keeps running
 tmux2kitty-toggle BrishGarden    #: whichever of the two applies
 tmux2kitty-stop BrishGarden      #: stop it and close its window
+tmux2kitty-restart BrishGarden   #: stop it and start the same command again in kitty
 ```
+
+`tmux2kitty-restart` is for a job that must reread something it reads only at
+start, such as an API key ([agfi:api-key-rotate] uses it). It keeps the job
+shown or hidden. The command comes from a record that `tmux2kitty` writes next
+to its marker (`<marker>.cmd`, owner-only: the directory and then the argv, each
+NUL-terminated). A job moved before that record existed has none. It is then
+left running, and you restart it once with its launcher and move it again.
 
 Pickers take an optional fuzzy query instead of a name:
 
