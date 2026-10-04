@@ -417,6 +417,17 @@ Found in real use on 2026-10-03, after the round above:
   the new screen; the fullscreen request now waits and is retried, untested
   on a real press.
 
+Found in real use on 2026-10-04:
+
+- **The monitor became the primary display**, so that macOS's Sticky Keys
+  banner (drawn by `universalaccessd` in a corner of the primary display,
+  with no setting for which display) moved there; it did. Right after the
+  switch, hyper+shift+; stopped moving Brave and printed nothing, and a
+  Hammerspoon restart fixed it. The cause is unknown: the press either
+  never reached the handler or took one of its early exits (another move
+  still marked as running, no focused window, no other screen), which drew
+  a band but logged nothing. Those exits now print too.
+
 Still unmeasured:
 
 - **What is still untested on two screens.** Since the second round, real

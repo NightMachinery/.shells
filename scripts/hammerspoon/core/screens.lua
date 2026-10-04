@@ -1064,8 +1064,12 @@ Screens.moveHandlers = Screens.moveHandlers or {}
 --- 2026-10-02, where the old version of this silently did nothing), so it
 --- leaves fullscreen, moves, and goes fullscreen again on the new screen.
 function Screens.moveWindowNext(delta)
+    -- Every exit prints, so a press that seems to do nothing shows up in the
+    -- console: after the primary display was switched (2026-10-04), presses
+    -- left no line at all until Hammerspoon was restarted.
     if moving then
         focusBand(Screens.focusedScreen(), "still moving a window")
+        print("Screens.moveWindowNext: ignored, still moving a window")
         return
     end
     -- Milliseconds since the press at each step, for the console line, so a
@@ -1078,12 +1082,15 @@ function Screens.moveWindowNext(delta)
     local w = hs.window.focusedWindow()
     if not w then
         focusBand(Screens.focusedScreen(), "no focused window")
+        print("Screens.moveWindowNext: no focused window")
         return
     end
     local from = w:screen()
     local to = Screens.neighbour(from, delta or 1)
     if not to or to:id() == from:id() then
         focusBand(from, "only one screen")
+        print(string.format("Screens.moveWindowNext: no other screen (window on %s; %d screens listed)",
+                            tostring(from and from:name()), #Screens.list()))
         return
     end
     local app = w:application()
