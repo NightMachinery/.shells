@@ -1219,10 +1219,12 @@ end
 --- The point needs the window's size. The width follows HSChooser's own rule
 --- (-resizeWindow), which reads hs.screen.mainScreen(). The height cannot be
 --- read from Lua, so it is taken from the window list after each show and
---- kept per row count and screen across reloads (ten rows measured 621 pt on
---- the laptop and 514 on the monitor, 2026-10-04); until one is seen, the
---- native show() runs when the target is the primary screen anyway, and a
---- guess places it elsewhere.
+--- kept per row count and screen across reloads. Only a chooser's first show
+--- is recorded: ten rows measured 621 pt on a new chooser's first show and
+--- 514 on its next, on the same screen (2026-10-04), and every chooser here
+--- is made afresh per press. Until a height is seen, the native show() runs
+--- when the target is the primary screen anyway, and a guess places it
+--- elsewhere.
 -- The metatable exists once the lazily loaded extension is.
 require("hs.chooser")
 local chooserMeta = hs.getObjectMetatable("hs.chooser")
@@ -1244,6 +1246,9 @@ local function chooserWidth(c)
     if pct >= 0 and pct <= 100 then return w * pct / 100 end
     return math.max(400, math.min(w * 0.5, 800))
 end
+
+-- Choosers shown at least once, so later shows are not measured.
+local chooserShown = setmetatable({}, { __mode = "k" })
 
 -- The heights table's key: the row count and the screen.
 local function chooserHeightKey(rows, screen)
@@ -1286,12 +1291,14 @@ chooserMeta.show = function(self, topLeft)
     local x = math.floor(f.x + (f.w - w) / 2)
     if h == nil and target:id() == hs.screen.primaryScreen():id() then
         native(self)
-        chooserMeasure(key, w)
+        if not chooserShown[self] then chooserMeasure(key, w) end
+        chooserShown[self] = true
         return self
     end
     h = h or f.h * kChooserHeightGuess
     native(self, { x = x, y = math.floor(f.y + math.max(0, f.h - h) * kChooserTopShare) })
-    chooserMeasure(key, w)
+    if not chooserShown[self] then chooserMeasure(key, w) end
+    chooserShown[self] = true
     return self
 end
 --- @end

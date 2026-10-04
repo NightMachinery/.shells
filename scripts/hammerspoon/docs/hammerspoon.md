@@ -1836,8 +1836,10 @@ The point needs the window's size:
 - **Height** cannot be read from Lua. After each show, the chooser's window
   is found in the window list (ours, above layer 0, of that width) and its
   height is kept per row count and screen in `hs.settings`
-  (`kChooserHeightsKey`), so it survives reloads. Per screen, because the
-  same ten rows measured 621 pt on the laptop and 514 on the monitor. Before a height has been
+  (`kChooserHeightsKey`), so it survives reloads. Only a chooser's first show
+  is recorded: a new chooser's ten rows measured 621 pt on its first show and
+  514 on its next, on the same screen, and every chooser here is made afresh
+  per press. Before a height has been
   seen, a chooser bound for the primary screen takes the native `show()`,
   which records it, and one bound elsewhere is placed with a guessed height
   (`kChooserHeightGuess`): on the right screen, but possibly a little off
