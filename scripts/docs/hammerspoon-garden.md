@@ -119,7 +119,7 @@ Each of these has a counterpart in zsh, and both copies carry the same
   effect (`inputMuteToggle` in `core/window-media-bindings.lua`). The iPhone
   mic's soft mute is a redis state machine that stays in zsh.
 - hyper+d, dismiss notifications: `osascript` on `notif-dismiss-v2.jxa`
-  (`core/app-hotkeys.lua`).
+  (`core/app-hotkeys/main.lua`).
 - hyper+g, anycomplete: Google's and DuckDuckGo's suggestions over `hs.http`
   (`anycompleteSuggest` in `core/choosers.lua`).
 - FIM completion: `hammerspoon/bin/fim-get.zsh`, which sources `fim.zsh`

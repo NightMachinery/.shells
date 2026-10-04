@@ -463,7 +463,7 @@ local function kittyStandardWindow(app)
 end
 
 -- Where hiding puts you back: the previous app on the screen kitty is on,
--- by screenReturnTarget (core/app-hotkeys.lua), the rule the app hotkeys
+-- by screenReturnTarget (core/app-hotkeys/main.lua), the rule the app hotkeys
 -- return by. `snap' (screenReturnSnapshot) is taken at press time, on the
 -- screen of kitty's own panel or window, before the hide's own activation
 -- has been filed. The recent-apps lists are fed by an
@@ -634,10 +634,10 @@ function kittyHandler()
     kittyPressAt = hs.timer.absoluteTime()
 
     -- A floating-window check still waiting for its timer would pull focus
-    -- back to the app being left (core/app-hotkeys.lua).
+    -- back to the app being left (core/app-hotkeys/main.lua).
     if appFloatingSupersede then appFloatingSupersede() end
 
-    -- getApp (core/app-hotkeys.lua) is a bundle-ID lookup that never
+    -- getApp (core/app-hotkeys/main.lua) is a bundle-ID lookup that never
     -- enumerates every running process.
     local app = getApp(kittyBundleID)
     local front = hs.application.frontmostApplication()

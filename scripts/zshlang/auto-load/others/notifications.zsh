@@ -1,6 +1,6 @@
 function notif-os-dismiss-all {
     #: @duplicateCode/b88a767cde3e47cb1bad4b855a8989b8: hyper+d runs the same
-    #: script from Lua, in hammerspoon/core/app-hotkeys.lua.
+    #: script from Lua, in hammerspoon/core/app-hotkeys/main.lua.
     if isDarwin ; then
         ##
         notif-dismiss-v2.jxa

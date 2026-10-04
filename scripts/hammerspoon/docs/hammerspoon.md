@@ -26,7 +26,7 @@ The explicit core load order is:
 - `popclick.lua`
 - `system-keys.lua`
 - `choosers.lua`
-- `app-hotkeys.lua`
+- `app-hotkeys/config.lua`, `app-hotkeys/main.lua`, `app-hotkeys/bindings.lua`
 - `window-media-bindings.lua`
 - `stt.lua`
 - `fim.lua`
@@ -39,6 +39,20 @@ Put core features in `core/` and add them to the explicit list in `boot.lua`.
 Put app-specific add-ons that can run after all core modules in `auto-load/`.
 
 ## App hotkeys
+
+The app hotkeys live in `core/app-hotkeys/`, as three files loaded in this
+order:
+
+- `config.lua`: every knob below, with its default and what each value does.
+  It is the one place the defaults are set. A knob set from the console
+  (`hs -c 'hide_return_policy = "summoner"'`) takes effect at once and lasts
+  until the next reload; `maccy_popup_screens` alone is read only at load.
+- `main.lua`: the engine: `appHotkey`, `getApp`, the hide and its return,
+  the floating-window check, the timing lines, Maccy's popup, and hyper+d.
+- `bindings.lua`: which key brings which app, as `appHotkey{...}` calls,
+  plus hyper+; and hyper+shift+;.
+
+Boolean knobs end in `_p`, after the Lisp convention.
 
 `appHotkey` accepts either one app name/bundle ID or a dense ordered array of
 them. On each press it uses `getApp` to try the candidates in order and toggles
@@ -79,15 +93,15 @@ handler starts, and entering hyper mode takes 10.5 ms (4.4 ms enabling its 71
 keys, 6.1 ms in `entered()`), which only delays a key pressed within that time
 of hyper.
 
-How the app comes forward is set by the global `app_hotkey_activate_via_ax`
-(default `false`). With `false`, the hotkey calls `app:unhide()`, since the
+How the app comes forward is set by `app_hotkey_activate_via_ax_p` in
+`core/app-hotkeys/config.lua`. With `false`, the hotkey calls `app:unhide()`, since the
 second press of a hotkey hides its app, and then `app:_bringtofront(false)`,
 the call `hs.application:activate()` itself ends with
 (`SetFrontProcessWithOptions`, front window only). With `true` it calls
 `activate()` as it is, which first asks the target app over Accessibility for
 its focused window and makes it main: 3 to 8 ms of round trips to an app that
-answers promptly, and unbounded for one that does not. Set it to `true` in a
-file that loads earlier, or from the console, if an app with several windows,
+answers promptly, and unbounded for one that does not. Set it to `true` there,
+or from the console, if an app with several windows,
 on several spaces say, ever comes forward with the wrong one.
 
 The second press of a hotkey hides its app and returns you to the app you were
@@ -208,7 +222,7 @@ it took focus. The kitty panel floats on purpose and stays
 clicking the video yourself later is left alone. A check does nothing once its
 app is no longer frontmost, or once a newer switch has started
 (`appFloatingSupersede`, which hyper+z and hyper+; call too): it would pull
-you back to an app you had just left. `app_focus_skip_floating = false` turns
+you back to an app you had just left. `app_focus_skip_floating_p = false` turns
 the check off, for every app.
 
 The layer is the test. A Chromium PiP window calls itself an
@@ -241,8 +255,8 @@ that is unmeasured. n means the n-th of `NSScreen.screens`, the order
 `hs.screen.allScreens()` lists them in.
 Its "window center" setting would be no better: it centres on the front app's
 first CoreGraphics window at any layer, which for Brave is a 24 px strip. So
-`core/app-hotkeys.lua` keeps `popupScreen` pointing at the screen named by the
-spec `maccy_popup_screens` (`false` leaves Maccy alone; the default, `active`,
+`core/app-hotkeys/main.lua` keeps `popupScreen` pointing at the screen named by
+the spec `maccy_popup_screens` in `config.lua` (`false` leaves Maccy alone; the default, `active`,
 had followed the lagging `mainScreen` until 2026-10-03 and so kept writing the
 laptop),
 rewriting it with `defaults write` when `Screens.onTargetChange` sees that
@@ -2100,7 +2114,7 @@ last window closes (`macos_quit_when_last_window_closed`), so "not running" is
 a normal state and the key has to start it. The second is the return of focus
 after a hide, which macOS will not do for you. The target is the previous
 app on the screen kitty is on, chosen by `screenReturnTarget` in
-`core/app-hotkeys.lua` with kitty left out (see "App hotkeys" above), and read
+`core/app-hotkeys/main.lua` with kitty left out (see "App hotkeys" above), and read
 at press time, before the hide, because the activation the hide causes would
 change the lists. `kittyFocusAfterHide` then carries it out through
 `screenReturnFocus`, inside `pcall`. In panel mode `kittyFocusWatcher`, an

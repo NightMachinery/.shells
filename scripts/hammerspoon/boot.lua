@@ -90,12 +90,16 @@ local hammerspoonCoreFiles = {
     "core/popclick.lua",
     "core/system-keys.lua",
     "core/choosers.lua",
-    "core/app-hotkeys.lua",
+    -- Settings, then the engine, then the keys: config.lua sets knobs
+    -- main.lua reads at load, and bindings.lua calls its appHotkey.
+    "core/app-hotkeys/config.lua",
+    "core/app-hotkeys/main.lua",
+    "core/app-hotkeys/bindings.lua",
     -- After alert/ and core/helpers.lua: it bands through alert_gateway and
     -- calls the garden through brishz_eval_out_hs. Before
     -- core/window-media-bindings.lua, which instantiates it twice.
     "core/level-stepper.lua",
-    -- After alert/ and core/app-hotkeys.lua: it uses alert_gateway and
+    -- After alert/ and core/app-hotkeys/: it uses alert_gateway and
     -- getApp. Before core/window-media-bindings.lua, whose hyper+z calls
     -- kittyPanelShow and kittyPanelHide.
     "core/kitty-panel.lua",

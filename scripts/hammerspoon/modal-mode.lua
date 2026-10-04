@@ -451,7 +451,7 @@ function ModalMode.create(o)
         local t0 = hs.timer.absoluteTime()
         mode.modality.down_p = true
         mode.toggle()
-        -- For the timing lines of core/app-hotkeys.lua: when the mode key
+        -- For the timing lines of core/app-hotkeys/main.lua: when the mode key
         -- went down, and how long entering the mode took. A key pressed
         -- sooner than that waits for it.
         mode.downAt = t0

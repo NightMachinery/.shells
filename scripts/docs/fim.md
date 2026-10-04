@@ -540,7 +540,7 @@ without its `]`.
 ### Per-app policy
 
 `fimAppPolicy` is a table keyed by bundle ID — house style throughout
-`core/app-hotkeys.lua`, and the reason that file never pays for a full
+`core/app-hotkeys/main.lua`, and the reason that file never pays for a full
 application enumeration. Four kinds of value:
 
 - `"default"` — run FIM. This is `fimAppPolicyDefault`, so it is what an app

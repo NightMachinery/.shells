@@ -348,14 +348,7 @@ function screenReturnSnapshot(screen)
 end
 
 --- Where a hide returns to, for the app hotkeys' second press and kitty's
---- toggle (screenReturnTarget, below). An enum:
----   "screen"    the default: the app used last on the screen being left.
----               With Emacs and Telegram on the laptop and Brave on the
----               monitor, hyper+x, hyper+/, hyper+l, hyper+l lands in Emacs.
----   "summoner"  the app you were in just before the one being hidden, on
----               whichever screen: the app that brought you here. The same
----               keys land in Brave.
-hide_return_policy = hide_return_policy or "screen"
+--- toggle (screenReturnTarget, below): `hide_return_policy', in config.lua.
 
 function screenReturnPolicy()
     local p = hide_return_policy
@@ -586,15 +579,8 @@ local kFloatingCheckDelay = 0.05
 -- kCGModalPanelWindowLevel, from the SDK's CGWindowLevel.h.
 local kModalPanelLayer = 8
 
--- true (the default): move focus off a floating window as above. false
--- turns the whole check off, so an activation keeps whatever window the app
--- focuses, Picture-in-Picture included. Read at every check, so setting it
--- from the console takes effect at once.
-if app_focus_skip_floating == nil then app_focus_skip_floating = true end
-
--- Apps whose floating window is the point: the kitty panel floats on purpose
--- (core/kitty-panel.lua), and a hide can return to it.
-appFloatingIntended = appFloatingIntended or { ["net.kovidgoyal.kitty"] = true }
+-- `app_focus_skip_floating_p' turns the check off, and `appFloatingIntended'
+-- lists apps it leaves alone; both in config.lua.
 
 -- Bumped by every switch this config starts; a check scheduled under an
 -- older value is dropped.
@@ -623,7 +609,7 @@ end
 --- `gen' is appFloatingGen when the check was scheduled; nil (from the
 --- console) checks regardless.
 function appFocusOffFloating(app, label, gen)
-    if not app_focus_skip_floating then return end
+    if not app_focus_skip_floating_p then return end
     if gen ~= nil and gen ~= appFloatingGen then return end
     -- NSRunningApplication's own flag: asks the app nothing.
     local okf, front = pcall(function() return app:isFrontmost() end)
@@ -704,22 +690,11 @@ appSwitchWatcher = hs.application.watcher.new(function(_, event, app)
 end)
 appSwitchWatcher:start()
 
--- How an app hotkey brings its app forward.
---
--- false (the default): straight to the window server. unhide() first, since
--- the second press of a hotkey hides its app; it is a no-op on a visible app.
--- Then _bringtofront(false), the call hs.application:activate() itself ends
--- with (SetFrontProcessWithOptions, front window only).
---
--- true: hs.application:activate() as it is, which before that asks the
--- target app over Accessibility for its focused window and makes it main.
--- That is 3 to 8 ms of round trips to an app that answers promptly, and
--- unbounded when it does not. Switch this on if an app with several windows
--- (on several spaces, say) ever comes forward with the wrong one.
-app_hotkey_activate_via_ax = app_hotkey_activate_via_ax or false
+-- How an app hotkey brings its app forward: `app_hotkey_activate_via_ax_p',
+-- in config.lua.
 
 local function appBringForward(app)
-    if app_hotkey_activate_via_ax then return app:activate() end
+    if app_hotkey_activate_via_ax_p then return app:activate() end
     app:unhide()
     return app:_bringtofront(false)
 end
@@ -877,147 +852,6 @@ end
 -- end
 -- @upstreamBug https://github.com/Hammerspoon/hammerspoon/issues/2879 hs.hotkey.bind cannot bind punctuation keys such as /
 
-appHotkey{
-    key='/',
-    appName={
-        'com.brave.Browser',
-        'company.thebrowser.Browser',
-        'com.vivaldi.Vivaldi',
-        'com.microsoft.edgemac',
-        'com.google.Chrome',
-        'com.apple.Safari',
-    }
-}
-appHotkey{
-    key='/',
-    mods={'shift'},
-    appName={
-        'company.thebrowser.Browser',
-        'com.interversehq.qView',
-    }
-}
-
-appHotkey{
-    key="'",
-    mods={'shift'},
-    appName='com.apple.Safari'
-}
-appHotkey{
-    key='.',
-    -- mods={'shift'},
-    appName={
-        'com.google.Chrome',
-        'com.apple.Safari',
-    }
-}
-appHotkey{
-    key='.',
-    mods={'shift'},
-    appName='com.microsoft.edgemac'
-}
--- appHotkey{ key='.', mods={'shift'}, appName='com.openai.atlas' }
--- appHotkey{ key='.', appName='com.openai.atlas' }
--- appHotkey{ key='m', appName='com.google.Chrome.app.ahiigpfcghkbjfcibpojancebdfjmoop' } -- https://devdocs.io/offline ; 'm' is also set as a search engine in Chrome
--- appHotkey{ key='m', appName='com.kapeli.dashdoc' } -- dash can bind itself in its pref
-appHotkey{
-    -- Was hyper+;, which now moves focus between screens (below).
-    key='y',
-    appName={
-        'chat.delta.desktop.electron',
-        'com.microsoft.Excel',
-    }
-}
-
--- hyper+; focuses the next screen's frontmost window, hyper+shift+; moves the
--- focused window to the next screen; both bring the pointer along. Screens go
--- left to right and wrap. See Screens.focusNext in core/screens.lua.
-hyper_bind_v2{ key=';', pressedfn=function() Screens.focusNext(1) end }
-hyper_bind_v2{ key=';', mods={'shift'}, pressedfn=function() Screens.moveWindowNext(1) end }
-
--- appHotkey{ key='c', appName='com.microsoft.VSCodeInsiders' }
--- appHotkey{ key='c', appName='com.apple.Terminal' }
-appHotkey{ key='c', appName='com.apple.iCal' }
--- appHotkey{ key='c', appName='com.todesktop.230313mzl4w4u92' } -- Cursor VSCode App
-
-emacsAppName = 'org.gnu.Emacs'
-appHotkey{ key='x', appName=emacsAppName }
-
-appHotkey{ key='l',
-           appName={
-               'com.tdesktop.PurpleTelegram',
-               'com.tdesktop.Telegram',
-           }
-}
-
-appHotkey{ key='\\', appName='com.anthropic.claudefordesktop' }
-appHotkey{
-    mods={'shift'},
-    key='\\',
-    appName='com.claudecode.context' }
--- appHotkey{ key='\\', appName='moe.Throne.macosx' }
--- appHotkey{ key='\\', appName='com.apple.iCal' }
-
--- appHotkey{ key='b', appName='com.apple.Preview' }
--- appHotkey{ key='b', appName='zathura' }
--- appHotkey{ key='a', appName='com.adobe.Reader' }
-
--- appHotkey{ key=']', appName='org.jdownloader.launcher' }
-
-appHotkey{
-    key='k',
-    appName={
-        'info.sioyek.sioyek',
-        'net.sourceforge.skim-app.skim',
-        'com.apple.Preview',
-    }
-}
--- appHotkey{ key='n', appName='net.sourceforge.skim-app.skim' }
--- appHotkey{ key='[', appName='info.sioyek.sioyek' }
--- appHotkey{ key=']', appName='net.sourceforge.skim-app.skim' }
-
-appHotkey{ key='f', appName='com.apple.finder' }
--- appHotkey{ key='o', appName='com.operasoftware.Opera' }
--- appHotkey{ key='l', appName='notion.id' }
-
-appHotkey{
-    key='m',
-    appName={
-        'io.mpv',
-        'com.openai.codex',
-        'sh.paseo.desktop'
-    }
-}
--- shift+m: paseo:
-appHotkey{ key='m', mods={'shift'}, appName='sh.paseo.desktop' }
--- appHotkey{ key='m', appName='com.adobe.Reader' }
-
-appHotkey{ key='n', appName='com.apple.MobileSMS' } -- Apple Messages
--- appHotkey{ key='n', appName='com.appilous.Chatbot' } -- Pal ChatGPT app
--- appHotkey{ key='/', appName='com.quora.app.Experts' }
-appHotkey{ key='b', appName='com.parallels.desktop.console' }
-
-appHotkey{
-    key='p',
-    appName={
-        'com.jetbrains.pycharm',
-        'com.apple.Preview',
-    }
-}
-appHotkey{
-    key='p',
-    mods={'shift'},
-    appName={
-        'com.microsoft.Powerpoint',
-        'com.apple.iWork.Keynote',
-    }
-}
--- appHotkey{ key='w', appName='com.microsoft.Word' }
-
-appHotkey{ key='=', appName='com.fortinet.FortiClient' }
-
-appHotkey{ key='t', appName='org.mozilla.thunderbird' }
-
-
 -- hyper+d: dismiss every notification, with the script zsh uses, run here
 -- rather than through BrishGarden so it works while the garden is down. It
 -- drives NotificationCenter through System Events, so the first run from
@@ -1049,7 +883,7 @@ end)
 -- layer, which for Brave is a 24 px strip.
 --
 -- So popupScreen is kept pointing at the screen named by the spec
--- `maccy_popup_screens' (default "active"; false leaves Maccy alone),
+-- `maccy_popup_screens' (in config.lua; false leaves Maccy alone),
 -- rewritten through `defaults' when Screens.onTargetChange sees that screen
 -- change (on a focus or display change; nothing watches the pointer), and a
 -- press costs nothing extra. One write runs at a time, and a change that
@@ -1061,8 +895,6 @@ end)
 -- whether Hammerspoon may access data from other apps (seen 2026-10-03). The
 -- write waits for that answer, hence the long timeout; a failed write is
 -- forgotten, so the next screen change tries again.
-if maccy_popup_screens == nil then maccy_popup_screens = "active" end
-
 local maccyBundleID = "org.p0deje.Maccy"
 
 if maccy_popup_screens and Screens then

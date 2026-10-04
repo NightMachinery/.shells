@@ -304,7 +304,7 @@ end
 --- ** Windows on a screen, without Accessibility
 --- hs.window.orderedWindows() and hs.window.allWindows() ask every running
 --- process over Accessibility, and some take 1.5 s each to answer (see
---- core/app-hotkeys.lua). CoreGraphics' window list asks none: hs.window.list
+--- core/app-hotkeys/main.lua). CoreGraphics' window list asks none: hs.window.list
 --- gives every on-screen window front to back with its owner's pid, bounds
 --- and layer, in 19 to 40 ms (measured 2026-10-02, 38 windows). Only the one
 --- app whose window is picked is then asked for its hs.window.
@@ -360,7 +360,7 @@ end
 --- listed it, or nil when none has. It reads nothing, so it is a hint: a
 --- window that changes layer keeps its old answer until it is listed again,
 --- and whether the window server ever reuses an id within a session is
---- unmeasured. The floating-window check (core/app-hotkeys.lua) therefore
+--- unmeasured. The floating-window check (core/app-hotkeys/main.lua) therefore
 --- trusts only a 0, where a wrong answer just skips the check, and reads the
 --- list afresh for anything else.
 function Screens.layerOf(id)
@@ -431,7 +431,7 @@ end
 --- the same day). Whether it lags on an idle machine is unmeasured. While
 --- this config read it, everything that follows focus followed it late or
 --- the wrong way: activations were filed under the screen just left
---- (core/app-hotkeys.lua), so a hide returned to an app on the other
+--- (core/app-hotkeys/main.lua), so a hide returned to an app on the other
 --- screen, and hyper+z, Maccy's popup and hyper+; all went to the screen
 --- focus had left.
 ---
@@ -593,7 +593,7 @@ end)
 Screens.appWatcher:start()
 
 --- ** Moving focus between screens
---- hyper+; and hyper+shift+; (bound in core/app-hotkeys.lua). Screens are
+--- hyper+; and hyper+shift+; (bound in core/app-hotkeys/bindings.lua). Screens are
 --- taken left to right and wrap, so with two it is a toggle and with more it
 --- walks across them.
 ---
@@ -652,7 +652,7 @@ function Screens.focusNext(delta)
     local name = r and r.name or "?"
 
     -- A floating-window check still waiting for its timer would pull focus
-    -- back to the app being left (core/app-hotkeys.lua).
+    -- back to the app being left (core/app-hotkeys/main.lua).
     if appFloatingSupersede then appFloatingSupersede() end
 
     local stack = Screens.windowStack()

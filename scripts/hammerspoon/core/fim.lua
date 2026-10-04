@@ -56,7 +56,7 @@ fimHotkeyDeepseek = fimHotkeyDeepseek or { mods = {"ctrl"}, key = "right" }
 fimDefaultProvider = fimDefaultProvider or "codestral"
 
 --- What the chord does per app, keyed by bundle ID -- house style throughout
---- `core/app-hotkeys.lua', and the reason that file never pays for a full
+--- `core/app-hotkeys/main.lua', and the reason that file never pays for a full
 --- application enumeration. Values:
 ---
 ---   "default"            run FIM here
