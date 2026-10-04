@@ -604,17 +604,17 @@ function kittyWindowToggle(app, front)
 
     kittyRemember(front)
 
-    -- Show, on the screen the mouse is on.
-    local mouseScreen = hs.mouse.getCurrentScreen()
-    if win:screen():id() ~= mouseScreen:id() then
-        win:moveToScreen(mouseScreen)
+    -- Show, on the `working' screen, as the panel and cursorHide do.
+    local screen = Screens.target("working")[1]
+    if win:screen():id() ~= screen:id() then
+        win:moveToScreen(screen)
     end
 
     kittyEvictFromFullscreen(win)
 
     -- Between user spaces the move works and saves a space switch. A
     -- fullscreen target is left alone: see the header.
-    local target = hs.spaces.activeSpaceOnScreen(mouseScreen)
+    local target = hs.spaces.activeSpaceOnScreen(screen)
     if target and spaceIsUser(target) and not windowInSpace(win, target) then
         local ok, err = hs.spaces.moveWindowToSpace(win, target)
         if not ok then

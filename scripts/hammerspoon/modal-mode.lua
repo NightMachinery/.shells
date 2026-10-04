@@ -103,7 +103,7 @@ function ModalMode.updateIndicatorText(indicator, style, text, screen)
     end
 
     local textBoxSize = indicator:minimumTextSize(2, text)
-    local screenFrame = (screen or hs.screen.primaryScreen()):fullFrame()
+    local screenFrame = (screen or Screens.target("active")[1]):fullFrame()
     local frame = {
         w = textBoxSize.w + style.strokeWidth * 2 + style.textSize,
         h = textBoxSize.h + style.strokeWidth * 2 + style.textSize,

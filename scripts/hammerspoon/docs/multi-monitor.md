@@ -75,7 +75,7 @@ Every module picked its own screen, through `hs.screen` directly:
   and then calls NSWindow `-center`, which centres it on the screen it is on
   (read from upstream `HSChooser.m`).
 - **The kitty panel** appeared wherever kitty first created it.
-- **Window-mode kitty** followed the pointer screen. It still does.
+- **Window-mode kitty** followed the pointer screen.
 - **Blackout rows** were keyed by CG id, so a display that came back under a
   new id lost its saved levels.
 
@@ -446,8 +446,9 @@ Known gaps:
 
 - **The avy grid overhangs its screen** by one cell on every side, so next to
   a second monitor the edge cells are drawn on the neighbour.
-- **Window-mode kitty** still follows the pointer screen rather than
-  `working`. Its hide also still hides kitty first and focuses the return
+- **Window-mode kitty** shows on the `working` screen now, like the panel
+  (changed 2026-10-04, untested: window mode is not in daily use). Its hide
+  still hides kitty first and focuses the return
   target afterwards, so macOS picks an app for a moment in between; the app
   hotkeys focus the target first and hide once it has activated.
 - **A summon from the other screen.** From B on the laptop, an app hotkey
@@ -461,5 +462,6 @@ Known gaps:
   same, and kitty's `output-name` cannot tell them apart.
 - **`screen_prefs`** carries only `role` so far. Per-screen defaults for the
   level keys, or a preferred screen per app, would go there too.
-- **`modal-mode.lua`** still falls back to the primary screen when an
-  indicator is drawn without one.
+- **`modal-mode.lua`** fell back to the primary screen when an indicator was
+  drawn without one; it now falls back to the active screen. Every caller
+  passes a screen, so the fallback is not reached today.

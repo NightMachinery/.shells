@@ -2077,8 +2077,8 @@ is in kitty: use the current Space of the panel's own display rather than
 upstream issue, with the reproduction above.
 
 In window mode `kittyWindowToggle` shows kitty's normal window maximized on
-the screen the mouse is on, and hides it on the next press. From a fullscreen
-app a press switches to kitty's desktop and a second press switches back,
+the `working` screen (`screens_working_policy`), and hides it on the next
+press. From a fullscreen app a press switches to kitty's desktop and a second press switches back,
 which is exactly what macOS itself would do with any normal window: a normal
 window cannot be put over a fullscreen space, and Hammerspoon cannot move one
 there, since a forced `hs.spaces.moveWindowToSpace` into a fullscreen space
