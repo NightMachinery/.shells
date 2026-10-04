@@ -25,6 +25,16 @@ GUI actions, plain Lua helpers and Hammerspoon garden calls also use the
 installed Go client. See
 [[NIGHTDIR:docs/brishzgo.md][usage and caller migrations]].
 
+* Moving movies and audiobooks from the phone
+
+[agfi:tealy-mv-movies] opens a multi-select picker for =storage/movies/=
+and one level inside its directories. =tealy-mv-movies .= moves the selected
+files or directory trees into the current directory through [agfi:rsp-mv].
+[agfi:tealy-mv-audiobooks] does the same for audiobooks. Both show the exact
+source and destination of each selection and use [agfi:ask] before transferring,
+with No as the default.
+See [[NIGHTDIR:docs/rsp.md][selection and source-removal behavior]].
+
 * Hammerspoon
 
 Hammerspoon shortcut notes are tracked in =./hammerspoon/docs/hammerspoon.md=.

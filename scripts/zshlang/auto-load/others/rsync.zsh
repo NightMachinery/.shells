@@ -69,6 +69,97 @@ aliasfn rspm rsp --crtimes
 aliasfn rspb rsp --backup --backup-dir=.rsync-backup
 aliasfn rspbm rspb --crtimes
 ##
+function h-tealy-mv-media {
+    : "usage: h-tealy-mv-media ROOT [DESTINATION]
+Pick remote entries, show their destinations, and confirm before moving them."
+    setopt localoptions pipefail
+
+    local root="${1%/}"
+    shift
+    local dest="${1:-.}"
+    if (( $# > 1 )) || [[ ! -d "${dest}" ]] ; then
+        ecerr "$0: destination must be an existing local directory"
+        return 2
+    fi
+    dest="${dest:A}"
+    ensure-cmd ssh fzf rsync @RET
+
+    local listing selection list_cmd
+    #: Root children plus one level inside them. NUL records preserve filenames
+    #: with newlines; the slash marks directories without following child links.
+    list_cmd="$(gquote command find -H "${root}" -mindepth 1 -maxdepth 2 \
+        '(' -type d -printf '%p/\0' -o -type f -print0 ')')" @RET
+    listing="$(h-termux-ssh tealy "${list_cmd}")" @RET
+    if [[ -z "${listing}" ]] ; then
+        ecerr "$0: no files or directories found"
+        return 0
+    fi
+
+    #: [agfi:fzf-noempty] peeks a newline-delimited record, so bypass it for
+    #: this already checked NUL stream. Do not send it through the MRU wrapper.
+    local fz_empty=y fzf_mru_context=''
+    selection="$(ecn "${listing}" | fz --multi --read0 --print0 \
+        --prompt="${root:t}> " \
+        --header='Tab: select; Enter: review moves; Esc: cancel. Directories move recursively.')" @RET
+    [[ -n "${selection}" ]] || return 0
+
+    local candidates=( ${(0)listing} ) selected=( ${(0)selection} ) sources=()
+    selected=("${(@u)selected}")
+    local item parent name source target
+    local moves=()
+    local -A target_sources=()
+    for item in "${selected[@]}" ; do
+        if (( ${candidates[(Ie)${item}]} == 0 )) ; then
+            ecerr "$0: picker returned an unknown entry: $(gquote "${item}")"
+            return 2
+        fi
+        #: A selected parent covers its children, regardless of picker order.
+        for parent in "${selected[@]}" ; do
+            if [[ "${parent}" != "${item}" && "${parent}" == */ && "${item}" == "${parent}"* ]] ; then
+                continue 2
+            fi
+        done
+
+        item="${item%/}"
+        name="${item:t}"
+        if [[ -n "${target_sources[${name}]:-}" ]] ; then
+            ecerr "$0: selected entries share the destination name $(gquote "${name}"); move them separately"
+            return 2
+        fi
+        target_sources[${name}]="${item}"
+        #: No trailing slash: a selected directory keeps its own name locally.
+        source="tealy:${item}"
+        target="${dest%/}/${name}"
+        sources+=("${source}")
+        #: Escape control characters as well as shell metacharacters in the
+        #: review, so unusual filenames cannot alter what the terminal shows.
+        moves+=("  ${(q)source} -> ${(q)target}")
+    done
+
+    (( ${#sources} )) || return 0
+    ecerr 'Planned moves (selected directories include their entire subtrees):'
+    arrNN "${moves[@]}" >&2
+    ecerr 'Existing destination files with matching names may be updated. Empty source directories remain.'
+    ask 'Move these entries and remove successfully copied source files?' N || return 130
+    reval-ec rsp-mv -- "${sources[@]}" "${dest}/"
+}
+
+function tealy-mv-movies {
+    : "usage: tealy-mv-movies [DESTINATION]
+Pick movies from the phone and confirm their move into DESTINATION (default: .)."
+
+    local root="${tealy_mv_movies_root:-storage/movies}"
+    h-tealy-mv-media "${root}" "$@"
+}
+
+function tealy-mv-audiobooks {
+    : "usage: tealy-mv-audiobooks [DESTINATION]
+Pick audiobooks from the phone and confirm their move into DESTINATION (default: .)."
+
+    local root="${tealy_mv_audiobooks_root:-storage/shared/audiobooks}"
+    h-tealy-mv-media "${root}" "$@"
+}
+##
 function path-parent-dirs {
     awk '{print; while(/\//) {sub("/[^/]*$", ""); print}}'
 }

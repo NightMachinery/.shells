@@ -75,6 +75,7 @@ comp-set '=eval' ruu reval reval-to llm-run reval-to-llm reval-to-flash reval-to
 # @todo8 '@opts' needs a custom completor that feeds the items after '@' to the evil completor
 ##
 comp-set '=rsync' rsp rspb rspbm rspm rsp-safe rsp-safe2 rsp-dl rsp-mv
+compdef _directories tealy-mv-movies tealy-mv-audiobooks
 ##
 rexa "compdef _=ls" pbadd mv # mv had a bug I think?
 # rexa "compdef _=man" mn # @alt =eval
