@@ -505,14 +505,25 @@ sometimes the laptop.
   with `SLSCopyActiveMenuBarDisplayIdentifier`) showed the active display
   flipping to the laptop at the moment kitty activated, with the pointer and
   the panel both on the monitor.
-- **Hypothesis, not yet tested:** kitty's panels are marked to join all
-  Spaces, stationary and out of the window cycle, but not
-  fullscreen-auxiliary. kitty pushes the panel into the current Space with a
-  private call when it shows it (its workaround for kitty issue 8740), so it
-  is drawn over the fullscreen app, but macOS may still treat kitty as an
-  app that cannot be active there and move the active display to a desktop
-  Space it can use. A stand-in panel app that differs only in that flag
-  would settle it.
+- **What triggers it, reproduced without kitty (2026-10-04):** a stand-in
+  app made a panel like kitty's (borderless, at a high window level, joining
+  all Spaces, pushed into the current Space with the same private call kitty
+  uses, its workaround for kitty issue 8740), then activated itself. With the
+  panel over Brave's fullscreen Space on the monitor and the laptop on its
+  desktop, the active display went to the laptop every time, and the panel
+  never became the key window. The mirror case did the same: a panel over
+  Paseo's fullscreen Space on the laptop, the monitor on its desktop.
+  - Adding the fullscreen-auxiliary flag changed nothing, so the missing
+    flag is not the cause.
+  - Pushing the panel into the Space again and making it key after the
+    activation changed nothing either.
+  - A **non-activating** panel (`NSWindowStyleMaskNonactivatingPanel`, as
+    Spotlight uses) took the keyboard without its app activating, and the
+    active display stayed on the monitor. kitty 0.48.2 makes its panels
+    plain `NSWindow`s (`GLFWWindow`), which cannot be non-activating, so
+    this would need a change in kitty. With it, kitty would no longer be
+    the frontmost app while the panel has the keyboard, which the hooks
+    here that hide the panel when another app comes forward assume it is.
 - **Dead end: setting the active display directly.**
   `SLSSetActiveMenuBarDisplayIdentifier`, which yabai calls since March 2025
   to focus an empty display, returned success and changed nothing on macOS
