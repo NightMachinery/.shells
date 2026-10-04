@@ -21,7 +21,7 @@ Anywhere else, use a `zf:` link and a zsh dynamic named directory, never a relat
 `file:` path:
 
 ```org
-[[zf:~\[cod\]/uni/papers/FairGrad/][the paper]]
+[[zf:~\[cod\]/uni/papers/ExamplePaper/][the paper]]
 ```
 
 **Escape the brackets as `~\[name\]`.** An unescaped `]` closes the link
@@ -41,18 +41,18 @@ in the notes; the bracketed form is the more common one.
 **Fuzzy names resolve too, but they are not portable.** When a name is not a
 registered `aliasdir`, [agfi:zsh_directory_name_1] falls back to
 [agfi:ffz-get], a frecency lookup over recently used directories — so
-`~[fair]/` finds the FairGrad paper directory with no alias defined. Handy
+`~[exampl]/` finds a paper directory with no alias defined. Handy
 interactively, but it depends on a *machine-local* database. Measured:
 
 ```
-                laptop                                   beta.cis.lmu.de
-~[fair]/   ->   /Users/evar/code/uni/papers/FairGrad/    <unresolved>
-~[cod]/    ->   /Users/evar/code/                        /mounts/Users/cisintern/feraidoon/code/
-~[nt]/     ->   /Users/evar/notes/                       /mounts/Users/cisintern/feraidoon/notes/
+                  laptop                          server
+~[exampl]/   ->   ~/code/uni/papers/ExamplePaper/   <unresolved>
+~[cod]/      ->   ~/code/                           <server home>/code/
+~[nt]/       ->   ~/notes/                          <server home>/notes/
 ```
 
 So for a link that is meant to last, use a registered name plus the explicit
-path (`~[cod]/uni/papers/FairGrad/`): it resolves on every host, and to that
+path (`~[cod]/uni/papers/ExamplePaper/`): it resolves on every host, and to that
 host's own path. Reserve the fuzzy form for throwaway or interactive use.
 
 Why, rather than `[[file:../../../foo]]`:
@@ -60,7 +60,7 @@ Why, rather than `[[file:../../../foo]]`:
 - Counting `../` across trees is easy to get wrong and fails silently — org
   renders a broken link exactly like a working one. Two links written that
   way were off by one level each: from
-  `notes/private/research/J-Space/spectral-clipping/`, `../../../../code/`
+  `notes/private/research/project/topic/`, `../../../../code/`
   resolves to `notes/code/` and `../../../public/` to `private/public/`.
 - A relative link breaks when *either* file moves; a `zf:` link only breaks
   if the target moves.
@@ -79,7 +79,7 @@ Rules:
 - **Verify before committing.** A link is only durable if it resolves:
 
   ```zsh
-  path-unabbrev '~[cod]/uni/papers/FairGrad/'
+  path-unabbrev '~[cod]/uni/papers/ExamplePaper/'
   emacsclient -e '(org-link-expand-abbrev "NIGHTDIR:docs/bell-auto.md")'
   emacsclient -e '(car (org-id-find "UUID"))'   #: nil means unresolved
   ```
