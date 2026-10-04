@@ -28,7 +28,7 @@ iredis
 -e ~/code/python/jalali-calendar-cli
 jill
 khal
--e ~/code/misc/kitty-theme-changer
+-e ~/code/misc/kitty-theme-changer --with psutil
 libgen-py
 lightnovel-crawler
 llm --with llm-gemini --with llm-anthropic --with llm-groq --with llm-openrouter --with llm-vertex --with llm-openai-via-codex
