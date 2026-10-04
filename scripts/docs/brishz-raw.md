@@ -8,7 +8,8 @@ lost on the way, and the client runs no `jq` at all.
 
 `brishzq.zsh` uses it by default. `brishz_raw=n` makes it use the JSON API
 (`POST /zsh/`) exactly as before. `brishz_raw` is parsed like the scripts'
-`bool`: `n`, `no`, `0` and the empty string mean off; unset means on.
+`bool`, with a default: `n`, `no` and `0` mean off; unset or empty means
+on, as in `brishz.dash` and `brishzgo`.
 
 ```zsh
 brishzq.zsh print -r -- ok
