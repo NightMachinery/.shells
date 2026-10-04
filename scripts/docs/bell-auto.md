@@ -157,7 +157,7 @@ notification hooks are added.
 
 For the payload to arrive, the hook in `~/.claude/settings.json` must forward stdin:
 
-    brishz_in=MAGIC_READ_STDIN brishz2.dash bell-claude "--pane=$TMUX_PANE" "--node=${TMUX_SUBAGENT_NODE:+1}"
+    brishz_async=y brishz_in=MAGIC_READ_STDIN "${BRISHZGO_BIN:-$HOME/go/bin/brishzgo}" -- bell-claude "--pane=$TMUX_PANE" "--node=${TMUX_SUBAGENT_NODE:+1}"
 
 The two leading words are for the subagent gate (see "Subagents" below).
 
@@ -318,16 +318,17 @@ every agent shell inherits `TMUX_PANE`.
 **Forwarding.** The garden does not see the agent's environment, so the hooks pass
 what the gate needs as leading arguments: `--pane=$TMUX_PANE` and
 `--node=${TMUX_SUBAGENT_NODE:+1}`. Only a flag goes over for the node, never its
-value. The reason is that `brishz2.dash` joins its words with spaces and the garden
-evals the result, so each forwarded argument must be one word that is safe to eval.
-An empty value still arrives as `--node=` rather than vanishing.
+value. `brishzgo` quotes each argument, preserving spaces and empty values.
+The named flags keep the identity fields explicit; an empty node flag arrives
+as `--node=`.
 
 Per agent:
 
 - **Claude Code**: the `Notification` and `Stop` hooks in
   `configFiles/claude-code/settings.json` forward both words. `~/.claude/settings.json`
-  and `~/.claude-work/settings.json` are both symlinks to that file, so both profiles
-  get the change. Running sessions pick it up too: the hooks reference says "Direct
+  and `~/.claude-work/settings.json` use that tracked source. If an app has
+  replaced a symlink with a plain file, update its hook commands in place too,
+  preserving its other settings. Running sessions pick it up too: the hooks reference says "Direct
   edits to hooks in settings files are normally picked up automatically by the file
   watcher" (code.claude.com/docs/en/hooks), so no restart is needed. Hooks
   are not snapshotted for the life of the session.
@@ -335,7 +336,7 @@ Per agent:
   exec'd without a shell, so the untracked `~/.codex/config.toml` needs a small shim
   to expand the variables:
 
-      notify = ["zsh", "-fc", "exec brishzq.zsh h-codex-notify \"--pane=$TMUX_PANE\" \"--node=${TMUX_SUBAGENT_NODE:+1}\" \"$1\"", "codex-notify"]
+      notify = ["zsh", "-fc", "exec \"${BRISHZGO_BIN:-$HOME/go/bin/brishzgo}\" -- h-codex-notify \"--pane=$TMUX_PANE\" \"--node=${TMUX_SUBAGENT_NODE:+1}\" \"$1\"", "codex-notify"]
 
   `h-codex-notify` passes the leading words through to `bell-codex`. The old line
   (`["brishzq.zsh", "h-codex-notify"]`) still works, through the identity fallback.

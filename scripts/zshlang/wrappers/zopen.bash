@@ -1,16 +1,6 @@
 #!/usr/local/bin/bash
 
 echo starting with "$@"
-args=("$@")
 
-if test -z "$BASHRC_LOADED" ; then
-    echo Loading bashrc manually
-    source ~/.bashrc
-fi
-
-brishzq.zsh awaysh-named JOKER_MARKER zopen "${args[@]}" & # idk what would happen on print, we can use awaysh if necessary
-
-# brishzq.zsh ec test
-# brishz.dash ec test2
-
-# echo exiting
+#: The garden owns the command environment; the Go worker detaches locally.
+brishz_async=y exec "${BRISHZGO_BIN:-${HOME}/go/bin/brishzgo}" -- awaysh-named JOKER_MARKER zopen "$@"

@@ -547,7 +547,7 @@ nobody scrolled to.
 
 `--pane-lines` is an argument and not only the `agent_subagents_preview_pane_lines`
 knob for a reason worth writing down: a preview reaches zshlang through the
-garden, and `brishzq.zsh` takes a command and its arguments rather than a shell
+garden, and `brishzgo` takes a command and its arguments rather than a shell
 line, so an `var=value` prefix in front of the call comes back as
 `command not found: var=value`.
 

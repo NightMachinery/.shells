@@ -20,7 +20,9 @@ command when streaming is supported. Older gardens fall back to raw/JSON.
 [agfi:brishz-v1] keeps the previous shell implementation. The Go client also
 supports detached =brishz_async=y= requests and =brishz_copy=y= clipboard
 replay. Sole =-h= or =--help= shows local help; leading =--= passes through
-literal arguments. See [[NIGHTDIR:docs/brishzgo.md][usage and migration candidates]].
+literal arguments. Agent hooks, fzf previews, menubar queries and standalone
+GUI actions also use the installed Go client. See
+[[NIGHTDIR:docs/brishzgo.md][usage and caller migrations]].
 
 * Hammerspoon
 

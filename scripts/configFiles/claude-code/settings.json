@@ -53,7 +53,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "brishz_async=y brishz_in=MAGIC_READ_STDIN brishz2.dash bell-claude \"--pane=$TMUX_PANE\" \"--node=${TMUX_SUBAGENT_NODE:+1}\""
+            "command": "brishz_async=y brishz_in=MAGIC_READ_STDIN \"${BRISHZGO_BIN:-$HOME/go/bin/brishzgo}\" -- bell-claude \"--pane=$TMUX_PANE\" \"--node=${TMUX_SUBAGENT_NODE:+1}\""
           }
         ]
       }
@@ -63,7 +63,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "brishz_async=y brishz_in=MAGIC_READ_STDIN brishz2.dash bell-claude \"--pane=$TMUX_PANE\" \"--node=${TMUX_SUBAGENT_NODE:+1}\""
+            "command": "brishz_async=y brishz_in=MAGIC_READ_STDIN \"${BRISHZGO_BIN:-$HOME/go/bin/brishzgo}\" -- bell-claude \"--pane=$TMUX_PANE\" \"--node=${TMUX_SUBAGENT_NODE:+1}\""
           }
         ]
       }
@@ -74,7 +74,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "brishz_async=y brishz_in=MAGIC_READ_STDIN brishz2.dash agent-auto-continue-hook claude \"$TMUX_PANE\" >/dev/null 2>&1"
+            "command": "brishz_async=y brishz_in=MAGIC_READ_STDIN \"${BRISHZGO_BIN:-$HOME/go/bin/brishzgo}\" -- agent-auto-continue-hook claude \"$TMUX_PANE\" >/dev/null 2>&1"
           }
         ]
       }
@@ -84,7 +84,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "brishz_async=y brishz_in=MAGIC_READ_STDIN brishz2.dash claude-code-session-register \"$$\" >/dev/null 2>&1"
+            "command": "brishz_async=y brishz_in=MAGIC_READ_STDIN \"${BRISHZGO_BIN:-$HOME/go/bin/brishzgo}\" -- claude-code-session-register \"$$\" >/dev/null 2>&1"
           }
         ]
       },
@@ -92,7 +92,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "brishz_async=y brishz_in=MAGIC_READ_STDIN brishz2.dash claude-code-session-tmux-autoname \"$TMUX_PANE\" >/dev/null 2>&1"
+            "command": "brishz_async=y brishz_in=MAGIC_READ_STDIN \"${BRISHZGO_BIN:-$HOME/go/bin/brishzgo}\" -- claude-code-session-tmux-autoname \"$TMUX_PANE\" >/dev/null 2>&1"
           }
         ]
       }
@@ -102,7 +102,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "brishz_async=y brishz_in=MAGIC_READ_STDIN brishz2.dash claude-code-session-register \"$$\" >/dev/null 2>&1"
+            "command": "brishz_async=y brishz_in=MAGIC_READ_STDIN \"${BRISHZGO_BIN:-$HOME/go/bin/brishzgo}\" -- claude-code-session-register \"$$\" >/dev/null 2>&1"
           }
         ]
       },
@@ -110,7 +110,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "brishz_async=y brishz_in=MAGIC_READ_STDIN brishz2.dash claude-code-session-tmux-autoname \"$TMUX_PANE\" >/dev/null 2>&1"
+            "command": "brishz_async=y brishz_in=MAGIC_READ_STDIN \"${BRISHZGO_BIN:-$HOME/go/bin/brishzgo}\" -- claude-code-session-tmux-autoname \"$TMUX_PANE\" >/dev/null 2>&1"
           }
         ]
       },
@@ -118,7 +118,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "brishz_async=y brishz_in=MAGIC_READ_STDIN brishz2.dash bell-claude-ack >/dev/null 2>&1"
+            "command": "brishz_async=y brishz_in=MAGIC_READ_STDIN \"${BRISHZGO_BIN:-$HOME/go/bin/brishzgo}\" -- bell-claude-ack >/dev/null 2>&1"
           }
         ]
       }

@@ -18,8 +18,7 @@ if test -n "$no_wait" ; then
     ##
     # @warn this mode obviously does not play well with blocking apps such as git
     ##
-    brishzq.zsh emc-nowait2 "$@"
-    return $ret
+    exec "${BRISHZGO_BIN:-${HOME}/go/bin/brishzgo}" -- emc-nowait2 "$@"
 else
     my_term="$TERM"
     if isDarwin || isKitty || isiTerm

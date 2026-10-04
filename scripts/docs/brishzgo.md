@@ -382,49 +382,42 @@ As `brishzq.zsh`'s, except where "Where it differs" below says otherwise:
   (exit 200); `brishzq.zsh` would print its `.out` as `null`.
 - The streaming API, enabled by default, is `brishzgo`'s alone; see above.
 
-## Suggested caller migrations
+## Caller migrations
 
-These are follow-up candidates, not changes made by the default switch:
+The active shell/config callers now use the installed Go client:
 
-- **Quoted Hammerspoon calls:** `gardenBrishzq` in
-  `hammerspoon/core/helpers.lua` can use the Go client with the same argv and
-  command status. Add it to the quoted-client failure classification, since
-  a command can itself return a curl-like error code. Use `hs.task`'s stream
-  callback to drain output; switching the client alone does not fix its
-  existing large-output pipe limit. Timeouts would also stop the garden
-  command when streaming is available.
-- **fzf reloads and agent picker setup:** the date parser in
-  `datetime, calendar, reminders.zsh`, search postprocessing in
-  `search/fuzzy.zsh`, and the row/parts calls in `agent-session-pick.zsh`
-  already pass quoted argv and want the command's own status. Faster startup
-  helps repeated calls, and cancelled reloads can stop obsolete work.
-- **Menubar queries:** `zshlang/menubar/date.sh` repeatedly starts a client.
-  Use quoted argv for ordinary function calls and `eval` for deliberate
-  command text. Output is collected into variables, so the benefit is fewer
-  subprocesses rather than visible streaming.
-- **Standalone quoted actions:** `emacs.dash`, `zopen.bash`, `stt_filter.sh`,
-  kitty open actions and the Sioyek command are straightforward argv callers.
-  Give GUI/launchd callers an installed absolute binary path, since their PATH
-  can omit `~/go/bin`.
-- **Lua pipe helpers:** the quoted branch in `lua/pipe.lua` is a candidate,
-  but `pipe_simple` writes all stdin, then drains stdout, then stderr. A client
-  streaming both outputs makes its pipe deadlock easier to hit. Drain all
-  channels concurrently before migrating it; review `evalFile` / `outFile`,
-  which the Go client ignores.
-- **Async agent hooks:** `brishz_async=y brishzgo eval "$command_text"` can
-  replace `brishz_quote=y brishz_async=y brishz.dash "$command_text"`.
-  Keep the existing stdin option for hooks which consume a payload. The Go
-  client now preserves their detached, silent behavior, while adding the
-  streaming transport and safe fallbacks. Calls already using quoted argv
-  can pass those argv directly.
+- Claude Code, Codex and Antigravity hooks keep `brishz_async=y` and direct
+  stdin, with quoted argv. Hooks launch silently and retain their existing
+  JSON acknowledgements and agent-managed async settings.
+- Date-parser reloads, search postprocessing and subagent previews use the
+  absolute client path quoted into fzf's shell command. Cancelled streaming
+  requests can stop obsolete work.
+- The standalone agent picker uses the client for rows, preview configuration
+  and selected actions. Alt+enter launches a detached request with quoted paths.
+- Menubar date queries use argv; the stopwatch's shell assignment and the
+  deliberate pipeline use `eval`. Captured output still feeds the same menu.
+- Emacs, zopen, STT, lock/unlock/audio hooks, reminder notifications and the
+  audio-guard launcher use the Go client. STT keeps its input file until the
+  synchronous call finishes and then removes it, including on failure.
+- Kitty actions and Sioyek's PDF-location command use `/bin/sh` solely to
+  expand the binary path, forwarding file paths as arguments. Sioyek's custom
+  parser joins backslash-escaped spaces before macro substitution; the shell
+  code therefore uses escaped spaces and receives macros as positional args.
 
-Keep `brishzb.dash`, JSON-envelope
-consumers such as `brishz_para.dash`, and file-mode callers on their current
-clients until their contracts are adapted. The Go client ignores
-the file flags, emits plain output rather than a requested
-JSON envelope, and returns the command's status rather than only the HTTP
-client's status. Raw command-string callers need `eval` or `brishz_noquote=y`
-when switched.
+GUI and standalone callers default to `${HOME}/go/bin/brishzgo`; an exported
+`BRISHZGO_BIN` overrides that path. This works with launchd's bare PATH and
+needs no `/usr/local/bin` symlink or root install. `setup/setup_go` installs
+this binary. Shell-generated fzf commands also accept the binary resolved in
+`$commands`. Re-run `brishz-restart` after changes to their garden functions.
+
+`python3 zshlang/tests/brishzgo-callers.py` verifies hook stdin, shell quoting,
+wrapper exit statuses, STT file lifetime, menu queries, picker actions and
+GUI command parsing using a recording client and a synthetic HOME.
+
+Hammerspoon and Lua helper migration also requires concurrent output draining;
+see [Hammerspoon garden helpers](hammerspoon-garden.md) for their failure and
+callback policy. Explicit JSON-envelope and file-mode consumers retain their
+compatibility clients until those contracts are adapted.
 
 ## Measurements
 

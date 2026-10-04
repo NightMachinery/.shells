@@ -716,7 +716,7 @@ Plain-text summary of one subagent, for an fzf preview."
     #:
     #: `--pane-lines' (default `agent_subagents_preview_pane_lines') is an
     #: argument and not only a knob because a preview reaches us through the
-    #: garden, and `brishzq.zsh' takes a command and its arguments -- not a
+    #: garden, and `brishzgo' takes a command and its arguments -- not a
     #: shell line -- so an `var=value' prefix in front of the call comes back
     #: as `command not found: var=value'. [agfi:subagents-of-fz] asks for more
     #: lines than [agfi:agent-clean-fz], whose question is only whether to
@@ -1040,10 +1040,10 @@ Fuzzy-picks finished tmux subagents and closes them; busy ones are hidden, see a
     #: first, then the transcript preview the Go binary renders, and that one
     #: only when the row has a transcript at all. A dash-compatible one-liner,
     #: since fzf runs it in its own `sh'.
-    local go_preview brishzq preview
+    local go_preview brishzgo preview
     go_preview="$(h-agent-session-preview-cmd '{3}')" @RET
-    brishzq="$(gquote "${commands[brishzq.zsh]:-brishzq.zsh}")" @RET
-    preview="p={2}; ${brishzq} agent-subagents-preview {1}; test \"\$p\" != - && ${go_preview} \"\$p\""
+    brishzgo="$(gquote "${BRISHZGO_BIN:-${commands[brishzgo]:-${HOME}/go/bin/brishzgo}}" --)" @RET
+    preview="p={2}; ${brishzgo} agent-subagents-preview {1}; test \"\$p\" != - && ${go_preview} \"\$p\""
 
     local picks
     picks="$(ec "${sorted}" | h-agent-session-fz multi --query "${query}" --preview "${preview}")" || return $?
@@ -1809,8 +1809,8 @@ Picks an agent that has launched tmux subagents, then one of its subagents to at
     fi
 
     local sort_by="${subagents_of_fz_sort:-last}"
-    local brishzq
-    brishzq="$(gquote "${commands[brishzq.zsh]:-brishzq.zsh}")" @RET
+    local brishzgo
+    brishzgo="$(gquote "${BRISHZGO_BIN:-${commands[brishzgo]:-${HOME}/go/bin/brishzgo}}" --)" @RET
 
     local recursive_arg=''
     bool "${recursive_p}" && recursive_arg=' -r'
@@ -1819,7 +1819,7 @@ Picks an agent that has launched tmux subagents, then one of its subagents to at
     local -a pick_opts
     pick_opts=(
         --prompt 'agent> '
-        --preview "${brishzq} agent-subagents-parent-preview {1}${recursive_arg}"
+        --preview "${brishzgo} agent-subagents-parent-preview {1}${recursive_arg}"
     )
     #: `--select-1' only here, and only with something to match on.
     #: `--exit-0' comes from [agfi:fz] already.
@@ -1856,7 +1856,7 @@ Picks an agent that has launched tmux subagents, then one of its subagents to at
         h-agent-session-fz no-multi \
             --prompt "subagents of ${parent}> " \
             --expect=ctrl-r \
-            --preview "${brishzq} agent-subagents-preview --pane-lines 40 {1}")" || child_pick=''
+            --preview "${brishzgo} agent-subagents-preview --pane-lines 40 {1}")" || child_pick=''
 
     #: `--expect' puts the key that ended fzf on the first line -- empty for
     #: enter -- so the row is the second. `(@f)' keeps that empty field, which

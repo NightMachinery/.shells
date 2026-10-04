@@ -60,7 +60,7 @@ function h-grep-output-to-fz {
         previewcode="ntom {1} {2} {s3..} ${dir_main_quoted} ${ntom_mode} ${rtl_code} || printf -- \"\n\n%s \" {}"
     fi
 
-    fzopts+=(--bind 'ctrl-\:execute-silent(brishzq.zsh ntsearch-postprocess-h1 '"${dir_main_quoted} $(gq "$output_pattern")"' {f})') # '{}' puts the current line itself, '{f}' puts a file containing it; using silent.zsh does not seem to make any difference to the strange fzf bug that causes escape codes to be written to the query
+    fzopts+=(--bind 'ctrl-\:execute-silent('"$(gquote "${BRISHZGO_BIN:-${commands[brishzgo]:-${HOME}/go/bin/brishzgo}}" --)"' ntsearch-postprocess-h1 '"${dir_main_quoted} $(gq "$output_pattern")"' {f})') # '{}' puts the current line itself, '{f}' puts a file containing it; using silent.zsh does not seem to make any difference to the strange fzf bug that causes escape codes to be written to the query
 
     fz_empty=y fzp_dni=truncate fzp --preview-window "right,50%,wrap,${hidden}${preview_header_lines}" --preview "$previewcode[*]" --ansi "${delim_opts[@]}" "${fzopts[@]}" --print0 --expect=alt-enter "$query" | {
         acceptor=''

@@ -2652,21 +2652,11 @@ function h-agent-session-open-cmd {
     #:
     #:     --bind "alt-enter:execute-silent($(h-agent-session-open-cmd) {2})"
     #:
-    #: Fire-and-forget, through `brishzb.dash' rather than `brishzq.zsh'.
-    #: `execute-silent' blocks fzf until the command returns, and brishzq waits
-    #: for the whole call -- 250ms measured, most of it not the garden hop
-    #: (~60ms) but [agfi:h-agent-view-launch]'s own foreground work: the
-    #: Hammerspoon band call, `gmktemp' and `tmuxnewsh2'. brishzb posts
-    #: `{ cmd } &>/dev/null &' and returns as soon as the garden forks: 20ms.
-    #:
-    #: Losing stdout and the exit status costs nothing here, because the work is
-    #: asynchronous either way -- every failure already reports through the band
-    #: and a notification, in [agfi:h-agent-view-fail].
-    #:
-    #: brishzb splices its arguments into JSON unquoted, which brishzq would
-    #: not, and that is safe here rather than by luck: fzf shell-quotes `{2}'
-    #: with single quotes, and a transcript path cannot contain a `"' or a `\'
-    #: --- each agent names its files after ids and encoded directories.
+    #: Fire-and-forget through brishzgo's detached client. fzf's
+    #: `execute-silent' returns after local launch, without waiting for the
+    #: HTTP reply or [agfi:h-agent-view-launch]'s foreground work.
+    #: argv is quoted by the client, including fzf's shell-quoted `{2}'.
+    #: Failures still report through [agfi:h-agent-view-fail]'s band.
     #:
     #: The absolute path comes from `$commands', so nothing depends on whatever
     #: PATH fzf happens to have.
@@ -2677,9 +2667,9 @@ function h-agent-session-open-cmd {
     #: instead, returning the literal string `alt-enter' as the choice. The
     #: idiom is in use nearby, in [agfi:h-grep-output-to-fz] and [agfi:rgf_].
     ##
-    local brishzb="${commands[brishzb.dash]:-brishzb.dash}"
+    local client="${BRISHZGO_BIN:-${commands[brishzgo]:-${HOME}/go/bin/brishzgo}}"
 
-    gquote "${brishzb}" agent-view-session-toggle
+    ec "brishz_async=y $(gquote "${client}" -- agent-view-session-toggle)"
 }
 
 #: What the pickers put in their `--header', so the binding is discoverable at

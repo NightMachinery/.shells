@@ -9,6 +9,6 @@
 # Run brishz-restart after editing audio-guard.zsh, or this keeps executing the
 # code the garden loaded at startup.
 ##
-PATH="$HOME/scripts/zshlang/wrappers/brishz/:$PATH"
+brishzgo="${BRISHZGO_BIN:-${HOME}/go/bin/brishzgo}"
 ##
-brishz.dash audio-guard-tick
+command "${brishzgo}" -- audio-guard-tick

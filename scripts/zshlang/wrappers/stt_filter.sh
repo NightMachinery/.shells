@@ -1,8 +1,9 @@
 #!/usr/bin/env dash
 ##
-PATH="$HOME/scripts/zshlang/wrappers/brishz/:$PATH"
+brishzgo="${BRISHZGO_BIN:-${HOME}/go/bin/brishzgo}"
 ##
-tmp="$(mktemp)"
-cat > "$tmp" || return $?
+tmp="$(command mktemp)" || exit $?
+trap 'command rm -f -- "$tmp"' EXIT HUP INT TERM
+command cat > "$tmp" || exit $?
 
-brishzq.zsh h-stt-filter "$tmp"
+command "${brishzgo}" -- h-stt-filter "$tmp"

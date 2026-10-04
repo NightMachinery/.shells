@@ -1,8 +1,8 @@
 #!/usr/bin/env dash
 ##
-PATH="$HOME/scripts/zshlang/wrappers/brishz/:$PATH"
+brishzgo="${BRISHZGO_BIN:-${HOME}/go/bin/brishzgo}"
 ##
-brishz.dash rem-today-notify
+command "${brishzgo}" -- rem-today-notify
 ## @startup/Darwin yeah this file has been named badly <_<
 # brishz.dash brew update
 

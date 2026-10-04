@@ -1,3 +1,3 @@
 #!/usr/bin/env zsh -f
 
-brishz.dash h-hook-audio-output-change "$@"
+command "${BRISHZGO_BIN:-${HOME}/go/bin/brishzgo}" -- h-hook-audio-output-change "$@"

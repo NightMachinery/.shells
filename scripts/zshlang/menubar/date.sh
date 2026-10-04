@@ -20,6 +20,7 @@
 
 source ~/.bashrc
 export PATH="$PATH:/usr/local/bin"
+brishzgo="${BRISHZGO_BIN:-${HOME}/go/bin/brishzgo}"
 
 ## ** =lastunlock=
 # function fromnow {
@@ -50,11 +51,11 @@ export PATH="$PATH:/usr/local/bin"
 # }
 ## * menubar
 # Appears in the menubar YYYY-MM-DD
-stopwatch_text="$(brishz.dash menu_stopwatch_format=min serr reval-true menu-stopwatch-text-get)"
+stopwatch_text="$(command "${brishzgo}" -- eval 'menu_stopwatch_format=min serr reval-true menu-stopwatch-text-get')"
 
-last_idle_min="$(brishz.dash last-idle-get-min)"
+last_idle_min="$(command "${brishzgo}" -- last-idle-get-min)"
 
-mic_glyph="$(brishz.dash audio-input-glyph-get 2>/dev/null)"
+mic_glyph="$(command "${brishzgo}" -- audio-input-glyph-get 2>/dev/null)"
 #: One symbol for the default microphone; see docs/audio-input-switch.md.
 #: xbar ignores ANSI in the title, so "muted" is a symbol of its own.
 mic_prefix="${mic_glyph:+${mic_glyph} }"
@@ -63,7 +64,7 @@ mic_prefix="${mic_glyph:+${mic_glyph} }"
 # current_date="$(date "+%b%-m/%d")"
 #: Gregorian
 
-current_date="$(brishz.dash datej)"
+current_date="$(command "${brishzgo}" -- datej)"
 #: Jalali
 
 if [ -n "$stopwatch_text" ]; then
@@ -75,7 +76,7 @@ fi
 echo "---"
 
 #---Music
-hear_path="$(brishzq.zsh eval '{ hear-get | path-abbrev } || true')"
+hear_path="$(command "${brishzgo}" -- eval '{ hear-get | path-abbrev } || true')"
 if test -n "${hear_path}" ; then
     if [[ ${#hear_path} -gt 110 ]] ; then
         printf "…%s\n" "${hear_path: -110}"
@@ -88,7 +89,7 @@ fi
 
 #---IR
 
-MDY="$(brishz.dash now)"
+MDY="$(command "${brishzgo}" -- now)"
 echo "$MDY | bash='$0' | param1=copy | param2='$MDY' | terminal=false"
 
 echo "---"

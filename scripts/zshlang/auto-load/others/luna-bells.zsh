@@ -1855,8 +1855,8 @@ not its Stop), hence the fallback. A subagent's bell follows [agfi:agent-bell-su
     local app="${1}" engine="${2}" fallback="${3}"
     shift 3
     #: What the agent's environment knows, forwarded by the hook command as
-    #: single words, since brishz2.dash joins its argv into one string that the
-    #: garden evaluates: an empty value would vanish and a spaced one split.
+    #: single words through brishzgo: the client quotes argv, preserving
+    #: empty values and spaces. The named flags also keep hook identity explicit.
     local pane='' node_p=''
     while (( $# )) ; do
         case "$1" in

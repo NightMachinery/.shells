@@ -1,3 +1,3 @@
 #!/usr/bin/env zsh -f
 
-brishz.dash h-hook-unlock
+command "${BRISHZGO_BIN:-${HOME}/go/bin/brishzgo}" -- h-hook-unlock

@@ -719,7 +719,7 @@ function remn-interactive {
     local -x datenat_hardcode_time=y
     
     local natdate=""
-    natdate="$(FZF_DEFAULT_COMMAND=echo fz-empty --header "$(Bold ; ecn "Today: " ; colorfg 0 100 255 ; datej-all-long-time ; resetcolor)" --reverse --height '20%' --bind "change:reload:brishzq.zsh reval-true serr datenat-full2-future {q} || true" --disabled --query "" --print-query | ghead -n 1)" || return $?
+    natdate="$(FZF_DEFAULT_COMMAND=echo fz-empty --header "$(Bold ; ecn "Today: " ; colorfg 0 100 255 ; datej-all-long-time ; resetcolor)" --reverse --height '20%' --bind "change:reload:$(gquote "${BRISHZGO_BIN:-${commands[brishzgo]:-${HOME}/go/bin/brishzgo}}" --) reval-true serr datenat-full2-future {q} || true" --disabled --query "" --print-query | ghead -n 1)" || return $?
     remn "$text" "$natdate"
 }
 aliasfn ri reminday_store_nosync=y remn-interactive

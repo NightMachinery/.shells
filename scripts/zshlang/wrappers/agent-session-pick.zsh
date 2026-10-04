@@ -11,7 +11,7 @@
 #: the tab's key as AGENT_VIEW_TAB_KEY, so the conversion runs in the
 #: background under that tab's band and a second cmd+shift+o cancels it -- or
 #: to the plain [agfi:agent-view-session-transcript] otherwise.
-#: `brishzq.zsh' rather than `brishz.dash' because it quotes its arguments,
+#: `brishzgo' quotes its arguments and streams its replies,
 #: so a path is never pasted into a command line raw.
 #:
 #: Plain `zsh -f' via zshplain.dash: loading zshlang here would cost seconds on
@@ -34,9 +34,9 @@
 #: activity, relative path, snippet. fzf shows from the label on; the
 #: transcript is field 2.
 ##
-brishzq="${NIGHTDIR:-${HOME}/scripts}/zshlang/wrappers/brishz/brishzq.zsh"
+brishzgo="${BRISHZGO_BIN:-${HOME}/go/bin/brishzgo}"
 
-if ! rows="$("${brishzq}" h-agent-session-pick-rows)" || [[ -z "${rows}" ]] ; then
+if ! rows="$("${brishzgo}" -- h-agent-session-pick-rows)" || [[ -z "${rows}" ]] ; then
     print -r -- 'agent-session-pick: no live agent session has a transcript to show' >&2
     sleep 2
     exit 1
@@ -45,9 +45,9 @@ fi
 #: The preview command, the alt+enter command and the header, in one round trip.
 #: Bare command names when the garden could not be reached, rather than empty
 #: strings: `--preview " {2}"' would have fzf try to run the transcript path.
-parts=( ${(@f)"$("${brishzq}" h-agent-session-fz-parts)"} )
+parts=( ${(@f)"$("${brishzgo}" -- h-agent-session-fz-parts)"} )
 preview_cmd="${parts[1]:-agent_session {3} preview}"
-open_cmd="${parts[2]:-brishzb.dash agent-view-session-toggle}"
+open_cmd="${parts[2]:-brishz_async=y ${(qq)brishzgo} -- agent-view-session-toggle}"
 #: An array, not `${header:+--header "${header}"}': zsh does not word-split an
 #: unquoted expansion, so that form reaches fzf as the single argument
 #: `--header alt+enter: ...' rather than as two.
@@ -69,6 +69,6 @@ transcript="${fields[2]}"
 [[ -n "${transcript}" ]] || exit 0
 
 if [[ -n "${AGENT_VIEW_TAB_KEY}" ]] ; then
-    exec "${brishzq}" agent-view-session-bg "${transcript}" "${AGENT_VIEW_TAB_KEY}"
+    exec "${brishzgo}" -- agent-view-session-bg "${transcript}" "${AGENT_VIEW_TAB_KEY}"
 fi
-exec "${brishzq}" agent-view-session-transcript "${transcript}"
+exec "${brishzgo}" -- agent-view-session-transcript "${transcript}"

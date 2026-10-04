@@ -6,13 +6,13 @@
         "hooks": [
           {
             "type": "command",
-            "command": "brishz_async=y brishz_in=MAGIC_READ_STDIN brishz2.dash codex-session-tmux-autoname \"$TMUX_PANE\" >/dev/null 2>&1",
+            "command": "brishz_async=y brishz_in=MAGIC_READ_STDIN \"${BRISHZGO_BIN:-$HOME/go/bin/brishzgo}\" -- codex-session-tmux-autoname \"$TMUX_PANE\" >/dev/null 2>&1",
             "async": true,
             "timeout": 10
           },
           {
             "type": "command",
-            "command": "brishz_async=y brishz_in=MAGIC_READ_STDIN brishz2.dash agent-session-register codex >/dev/null 2>&1",
+            "command": "brishz_async=y brishz_in=MAGIC_READ_STDIN \"${BRISHZGO_BIN:-$HOME/go/bin/brishzgo}\" -- agent-session-register codex >/dev/null 2>&1",
             "async": true,
             "timeout": 10
           }
@@ -24,19 +24,19 @@
         "hooks": [
           {
             "type": "command",
-            "command": "brishz_async=y brishz_in=MAGIC_READ_STDIN brishz2.dash codex-session-tmux-autoname \"$TMUX_PANE\" >/dev/null 2>&1",
+            "command": "brishz_async=y brishz_in=MAGIC_READ_STDIN \"${BRISHZGO_BIN:-$HOME/go/bin/brishzgo}\" -- codex-session-tmux-autoname \"$TMUX_PANE\" >/dev/null 2>&1",
             "async": true,
             "timeout": 10
           },
           {
             "type": "command",
-            "command": "brishz_async=y brishz_in=MAGIC_READ_STDIN brishz2.dash agent-session-register codex >/dev/null 2>&1",
+            "command": "brishz_async=y brishz_in=MAGIC_READ_STDIN \"${BRISHZGO_BIN:-$HOME/go/bin/brishzgo}\" -- agent-session-register codex >/dev/null 2>&1",
             "async": true,
             "timeout": 10
           },
           {
             "type": "command",
-            "command": "brishz_async=y brishz_in=MAGIC_READ_STDIN brishz2.dash bell-codex-ack >/dev/null 2>&1",
+            "command": "brishz_async=y brishz_in=MAGIC_READ_STDIN \"${BRISHZGO_BIN:-$HOME/go/bin/brishzgo}\" -- bell-codex-ack >/dev/null 2>&1",
             "async": true,
             "timeout": 10
           }
