@@ -58,6 +58,7 @@ function brishz {
     local -x brishz_session="${brishz_session:-${brishz_s}}"
     local -x brishz_nolog="${brishz_nolog}"
     local -x brishz_async="${brishz_async}"
+    local -x brishz_copy="${brishz_copy:-${brishz_c}}"
 
     go-local-dep brishzgo "${nightdir}/golang/brishzgo" @RET
     command brishzgo "$@"

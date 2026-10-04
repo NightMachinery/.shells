@@ -64,7 +64,7 @@ var clientEnvNames = []string{
 	"bshEndpoint", "GARDEN_PORT", "GARDEN_PASS0", "DISABLE_BRISH",
 	"brishz_in", "brishz_session", "brishz_nolog", "brishz_failure_expected",
 	"brishz_binary", "brishz_raw", "brishz_stream", "brishz_debug", "brishz_noquote",
-	"brishz_async", "NIGHT_EMACS_P", "EMACS_SOCKET_NAME", "emacs_night_server_name",
+	"brishz_async", "brishz_copy", "brishz_c", "NIGHT_EMACS_P", "EMACS_SOCKET_NAME", "emacs_night_server_name",
 }
 
 func asyncEnvironment(env lookupEnv, pwd, home string) []string {
@@ -82,5 +82,5 @@ func asyncEnvironment(env lookupEnv, pwd, home string) []string {
 			result = append(result, name+"="+value)
 		}
 	}
-	return append(result, "brishz_async=", "PWD="+pwd, "HOME="+home)
+	return append(result, "brishz_async=", "brishz_copy=", "brishz_c=", "PWD="+pwd, "HOME="+home)
 }

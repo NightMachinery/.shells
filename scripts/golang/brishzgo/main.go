@@ -132,6 +132,14 @@ func run(args []string, env lookupEnv, pwd, home string, stdin io.Reader, stdout
 	}
 	cfg := newConfig(args, env, pwd, home)
 	defer temps.removeAll()
+	if env.get("brishz_copy") != "" || env.get("brishz_c") != "" {
+		var err error
+		stdin, err = copyReplay(cfg, pwd, stdin, stderr)
+		if err != nil {
+			fmt.Fprintf(stderr, "brishzgo: copy stdin: %v\n", err)
+			return 1
+		}
+	}
 	if env.get("brishz_async") != "" {
 		return startAsync(cfg, pwd, home, stdin, stderr)
 	}

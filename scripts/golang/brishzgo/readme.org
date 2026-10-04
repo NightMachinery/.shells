@@ -26,6 +26,8 @@ arguments to the garden unchanged; leading =-c= remains a legacy alias.
 =brishz_async=y= launches a detached worker, discarding output and returning
 after local launch. Direct stdin is consumed before launch and survives the
 parent's exit; the worker drains streaming replies to completion.
+=brishz_copy=y= (or =brishz_c=y=) copies a replay command through =pbcopy=,
+with binary stdin embedded and credentials read from their normal sources.
 
 Check the zsh wrapper separately with
 =zsh -f zshlang/tests/brishz-default.zsh= from the scripts root. It uses mock
@@ -35,6 +37,7 @@ guard without touching a garden.
 * Layout
 - =main.go=: the environment, the configuration and the dispatch.
 - =async.go=: detached workers, stdin handoff and inherited configuration.
+- =copy.go=: clipboard replay with argv, options and binary stdin.
 - =command.go= and =quote.go=: the command text, as =brishzq.zsh= builds it.
 - =stdin.go=: streamed stdin, with the copy a fallback needs; each request
   reads it through its own reader, which replays what earlier ones read.
@@ -78,6 +81,11 @@ go test -run '^$' -fuzz FuzzReadFrames -fuzztime 60s
 #+end_src
 =TestStreamSignals= builds the binary and checks that SIGINT, SIGTERM and
 SIGHUP mid stream close the connection and kill it with the same signal.
+=TestAsyncDetached= checks return before the HTTP reply, preserved input,
+caller-group signals, silent output and fallbacks. =TestCopyReplay= uses a
+mock =pbcopy= and executes the copied script against a fake garden, comparing
+the original and replayed requests, including binary stdin and transport
+options. These tests do not touch the user's clipboard.
 
 Two more are skipped unless pointed at something:
 

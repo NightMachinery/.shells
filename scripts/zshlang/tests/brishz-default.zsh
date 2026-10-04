@@ -19,6 +19,7 @@ command cat > "${brishz_test_tmp}/brishzgo" <<'EOF'
 #!/bin/sh
 printf '%s\n' go "${brishz_session}" "${brishz_nolog}" "${brishz_in}" "${brishz_stream}" "$@"
 if [ -n "${brishz_async}" ]; then printf 'async=%s\n' "${brishz_async}"; fi
+if [ -n "${brishz_copy}" ]; then printf 'copy=%s\n' "${brishz_copy}"; fi
 if [ "${brishz_in}" = MAGIC_READ_STDIN ]; then command cat; fi
 exit 7
 EOF
@@ -61,6 +62,8 @@ print -rn -- $'direct\n\n' | brishz_in=MAGIC_READ_STDIN \
 
 brishz_s=old brishz_c=y brishz-test-expect 9 $'v1\nold\ny\ntrue\n' brishz-v1 true
 brishz_async=y brishz-test-expect 7 $'go\n\n\n\n\ntrue\nasync=y\n' brishz true
+brishz_c=y brishz-test-expect 7 $'go\n\n\n\n\ntrue\ncopy=y\n' brishz true
+brishz_c=y brishz_copy=explicit brishz-test-expect 7 $'go\n\n\n\n\ntrue\ncopy=explicit\n' brishz true
 brishz-test-expect 9 $'v1\nopts\n\ntrue\n' @opts session opts @ brishz-v1 true
 
 function go-local-dep { return 42 }

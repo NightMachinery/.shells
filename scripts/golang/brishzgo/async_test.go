@@ -82,6 +82,16 @@ func TestAsyncDetached(t *testing.T) {
 				// without touching the test runner or unrelated processes.
 				cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 				cmd.Env = []string{"HOME=" + t.TempDir(), "bshEndpoint=" + g.URL, "brishz_async=y", "brishz_noquote=y"}
+				var copyCount string
+				if mode == "stream" && inputMode == "stdin" {
+					mockDir := t.TempDir()
+					copyCount = filepath.Join(mockDir, "copy-count")
+					mock := "#!/bin/sh\ncommand cat > /dev/null\ncommand printf x >> " + quoteSingle(copyCount) + "\n"
+					if err := os.WriteFile(filepath.Join(mockDir, "pbcopy"), []byte(mock), 0o700); err != nil {
+						t.Fatal(err)
+					}
+					cmd.Env = append(cmd.Env, "PATH="+mockDir+":/usr/bin:/bin", "brishz_copy=y")
+				}
 				if mode == "raw" {
 					cmd.Env = append(cmd.Env, "brishz_stream=n")
 				}
@@ -99,6 +109,11 @@ func TestAsyncDetached(t *testing.T) {
 				case got := <-ready:
 					if string(got) != input {
 						t.Errorf("stdin changed: received %d of %d bytes", len(got), len(input))
+					}
+					if copyCount != "" {
+						if copies, err := os.ReadFile(copyCount); err != nil || string(copies) != "x" {
+							t.Fatalf("copy ran again in worker: %q, %v", copies, err)
+						}
 					}
 				case err := <-finished:
 					t.Fatalf("request failed: %v", err)

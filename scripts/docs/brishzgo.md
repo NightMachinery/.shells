@@ -23,8 +23,8 @@ exports `brishz_in`, `brishz_nolog` and `brishz_session` (including the
 reads the caller's stdin directly; other non-empty values are literal input.
 [agfi:brishz-in] uses that direct stdin path, preserving trailing newlines
 and avoiding a whole-input shell buffer.
-The old clipboard option `brishz_copy` / `brishz_c` remains available through
-[agfi:brishz-v1]; the Go client ignores it. A remote garden needing basic
+The clipboard option `brishz_copy` / `brishz_c` copies a replay command;
+`brishz_async` launches a detached request. A remote garden needing basic
 auth requires `GARDEN_PASS0` exported before calling the Go client.
 
 ## Install
@@ -89,6 +89,19 @@ only joined by spaces, with no wrapping and no forwarding.
   gets the value as it is and takes any non-empty string as true, and the
   raw request sends `1`, as `brishzq.zsh` does.
 - `brishz_noquote`: see above.
+- `brishz_copy` (or `brishz_c`): any non-empty value copies a replayable shell
+  command through `pbcopy`, when installed. This copies the request, not its
+  output, as in `brishzq.zsh`. The replay restores the original working
+  directory, argv, session and transport flags. Direct stdin is embedded as base64,
+  preserving binary bytes and trailing newlines without stale temp paths.
+  Copying direct stdin consumes and buffers it before sending the request;
+  normal streaming is unchanged when copy is off or `pbcopy` is absent.
+  API key headers and passwords are not embedded: replay uses the usual key
+  file and exported authentication/proxy variables. If `bshEndpoint` contains
+  URL credentials, it too must remain exported for replay. Replay runs
+  synchronously with copying disabled, even if the original call was async.
+  An unavailable `pbcopy` is silently skipped; a failed `pbcopy` prints a
+  diagnostic but does not prevent execution or replace the command's status.
 - `brishz_async`: any non-empty value launches a detached client and returns
   0 after local launch, without waiting for an HTTP round trip or the command.
   Both output streams and later errors are discarded. As in `brishz.dash`,
@@ -344,7 +357,7 @@ As `brishzq.zsh`'s, except where "Where it differs" below says otherwise:
   `\uXXXX` (refused by a shell in the C locale) or a single `\M-` byte for
   U+0080 to U+00FF (which loses a byte). The value arrives intact either way;
   zsh's own text does not always give it back.
-- `brishz_out_file_p`, `brishz_eval_file_p`, `brishz_copy` and
+- `brishz_out_file_p`, `brishz_eval_file_p` and
   `brishz_summary_p` are ignored. The first two work around the legacy
   transport's losses, which the raw API does not have.
 - `GARDEN_PASS0` comes from the environment only: `brishzgo` does not source
