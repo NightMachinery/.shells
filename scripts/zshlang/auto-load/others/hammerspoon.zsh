@@ -49,12 +49,24 @@ hotkey or a watcher did not get installed."
         quiet_opts=(-q)
     fi
 
+    #: With -c, hs still reads stdin to its end when stdin is not a terminal,
+    #: and sends what it read as a second command. A caller whose stdin is a
+    #: pipe or socket nobody closes (an agent's background shell, a garden
+    #: job) then waits until the gtimeout kills it, its answer unprinted:
+    #: `sleep 8 | gtimeout 5 hs -c 'return 1'` timed out, and the same call
+    #: with </dev/null took 10 to 40 ms (2026-10-04). Without -c, stdin is
+    #: the REPL's or the caller's code, so it is left alone.
+    local stdin=/dev/stdin
+    if (( ${@[(I)-c]} )) ; then
+        stdin=/dev/null
+    fi
+
     #: -t is the client's own receive timeout (default 4); the gtimeout is the
     #: backstop for a Hammerspoon that never answers at all.
     if bool "$assert_p" ; then
-        assert gtimeout 30s hs "${quiet_opts[@]}" -A -t 5 "$@" @RET
+        assert gtimeout 30s hs "${quiet_opts[@]}" -A -t 5 "$@" <"$stdin" @RET
     else
-        gtimeout 30s hs "${quiet_opts[@]}" -A -t 5 "$@"
+        gtimeout 30s hs "${quiet_opts[@]}" -A -t 5 "$@" <"$stdin"
     fi
 }
 ##
