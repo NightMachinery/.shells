@@ -14,8 +14,10 @@ function ensure-dep-switchaudio {
 }
 ##
 function kitty-theme-install {
-    pip-install psutil 'git+git://github.com/fretboardfreak/kitty-theme-changer.git@master'
-    # psutil is needed by kitty_theme_changer.conf.py
+    #: A uv tool, like our other Python CLIs. psutil is needed by
+    #: kitty_theme_changer.conf.py, so it goes into the tool's venv.
+    UV_PYTHON_PREFERENCE=only-managed uv tool install --with psutil \
+        'git+https://github.com/fretboardfreak/kitty-theme-changer.git@master'
 }
 
 function ensure-dep-kitty-theme {

@@ -18,11 +18,11 @@ function chronic-certs {
 
 function chronic-update {
     codex-install
-    pipx upgrade aider-chat
 
-    pip-install fanficfare cloudscraper
-    # ddgr
-    pip install --upgrade --force tzdata pytube ytmusicapi youtube-dl spotipy spotdl
+    #: CLI tools (fanficfare, pytube, spotdl, ...) are uv tools; see
+    #: [[NIGHTDIR:docs/python-envs.md]]. Libraries stay in the conda env.
+    uv-tools-upgrade
+    pip-install cloudscraper tzdata ytmusicapi youtube-dl spotipy
 
     yt-dlp-update
 
@@ -71,13 +71,9 @@ function chronic-anticreep {
     pip uninstall -y enum34 # Since python 3.6 the enum34 library is no longer compatible with the standard library.
     pip uninstall -y typing # same
     pip uninstall -y dataclasses # same
-
-    pip uninstall -y pyOpenSSL
-    #: https://github.com/aws/aws-cli/issues/7325
-    #: makes BrishGarden not work
-
-    pip install -U 'urllib3<2'
-    #: [[id:90489ec6-5e11-40c9-9f13-673942019b33][python - "cannot import name 'DEFAULT_CIPHERS' from 'urllib3.util.ssl_'" on AWS Lambda using a layer - Stack Overflow]]
+    #: No longer forced: `urllib3<2` (for the dead cfscrape) would downgrade the
+    #: env below what current libraries need, and removing pyOpenSSL protected
+    #: a BrishGarden that now has its own uv tool venv.
 }
 ##
 function cron-commands-reboot-get {

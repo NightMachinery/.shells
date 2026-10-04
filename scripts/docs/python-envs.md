@@ -52,6 +52,9 @@ that env cannot break a tool.
   which takes Brish and PyNight from PyPI. Check which interpreter it got
   (see the end of this file): an old uv can pick a 3.14 release candidate,
   which current pydantic cannot import under.
+- [agfi:chronic-update] upgrades the tools through [agfi:uv-tools-upgrade],
+  which skips the ones in `uv_tools_upgrade_skip` (BrishGarden by default):
+  upgrading a running server's venv swaps files underneath it.
 - A tool that Homebrew already ships (`ocrmypdf`, `googler`,
   `speedtest-cli`) stays a brew formula, not a uv tool.
 - `pi` ([agfi:pip-install]) installs into the env that owns the `python3`

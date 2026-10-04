@@ -74,6 +74,25 @@ function uv-tool-install {
     UV_PYTHON_PREFERENCE=only-managed reval-ec uv tool install "${args[@]}"
 }
 
+function uv-tools-upgrade {
+    #: `uv tool upgrade` for every installed tool except those in
+    #: `uv_tools_upgrade_skip`: a tool that serves a long-running process gets
+    #: its files swapped underneath that process, so restart it to upgrade.
+    ##
+    local skip=(${=uv_tools_upgrade_skip-brishgarden})
+    local tool failed=()
+    for tool in ${(f)"$(uv tool list 2>/dev/null | command grep -v '^-' | command awk '{print $1}')"} ; do
+        (( ${skip[(Ie)$tool]} )) && continue
+        reval-ec uv tool upgrade "$tool" ||
+            failed+=("$tool")
+    done
+
+    if (( ${#failed} )) ; then
+        ecerr "$0: failed: ${failed[*]}"
+        return 1
+    fi
+}
+
 function uvtadd {
     ec "$*" >> "$uvtoolables"
     test -n "$noi" ||
