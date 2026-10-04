@@ -586,6 +586,12 @@ local kFloatingCheckDelay = 0.05
 -- kCGModalPanelWindowLevel, from the SDK's CGWindowLevel.h.
 local kModalPanelLayer = 8
 
+-- true (the default): move focus off a floating window as above. false
+-- turns the whole check off, so an activation keeps whatever window the app
+-- focuses, Picture-in-Picture included. Read at every check, so setting it
+-- from the console takes effect at once.
+if app_focus_skip_floating == nil then app_focus_skip_floating = true end
+
 -- Apps whose floating window is the point: the kitty panel floats on purpose
 -- (core/kitty-panel.lua), and a hide can return to it.
 appFloatingIntended = appFloatingIntended or { ["net.kovidgoyal.kitty"] = true }
@@ -617,6 +623,7 @@ end
 --- `gen' is appFloatingGen when the check was scheduled; nil (from the
 --- console) checks regardless.
 function appFocusOffFloating(app, label, gen)
+    if not app_focus_skip_floating then return end
     if gen ~= nil and gen ~= appFloatingGen then return end
     -- NSRunningApplication's own flag: asks the app nothing.
     local okf, front = pcall(function() return app:isFrontmost() end)

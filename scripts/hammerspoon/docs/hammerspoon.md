@@ -208,7 +208,8 @@ it took focus. The kitty panel floats on purpose and stays
 clicking the video yourself later is left alone. A check does nothing once its
 app is no longer frontmost, or once a newer switch has started
 (`appFloatingSupersede`, which hyper+z and hyper+; call too): it would pull
-you back to an app you had just left.
+you back to an app you had just left. `app_focus_skip_floating = false` turns
+the check off, for every app.
 
 The layer is the test. A Chromium PiP window calls itself an
 `AXStandardWindow`, with the usual window buttons, so `isStandard()` passes it.
