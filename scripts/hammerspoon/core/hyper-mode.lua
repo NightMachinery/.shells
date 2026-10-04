@@ -49,17 +49,7 @@ local hyperStyle = {
 local secureInputStyle = tableShallowCopy(hyperStyle)
 secureInputStyle.fillColor = { red = 1, green = 0, blue = 0, alpha = 0.5 }
 
-local realCurrentWindow
-local maxSIMWaitTime <const> = 0.75 -- seconds
-
-local focusStealingWebview = hs.webview.new{x=0, y=0, w=500, h=500}
--- local focusStealingWebview = hs.webview.new{x=0, y=0, w=0, h=0}
-
 local isSecureInputEnabled = hs.eventtap.isSecureInputEnabled
-
--- The Secure Input warning is one alert with a fixed id rather than a handle
--- per screen, so exiting the mode has a single thing to dismiss.
-local kHyperSIMAlertId = "hyper-secure-input"
 ---
 -- The indicator is a canvas group, not an hs.alert. The hs.alert route this
 -- replaced could not show over fullscreen spaces at all:
@@ -73,20 +63,6 @@ local hyperModeIndicator = hyperModeIndicatorOrig
 ---
 hyper_mode = ModalMode.create{name="hyper"}
 ModalMode.installGlobals(hyper_mode, "hyper")
-
-if false then
-    -- For debugging:
-    hs.hotkey.bind('ctrl', "'",
-                   function() -- pressed
-                       focusStealingWebview:allowTextEntry(true)
-                       focusStealingWebview:windowStyle(hs.webview.windowMasks.titled)
-                       focusStealingWebview:show():hswindow():focus()
-                   end,
-                   function() -- released
-                       focusStealingWebview:hide()
-                   end
-    )
-end
 
 prevFocusedElement = nil
 function hyper_modality:entered()
@@ -114,66 +90,19 @@ function hyper_modality:entered()
 
     if isSecureInputEnabled() then
         -- [[https://github.com/Hammerspoon/hammerspoon/issues/3555][Hammerspoon hangs spradically when entering hyper mode and displaying a modal window · Issue #3555 · Hammerspoon/hammerspoon]]
-        -- hs.alert("⚠️ Secure Input is on. Our Hyper Mode commands might not work.", 0.7)
 
         hyperModeIndicator = hyperModeIndicatorSI
-        ---
-        if true then
-            local axApp = hs.axuielement.applicationElement(hs.application.frontmostApplication())
-            if axApp then
-                -- hs.alert("axApp found")
-                prevFocusedElement = axApp.AXFocusedUIElement
-
-                -- hs.alert("axApp.AXFocusedUIElement: " .. prevFocusedElement)
-                prevFocusedElement.AXFocused = false
-            else
-                -- hs.alert("no axApp")
-            end
-        elseif true then
-            doEscape()
-            -- An escape makes the password input bar unfocused in Arc.
-        else
-            realCurrentWindow = hs.window.focusedWindow()
-
-            -- focusStealingWebview:allowTextEntry(true)
-          focusStealingWebview:windowStyle(hs.webview.windowMasks.titled)
-            focusStealingWebview:show():hswindow():focus()
-
-            if false then
-                -- Whichever app is enabling SIM might not disable it immediately.
-                -- Watch for SIM to shut off, giving up after `maxSIMWaitTime` seconds.
-                local endTime = hs.timer.absoluteTime() + maxSIMWaitTime*1000000000 -- convert to nanoseconds
-                while isSecureInputEnabled() and hs.timer.absoluteTime() < endTime do
-                    -- Normally I try to avoid hs.timer.usleep, because it basically hangs Hammerspoon.
-                    -- But for really short periods like this, it's probably cleaner than rewriting with timers or coroutines.
-                    hs.timer.usleep(1000)
-                end
-
-                if isSecureInputEnabled() then
-                    -- Still in Secure Input Mode - give up and show alerts about it.
-                    local secureInputInfo = hs.execute[[ps -c -o pid=,command= -p $(ioreg -l -w 0 | grep -Eo '"kCGSSessionSecureInputPID"=[0-9]+' | cut -d= -f2 | sort | uniq]]
-
-                    local msg = "⚠️ Secure Input is on. Hyper Mode commands might not work.\nEnabled by:\n"..secureInputInfo
-                    msg = msg:gsub('loginwindow', 'unknown (supposedly loginwindow)')
-                    msg = msg:gsub('^%s*(.-)%s*$', '%1')
-
-                    print(msg) -- leave a copy of the message in the console, so you can still see it after the alert goes away
-                    -- One alert, not one per screen: the engine draws a band on
-                    -- every screen it targets, so the loop this replaces would
-                    -- have stacked N copies of the same warning.
-                    alert_gateway(msg, {
-                        id = kHyperSIMAlertId,
-                        color = "crit",
-                        -- Cleared on exit; the engine's ceiling is the backstop.
-                        seconds = math.huge,
-                        screens = "all",
-                    })
-                end
-            end
+        -- Unfocus the app's focused element over Accessibility; exited()
+        -- focuses it again. Two older tries, unused for a while, are in git
+        -- history: an Escape, and focusing a Hammerspoon webview at the
+        -- primary screen's corner, with a wait for Secure Input to end and a
+        -- warning band when it did not.
+        local axApp = hs.axuielement.applicationElement(hs.application.frontmostApplication())
+        prevFocusedElement = axApp and axApp.AXFocusedUIElement
+        if prevFocusedElement then
+            prevFocusedElement.AXFocused = false
         end
     else
-        realCurrentWindow = nil
-
         hyperModeIndicator = hyperModeIndicatorOrig
     end
 
@@ -187,14 +116,6 @@ function hyper_modality:exited()
     if blackoutChordTapStop then blackoutChordTapStop() end
 
     if alertV2PeekEnd then alertV2PeekEnd() end
-
-    alert_gateway_dismiss(kHyperSIMAlertId)
-
-    if realCurrentWindow then
-        realCurrentWindow:focus()
-        realCurrentWindow = nil
-        focusStealingWebview:hide()
-    end
 
     if prevFocusedElement and prevFocusedElement:isValid() then
         prevFocusedElement.AXFocused = true

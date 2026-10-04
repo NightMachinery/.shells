@@ -230,7 +230,7 @@ end
 -- Apps that take focus for a moment and give it back are left out, so they
 -- never become a return target: Maccy's popup (hyper+v is a passthrough
 -- key), Handy's dictation overlay (cmd+'), and Hammerspoon itself, for
--- choosers and the Secure Input webview on hyper. A password dialog (sudo's
+-- its choosers. A password dialog (sudo's
 -- askpass, say) does get in, and is gone by the next hide; the entries
 -- behind it are why this is a list and not one app.
 recentAppsTransient = {

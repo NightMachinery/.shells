@@ -103,7 +103,7 @@ answer; see `axLatencyReport`). A hide chooses its target per screen (below),
 and falls back to this list only when nothing else is on that screen. The
 "transient apps" in `recentAppsTransient` never enter
 it, since they take focus for a moment and give it back: Hammerspoon itself,
-for choosers and the Secure Input webview; Maccy, whose popup is the hyper+v
+for its choosers; Maccy, whose popup is the hyper+v
 passthrough key; and Handy, whose dictation overlay is cmd+'. A password
 dialog such as sudo's askpass does enter it, and has quit by the next hide;
 the entries behind it are why this is a list and not one app.
@@ -732,7 +732,7 @@ Anything fired repeatedly passes a stable `id`, which is what keeps a held
 volume key from stacking one band per repeat: re-showing an id rewrites that
 band in place. The ids in use are `volume`, `input-language`,
 `stt-input-device`, `stt-recorder-mode`, `emoji-chooser`, `wifi-chooser`,
-`wifi-watcher`, `hyper-secure-input`, `purple-secure-input` and `nop`. A
+`wifi-watcher`, `purple-secure-input` and `nop`. A
 message that can be superseded rather than repeated wants one too: the Wi-Fi
 chooser shares a single id across the whole connect flow, so `Connecting` is
 replaced by its own outcome rather than leaving two bands up.
