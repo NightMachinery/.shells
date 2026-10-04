@@ -12,7 +12,22 @@
       "Bash(vcsh night.sh commit:*)",
       "Bash(grep:*)",
       "Bash(python3 -m py_compile:*)",
-      "WebFetch(domain:docs.anthropic.com)"
+      "Bash(./bring_up_fleet.sh:*)",
+      "Bash(./teardown_node.sh:*)",
+      "Bash(./bring_up_q27b.sh:*)",
+      "Bash(gcloud compute instances:*)",
+      "Bash(gcloud compute disks:*)",
+      "Bash(gcloud compute regions describe:*)",
+      "Bash(gcloud compute project-info describe:*)",
+      "Bash(/Users/evar/code/uni/linroute/ops/bear-fleet/bring_up_fleet.sh:*)",
+      "Bash(/Users/evar/code/uni/linroute/ops/bear-fleet/teardown_node.sh:*)",
+      "Bash(/Users/evar/tmp/agents/LIN/0/claude/qwen27b-ops/bring_up_q27b.sh:*)",
+      "Bash(/Users/evar/tmp/agents/LIN/0/claude/qwen27b-ops/teardown_node.sh:*)",
+      "WebFetch(domain:docs.anthropic.com)",
+      "Bash(/Users/evar/code/uni/linroute/ops/bear-fleet/:*)",
+      "Bash(sh /Users/evar/code/uni/linroute/ops/bear-fleet/:*)",
+      "Bash(/Users/evar/tmp/agents/LIN/0/claude/qwen27b-ops/:*)",
+      "Bash(sh /Users/evar/tmp/agents/LIN/0/claude/qwen27b-ops/:*)"
     ],
     "deny": [],
     "ask": [
@@ -20,7 +35,7 @@
     ],
     "defaultMode": "plan"
   },
-  "model": "sonnet",
+  "model": "opus[1m]",
   "hooks": {
     "PreToolUse": [
       {
@@ -119,19 +134,32 @@
   "feedbackSurveyRate": 0,
   "alwaysThinkingEnabled": true,
   "effortLevel": "high",
+  "modelSettings": {
+    "claude-opus-5-5": {
+      "effortLevel": "high"
+    }
+  },
   "autoCompactWindow": 400000,
   "voice": {
     "enabled": true,
     "mode": "tap"
   },
   "skipDangerousModePermissionPrompt": true,
+  "skipWorkflowUsageWarning": true,
   "theme": "custom:profile",
   "editorMode": "vim",
   "preferredNotifChannel": "notifications_disabled",
   "autoCompactEnabled": true,
+  "switchModelsOnFlag": false,
   "remoteControlAtStartup": true,
   "inputNeededNotifEnabled": true,
   "agentPushNotifEnabled": true,
-  "voiceEnabled": false,
-  "switchModelsOnFlag": false
+  "autoMode": {
+    "allow": [
+      "$defaults",
+      "GCP: GCP read-only actions are always allowed. Mutating actions on the user's own nodes are also allowed.",
+      "Subagents: sending messages to subagents is always allowed."
+    ]
+  },
+  "voiceEnabled": false
 }
