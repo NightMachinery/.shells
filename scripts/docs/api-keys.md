@@ -102,9 +102,14 @@ route /api/v1/* {
 request that already passed authentication, and `header_up` *overwrites* whatever
 the client sent, so nobody can smuggle a key past Caddy.
 
-`GARDEN_KEY` comes from the environment Caddy is launched with, in
-`launchers/various.zsh`. The remote wrappers — `brishzr.dash`, `brishzrb.dash`,
-`brishzrq.dash` — are unchanged and still send only the basic-auth credentials.
+`GARDEN_KEY` is in Caddy's environment. `launchers/various.zsh` starts Caddy
+through [agfi:caddy-run-garden], which reads the key itself and then `exec`s
+`caddy` with it, so the key appears in no argv. A process's environment is
+readable only by its owner and root, while `ps` shows every argv to every local
+user. The launcher used to pass `GARDEN_KEY=<key>` to tmux, which put the key in
+the argv of the pane's shell. The remote wrappers (`brishzr.dash`,
+`brishzrb.dash`, `brishzrq.dash`) are unchanged and still send only the
+basic-auth credentials.
 
 Keys are per host and never leave the host they were generated on. A consequence
 worth remembering: if you SSH-tunnel a *remote* garden to a local port, the
@@ -118,7 +123,36 @@ cannot carry a comment saying so: Caddy rejects unknown JSON fields.
 
 ## Rotating a key
 
-Delete the file and restart the service; it generates a new one at boot. Clients
-that read the file per invocation — all the wrappers do — pick the new key up
-with no further action. Caddy holds `GARDEN_KEY` in its environment, so a garden
-rotation on the VPS needs Caddy restarted too.
+```zsh
+api-key-rotate brishgarden
+```
+
+[agfi:api-key-rotate] writes a new random key, replacing the file in one rename,
+so a reader sees the old key or the new one, never a partial file. It never
+prints a key. Clients read the file on every call, as all the wrappers do, so
+they switch at once.
+
+The servers read their key once, at boot, and so does Caddy through
+`GARDEN_KEY`. Until they restart, the garden refuses the new key with a `401`,
+and Caddy keeps sending the old one. So `api-key-rotate` then restarts every
+session in `api_key_holders[<service>]` that runs on this host. For
+`brishgarden` these are `BrishGarden`, the garden, and `serve-dl`, Caddy on the
+VPS.
+
+- A tmux session gets [agfi:tmux-session-restart]. It kills the pane's
+  processes and respawns the pane with its original command, which needs tmux's
+  `remain-on-exit on` (set in `~/.tmux.conf`).
+- A job that [agfi:tmux2kitty] moved into kitty gets [agfi:tmux2kitty-restart].
+  A job moved before tmux2kitty began recording its command cannot be restarted
+  this way. Restart it once with its launcher and move it again.
+- A holder that does not run on this host is skipped.
+
+It refuses to run inside a Brish worker, or inside a tmux session it would
+restart. The restart would kill it after the new key is written but before the
+holder had read it, which leaves every client refused. Run it from a terminal.
+Expect the garden to be down for a few seconds while it restarts. A holder that
+fails to restart is reported, and keeps the old key until you restart it by
+hand.
+
+For another service, set its holders first, e.g. in `~/.privateShell`:
+`api_key_holders[jupytergarden]='JupyterGarden'`.

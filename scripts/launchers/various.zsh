@@ -20,14 +20,12 @@ tmuxnew serve-dl-webdav-rclone rclone serve webdav ~/Downloads/ --read-only --ad
 #: caddy's memory usage sucks, and oom can kill it. We might need to add `retry` to it, but I want things to break noisily for now.
 
 #: Caddy authenticates remote callers with basic auth, then vouches for them to
-#: the garden by injecting this key (see `header_up` in the Caddyfile). We create
-#: the key here rather than waiting for the garden, which boots asynchronously
-#: above and may not have written it yet.
-garden_key="$(api-key-get brishgarden)" || ecerr "$0: could not read the garden's API key; remote access will 401"
-
+#: the garden by injecting the garden's key (see `header_up` in the Caddyfile).
+#: [agfi:caddy-run-garden] reads the key inside the pane, so that it shows up in
+#: no argv, and creates it if the garden, which boots asynchronously above, has
+#: not written it yet. [agfi:api-key-rotate] restarts this session.
 # tmuxnewsh2 serve-dl caddy run --config $NIGHTDIR/launchers/Caddyfile.json
-tmuxnewsh2 serve-dl GARDEN_KEY="$garden_key" caddy run --config $NIGHTDIR/launchers/Caddyfile
-unset garden_key
+tmuxnewsh2 serve-dl caddy-run-garden run --config $NIGHTDIR/launchers/Caddyfile
 # miniserve -- . #http-server
 ##
 # tmuxnew shadowsocks-ss ss-server -c "$nightNotes/private/configs/eva/shadowsocks/ss.json" # see `man shadowsocks-libev` for config # we might also have this in systemd: `systemctl status ss8324` # needed for the old laptop
