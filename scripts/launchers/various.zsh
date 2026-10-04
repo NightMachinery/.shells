@@ -45,10 +45,7 @@ tmuxnew vless-reality xray -config ~/vless_reality_server.json
 #tmuxnew splash 'docker run -it -p 8050:8050 scrapinghub/splash'
 ##
 borgdir=~/code/betterborg/
-#: betterborg stays on the 3.10 env until its test suite passes under 3.14;
-#: drop this pin then. Hosts without that env use the python on PATH.
-borg_python=~/micromamba/envs/p310/bin/python3.10
-test -x "$borg_python" || borg_python="$(realpath2 python3)"
+borg_python="$(realpath2 python3)"
 # tmuxnewsh2 juliaX borg_brish_count=0 python stdborg.py # for testing iterations quickly
 tmuxnew julia "dash -c 'cd $(gq $borgdir) && $(gq "$borg_python") $(gq $borgdir/start_server.py)'"
 tmuxnew julia_papersonegai "dash -c 'cd $(gq $borgdir) && borg_session=session_papersonegai borg_plugin_path=papersonegai_plugins borg_brish_count=1 $(gq "$borg_python") $(gq $borgdir/stdborg.py)'"
