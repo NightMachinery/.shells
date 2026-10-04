@@ -36,6 +36,16 @@ that env cannot break a tool.
   (expanded by `ins-uv-tools`). A local tool that imports one of our own
   libraries gets it as `--with-editable`, otherwise uv would resolve it from
   PyPI: BrishGarden uses `--with-editable ~/code/python/brish`.
+- [agfi:brishgarden-boot] runs the uv tool, `~/.local/bin/brishgarden`,
+  whenever it exists, and only otherwise the first `brishgarden` on `PATH`.
+  A server may still have an old `brishgarden` in a conda env that other
+  services share and that comes first on its `PATH`; upgrading the garden
+  inside that env would upgrade their packages too. A host without the local
+  checkouts installs the tool from git:
+  `uv tool install --python 3.14 'brishgarden @ git+https://github.com/NightMachinery/BrishGarden.git@<rev>'`,
+  which takes Brish and PyNight from PyPI. Check which interpreter it got
+  (see the end of this file): an old uv can pick a 3.14 release candidate,
+  which current pydantic cannot import under.
 - A tool that Homebrew already ships (`ocrmypdf`, `googler`,
   `speedtest-cli`) stays a brew formula, not a uv tool.
 - `pi` ([agfi:pip-install]) installs into the env that owns the `python3`
