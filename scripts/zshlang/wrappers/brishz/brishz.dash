@@ -9,21 +9,21 @@ fi
 
 cmd="$*"
 stdin="$brishz_in"
-#: brishz_binary=y: exact bytes both ways, over the garden's binary transport
-#: (cmd_b64, stdin_b64, binary: 1); see docs/brishz-binary.md. It needs a
-#: garden in binary mode, which is the garden's default (BRISH_BINARY=0
-#: turns it off). Parsed like brishzq.zsh's bool.
+#: brishz_binary=y: exact bytes both ways; see docs/brishz-binary.md. It
+#: needs a garden in binary mode, which is the garden's default
+#: (BRISH_BINARY=0 turns it off). Parsed like brishzq.zsh's bool.
 binary_p=''
 case "$brishz_binary" in
    ''|[nN]|[nN][oO]|0) ;;
    *) binary_p=y ;;
 esac
-#: In binary mode stdin is streamed into base64 below instead, since `$(cat)`
-#: drops trailing newlines and a shell variable cannot hold a NUL.
+#: In binary mode stdin is streamed into the request below instead, since
+#: `$(cat)` drops trailing newlines and a shell variable cannot hold a NUL.
 [ "$stdin" = 'MAGIC_READ_STDIN' ] && test -z "$binary_p" && stdin="$(cat)"
 session="${brishz_session}"
 nolog="${brishz_nolog}"
-endpoint="${bshEndpoint:-http://127.0.0.1:${GARDEN_PORT:-7230}}/zsh/"
+endpoint_base="${bshEndpoint:-http://127.0.0.1:${GARDEN_PORT:-7230}}"
+endpoint="${endpoint_base}/zsh/"
 if test -n "$nolog" ; then
    endpoint="${endpoint}nolog/"
 fi
@@ -46,27 +46,208 @@ if test -e "$cmd" ; then
    }
 fi
 
-#: brishz_binary=y. The command and stdin are always encoded here, as with
-#: brishz_quote=y (so pass them raw, not JSON-escaped), and `binary: 1` is
-#: sent on both reply paths: the plain one then answers with the exact bytes
-#: of stdout followed by stderr, the JSON one adds out_b64 and err_b64.
-if test -n "$binary_p" ; then
-   #: jq is outside launchd's bare PATH, which Hammerspoon runs us with.
-   PATH="$PATH:/usr/local/bin:/opt/homebrew/bin"
-   tmp="$(mktemp -d)" || exit $?
-   #: jq is not binary-safe (it turns invalid UTF-8 into U+FFFD), so the raw
-   #: bytes pass through the base64 binary first. They go through files,
-   #: never argv, which is size-limited and shown by `ps`. The command goes
-   #: only in cmd_b64, never also in cmd: a garden that predates the _b64
-   #: fields then gets an empty command and runs nothing.
-   if printf '%s' "$cmd" | base64 > "$tmp/cmd" &&
-      if [ "$stdin" = 'MAGIC_READ_STDIN' ] ; then
+binary_raw() {
+   #: brishz_binary=y on the plain reply path, over the garden's raw API
+   #: (POST .../zsh/raw/): the body is the command's bytes, then stdin's,
+   #: with no base64 and no jq. Prints the reply and sets r to our exit
+   #: status, or sets r to '' when the garden ran nothing and the JSON API
+   #: may get the request: it has no raw API (HTTP 404 or 405), or it
+   #: refused the request (X-Brish-Refused: 1), as a legacy-mode garden
+   #: refuses binary=1.
+   #:
+   #: merge=1 merges stderr into stdout in the shell, as the JSON API's
+   #: plain reply path does, so the reply holds the same bytes. It is
+   #: printed whole, and we exit 0, as on that path.
+   url="${endpoint_base}/zsh/raw/"
+   if test -n "$nolog" ; then
+      url="${url}nolog/"
+   fi
+   query=''
+   if test -n "$session" ; then
+      query="session=$(jq --null-input --raw-output --arg s "$session" '$s | @uri')&" || {
+         r=$?
+         echo "brishz.dash: could not encode the session" >&2
+         return
+      }
+   fi
+   #: The JSON path sends nolog as a string, and the garden takes any
+   #: non-empty string there as true.
+   if test -n "$nolog" ; then
+      query="${query}nolog=1&"
+   fi
+   query="${query}merge=1&binary=1"
+
+   #: X-Brish-Cmd-Length counts bytes. BSD's `wc` pads the count with spaces,
+   #: which the unquoted `set --` drops.
+   set -- $(printf '%s' "$cmd" | LC_ALL=C wc -c)
+   case "$1" in
+      ''|*[!0-9]*)
+         echo "brishz.dash: could not count the command's bytes" >&2
+         r=1
+         return
+         ;;
+   esac
+
+   #: No `--fail`: the HTTP status tells an old garden (404) from an error.
+   #: `Expect:` stops curl from waiting for a 100 Continue on large bodies.
+   : > "$tmp/body"
+   code="$( { printf '%s' "$cmd" ; if test -n "$stdin_file" ; then cat "$stdin_file" ; else printf '%s' "$stdin" ; fi ; } |
+      curl ${apikey_header:+--header "$apikey_header"} --silent --location --header 'Content-Type: application/octet-stream' --header 'Expect:' --header "X-Brish-Cmd-Length: $1" --data-binary @- --dump-header "$tmp/headers" --output "$tmp/body" --write-out '%{http_code}' "${url}?${query}" )"
+   r=$?
+   if test "$r" -ne 0 ; then
+      #: A transport failure: curl's own status, as on the JSON path
+      #: (Hammerspoon reads 7 as "not sent").
+      return
+   fi
+   case "$code" in
+      404|405)
+         r=''
+         return
+         ;;
+      [123][0-9][0-9]) ;;
+      [45][0-9][0-9])
+         #: The JSON path's `curl --fail`: exit 22, print nothing.
+         r=22
+         return
+         ;;
+      *)
+         echo "brishz.dash: could not parse curl's reply" >&2
+         r=1
+         return
+         ;;
+   esac
+
+   #: curl dumps the headers of every response it got (a redirect's too), so
+   #: only the last response's count. Header names are case-insensitive, and
+   #: the garden sends them lowercased. Builtins only, since every process
+   #: we start costs milliseconds; [[:space:]] also strips the CR of CRLF.
+   binary_h='' refused_h='' retcode_h='' notice_h=''
+   while IFS= read -r line || test -n "$line" ; do
+      case "$line" in
+         HTTP/*)
+            #: A new response (after a redirect or a 100 Continue).
+            binary_h='' refused_h='' retcode_h='' notice_h=''
+            continue
+            ;;
+      esac
+      value="${line#*:}"
+      value="${value#"${value%%[![:space:]]*}"}"
+      value="${value%"${value##*[![:space:]]}"}"
+      case "${line%%:*}" in
+         [xX]-[bB][rR][iI][sS][hH]-[bB][iI][nN][aA][rR][yY]) binary_h="$value" ;;
+         [xX]-[bB][rR][iI][sS][hH]-[rR][eE][fF][uU][sS][eE][dD]) refused_h="$value" ;;
+         [xX]-[bB][rR][iI][sS][hH]-[rR][eE][tT][cC][oO][dD][eE]) retcode_h="$value" ;;
+         [xX]-[bB][rR][iI][sS][hH]-[nN][oO][tT][iI][cC][eE]) notice_h="$value" ;;
+      esac
+   done < "$tmp/headers"
+
+   if test "$refused_h" = 1 ; then
+      r=''
+      return
+   fi
+   if test "$binary_h" = 1 ; then
+      #: Exact bytes: the command's output or a notice (an empty command, a
+      #: magic command's log).
+      cat "$tmp/body"
+      r=$?
+      return
+   fi
+   #: Neither refused nor exact: a legacy-mode garden older than the option
+   #: binary=1 ignored it and ran the command in text mode. Its output may
+   #: have lost bytes, so none of it is printed.
+   case "$retcode_h" in
+      ''|-|*[!0-9-]*|?*-*) retcode_h=unknown ;;
+   esac
+   what='ran the command in text mode'
+   if test "$notice_h" = 1 ; then
+      #: An empty or magic command: the garden's own notice, no command's output.
+      what="answered in text mode with a notice, not a command's output"
+   elif test "$retcode_h" = 9000 ; then
+      #: A garden with the raw API but older than X-Brish-Refused (from
+      #: BrishGarden d0a9514 until 0fd2752 added it) refuses a NUL or invalid
+      #: UTF-8 with retcode 9000 and no mark, which we cannot tell from a
+      #: command that ran and ended so.
+      what='ran the command in text mode, or refused it and ran nothing'
+   fi
+   echo "brishz.dash: garden ${what} (no X-Brish-Binary: 1); it predates the binary=1 option and runs with BRISH_BINARY=0; output withheld; retcode ${retcode_h}" >&2
+   r=201
+}
+
+binary_json_request() {
+   #: The binary JSON request, into $tmp/req. jq is not binary-safe (it turns
+   #: invalid UTF-8 into U+FFFD), so the raw bytes pass through the base64
+   #: binary first. They go through files, never argv, which is size-limited
+   #: and shown by `ps`. The command goes only in cmd_b64, never also in cmd:
+   #: a garden that predates the _b64 fields then gets an empty command and
+   #: runs nothing.
+   printf '%s' "$cmd" | base64 > "$tmp/cmd" &&
+      if test -n "$stdin_file" ; then
+         base64 < "$stdin_file" > "$tmp/stdin"
+      elif [ "$stdin" = 'MAGIC_READ_STDIN' ] ; then
          base64 > "$tmp/stdin"
       else
          printf '%s' "$stdin" | base64 > "$tmp/stdin"
       fi &&
       jq --null-input --compact-output --rawfile c "$tmp/cmd" --rawfile i "$tmp/stdin" --arg nolog "$nolog" --arg s "$session" --arg v "$v" '{"cmd_b64": $c, "stdin_b64": $i, "binary": 1, "session": $s, "json_output": $v, "nolog": $nolog}' > "$tmp/req"
-   then
+}
+
+binary_json_post() {
+   #: Sends $tmp/req to the JSON API, with the extra curl options "$@".
+   curl ${apikey_header:+--header "$apikey_header"} --fail --silent --location "$@" --header 'Content-Type: application/json' --request POST --data-binary "@$tmp/req" $endpoint
+}
+
+#: brishz_binary=y. The command and stdin are always encoded here, as with
+#: brishz_quote=y (so pass them raw, not JSON-escaped). On the plain reply
+#: path (brishz_json_output=0, the default) the request goes to the raw API
+#: with binary=1 (binary_raw), unless brishz_raw=n (parsed like
+#: brishz_binary, except that unset or empty means on). Otherwise, and when
+#: the garden has no raw API or refuses the request, it goes to the JSON API
+#: with `binary: 1`: the plain reply then holds the exact bytes of stdout
+#: followed by stderr, the JSON one adds out_b64 and err_b64. So exact bytes
+#: come back, or nothing runs, or (only on a legacy-mode garden older than
+#: the option binary=1) the command runs in text mode, its output is
+#: withheld and we exit 201.
+if test -n "$binary_p" ; then
+   #: jq is outside launchd's bare PATH, which Hammerspoon runs us with.
+   PATH="$PATH:/usr/local/bin:/opt/homebrew/bin"
+   tmp="$(mktemp -d)" || exit $?
+
+   raw_p=''
+   if test "$v" = 0 ; then
+      case "$brishz_raw" in
+         [nN]|[nN][oO]|0) ;;
+         *) raw_p=y ;;
+      esac
+   fi
+   #: A refused raw request is sent again to the JSON API, so our own stdin,
+   #: which can be read only once, waits in a file.
+   stdin_file=''
+   if test -n "$raw_p" && [ "$stdin" = 'MAGIC_READ_STDIN' ] ; then
+      stdin_file="$tmp/in"
+      cat > "$stdin_file" || {
+         r=$?
+         echo "brishz.dash: could not read stdin" >&2
+         rm -rf "$tmp"
+         exit "$r"
+      }
+   fi
+
+   if test -n "$raw_p" ; then
+      #: brishz_async (see below): the raw request, and the JSON one it may
+      #: fall back to, go out from the background process, so an old garden
+      #: still gets the command. Nothing reads the reply.
+      if test -n "$brishz_async" ; then
+         { binary_raw ; test -n "$r" || { binary_json_request && binary_json_post ; } ; rm -rf "$tmp" ; } >/dev/null 2>&1 </dev/null &
+         exit 0
+      fi
+      binary_raw
+      if test -n "$r" ; then
+         rm -rf "$tmp"
+         exit "$r"
+      fi
+   fi
+
+   if binary_json_request ; then
       :
    else
       r=$?
@@ -78,7 +259,7 @@ if test -n "$binary_p" ; then
    #: brishz_async (see below): nothing reads the reply, so nothing checks
    #: its header either.
    if test -n "$brishz_async" ; then
-      { curl ${apikey_header:+--header "$apikey_header"} --fail --silent --location --header 'Content-Type: application/json' --request POST --data-binary "@$tmp/req" $endpoint ; rm -rf "$tmp" ; } >/dev/null 2>&1 </dev/null &
+      { binary_json_post ; rm -rf "$tmp" ; } >/dev/null 2>&1 </dev/null &
       exit 0
    fi
 
@@ -88,7 +269,7 @@ if test -n "$binary_p" ; then
    #: Every reply is HTTP 200, so `--fail` cannot tell. The body waits in a
    #: file until the headers are checked.
    : > "$tmp/body"
-   curl ${apikey_header:+--header "$apikey_header"} --fail --silent --location --dump-header "$tmp/headers" --output "$tmp/body" --header 'Content-Type: application/json' --request POST --data-binary "@$tmp/req" $endpoint
+   binary_json_post --dump-header "$tmp/headers" --output "$tmp/body"
    r=$?
    if test "$r" -eq 0 ; then
       #: Header names are case-insensitive, and the garden sends this one lowercased.
