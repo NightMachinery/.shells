@@ -48,7 +48,12 @@ brishz_stream=n brishzgo print -r -- buffered
 brishz_stream=n brishz_raw=n brishzgo print -r -- json
 ```
 
-A leading `-c` is dropped, as `brishzq.zsh` does.
+Sole `-h` or `--help` prints local help and exits 0, even when
+`DISABLE_BRISH=y`, without contacting a garden or reading stdin. A leading
+`--` is dropped and everything after it goes to the garden:
+`brishzgo -- --help` runs a command named `--help` there.
+`brishzgo command --help` passes `--help` to `command`. The old leading
+`-c` still works as an alias for `--`, for compatibility with `brishzq.zsh`.
 
 ### The command text
 

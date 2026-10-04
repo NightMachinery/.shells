@@ -69,7 +69,7 @@ var (
 )
 
 func newConfig(args []string, env lookupEnv, pwd, home string) config {
-	if len(args) > 0 && args[0] == "-c" {
+	if len(args) > 0 && (args[0] == "--" || args[0] == "-c") {
 		args = args[1:]
 	}
 	c := config{env: env, args: args}
@@ -122,6 +122,10 @@ func newConfig(args []string, env lookupEnv, pwd, home string) config {
 
 // run is the whole client; it returns the exit status.
 func run(args []string, env lookupEnv, pwd, home string, stdin io.Reader, stdout, stderr io.Writer) int {
+	if len(args) == 1 && (args[0] == "-h" || args[0] == "--help") {
+		fmt.Fprint(stdout, helpText)
+		return 0
+	}
 	if strings.ToLower(env.get("DISABLE_BRISH")) == "y" {
 		fmt.Fprintln(stderr, "brishzgo: disabled by DISABLE_BRISH")
 		return 1

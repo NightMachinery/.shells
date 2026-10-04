@@ -21,6 +21,8 @@ That puts =brishzgo= in =~/go/bin=. It is registered in =setup/setup_go=.
 [agfi:go-local-dep]. [agfi:brishz-v1] preserves the previous shell client.
 Streaming passes output through while the command runs; interrupting the
 client stops that command when the garden supports streaming.
+Sole =-h= or =--help= shows local help. Leading =--= passes the remaining
+arguments to the garden unchanged; leading =-c= remains a legacy alias.
 
 Check the zsh wrapper separately with
 =zsh -f zshlang/tests/brishz-default.zsh= from the scripts root. It uses mock
