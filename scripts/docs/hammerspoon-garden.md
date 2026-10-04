@@ -162,3 +162,27 @@ panel:
   it. Callbacks capture the key, never the object.
 - `hsAfter(seconds, fn)` is a pinned `hs.timer.doAfter` that releases itself
   when it fires; `hsCancel(key)` stops one early.
+
+## Plain Lua callers
+
+`lua/pipe.lua` uses `${BRISHZGO_BIN:-$HOME/go/bin/brishzgo}` for normal
+`brishz_eval`, `_q`, `_bsh` and `_bg` calls. The string form sets
+`brishz_noquote=y`, preserving named-session shell state; the argv form quotes
+values. Both synchronous forms return trimmed stdout, stderr and the remote
+command's status. Background forms use `brishz_async=y`, returning after local
+launch and discarding the garden reply. The worker receives any direct stdin
+before the parent exits.
+
+`pipe_simple` multiplexes nonblocking stdin, stdout and stderr with
+[luaposix poll](https://luaposix.github.io/luaposix/modules/posix.poll.html).
+It handles partial writes, a child closing stdin early, EOF on each output and
+interrupted system calls, closes all descriptors and reaps the child. Signals
+are reported as 128 plus the signal number. Binary input is piped instead of
+put into environment variables.
+
+The explicit `evalFile` and `outFile` options keep `brishzq.zsh` for their
+file-based contract. No current normal caller requires those flags.
+`lua lua/tests/pipe-test.lua` exercises a child which fills stdout and stderr
+before reading more than a pipe buffer of binary input, early input closure,
+signal status, exec failure and the Go argument/option boundary. Run it under
+an external timeout when checking the deadlock regression.

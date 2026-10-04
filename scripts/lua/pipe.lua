@@ -1,6 +1,8 @@
 local posix = require("posix")
 
-brishzq_binary = "/usr/local/bin/brishzq.zsh"
+brishzgo_binary = os.getenv("BRISHZGO_BIN") or (os.getenv("HOME") .. "/go/bin/brishzgo")
+-- Compatibility name for callers outside this module.
+brishzq_binary = brishzgo_binary
 ---
 ---
 -- froked from https://stackoverflow.com/a/16515126/1410221
@@ -59,50 +61,75 @@ end
 -- and then return status code, stdout and stderr from cmd.
 --
 function pipe_simple(input, cmd, ...)
-    --
-    -- Launch child process
-    --
-    local pid, w, r, e = popen3(cmd, table.unpack({...}))
-    assert(pid ~= nil, "filter() unable to popen3()")
-
-    --
-    -- Write to popen3's stdin, important to close it as some (most?) proccess
-    -- block until the stdin pipe is closed
-    --
-    posix.write(w, input)
-    posix.close(w)
-
-    local bufsize = 4096
-    --
-    -- Read popen3's stdout via Posix file handle
-    --
-    local stdout = {}
-    local i = 1
-    while true do
-        buf = posix.read(r, bufsize)
-        if buf == nil or #buf == 0 then break end
-        stdout[i] = buf
-        i = i + 1
+    input = input or ""
+    local pid, w, r, e = popen3(cmd, ...)
+    local fds = {
+        [w] = {events = {OUT = true}},
+        [r] = {events = {IN = true}},
+        [e] = {events = {IN = true}},
+    }
+    local stdout, stderr, offset = {}, {}, 1
+    local function close(fd)
+        if fds[fd] then posix.close(fd); fds[fd] = nil end
     end
-
-    --
-    -- Read popen3's stderr via Posix file handle
-    --
-    local stderr = {}
-    local i = 1
-    while true do
-        buf = posix.read(e, bufsize)
-        if buf == nil or #buf == 0 then break end
-        stderr[i] = buf
-        i = i + 1
-    end
-
-    --
-    -- Clean-up child (no zombies) and get return status
-    --
-    local wait_pid, wait_cause, wait_status = posix.wait(pid)
-
-    return wait_status, table.concat(stdout), table.concat(stderr)
+    -- A child may close stdin early. Handle EPIPE without terminating Lua.
+    local oldSigpipe = posix.signal(posix.SIGPIPE, posix.SIG_IGN)
+    local ok, failure = pcall(function()
+        for fd in pairs(fds) do
+            local flags = assert(posix.fcntl(fd, posix.F_GETFL, 0))
+            assert(posix.fcntl(fd, posix.F_SETFL, flags | posix.O_NONBLOCK))
+        end
+        if #input == 0 then close(w) end
+        while next(fds) do
+            local count, err, errno = posix.poll(fds, -1)
+            if not count then
+                if errno ~= posix.EINTR then error("poll: " .. tostring(err)) end
+            else
+                for fd, state in pairs(fds) do
+                    local events = state.revents or {}
+                    if fd == w then
+                        if events.ERR or events.HUP then
+                            close(w)
+                        elseif events.OUT then
+                            local n, writeErr, writeErrno = posix.write(w, input:sub(offset, offset + 65535))
+                            if n then
+                                offset = offset + n
+                                if offset > #input then close(w) end
+                            elseif writeErrno == posix.EPIPE then
+                                close(w)
+                            elseif writeErrno ~= posix.EAGAIN and writeErrno ~= posix.EINTR then
+                                error("write: " .. tostring(writeErr))
+                            end
+                        end
+                    elseif events.IN or events.HUP or events.ERR then
+                        local buf, readErr, readErrno = posix.read(fd, 65536)
+                        if buf then
+                            if #buf == 0 then
+                                close(fd)
+                            else
+                                local target = fd == r and stdout or stderr
+                                target[#target + 1] = buf
+                            end
+                        elseif readErrno ~= posix.EAGAIN and readErrno ~= posix.EINTR then
+                            error("read: " .. tostring(readErr))
+                        end
+                    end
+                    if events.NVAL then error("poll: invalid file descriptor") end
+                end
+            end
+        end
+    end)
+    for fd in pairs(fds) do close(fd) end
+    posix.signal(posix.SIGPIPE, oldSigpipe)
+    if not ok then posix.kill(pid, posix.SIGTERM) end
+    local waitPid, cause, status
+    repeat
+        waitPid, cause, status = posix.wait(pid)
+    until waitPid or status ~= posix.EINTR
+    if not ok then error(failure) end
+    assert(waitPid, "wait: " .. tostring(cause))
+    if cause == "killed" then status = 128 + status end
+    return status, table.concat(stdout), table.concat(stderr)
 end
 
 --- example
@@ -131,83 +158,42 @@ end
 --- directly with an argument list -- there is no shell in the middle, so there
 --- is nothing to quote and nothing that can be mis-quoted into code.
 ---
---- Two clients, because they answer two different needs:
+--- brishzgo handles both forms: `_q' takes quoted argv, while the string
+--- form uses brishz_noquote=y so named sessions retain their shell state.
+--- Both report the command's status and stream its output. `_bg' uses the
+--- Go client's detached worker, without waiting for the HTTP reply.
 ---
----   brishz2.dash  43 lines of dash. Takes one string, a command line for the
----                 garden to evaluate. ~55ms. Enough when the command is a
----                 constant.
----   brishzq.zsh   the real client. Takes an argument list and quotes each
----                 element itself, so a value may contain quotes, semicolons,
----                 newlines or anything else without becoming code. Also
----                 returns the command's own exit code, forwards its stderr,
----                 and can pick a session. ~85ms: zsh startup plus quoting.
----
---- Hence the `_q' in the names: pay for quoting when a value is involved, not
---- when the command is a constant. Read the names as
---- brishz_eval[_q][_bg]: `_q' takes an argv table, `_bg' does not wait.
----
---- In the `_bg' forms the quoting is free, because nothing waits for the reply
---- at all. Prefer `_q' there whenever a value is interpolated.
----
---- Some of these have no callers today, and are kept anyway. This file is plain
---- Lua over posix and does not know it is inside Hammerspoon, which has hs.task
---- and so a cheaper way to not wait (brishz_eval_hs, in core/helpers.lua). The
---- set stays complete so that the name you reach for exists.
+--- Explicit evalFile/outFile options keep the legacy client, since those
+--- flags describe a file-based transport that the Go client does not expose.
+--- This file stays plain Lua; Hammerspoon uses hs.task in core/helpers.lua.
 
-local kBrishzDash = "/usr/local/bin/brishz2.dash"
-local kBrishzq = "/usr/local/bin/brishzq.zsh"
+local kBrishzqLegacy = "/usr/local/bin/brishzq.zsh"
 
---- Brish is configured through environment variables, and `env' sets them for
---- the child alone. posix.setenv would change Hammerspoon's own environment and
---- leak into every later call.
----
---- opts: session, evalFile (send the command as a file, for binary-unsafe
---- payloads), outFile (receive the output as a file), stdin.
-local function brishzArgv(quoted, cmd, opts)
+local function brishzArgv(quoted, cmd, opts, async)
     opts = opts or {}
-    -- Only the full client understands these, so asking for one sends a string
-    -- command there too, in its no-quoting mode.
-    local useZsh = quoted or opts.session or opts.evalFile or opts.outFile
+    local legacy = opts.evalFile or opts.outFile
+    local vars = {"brishz_async=", "brishz_copy=", "brishz_c=",
+                  "brishz_in=", "brishz_noquote="}
+    if not quoted then vars[#vars + 1] = "brishz_noquote=y" end
+    if opts.session then vars[#vars + 1] = "brishz_session=" .. opts.session end
+    if opts.evalFile then vars[#vars + 1] = "brishz_eval_file_p=y" end
+    if opts.outFile then vars[#vars + 1] = "brishz_out_file_p=y" end
+    if opts.stdin ~= nil then
+        vars[#vars + 1] = "brishz_in=" .. (legacy and opts.stdin or "MAGIC_READ_STDIN")
+    end
+    if async and not legacy then vars[#vars + 1] = "brishz_async=y" end
 
-    local vars = {}
-    if useZsh and not quoted then
-        -- Without this brishzq.zsh quotes the whole command line into a single
-        -- word, and the garden looks for a command by that name.
-        table.insert(vars, "brishz_noquote=y")
-    end
-    if opts.session then
-        table.insert(vars, "brishz_session=" .. opts.session)
-    end
-    if opts.evalFile then
-        table.insert(vars, "brishz_eval_file_p=y")
-    end
-    if opts.outFile then
-        table.insert(vars, "brishz_out_file_p=y")
-    end
-    if opts.stdin then
-        table.insert(vars, "brishz_in=" .. opts.stdin)
-    end
-
-    -- `env' is only worth an extra exec when there is something to set, and the
-    -- common case -- a constant command line, no options -- sets nothing.
-    local argv = {}
-    if #vars > 0 then
-        table.insert(argv, "/usr/bin/env")
-        for _, v in ipairs(vars) do
-            table.insert(argv, v)
-        end
-    end
-
-    table.insert(argv, useZsh and kBrishzq or kBrishzDash)
+    local argv = {"/usr/bin/env"}
+    for _, v in ipairs(vars) do argv[#argv + 1] = v end
+    argv[#argv + 1] = legacy and kBrishzqLegacy or brishzgo_binary
+    -- Leading -- avoids interpreting a literal command name as local help.
+    if not legacy then argv[#argv + 1] = "--" end
     if quoted then
-        for _, word in ipairs(cmd) do
-            table.insert(argv, tostring(word))
-        end
+        for _, word in ipairs(cmd) do argv[#argv + 1] = tostring(word) end
     else
-        table.insert(argv, cmd)
+        argv[#argv + 1] = cmd
     end
-
-    return argv
+    return argv, legacy
 end
 
 --- Fire and forget. Forks twice: the middle child exits at once and is reaped
@@ -241,7 +227,7 @@ end
 
 local function brishzRun(quoted, cmd, opts)
     local argv = brishzArgv(quoted, cmd, opts)
-    local status, out, err = pipe_simple("", table.unpack(argv))
+    local status, out, err = pipe_simple((opts and opts.stdin) or "", table.unpack(argv))
     return trim1(out or ""), err or "", status
 end
 
@@ -249,8 +235,7 @@ end
 --- and its exit status -- all three, so that a failure is distinguishable from
 --- empty output.
 ---
---- The status here is the client's, so it reports that the call failed but not
---- what the command itself returned. brishz_eval_q gives the real code.
+--- The status is the command's own for both the string and argv forms.
 function brishz_eval(cmd, opts)
     return brishzRun(false, cmd, opts)
 end
@@ -265,14 +250,25 @@ end
 --- Does not wait for anything: not for the command, and not for the HTTP
 --- round-trip either. Backgrounding the command *inside* the garden would not
 --- achieve that, since the reply is still waited for.
+local function brishzBackground(quoted, cmd, opts)
+    local argv, legacy = brishzArgv(quoted, cmd, opts, true)
+    if legacy then
+        spawnDetached(argv)
+    else
+        -- This waits only for local launch. The detached worker owns stdin
+        -- and its garden connection after the client parent exits.
+        return pipe_simple((opts and opts.stdin) or "", table.unpack(argv))
+    end
+end
+
 function brishz_eval_bg(cmd, opts)
-    spawnDetached(brishzArgv(false, cmd, opts))
+    return brishzBackground(false, cmd, opts)
 end
 
 --- Argument-list form of brishz_eval_bg. Costs nothing extra, since nothing is
 --- waited for; use it for anything with a value in it.
 function brishz_eval_q_bg(argv, opts)
-    spawnDetached(brishzArgv(true, argv, opts))
+    return brishzBackground(true, argv, opts)
 end
 
 --- A shell that keeps its state between calls -- variables, cwd, anything --

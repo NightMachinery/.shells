@@ -14,8 +14,8 @@ to JSON. `brishz_stream=n` selects the previous raw/JSON behavior.
 The source is `golang/brishzgo/`; its `readme.org` covers building and the
 tests. [agfi:brishz] now runs it, including callers of [agfi:bsh],
 [agfi:brishzr] and [agfi:brishz-all]. The previous shell implementation is
-[agfi:brishz-v1], still using `brishzq.zsh`. Hammerspoon, `lua/pipe.lua`,
-the agent hooks and standalone wrappers keep their existing clients.
+[agfi:brishz-v1], still using `brishzq.zsh`. Normal Lua calls, agent hooks
+and standalone wrappers use the Go client too.
 
 The shell wrapper builds or refreshes the binary through [agfi:go-local-dep],
 exports `brishz_in`, `brishz_nolog` and `brishz_session` (including the
