@@ -1,4 +1,16 @@
-# Optional extended attributes in rsp
+# rsp: copying, mirroring, and moving files
+
+[agfi:rsp] wraps [agfi:rsp-safe] with `--delete-after --force-delete`.
+These options delete extraneous files on the receiving side when synchronizing
+directories. They do not remove the source files after copying them.
+
+To move files, use `rsp-safe --remove-source-files SOURCE DESTINATION`.
+Rsync removes source files only after successfully duplicating them at the
+destination; source directories remain. `rsp-safe` keeps the checksum and
+resume options without enabling destination cleanup. Use this with finished
+files that are no longer being written.
+
+## Optional extended attributes
 
 [agfi:rsp] and the other `rsp` variants preserve extended attributes when
 rsync supports them. If the client or server reports that extended attributes
