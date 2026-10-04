@@ -62,12 +62,45 @@ hotkey or a watcher did not get installed."
     fi
 
     #: -t is the client's own receive timeout (default 4); the gtimeout is the
-    #: backstop for a Hammerspoon that never answers at all.
-    if bool "$assert_p" ; then
-        assert gtimeout 30s hs "${quiet_opts[@]}" -A -t 5 "$@" <"$stdin" @RET
-    else
-        gtimeout 30s hs "${quiet_opts[@]}" -A -t 5 "$@" <"$stdin"
+    #: backstop for a Hammerspoon that never answers at all. `always' so a
+    #: failed call, which @RET returns from, is logged too.
+    local t0=$EPOCHREALTIME
+    {
+        if bool "$assert_p" ; then
+            assert gtimeout 30s hs "${quiet_opts[@]}" -A -t 5 "$@" <"$stdin" @RET
+        else
+            gtimeout 30s hs "${quiet_opts[@]}" -A -t 5 "$@" <"$stdin"
+        fi
+    } always {
+        h-hammerspoon-cli-log "$?" "$t0" "$@"
+    }
+}
+
+function h-hammerspoon-cli-log {
+    : "RET T0 ARGS...: append a line to \$hammerspoon_cli_log_file for a call to
+[agfi:hammerspoon] that failed or took longer than
+\$hammerspoon_slow_log_seconds, so stalls can be counted instead of
+remembered. An empty log file disables it."
+
+    local ret="$1" t0="$2"
+    shift 2
+    local log="${hammerspoon_cli_log_file-$HOME/logs/hammerspoon-cli.log}"
+    if [[ -z "$log" ]] ; then
+        return 0
     fi
+
+    local elapsed=$(( EPOCHREALTIME - t0 ))
+    if (( ret == 0 && elapsed < ${hammerspoon_slow_log_seconds:-2} )) ; then
+        return 0
+    fi
+
+    #: The Lua, flattened and cut short: enough to tell the callers apart.
+    local code="${${(j: :)@}//$'\n'/ }"
+    {
+        command mkdir -p "${log:h}" &&
+            print -r -- "$(command date '+%Y-%m-%d %H:%M:%S') ${(l:7:)$(( int(elapsed * 1000) ))}ms rc=${ret} ${funcstack[3]:-toplevel} ${code[1,160]}" >>"$log"
+    } 2>/dev/null
+    return 0
 }
 ##
 function h-hammerspoon-eval {

@@ -451,8 +451,20 @@ Found in real use on 2026-10-04:
   traced to its app. The fallback asks the recent apps instead.
 - **`hs -c` stalls.** Several `hs -c` calls from a shell got no answer within
   20 to 30 s while Hammerspoon went on running its own timers, and a press
-  sent through one arrived about a minute late. Not investigated; see
-  `core/ipc-fix.lua` for the earlier IPC problem.
+  sent through one arrived about a minute late. Most of it was the client,
+  not IPC: with `-c`, `hs` still reads stdin to its end when stdin is not a
+  terminal, and a background shell's stdin (a socket) never ends, so the
+  call hung until `timeout` killed it, its answer still buffered.
+  `sleep 8 | timeout 5 hs -c 'return "ok"'` timed out every time, and with
+  `</dev/null` the same call took 10 to 40 ms. The `hammerspoon` zsh
+  function now gives `hs` an empty stdin under `-c`, and the agent
+  instructions add `</dev/null` to the banner commands. A request a client
+  gave up on probably still runs once Hammerspoon gets to it, which would
+  explain a press arriving a minute late (read from the CFMessagePort source,
+  not measured). To count what stalls remain, the function logs
+  every call that fails or is slower than `hammerspoon_slow_log_seconds` to
+  `hammerspoon_cli_log_file`. See `core/ipc-fix.lua` for the earlier IPC
+  problem.
 
 Still unmeasured:
 
