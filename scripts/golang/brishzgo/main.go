@@ -132,6 +132,9 @@ func run(args []string, env lookupEnv, pwd, home string, stdin io.Reader, stdout
 	}
 	cfg := newConfig(args, env, pwd, home)
 	defer temps.removeAll()
+	if env.get("brishz_async") != "" {
+		return startAsync(cfg, pwd, home, stdin, stderr)
+	}
 	cl := newClient(cfg, stdout, stderr)
 	in := newStdinSource(cfg, stdin)
 	// brishz_binary=y asks the raw and streaming APIs for exact bytes with

@@ -20,6 +20,7 @@ Environment:
   GARDEN_PORT              Local port when bshEndpoint is unset.
   brishz_in                Literal stdin, or MAGIC_READ_STDIN to read stdin.
   brishz_session           Persistent garden session.
+  brishz_async             Non-empty launches a detached request; discard output.
   brishz_nolog             Non-empty disables garden logging.
   brishz_failure_expected  Non-empty marks failures as expected.
   brishz_stream=n          Disable streaming (raw/JSON instead).

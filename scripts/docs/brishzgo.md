@@ -89,6 +89,16 @@ only joined by spaces, with no wrapping and no forwarding.
   gets the value as it is and takes any non-empty string as true, and the
   raw request sends `1`, as `brishzq.zsh` does.
 - `brishz_noquote`: see above.
+- `brishz_async`: any non-empty value launches a detached client and returns
+  0 after local launch, without waiting for an HTTP round trip or the command.
+  Both output streams and later errors are discarded. As in `brishz.dash`,
+  even `n` or `0` enables it; unset or empty disables it. With
+  `MAGIC_READ_STDIN`, the parent first consumes stdin into an unlinked temp
+  file, so the worker receives every byte after the caller exits. The worker
+  owns its session and drains the streaming reply to completion, including
+  raw/JSON fallbacks, so the parent's exit does not cancel the command.
+  A local input or launch failure returns 1. `DISABLE_BRISH=y` still prevents
+  launching. Async success confirms launch, not delivery or command success.
 - `brishz_binary`: the exact-bytes opt-in of [brishz-binary](brishz-binary.md),
   parsed like `brishzq.zsh`'s `bool`: empty, `n`, `no` and `0` (in any case)
   are false, and anything else is true, `false` included, as in
@@ -388,11 +398,17 @@ These are follow-up candidates, not changes made by the default switch:
   streaming both outputs makes its pipe deadlock easier to hit. Drain all
   channels concurrently before migrating it; review `evalFile` / `outFile`,
   which the Go client ignores.
+- **Async agent hooks:** `brishz_async=y brishzgo eval "$command_text"` can
+  replace `brishz_quote=y brishz_async=y brishz.dash "$command_text"`.
+  Keep the existing stdin option for hooks which consume a payload. The Go
+  client now preserves their detached, silent behavior, while adding the
+  streaming transport and safe fallbacks. Calls already using quoted argv
+  can pass those argv directly.
 
-Keep async agent hooks (`brishz_async=y`), `brishzb.dash`, JSON-envelope
+Keep `brishzb.dash`, JSON-envelope
 consumers such as `brishz_para.dash`, and file-mode callers on their current
 clients until their contracts are adapted. The Go client ignores
-`brishz_async` and the file flags, emits plain output rather than a requested
+the file flags, emits plain output rather than a requested
 JSON envelope, and returns the command's status rather than only the HTTP
 client's status. Raw command-string callers need `eval` or `brishz_noquote=y`
 when switched.

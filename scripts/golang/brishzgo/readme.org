@@ -23,6 +23,9 @@ Streaming passes output through while the command runs; interrupting the
 client stops that command when the garden supports streaming.
 Sole =-h= or =--help= shows local help. Leading =--= passes the remaining
 arguments to the garden unchanged; leading =-c= remains a legacy alias.
+=brishz_async=y= launches a detached worker, discarding output and returning
+after local launch. Direct stdin is consumed before launch and survives the
+parent's exit; the worker drains streaming replies to completion.
 
 Check the zsh wrapper separately with
 =zsh -f zshlang/tests/brishz-default.zsh= from the scripts root. It uses mock
@@ -31,6 +34,7 @@ guard without touching a garden.
 
 * Layout
 - =main.go=: the environment, the configuration and the dispatch.
+- =async.go=: detached workers, stdin handoff and inherited configuration.
 - =command.go= and =quote.go=: the command text, as =brishzq.zsh= builds it.
 - =stdin.go=: streamed stdin, with the copy a fallback needs; each request
   reads it through its own reader, which replays what earlier ones read.
