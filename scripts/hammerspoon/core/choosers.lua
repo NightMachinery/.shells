@@ -467,6 +467,15 @@ function wifiChooser()
             end
 
             if type(networks) == "string" then
+                -- With Internet Sharing serving over Wi-Fi, the interface is
+                -- an access point and CoreWLAN refuses every scan
+                -- (kCWNotSupportedErr, -3903), so retrying cannot help.
+                local okd, details = pcall(wifi.interfaceDetails, interface)
+                if okd and details and details.interfaceMode == "Host AP" then
+                    chooser:choices({{text="Wi-Fi is hosting Internet Sharing",
+                                      subText="It cannot scan as an access point; turn sharing off to choose a network", ssid=""}})
+                    return
+                end
                 if wifiChooserNetworkCache then
                     updateChoices(wifiChooserNetworkCache)
                     chooser:placeholderText("Choose Wi-Fi network... " .. wifiChooserCacheAgeText() .. "; scan retrying")

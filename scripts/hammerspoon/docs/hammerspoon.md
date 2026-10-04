@@ -1859,6 +1859,11 @@ networksetup -setairportnetwork <interface> <ssid>
 This works best for open or previously remembered networks. New protected
 networks may still need credentials added through macOS first.
 
+While Internet Sharing serves over Wi-Fi, the interface is an access point
+(`interfaceMode` "Host AP") and every scan fails with `kCWNotSupportedErr`
+(-3903). The chooser then says so in a single row and stops retrying, rather
+than retrying for as long as it is open. (Seen 2026-10-04.)
+
 ## kitty: hyper+z
 
 `kittyHandler` in `core/window-media-bindings.lua` is the hyper+z toggle for
