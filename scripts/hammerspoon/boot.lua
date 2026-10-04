@@ -90,8 +90,8 @@ local hammerspoonCoreFiles = {
     "core/popclick.lua",
     "core/system-keys.lua",
     "core/choosers.lua",
-    -- Settings, then the engine, then the keys: config.lua sets knobs
-    -- main.lua reads at load, and bindings.lua calls its appHotkey.
+    -- Settings, then the engine, then the keys: bindings.lua calls the
+    -- engine's appHotkey.
     "core/app-hotkeys/config.lua",
     "core/app-hotkeys/main.lua",
     "core/app-hotkeys/bindings.lua",

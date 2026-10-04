@@ -195,9 +195,10 @@ Each is documented with its feature in `docs/hammerspoon.md`:
   `show` method every `hs.chooser` shares, so a `show()` with no point gets
   one there, Spoons included. ("Choosers on the focused screen" in
   `docs/hammerspoon.md`.)
-- **Maccy's hyper+v popup** opens on the screen named by
-  `maccy_popup_screens`: its `popupScreen` setting is rewritten when that
-  screen changes, one write at a time. ("App hotkeys".)
+- **Maccy's hyper+v popup**: Maccy's own "Active screen" setting places it,
+  since 2026-10-04. The code that rewrote its `popupScreen` setting at every
+  focus change is retired to `disabled/maccy-popup-screen.lua`. ("App
+  hotkeys".)
 - **Screenshots**: hyper+3 copies the screen named by `screenshot_screens`
   (the active one by default) and hyper+shift+3 every screen, through
   `screencapture -R` on the screens' frames. A picture of one screen comes
@@ -234,8 +235,8 @@ bounds and layer, in 19 to 40 ms, asking no app anything. Accessibility's
   (`Screens.specMoves`), on every active-screen change, calling `fn` again
   when the answer is a different screen. Nothing watches the pointer, so a
   pointer spec follows the mouse only at the next focus or display change.
-  For state outside Hammerspoon that has to follow a screen (Maccy's
-  setting).
+  For state outside Hammerspoon that has to follow a screen; its one user,
+  Maccy's setting, is retired to `disabled/`.
 
 ### Where focus is
 

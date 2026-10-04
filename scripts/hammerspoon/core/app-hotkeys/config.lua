@@ -1,8 +1,8 @@
 --- * App hotkeys: settings
---- The knobs of main.lua, with their defaults. Loaded before it, since
---- `maccy_popup_screens' is read once at load; the rest are read at every use,
---- so setting one from the console (hs -c 'hide_return_policy = "summoner"')
---- takes effect at once, until the next reload.
+--- The knobs of main.lua, with their defaults. Loaded before it. Each is read
+--- at every use, so setting one from the console
+--- (hs -c 'hide_return_policy = "summoner"') takes effect at once, until the
+--- next reload.
 
 --- Where a hide returns to, for the app hotkeys' second press and kitty's
 --- toggle (screenReturnTarget). An enum:
@@ -37,7 +37,3 @@ app_focus_skip_floating_p = true
 --- the kitty panel floats on purpose (core/kitty-panel.lua), and a hide can
 --- return to it.
 appFloatingIntended = { ["net.kovidgoyal.kitty"] = true }
-
---- The screen Maccy's hyper+v popup opens on: a core/screens.lua spec,
---- followed as it changes, or false to leave Maccy's own setting alone.
-maccy_popup_screens = "active"

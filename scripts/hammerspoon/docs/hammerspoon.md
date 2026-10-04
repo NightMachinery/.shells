@@ -46,9 +46,9 @@ order:
 - `config.lua`: every knob below, with its default and what each value does.
   It is the one place the defaults are set. A knob set from the console
   (`hs -c 'hide_return_policy = "summoner"'`) takes effect at once and lasts
-  until the next reload; `maccy_popup_screens` alone is read only at load.
+  until the next reload.
 - `main.lua`: the engine: `appHotkey`, `getApp`, the hide and its return,
-  the floating-window check, the timing lines, Maccy's popup, and hyper+d.
+  the floating-window check, the timing lines, and hyper+d.
 - `bindings.lua`: which key brings which app, as `appHotkey{...}` calls,
   plus hyper+; and hyper+shift+;.
 
@@ -246,28 +246,17 @@ any earlier window-list read saw at layer 0 ends it there
 (`Screens.layerOf`, which keeps every layer it has seen); anything else costs
 one window-list read, and only a floating window pays for more.
 
-Maccy places its hyper+v popup itself. Set to "screen center", Maccy 0.31
-reads its `popupScreen` setting at every popup: 0, the default, falls back to
-`NSScreen.main` inside Maccy (its source), and with 0 the popup opened on the
-laptop while you worked on the monitor. Inside Hammerspoon the same call falls
-behind focus (see "Where focus is" in `docs/multi-monitor.md`); inside Maccy
-that is unmeasured. n means the n-th of `NSScreen.screens`, the order
-`hs.screen.allScreens()` lists them in.
-Its "window center" setting would be no better: it centres on the front app's
-first CoreGraphics window at any layer, which for Brave is a 24 px strip. So
-`core/app-hotkeys/main.lua` keeps `popupScreen` pointing at the screen named by
-the spec `maccy_popup_screens` in `config.lua` (`false` leaves Maccy alone; the default, `active`,
-had followed the lagging `mainScreen` until 2026-10-03 and so kept writing the
-laptop),
-rewriting it with `defaults write` when `Screens.onTargetChange` sees that
-screen change, on a focus or display change, so a press costs nothing extra.
-One write runs at a time, and a change that arrives meanwhile is written after
-it, newest only: two writes running at once could finish in either order and
-leave the older screen. Maccy is
-sandboxed and its settings live in its container, so on macOS 14 the first
-such write made macOS ask whether Hammerspoon may access data from other apps
-(seen 2026-10-03); the write waits for the answer, and a failed one is retried
-at the next screen change.
+Maccy places its hyper+v popup itself, and its own "Screen center" →
+"Active screen" setting (`popupScreen` 0) puts it on the focused screen.
+Until 2026-10-04 Hammerspoon overrode that setting: with 0 the popup had been
+seen on the laptop while you worked on the monitor (2026-10-03), so
+`maccy_popup_screens` kept `popupScreen` pointing at the focused screen's
+index, rewriting it with `defaults write` at every load and focus change.
+That also overwrote "Active screen" when picked in Maccy, at the next reload.
+The code is retired to `disabled/maccy-popup-screen.lua`, whose header says
+how to turn it back on and why each Maccy setting fell short then. Maccy is
+sandboxed, so the first such write made macOS 14 ask whether Hammerspoon may
+access data from other apps (seen 2026-10-03).
 
 ### Moving between screens: hyper+; and hyper+shift+;
 
