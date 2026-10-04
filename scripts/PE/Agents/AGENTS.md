@@ -125,9 +125,9 @@ binary can produce subtly wrong output rather than an error.
 
 ## macOS Tools Are BSD
 
-On macOS, `grep`, `sed`, `date`, `stat`, `find`, `awk` and `xargs` are the BSD
+On macOS, `grep`, `sed`, `date`, `stat`, `find`, `awk`, `tar` and `xargs` are the BSD
 versions. When you need GNU flags or behaviour, call the g-prefixed GNU tools:
-`ggrep`, `gsed`, `gdate`, `gstat`, `gfind`, `gawk`, `gxargs`.
+`ggrep`, `gsed`, `gdate`, `gstat`, `gfind`, `gawk`, `gtar`, `gxargs`.
 
 ## Background Jobs
 
