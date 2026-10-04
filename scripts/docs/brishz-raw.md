@@ -39,7 +39,8 @@ its silent routes cover only `/zsh/nolog/`; the JSON retry stays silent.
 - `brishz_session` goes in the query string, percent-encoded byte by byte. A
   non-empty `brishz_nolog` or `brishz_failure_expected` sends `nolog=1` or
   `failure_expected=1`, since the JSON API takes any non-empty string there as
-  true. `brishz_nolog` also selects `/zsh/raw/nolog/`.
+  true. `brishz_nolog` also selects `/zsh/raw/nolog/`. `brishz_binary=y`
+  sends `binary=1` (see below).
 - The command text is the same as on the JSON path: the local wrapper (the
   `mark-me` subshell that `cd`s to `$PWD`), `brishz_noquote`, and the
   variables forwarded from Emacs all apply. Stdin is the one difference.
@@ -50,7 +51,9 @@ its silent routes cover only `/zsh/nolog/`; the JSON retry stays silent.
   the body and the garden pipes it in: `[[ -f /dev/stdin ]]` is false, a
   reader cannot seek back or leave an exact offset for the next reader, and
   with `brishz_noquote` `$LINENO` is 1, not 2. No byte is lost either way.
-  Nothing in zshlang tests what kind of file its stdin is.
+  Nothing in zshlang tests what kind of file its stdin is. (Under
+  `brishz_binary=y`, the JSON request carries stdin itself, as `stdin_b64`,
+  with no temp file and no `< 'file' {` wrapper.)
 - `bshEndpoint`, `GARDEN_PORT`, the API key header and the remote basic auth
   work as on the JSON path. The caller's `bshEndpoint` or `GARDEN_PORT` beats
   the one `~/.privateShell` sets, so `GARDEN_PORT=7299 brishzq.zsh ...`
@@ -77,17 +80,28 @@ its silent routes cover only `/zsh/nolog/`; the JSON retry stays silent.
 - A refusal (`X-Brish-Refused: 1`): the garden ran nothing, because the
   request was malformed, or because it runs in legacy mode (`BRISH_BINARY=0`)
   and the command or stdin is not valid UTF-8 or holds a NUL, which legacy
-  mode cannot carry. The request goes to the JSON API, which runs it as it
-  always has. Only that header sends a request there: a reply without it is
-  a command's result, even with retcode 9000 and a stderr that reads like a
-  refusal, so no command runs twice.
+  mode cannot carry, or the request has `binary=1`. The request goes to the
+  JSON API, which handles it as it always has (and refuses `binary: 1` in
+  legacy mode too). Only that header sends a request there: a reply without
+  it is a command's result, even with retcode 9000 and a stderr that reads
+  like a refusal, so no command runs twice.
+- With `brishz_binary=y`, a reply that is neither a refusal nor a 404 or 405
+  and lacks `X-Brish-Binary: 1`: a legacy-mode garden older than `binary=1`
+  ignored that option and ran the command in text mode. Nothing goes to
+  stdout, one line on stderr names the command's retcode, and the exit
+  status is 201 (see [brishz-binary](brishz-binary.md)).
 
-Three options need the JSON API and always use it: `brishz_binary=y`
-([brishz-binary](brishz-binary.md)), `brishz_out_file_p` and
-`brishz_eval_file_p`. `brishz_binary=y` keeps its guarantee there: exact bytes
-or nothing runs. The raw API cannot give that guarantee, because a legacy-mode
-garden runs a valid UTF-8 request and only says afterwards that its bytes went
-through text.
+Two options need the JSON API and always use it: `brishz_out_file_p` and
+`brishz_eval_file_p`. `brishz_binary=y` ([brishz-binary](brishz-binary.md))
+used to as well, since only the JSON API's binary transport guaranteed that
+nothing runs on a garden without binary support. It now takes the raw API
+with the query option `binary=1`, which a legacy-mode garden from
+BrishGarden 8571467 on refuses without running anything; such a refusal, or
+a garden without the raw API, sends it to that binary transport, where it
+fails with 201 on a garden without binary support. Only a legacy-mode garden
+older than the option can still run the command, in text mode, and then the
+client withholds the output and exits 201. With `brishz_raw=n`,
+`brishz_binary=y` goes straight to the binary transport, as before.
 
 ## How it compares with the JSON path
 
@@ -132,7 +146,9 @@ laptop, interleaved, after 10 warmups:
 - `print -r -- ok`, 200 calls: JSON path p50 129 ms and p90 209 ms; raw path
   p50 60 ms and p90 117 ms.
 - 1 MiB of text through `cat`, 20 calls: JSON path p50 154 ms; raw path p50
-  59 ms; `brishz_binary=y` p50 about 110 ms.
+  59 ms; `brishz_binary=y` p50 about 110 ms, over the JSON binary transport
+  it then took. It now takes the raw path; see
+  [brishz-binary](brishz-binary.md) for its numbers.
 - Against a garden without the raw API, 200 calls: JSON path p50 148 ms;
   raw path with its fallback p50 165 ms (and 178 against 204 in an earlier
   run), so the fallback costs about 20 to 25 ms per call.
@@ -156,11 +172,11 @@ noisy; the ratios held across runs.
   (zshlang defines none), and in the C locale (Hammerspoon's) it now arrives
   exact, where `(q+)` corrupted an ideographic space.
 - Temp files (stdin for the JSON path, `brishz_out_file_p`,
-  `brishz_eval_file_p`, the header dump of `brishz_binary=y`) are removed on
-  exit and on HUP, INT and TERM; after INT or TERM the script still dies of
-  that signal, and HUP exits 1 as it always did. All but the header dump used
-  to be left behind. The raw path creates none, and neither do Hammerspoon's
-  calls.
+  `brishz_eval_file_p`, the header dump of `brishz_binary=y`'s JSON
+  request) are removed on exit and on HUP, INT and TERM; after INT or TERM
+  the script still dies of that signal, and HUP exits 1 as it always did.
+  All but the header dump used to be left behind. The raw path creates
+  none, and neither do Hammerspoon's calls.
 - A signal the parent ignored stays ignored, as it always was: `nohup`'s
   HUP, the INT that a non-interactive shell's `cmd &` ignores, a
   `trap '' TERM`. The client then survives it and prints the command's

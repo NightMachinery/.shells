@@ -122,6 +122,23 @@ Prints base64(<cmd>), a '.', then base64(<stdin>); the <stdin> MAGIC_READ_STDIN 
     fi
 }
 
+function h-brishzq-read-stdin {
+    : "usage: h-brishzq-read-stdin
+Sets REPLY to all of our stdin, byte for byte. Fails when it cannot read it."
+    #: For brishz_binary, whose raw request and its JSON fallback send the
+    #: same bytes. `command cat`, not the null command `</dev/stdin`: zsh
+    #: runs that through $READNULLCMD (`more`), which an exported
+    #: READNULLCMD or a LESSOPEN preprocessor makes change the bytes, and
+    #: which reads an unreadable stdin as empty. A zsh variable holds any
+    #: byte, NUL included; the '.' keeps the trailing newlines that `$(...)`
+    #: would strip, and is missing when cat fails, which then fails the
+    #: assignment. Bytewise, since a multibyte subscript of 1 MiB of random
+    #: bytes is slow.
+    setopt localoptions nomultibyte
+    REPLY="$(command cat && ecn .)" || return $?
+    REPLY="${REPLY[1,-2]}"
+}
+
 function h-brishzq-binary-header-p {
     : "usage: h-brishzq-binary-header-p <header-file>
 Succeeds when the headers curl dumped there include X-Brish-Binary: 1."
@@ -233,7 +250,7 @@ prints its stdout and stderr exactly, and exits with its status. Returns (0)
 only when the garden ran nothing and the JSON API may get the request: it has
 no raw API (HTTP 404 or 405), or it refused the request (X-Brish-Refused: 1)."
     #: Reads the script's locals: raw_endpoint, session, nolog,
-    #: failure_expected, opts, copy_cmd, debug_p.
+    #: failure_expected, binary_p, opts, copy_cmd, debug_p.
     #:
     #: Byte semantics throughout: X-Brish-Cmd-Length counts bytes, and the
     #: reply is split at byte offsets.
@@ -253,6 +270,12 @@ no raw API (HTTP 404 or 405), or it refused the request (X-Brish-Refused: 1)."
     fi
     if test -n "$failure_expected" ; then
         query+=( failure_expected=1 )
+    fi
+    #: brishz_binary: a legacy-mode garden refuses binary=1 without running
+    #: anything. A garden older than the option ignores it, so the reply's
+    #: X-Brish-Binary is checked below too.
+    if bool "$binary_p" ; then
+        query+=( binary=1 )
     fi
     if (( ${#query} )) ; then
         url+="?${(j:&:)query}"
@@ -302,11 +325,11 @@ no raw API (HTTP 404 or 405), or it refused the request (X-Brish-Refused: 1)."
     fi
 
     local headers="${reply[1,size_header]}" body="${reply[size_header+1,-1]}"
-    local line name value retcode='' out_length='' notice_p='' refused_p=''
+    local line name value retcode='' out_length='' notice_p='' refused_p='' exact_p=''
     for line in "${(@ps:\r\n:)headers}" ; do
         if [[ "$line" == HTTP/* ]] ; then
             #: A new response (after a 100 Continue or a redirect).
-            retcode='' out_length='' notice_p='' refused_p=''
+            retcode='' out_length='' notice_p='' refused_p='' exact_p=''
             continue
         fi
         name="${${line%%:*}:l}"
@@ -318,17 +341,40 @@ no raw API (HTTP 404 or 405), or it refused the request (X-Brish-Refused: 1)."
             (x-brish-out-length) out_length="$value" ;;
             (x-brish-notice) [[ "$value" == 1 ]] && notice_p=y ;;
             (x-brish-refused) [[ "$value" == 1 ]] && refused_p=y ;;
+            (x-brish-binary) [[ "$value" == 1 ]] && exact_p=y ;;
         esac
     done
 
     if test -n "$refused_p" ; then
         #: The garden ran nothing, and says so: a malformed request, or, in
         #: legacy (text) mode, a command or stdin that is not valid UTF-8 or
-        #: holds a NUL. The JSON path runs those as it always has (stdin from
-        #: a temp file arrives exact). A reply without this header never
-        #: falls back, whatever its retcode and stderr: that command ran.
+        #: holds a NUL, or brishz_binary's binary=1. The JSON path runs those
+        #: as it always has (stdin from a temp file arrives exact); under
+        #: brishz_binary, a legacy-mode garden refuses that JSON request
+        #: too, and we exit 201. A reply without this header never falls
+        #: back, whatever its retcode and stderr: that command ran.
         test -n "${debug_p}" && ec "brishzq.zsh: raw: refused (X-Brish-Refused), falling back to the JSON API"
         return 0
+    fi
+
+    if bool "$binary_p" && test -z "$exact_p" ; then
+        #: A legacy-mode garden older than binary=1 ignored it and ran the
+        #: command in text mode. Its output may have lost bytes, so none of
+        #: it is printed as the command's output; a notice is withheld too.
+        #: brishz.dash and brishzgo print the same line.
+        local what='ran the command in text mode'
+        if test -n "$notice_p" ; then
+            #: An empty or magic command: the garden's own notice, no command's output.
+            what="answered in text mode with a notice, not a command's output"
+        elif [[ "$retcode" == 9000 ]] ; then
+            #: A garden with the raw API but older than X-Brish-Refused (from
+            #: BrishGarden d0a9514 until 0fd2752 added it) refuses a NUL or
+            #: invalid UTF-8 with retcode 9000 and no mark, which we cannot
+            #: tell from a command that ran and ended so.
+            what='ran the command in text mode, or refused it and ran nothing'
+        fi
+        ec "brishzq.zsh: garden ${what} (no X-Brish-Binary: 1); it predates the binary=1 option and runs with BRISH_BINARY=0; output withheld; retcode ${retcode:-unknown}" >&2
+        exit 201
     fi
 
     if test -n "$notice_p" ; then
@@ -378,9 +424,12 @@ local nolog="${brishz_nolog}"
 local summary_p="${brishz_summary_p:-y}"
 local endpoint_base="${bshEndpoint:-http://127.0.0.1:${GARDEN_PORT:-7230}}"
 local endpoint="${endpoint_base}/zsh/"
-#: brishz_binary=y: exact bytes both ways or nothing runs, over the JSON
-#: API's binary transport (cmd_b64, stdin_b64, binary: 1, b64_only: 1);
-#: see docs/brishz-binary.md. It needs a garden in binary mode.
+#: brishz_binary=y: exact bytes both ways, over the raw API with binary=1,
+#: else (brishz_raw=n, the file options below, or a garden that refused the
+#: raw request or has no raw API) over the JSON API's binary transport
+#: (cmd_b64, stdin_b64, binary: 1, b64_only: 1); see docs/brishz-binary.md.
+#: It needs a garden in binary mode. On any other garden nothing runs, or
+#: the output is withheld; either way we exit 201.
 local binary_p="${brishz_binary}"
 
 #: @safety features that work around the upstream brish bug of not supporting binary IO and corrupting text
@@ -395,10 +444,12 @@ local eval_from_file_p="${brishz_eval_file_p}"
 #: and runs nothing; we then send the same request to the JSON API, which
 #: costs about 25 ms more per call. (So does a request the garden marks
 #: X-Brish-Refused: 1, which also ran nothing.) See docs/brishz-raw.md. The
-#: options above that need the JSON API (brishz_binary, brishz_out_file_p,
-#: brishz_eval_file_p) always use it.
+#: options above that need the JSON API (brishz_out_file_p,
+#: brishz_eval_file_p) always use it. brishz_binary does not: it sends
+#: binary=1 on the raw API, and its fallback is the JSON API's binary
+#: transport.
 local raw_p="${brishz_raw:-y}"
-if bool "$binary_p" || bool "$out_from_file_p" || bool "$eval_from_file_p" ; then
+if bool "$out_from_file_p" || bool "$eval_from_file_p" ; then
     raw_p=n
 fi
 
@@ -468,8 +519,8 @@ fi
 
 
 local stdin="${brishz_in}"
-local stdin_file_p=''
-if bool "$binary_p" ; then
+local stdin_file_p='' stdin_read_p=''
+if bool "$binary_p" && ! bool "$raw_p" ; then
     #: h-brishzq-b64-payloads streams stdin into base64 and it travels in
     #: the request as stdin_b64, so it also reaches a remote garden, which
     #: cannot read our temp files.
@@ -477,10 +528,25 @@ if bool "$binary_p" ; then
 elif [[ "$stdin" == 'MAGIC_READ_STDIN' ]] ; then
     test -n "${debug_p}" && ec 'brishzq.zsh: reading stdin'
 
-    stdin_file_p='y'
+    #: Read here, once: a fallback from the raw API to the JSON API sends
+    #: the same bytes again. The raw API carries them in its body, the JSON
+    #: API as stdin_b64 under brishz_binary, else in a temp file.
+    if bool "$binary_p" ; then
+        stdin_read_p='y'
+        #: A failed read runs nothing, as the JSON path's `base64` does.
+        h-brishzq-read-stdin || {
+            ec "brishzq.zsh: could not read stdin" >&2
+            exit 1
+        }
+        stdin="$REPLY" REPLY=''
+    else
+        stdin_file_p='y'
 
-    stdin="${$(</dev/stdin ; ecn .)[1,-2]}"
-    # stdin="$(cat)"
+        #: A zsh variable holds any byte, NUL included; the '.' keeps the
+        #: trailing newlines that `$(...)` would strip.
+        stdin="${$(</dev/stdin ; ecn .)[1,-2]}"
+        # stdin="$(cat)"
+    fi
 
     test -n "${debug_p}" && ec 'brishzq.zsh: stdin read'
 
@@ -517,7 +583,8 @@ if bool "$raw_p" ; then
     if test -n "$nolog" ; then
         raw_endpoint+="nolog/"
     fi
-    #: Exits, except when the garden has no raw API.
+    #: Exits, except when the garden ran nothing: it has no raw API, or it
+    #: refused the request.
     h-brishzq-raw "$input_cmd[*]" "$stdin"
 fi
 
@@ -527,9 +594,15 @@ local req
 if bool "$binary_p" ; then
     #: The command goes only in cmd_b64, never also in cmd: a garden that
     #: predates the _b64 fields then gets an empty command and runs nothing.
-    #: `setopt` inside `$(...)` stays in that subshell.
+    #: `setopt` inside `$(...)` stays in that subshell. After a raw request,
+    #: stdin's bytes are in $stdin (stdin_read_p). They go in through the
+    #: pipe, so a stdin that is the text MAGIC_READ_STDIN stays itself.
     req="$(setopt pipefail
-        h-brishzq-b64-payloads "$input_cmd[*]" "$stdin" \
+        if test -n "$stdin_read_p" ; then
+            print -rn -- "$stdin" | h-brishzq-b64-payloads "$input_cmd[*]" MAGIC_READ_STDIN
+        else
+            h-brishzq-b64-payloads "$input_cmd[*]" "$stdin"
+        fi \
             | command jq --raw-input --slurp --compact-output \
             --arg nolog "$nolog" \
             --arg failure_expected "$failure_expected" \
