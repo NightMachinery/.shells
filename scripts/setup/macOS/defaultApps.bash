@@ -34,6 +34,7 @@ function set-defaults() {
             duti -s $cf_emacs .org editor
             duti -s $cf_emacs .jl editor
             duti -s $cf_emacs .lua editor
+            duti -s $cf_emacs .toml editor
 
             # duti -s $cf_emacs .pdf editor
             # duti -s $cf_emacs "" editor
