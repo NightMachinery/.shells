@@ -93,8 +93,9 @@ function whisper.transcribeCommand(inputFile, language, backend)
         }
     else
         cmd = {
-            command = brishzq_binary,
+            command = brishzgo_binary,
             args = {
+                "--",
                 "fnswap",
                 "ecgray",
                 "true",
@@ -234,7 +235,7 @@ function processRecording(wavFile, language, backend)
     end
 
     local transcribeCommand = whisper.transcribeCommand(wavFile, language, backend)
-    local whisperTask = hs.task.new(transcribeCommand.command, function(exitCode, stdOut, stdErr)
+    local whisperTask, discardCapture = taskCollectWithPath(transcribeCommand.command, function(exitCode, stdOut, stdErr)
         content = stdOut
 
         if exitCode == 0 then
@@ -249,8 +250,14 @@ function processRecording(wavFile, language, backend)
         resetState()
     end, transcribeCommand.args)
 
-    local success = whisperTask:start()
+    if whisperTask and backend ~= "whisper" then
+        local env = whisperTask:environment() or {}
+        for k, v in pairs(gardenClientEnvironment(false)) do env[k] = v end
+        whisperTask:setEnvironment(env)
+    end
+    local success = whisperTask and whisperTask:start()
     if not success then
+        discardCapture()
         alert_gateway("Failed to start transcription process", { color = "crit" })
         resetState()
     end

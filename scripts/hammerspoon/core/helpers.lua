@@ -139,31 +139,10 @@ end
 -- keystroke for the duration. Compare core/redis.lua, which documents a
 -- previous version that could freeze the machine for up to 50 minutes.
 --
--- Measured on this machine with hs.timer.absoluteTime, averaged over six warm
--- runs:
---
---   brishz_eval("true")     53.4 ms   synchronous
---   brishz_eval_bg("true")  19.6 ms   fork twice and forget
---   brishz_eval_hs("true")   7.5 ms   hs.task
---
--- So inside Hammerspoon this is the one to reach for: it is the cheapest of
--- them, and the only one that can report a failure. brishz_eval_bg is for plain
--- Lua, where there is no hs.task to use.
---
--- hs.task is genuinely asynchronous (NSTask, callback on completion), and is
--- already the idiom elsewhere in this config: core/hyper-mode.lua,
--- core/mouse.lua, and core/choosers.lua all use it, the last one to run
--- brishz2.dash exactly like this.
-
--- hs.task does NOT inherit an interactive PATH. It gets the bare launchd one,
--- /usr/bin:/bin:/usr/sbin:/sbin, and brishz.dash shells out to jq, which lives
--- in /opt/homebrew/bin. Without this the task exits 22 with
--- "brishz.dash: 41: jq: not found" and, because a nil callback discards both
--- streams, fails completely silently. Same class of bug as the PATH in
--- launchers/audio-guard/com.user.audio-guard.plist.
---
--- Not only brew: ~/go/bin is where go-install-local puts our own binaries, and
--- core/reload.lua now runs one of them (night_hold) on every save.
+-- Use hs.task for garden calls so a slow request cannot block the main
+-- thread. Both string and argv forms now run the streaming Go client.
+-- taskWithPath also supports standalone tasks that need Homebrew or locally
+-- installed Go binaries under launchd's minimal PATH.
 local EXTRA_PATHS = "/opt/homebrew/bin:/usr/local/bin:" .. os.getenv("HOME") .. "/go/bin"
 
 function taskWithPath(bin, callback, args)
@@ -177,6 +156,54 @@ function taskWithPath(bin, callback, args)
     task:setEnvironment(env)
 
     return task
+end
+
+--- Collect output without pipe limits or hs.task's UTF-8 chunk decoding.
+--- Streaming callbacks in hs.task decode each read separately, losing a chunk
+--- that splits a Unicode character. Redirect the child straight into private
+--- temporary files instead. The shell execs the binary, so PID and signals
+--- still belong to the client. Completion reads the files as Lua byte strings.
+--- Returns task, discard; call discard when creation/start fails or on timeout.
+function taskCollectWithPath(bin, callback, args)
+    local paths = setmetatable({}, {__gc = function(files)
+        for _, path in pairs(files) do os.remove(path) end
+    end})
+    local finished = false
+    local function discard()
+        if finished then return end
+        finished = true
+        for i, path in pairs(paths) do os.remove(path); paths[i] = nil end
+    end
+    for i = 1, 2 do
+        -- os.tmpname uses mkstemp (0600) on this POSIX host.
+        local ok, path = pcall(os.tmpname)
+        if not ok then discard(); return nil, discard end
+        paths[i] = path
+    end
+    local function read(path)
+        local file, err = io.open(path, "rb")
+        if not file then return nil, err end
+        local data, readErr = file:read("*a")
+        file:close()
+        return data, readErr
+    end
+    local argv = {"-c", 'out=$1; err=$2; shift 2; exec "$@" >"$out" 2>"$err"',
+                  "task-capture", paths[1], paths[2], bin}
+    for _, arg in ipairs(args or {}) do argv[#argv + 1] = arg end
+    local task = taskWithPath("/bin/sh", function(code, out, err)
+        if finished then return end
+        local capturedOut, outErr = read(paths[1])
+        local capturedErr, errErr = read(paths[2])
+        discard()
+        if not capturedOut or not capturedErr then
+            code = -1
+            err = (err or "") .. " capture failed: " .. tostring(outErr or errErr)
+        end
+        callback(code, (capturedOut or "") .. (out or ""),
+                 (capturedErr or "") .. (err or ""))
+    end, argv)
+    if not task then discard() end
+    return task, discard
 end
 
 --- ** Keeping callback objects alive, without leaking them
@@ -242,16 +269,11 @@ end
 -- (the kitty panel is one), and the rest wait for the garden to be fixed.
 -- The terms:
 --
---   * "Provably not sent": the client's exit code proves the request never
---     reached the garden. brishz2.dash exits with curl's own status, and
---     curl's 2, 3, 6, 7 and 26 all mean the request was never sent.
---     brishzq.zsh exits with the command's own status once it has an answer,
---     so a 7 there counts only when a TCP connect to the garden is refused
---     as well. Every other failure (22 HTTP error, 28 timeout, 52 empty
---     reply, 18/55/56 transfer errors) may have run the command. A client
---     killed by a signal reports 128 plus the signal number, as a shell
---     would; hs.task hands back the bare number, and SIGINT (2) would
---     otherwise read as curl's 2.
+--   * "Not sent": a possible connection/setup error (2, 3, 6, 7 or 26)
+--     accompanied by a failed TCP probe. Go also returns remote exit codes,
+--     so an exit code alone cannot identify a connection failure. This is a
+--     best-effort outage check, not proof if the garden dies after execution.
+--     A client killed by a signal reports 128 plus the signal number.
 --   * The "garden-down band": a warn band (id garden-down) naming the
 --     hotkey that did not run, or the call that failed. While the liveness
 --     probe (gardenLivenessCheck, every 60 s) finds the garden down, it
@@ -259,20 +281,31 @@ end
 --
 -- Every client call is killed, with its whole process tree, if it is still
 -- running after `opts.timeout' seconds (default 30), so a wedged garden
--- cannot pile tasks up. That also covers a reply larger than 64 KiB, which
--- hs.task cannot read: it collects stdout only once the child has exited,
--- so such a child blocks forever (see core/kitty-panel.lua).
+-- cannot pile tasks up. Capturing streamed output in files avoids full pipes.
+-- With a streaming garden, killing the Go client cancels the remote command.
 --
--- `opts', for all three helpers:
+-- `opts', for all four helpers:
 --   quiet     true: no console line for ordinary failures.
 --   timeout   seconds before a client call is killed (default 30).
 --   onFail    called as onFail(code, notSent) once when the call failed,
 --             after the band, for a caller with a native way to do the job
---             or state to take back. notSent is true when the call provably
---             never reached the garden, and false when it may have run.
+--             or state to take back. notSent means a possible connection
+--             error with a failed probe, subject to the race described above.
 
-local gardenBrishz = "/usr/local/bin/brishz2.dash"
-local gardenBrishzq = "/usr/local/bin/brishzq.zsh"
+local gardenBrishzgo = os.getenv("BRISHZGO_BIN")
+if not gardenBrishzgo or gardenBrishzgo == "" then
+    gardenBrishzgo = os.getenv("HOME") .. "/go/bin/brishzgo"
+end
+
+function gardenClientEnvironment(noquote)
+    local env = {brishz_async = "", brishz_copy = "", brishz_c = "",
+                 brishz_in = "", brishz_noquote = noquote and "y" or ""}
+    if garden_port_override then
+        env.GARDEN_PORT = tostring(garden_port_override)
+        env.bshEndpoint = "http://127.0.0.1:" .. tostring(garden_port_override)
+    end
+    return env
+end
 
 -- The garden's port, as the clients compute it (${GARDEN_PORT:-7230}).
 -- garden_port_override points the helpers, their clients and the probe at
@@ -301,14 +334,12 @@ function gardenProbe(cb)
     hsPinned(sockKey):connect("127.0.0.1", gardenPort(), function() finish(true) end)
 end
 
---- cb(true) when a failed client call provably never reached the garden
---- (see the terms above), cb(false) otherwise.
+--- cb(true) for a possible connection/setup failure and a failed TCP probe;
+--- cb(false) otherwise. See the outage race described above.
 function gardenNotSentP(bin, code, cb)
     if not gardenNotSentCodes[code] then return cb(false) end
-    if bin == gardenBrishzq then
-        return gardenProbe(function(up) cb(not up) end)
-    end
-    cb(true)
+    -- A remote command can return any of these statuses too.
+    return gardenProbe(function(up) cb(not up) end)
 end
 
 -- Whether the garden answered the last call or probe: true, false, or nil
@@ -320,8 +351,7 @@ local function gardenBand(msg, seconds)
 end
 
 -- Terminates `rootPid' and everything below it. hs.task:terminate() alone
--- would kill only the client, and its curl would live on, blocked on a
--- garden that never answers. Reads `ps' synchronously; this only runs when a
+-- would leave any child processes behind. Reads `ps' synchronously; only a
 -- call has already timed out.
 local function gardenKillTree(rootPid, label)
     if type(rootPid) ~= "number" or rootPid <= 1 then return end
@@ -360,17 +390,19 @@ end
 --- whether it started.
 function gardenTask(bin, args, cb, timeout, env, label)
     label = label or bin
-    local taskKey, timer
+    local taskKey, timer, discardCapture
 
     local function finish(code, out, err)
         if taskKey then
             if not hsUnpin(taskKey) then return end
         end
         hsCancel(timer)
+        if discardCapture then discardCapture() end
         cb(code, out or "", err or "")
     end
 
-    local task = taskWithPath(bin, function(code, out, err)
+    local task
+    task, discardCapture = taskCollectWithPath(bin, function(code, out, err)
         local t = hsPinned(taskKey)
         if t and t:terminationReason() == "interrupt" then
             err = (err or "") .. " (killed by signal " .. tostring(code) .. ")"
@@ -405,16 +437,14 @@ end
 
 -- One garden call: `bin args', then the policy above on failure.
 -- onResult(code, stdout, stderr) exactly once.
-local function gardenCall(bin, args, label, opts, onResult)
+local function gardenCall(args, label, opts, onResult, noquote)
     opts = opts or {}
-    -- bshEndpoint as well: the clients read it before GARDEN_PORT, so one in
-    -- Hammerspoon's own environment would otherwise win.
-    local env = garden_port_override and {
-        GARDEN_PORT = tostring(garden_port_override),
-        bshEndpoint = "http://127.0.0.1:" .. tostring(garden_port_override),
-    } or nil
+    local bin = gardenBrishzgo
+    local env = gardenClientEnvironment(noquote)
+    local clientArgs = {"--"}
+    for _, arg in ipairs(args) do clientArgs[#clientArgs + 1] = arg end
 
-    gardenTask(bin, args, function(code, out, err)
+    gardenTask(bin, clientArgs, function(code, out, err)
         if code == 0 then
             gardenUp = true
             return onResult(0, out, err)
@@ -429,9 +459,9 @@ local function gardenCall(bin, args, label, opts, onResult)
                 if not opts.quiet then
                     print(label .. ": " .. bin .. " exited " .. tostring(code) .. ": " .. err)
                 end
-                -- brishz2.dash fails only when the call itself did; a
-                -- brishzq.zsh failure is usually the command's own.
-                if bin == gardenBrishz then
+                -- Remote nonzero statuses belong to the command. Local start
+                -- and timeout failures still warrant a visible band.
+                if code < 0 then
                     gardenBand("BrishGarden call failed: " .. label .. " (exit " .. tostring(code) .. ")")
                 end
             end
@@ -450,36 +480,24 @@ end
 --- caller's call failed; `opts' is described above.
 ---
 --- Reporting the failure is the thing brishz_eval_bg cannot do at all: it
---- forks away and forgets, so nobody is left to notice a non-zero exit.
----
---- Inside Hammerspoon this is also the faster of the two (7.5ms against
---- 19.6), because forking a process this large costs more than handing the
---- work to NSTask. Prefer it here; brishz_eval_bg is for Lua without
---- Hammerspoon.
+--- launches a detached worker, so nobody is left to notice a remote failure.
 ---
 --- Lives here rather than in lua/pipe.lua because hs.task is Hammerspoon's;
 --- pipe.lua is plain Lua over posix and stays that way.
 function brishz_eval_hs(cmd, label, opts)
     label = label or "brishz_eval_hs"
-    gardenCall(gardenBrishz, { cmd }, label, opts, function() end)
+    gardenCall({ cmd }, label, opts, function() end, true)
 end
 
 --- The argument-list form: brishz_eval_q_hs({"some-hook", value, other}). Each
 --- element is quoted by the client, so a value may contain anything at all and
 --- still arrive as one word rather than as code. Use it whenever a value is
---- interpolated; the extra ~25ms of zsh startup costs nothing here, because
---- nothing waits for the reply.
----
---- It cannot express a pipeline or a `;' sequence -- an argument list is one
---- command by definition. Those still go through brishz_eval_hs with a string.
----
---- One difference worth knowing: brishzq.zsh reports the command's own exit
---- code, where brishz2.dash reports only the client's. So this logs when the
---- command itself fails, which is usually what you want and is occasionally
---- noisier than you expect from something that merely exits non-zero.
+--- interpolated. String commands still go through brishz_eval_hs, with
+--- brishz_noquote=y to preserve shell code and named-session state.
+--- Both forms now report the remote command's exit status.
 function brishz_eval_q_hs(argv, label, opts)
     label = label or "brishz_eval_q_hs"
-    gardenCall(gardenBrishzq, argv, label, opts, function() end)
+    gardenCall(argv, label, opts, function() end)
 end
 
 --- Like brishz_eval_hs, but hands stdout to a callback instead of discarding
@@ -493,24 +511,20 @@ end
 --- caller can serialise garden work: keep one call in flight and send the
 --- next from the callback. See hyperBrightnessStep in
 --- core/window-media-bindings.lua, where doing that is the difference between
---- ten brightness steps landing and one. The output must stay under 64 KiB
---- (see above).
+--- ten brightness steps landing and one. Captured output has no pipe limit.
 function brishz_eval_out_hs(cmd, callback, label, opts)
     label = label or "brishz_eval_out_hs"
-    gardenCall(gardenBrishz, { cmd }, label, opts, function(code, out)
+    gardenCall({ cmd }, label, opts, function(code, out)
         if code ~= 0 then return callback(nil) end
         callback((tostring(out or "")):gsub("^%s+", ""):gsub("%s+$", ""))
-    end)
+    end, true)
 end
 
---- The argument-list form of brishz_eval_out_hs: brishzq.zsh, so every
---- element arrives as one word, and the callback gets the trimmed stdout, or
---- nil when the call or the command failed (brishzq.zsh exits with the
---- command's own status). For a chooser that asks the garden on every
---- keystroke without blocking, or quoting what was typed into zsh.
+--- The argument-list form of brishz_eval_out_hs. Each value arrives as one
+--- word; the callback gets trimmed stdout, or nil on call/command failure.
 function brishz_eval_q_out_hs(argv, callback, label, opts)
     label = label or "brishz_eval_q_out_hs"
-    gardenCall(gardenBrishzq, argv, label, opts, function(code, out)
+    gardenCall(argv, label, opts, function(code, out)
         if code ~= 0 then return callback(nil) end
         callback((tostring(out or "")):gsub("^%s+", ""):gsub("%s+$", ""))
     end)

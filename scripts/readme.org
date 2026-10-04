@@ -21,7 +21,8 @@ command when streaming is supported. Older gardens fall back to raw/JSON.
 supports detached =brishz_async=y= requests and =brishz_copy=y= clipboard
 replay. Sole =-h= or =--help= shows local help; leading =--= passes through
 literal arguments. Agent hooks, fzf previews, menubar queries and standalone
-GUI actions also use the installed Go client. See
+GUI actions, plain Lua helpers and Hammerspoon garden calls also use the
+installed Go client. See
 [[NIGHTDIR:docs/brishzgo.md][usage and caller migrations]].
 
 * Hammerspoon

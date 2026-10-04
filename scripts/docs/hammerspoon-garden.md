@@ -12,16 +12,22 @@ The code is the "BrishGarden calls that say when it is down" section of
 ## The helpers
 
 - `brishz_eval_hs(cmd, label, opts)`: runs the string `cmd` in BrishGarden
-  through `/usr/local/bin/brishz2.dash`, without blocking.
+  through `brishzgo --` with `brishz_noquote=y`, without blocking. This keeps
+  shell code and named-session state intact.
 - `brishz_eval_q_hs(argv, label, opts)`: the argument-list form, through
-  `/usr/local/bin/brishzq.zsh`, which quotes every word. Use it whenever a
+  `brishzgo --`, which quotes every word. Use it whenever a
   value is interpolated.
 - `brishz_eval_out_hs(cmd, callback, label, opts)`: like `brishz_eval_hs`,
   but hands the trimmed stdout to `callback`, or `nil` on failure. The
   callback is called exactly once on every path.
 - `brishz_eval_q_out_hs(argv, callback, label, opts)`: the argument-list form
-  of that, through `brishzq.zsh`; `nil` also when the command itself failed.
+  of that; `nil` also when the command itself failed.
   `ntagFinder` (hyper+cmd+N) asks it on every keystroke.
+
+All four use `${BRISHZGO_BIN:-$HOME/go/bin/brishzgo}`, clear inherited
+async/copy/stdin controls, and report the remote command's status. They keep
+`hs.task` asynchronous until completion; Go's detached mode would lose that
+callback. The STT garden backend uses the same client and output collector.
 
 `label` names the caller in console lines and bands. `opts` is optional:
 
@@ -29,31 +35,26 @@ The code is the "BrishGarden calls that say when it is down" section of
 - `timeout`: seconds before a client call is killed (default 30).
 - `onFail`: called as `onFail(code, notSent)` once when the call failed, after
   the band, for a caller with a native way to do the job or state to take back.
-  `notSent` is true when the call provably never reached BrishGarden, and false
-  when it may have run. The blackout chords use it: a blackout that never
-  started gives the keyboard back, and one that cannot be ended through
+  `notSent` is true when a connection/setup status coincides with a failed
+  TCP probe. This is a best-effort outage check: a garden dying after the
+  command returned that same status can also satisfy it. The blackout chords
+  use it: a blackout that never started gives the keyboard back, and one that cannot be ended through
   BrishGarden is ended in Lua (see "Ending a blackout without BrishGarden" in
   `hammerspoon/docs/hammerspoon.md`).
 
 ## When a call fails
 
-A failed call is "provably not sent" when the client's exit status proves the
-request never reached BrishGarden, which then means BrishGarden is down and the
-command did not run.
+The Go client returns the remote command's status once it has an answer.
+Connection/setup codes 2, 3, 6, 7 and 26 therefore need a TCP probe as well:
+a command can return those exact numbers. If the probe succeeds, the helper
+reports an ordinary command failure. If it fails, the helper reports the
+garden as down. This cannot prove non-execution if the garden dies between
+the command returning and the probe.
 
-- `brishz2.dash` exits with curl's own status. These codes mean curl never
-  sent the request: 2 (initialisation failed), 3 (malformed URL), 6 (could
-  not resolve the host), 7 (could not connect) and 26 (could not read the
-  request body).
-- `brishzq.zsh` exits with the remote command's status once it has an
-  answer, so a 7 from it may be the command's own. It counts as not sent only
-  when a TCP connect to BrishGarden's port is refused as well
-  (`gardenProbe`).
-- A client killed by a signal reports 128 plus the signal number, as a shell
-  would. `hs.task` hands back the bare signal number, and a SIGINT (2) would
-  otherwise read as curl's 2.
-- Every other failure may have run the command: 22 (an HTTP error), 28 (a
-  timeout), 52 (an empty reply), 18, 55 and 56 (transfer errors).
+A client killed by a signal reports 128 plus the signal number, as a shell
+would. `hs.task` hands back the bare signal number, so the helper normalizes
+it before classifying failures. HTTP, timeout, empty-reply and transfer errors
+may have run the command and never trigger an automatic retry.
 
 Nothing is run anywhere else. An earlier version re-ran a not-sent command in
 a fresh `zsh -c`, but the hotkeys that matter now have garden-free code (the
@@ -65,12 +66,11 @@ from inside could not run that way.
 
 - The "BrishGarden-down band": a warn band with id `garden-down`, so a new
   message replaces the one on screen instead of stacking.
-  - For a not-sent call: "BrishGarden down: <label> did not run; run ivy",
-    for 30 s.
-  - For another failure of `brishz2.dash`, which fails only when the call
-    itself did: "BrishGarden call failed: <label> (exit N)". A failing
-    `brishzq.zsh` is usually the command's own failure, so it only gets a
-    console line.
+  - For a failed connection/setup status with a failed probe: "BrishGarden
+    down: <label> did not run; run ivy", for 30 s.
+  - For a local start or timeout failure: "BrishGarden call failed: <label>
+    (exit N)". Ordinary remote failures get a console line and `onFail`,
+    without a garden-down band.
 - A liveness probe, `gardenLivenessCheck`, connects to BrishGarden's port
   every 60 s and 5 s after each config load. While BrishGarden is down, every
   probe re-issues "BrishGarden is down: hotkeys that need it do nothing; run
@@ -84,25 +84,43 @@ from inside could not run that way.
 
 ## Timeouts
 
-Every client call is killed, with its whole process tree, if it is still
-running after `opts.timeout` seconds. `hs.task:terminate()` alone would kill
-only the client, and its curl would stay behind, blocked on a BrishGarden that
-never answers. The timeout also covers a reply larger than 64 KiB. `hs.task`
-collects a child's stdout only once the child has exited, so a child that
-writes more than the pipe buffer blocks forever (measured with Hammerspoon
-1.1.1).
+Every client call is killed, with its whole process tree, after
+`opts.timeout` seconds (default 30). With the streaming garden API, terminating
+the Go client closes the connection and cancels the remote command. Older
+raw/JSON fallback APIs can continue running the remote command.
+
+`taskCollectWithPath` captures stdout and stderr directly into separate 0600
+temporary files. A small shell launcher uses `exec`, retaining the client's
+PID and signal status. Completion reads both files as Lua byte strings and
+removes them. Failure to create/start, timeouts and garbage collection also
+remove them. This uses disk I/O and keeps the full reply in memory when the
+callback runs, as the existing callback contract requires.
+
+This avoids two `hs.task` problems: without a streaming callback, a child can
+fill an output pipe before exit; with one, Hammerspoon decodes each read as
+UTF-8 separately and drops chunks that split a character. The
+[hs.task implementation](https://github.com/Hammerspoon/hammerspoon/blob/master/extensions/task/libtask.m)
+shows both paths. A live test writing the three bytes of `€` in separate
+flushed writes reproduced the Unicode loss. File capture preserves the exact
+bytes and allows replies larger than the pipe buffer. Go still streams its
+network reply directly into the files.
 
 ## Testing without touching the live BrishGarden
 
 `garden_port_override` points the helpers, their clients and the probe at
-another port. It sets both `GARDEN_PORT` and `bshEndpoint` for the client,
-because the clients read `bshEndpoint` first, so one in Hammerspoon's own
-environment would otherwise win. A caller's `GARDEN_PORT` or `bshEndpoint`
-also beats the one `~/.privateShell` sets, which `brishzq.zsh` sources (before
-that fix, `GARDEN_PORT` alone sent a test call to the live BrishGarden).
+another port. It sets both `GARDEN_PORT` and `bshEndpoint`, because the client
+reads `bshEndpoint` first. Go does not source shell startup files.
 Set it to a closed port such as 7231 to play a dead BrishGarden, test with
 inert commands (`print -r -- sentinel`), and swap `alert_gateway` for a
 recorder while testing, so no band reaches the screen.
+
+`lua lua/tests/garden-task-test.lua` mocks tasks, probes, timers and bands.
+It checks large binary/Unicode stdout and stderr, argv and raw shell mode,
+remote status 7 with a live probe, a closed-garden failure, start failures,
+timeout cleanup, signal status, exactly-once callbacks, object collection and
+STT output/start-failure handling.
+Live `gardenTask` checks should use inert producers, compare exact output,
+and avoid clipboard or hotkey actions.
 
 ## What no longer needs BrishGarden
 

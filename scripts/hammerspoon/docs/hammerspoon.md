@@ -507,35 +507,33 @@ argument list instead of a command line, `_bg` does not wait. `brishz_eval_hs`
 lives in `core/helpers.lua` instead, because it uses `hs.task`, and `pipe.lua`
 is plain Lua over posix.
 
-Which to use, with warm measurements from this machine:
+Both plain Lua and Hammerspoon now use `brishzgo`, with streaming enabled by
+default. `_q` quotes an argument list; the string form sets `brishz_noquote=y`
+to preserve shell code and named-session state. Both return the remote
+command's exit status. Quoting no longer starts a separate zsh client.
 
-- `brishz_eval(cmd, opts)` — 53ms, waits, returns output, stderr and exit status
-- `brishz_eval_q(argv, opts)` — 78ms, same but the client quotes each element,
-  and the status is the command's own rather than the client's
-- `brishz_eval_bg(cmd, opts)` — 20ms, forks twice and forgets
-- `brishz_eval_q_bg(argv, opts)` — 22ms, the same with an argument list
-- `brishz_eval_bsh(cmd)` — a session that keeps its state between calls
-- `brishz_eval_hs(cmd, label)` — 7.5ms, and the only one that reports a failure
+- `brishz_eval(cmd, opts)` and `brishz_eval_q(argv, opts)` wait and return
+  trimmed stdout, stderr and status. Plain Lua drains all three pipes
+  concurrently, including binary stdin.
+- `brishz_eval_bg` and `_q_bg` use Go's detached worker. They return after
+  local launch and discard the remote reply.
+- `brishz_eval_bsh(cmd, opts)` keeps state in a named garden session.
+- `brishz_eval_hs` and `_q_hs` use `hs.task` and report failures asynchronously.
+- `brishz_eval_out_hs` and `_q_out_hs` additionally return trimmed stdout to a
+  callback, or `nil` on failure.
 
-Inside Hammerspoon prefer `brishz_eval_hs` for anything whose output you do not
-need: it is the cheapest of them and it logs a non-zero exit. When BrishGarden
-is down it says so in a band; see `docs/hammerspoon-garden.md` in the scripts
-root for that, and for writing a hotkey that does not need BrishGarden at all.
-`brishz_eval_bg` exists for Lua without Hammerspoon. Anything synchronous
-blocks the main thread, which is also the hotkey and event thread, so treat
-53ms as 53ms of frozen keyboard.
+Inside Hammerspoon prefer the `_hs` forms. Synchronous garden calls block
+hotkeys and event callbacks for the entire request. Hammerspoon captures Go's
+streamed stdout/stderr in temporary files, avoiding full pipes and Unicode
+loss from `hs.task` streaming callbacks. The STT garden backend uses this
+collector too. See `docs/hammerspoon-garden.md` in the scripts root for the
+failure policy, timeouts and tests.
 
-The `_q` distinction is about cost. Quoting means going through `brishzq.zsh`
-rather than the small dash client, which is about 25ms of zsh startup — worth it
-when a value is interpolated, wasted when the command is a constant. In the
-`_bg` forms it is free, since nothing waits, so prefer `_q` there whenever a
-value is involved.
-
-Nothing here builds a shell string. Every call execs a client with an argument
-list, so there is no quoting step that can turn a value into code. `opts` covers
-`session`, `stdin`, `evalFile` and `outFile`; passing data on `stdin` is the way
-to feed a pipeline something arbitrary, as `system-keys.lua` does with the
-clipboard.
+Every command and value reaches the client as an argument, without a shell
+interpolation step. Plain Lua `opts` covers `session`, `stdin`, `evalFile` and
+`outFile`. Explicit file options retain the compatibility client; normal
+stdin is piped directly into Go. Hammerspoon `opts` covers `quiet`, `timeout`
+and `onFail`.
 
 ## Auto-reload
 

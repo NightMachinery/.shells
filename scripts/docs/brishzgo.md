@@ -14,8 +14,8 @@ to JSON. `brishz_stream=n` selects the previous raw/JSON behavior.
 The source is `golang/brishzgo/`; its `readme.org` covers building and the
 tests. [agfi:brishz] now runs it, including callers of [agfi:bsh],
 [agfi:brishzr] and [agfi:brishz-all]. The previous shell implementation is
-[agfi:brishz-v1], still using `brishzq.zsh`. Normal Lua calls, agent hooks
-and standalone wrappers use the Go client too.
+[agfi:brishz-v1], still using `brishzq.zsh`. Normal Lua and Hammerspoon calls,
+agent hooks and standalone wrappers use the Go client too.
 
 The shell wrapper builds or refreshes the binary through [agfi:go-local-dep],
 exports `brishz_in`, `brishz_nolog` and `brishz_session` (including the
@@ -414,9 +414,11 @@ this binary. Shell-generated fzf commands also accept the binary resolved in
 wrapper exit statuses, STT file lifetime, menu queries, picker actions and
 GUI command parsing using a recording client and a synthetic HOME.
 
-Hammerspoon and Lua helper migration also requires concurrent output draining;
-see [Hammerspoon garden helpers](hammerspoon-garden.md) for their failure and
-callback policy. Explicit JSON-envelope and file-mode consumers retain their
+Normal Lua helpers drain stdin/stdout/stderr concurrently. Hammerspoon helpers
+and the STT backend capture Go output in private temporary files, preserving
+Unicode and avoiding full pipes while retaining completion callbacks. See
+[Hammerspoon garden helpers](hammerspoon-garden.md) for their failure policy
+and tests. Explicit JSON-envelope and file-mode consumers retain their
 compatibility clients until those contracts are adapted.
 
 ## Measurements
