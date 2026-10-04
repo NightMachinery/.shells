@@ -212,7 +212,10 @@ function sharif-vc-p {
 aliasfn sharif-vc-is sharif-vc-p
 
 function meeting-p {
-    browser-current-match-p '^https://(vc\.sharif\.edu|meet\.google\.)'
+    local urls
+    urls="$(browsers-running-urls)" @RET
+    #: A here-string avoids a successful match becoming SIGPIPE under pipefail.
+    command rg --ignore-case --quiet '^https://(vc\.sharif\.edu|meet\.google\.)' <<< "${urls}"
 }
 
 function bell-avarice {
@@ -914,9 +917,8 @@ bell_auto_stop_mode: idle | idle+timeout | notif | bell+notif | auto (default)"
         #:
         #: - In a meeting, even one ring is wrong: speakers feed it into the mic,
         #:   headphones play it over whoever is talking. Notification only.
-        #:   [agfi:meeting-p] reads the *current* browser tab, so a meeting behind
-        #:   another tab still rings; that failure direction (an annoying ring, not
-        #:   a missed one) is the tolerable one.
+        #:   [agfi:meeting-p] checks all tabs in running scriptable browsers,
+        #:   including background tabs and browsers other than the default.
         #: - At the office on speakers, the colleagues hear every repeat.
         #: - On headphones, ring once: if they are on your ears the first ring did
         #:   the job and the loop would just keep ducking your audio; if they are

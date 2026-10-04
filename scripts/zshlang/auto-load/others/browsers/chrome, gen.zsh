@@ -141,8 +141,80 @@ function browser-current-url {
 }
 
 function browser-all-urls {
-    chrome-cli list links | gcut -d' ' -f '2-'
+    local timeout="${browser_all_urls_timeout}"
+    local bundle_id="${CHROME_BUNDLE_IDENTIFIER:-$browser_default_bundle_id}"
+    setopt localoptions pipefail
+    {
+        if [[ -n "${timeout}" ]] ; then
+            command gtimeout "${timeout}" env "CHROME_BUNDLE_IDENTIFIER=${bundle_id}" \
+                chrome-cli list links
+        else
+            chrome-cli list links
+        fi
+    } | command gcut --delimiter=' ' --fields='2-'
 }
+
+function h-browser-running-bundle-ids {
+    #: NSWorkspace does not launch applications or require System Events access.
+    command gtimeout 2s osascript -l JavaScript - "$@" <<'JXA'
+ObjC.import('AppKit');
+function run(ids) {
+    var apps = $.NSWorkspace.sharedWorkspace.runningApplications;
+    var running = [];
+    for (var i = 0; i < apps.count; i++) {
+        var id = ObjC.unwrap(apps.objectAtIndex(i).bundleIdentifier);
+        if (ids.indexOf(id) >= 0 && running.indexOf(id) < 0) running.push(id);
+    }
+    return running.join('\n');
+}
+JXA
+}
+
+function browsers-running-urls {
+    : "List every tab URL in running, scriptable macOS browsers."
+    local default_id="${CHROME_BUNDLE_IDENTIFIER:-$browser_default_bundle_id}"
+    @darwinOnly
+    ensure-cmd osascript gtimeout @RET
+
+    local ids=(
+        "${default_id}"
+        com.google.Chrome com.google.Chrome.canary org.chromium.Chromium
+        com.brave.Browser com.brave.Browser.beta com.brave.Browser.nightly
+        com.microsoft.edgemac com.microsoft.edgemac.Beta
+        com.microsoft.edgemac.Dev com.microsoft.edgemac.Canary
+        company.thebrowser.Browser com.vivaldi.Vivaldi
+        com.operasoftware.Opera com.apple.Safari com.apple.SafariTechnologyPreview
+    )
+    local running id urls
+    running="$(h-browser-running-bundle-ids "${(@u)ids}")" @RET
+    for id in "${(@f)running}" ; do
+        [[ -n "${id}" ]] || continue
+        case "${id}" in
+            com.apple.Safari|com.apple.SafariTechnologyPreview)
+                urls="$(command gtimeout 2s osascript -l JavaScript - "${id}" 2>/dev/null <<'JXA'
+function run(ids) {
+    var app = Application(ids[0]);
+    if (!app.running()) return '';
+    return app.windows.tabs.url().reduce(function(all, urls) {
+        return all.concat(urls);
+    }, []).filter(function(url) { return typeof url === 'string'; }).join('\n');
+}
+JXA
+                )" || continue
+                ;;
+            *)
+                #: Reuse [agfi:browser-all-urls], with a deadline per browser.
+                #: Failure in one browser must not hide a meeting in another.
+                ensure-cmd chrome-cli gcut @RET
+                urls="$(CHROME_BUNDLE_IDENTIFIER="${id}" browser_all_urls_timeout=2s \
+                    browser-all-urls 2>/dev/null)" || continue
+                ;;
+        esac
+        [[ -z "${urls}" ]] || ec "${urls}"
+    done
+    return 0
+}
+
 ##
 aliasfn chrome-current-html with-chrome browser-current-html
 aliasfn chrome-current-links with-chrome browser-current-links

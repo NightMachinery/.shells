@@ -39,9 +39,15 @@ Set with `bell_auto_stop_mode`, or `@opts stop_mode <mode> @ bell-auto`.
 `auto` resolves in order:
 
 - `meeting-p` → `notif`. Even one ring is wrong in a meeting: speakers feed it
-  into the mic, headphones play it over whoever is talking. `meeting-p` reads the
-  *current* browser tab, so a meeting behind another tab still rings — an annoying
-  failure rather than a silent one, which is the tolerable direction.
+  into the mic, headphones play it over whoever is talking. `meeting-p` checks
+  Google Meet and Sharif VC URLs in every tab of running scriptable browsers,
+  including background tabs and windows. It scans Chrome, Brave, Edge, Arc,
+  Vivaldi, Chromium, Opera, Safari, their listed preview channels, and the configured
+  Chromium default. Closed browsers are skipped without launching them. An idle
+  meeting tab still suppresses bells, since this detects an open page rather than
+  whether you have joined the call. Firefox does not expose tab URLs through this
+  scripting interface. An inaccessible or unresponsive browser is skipped after
+  at most two seconds; other running browsers are still checked.
 - `office-public-audio-p` or `headphones-p` → `bell+notif`. On office speakers the
   colleagues hear every repeat. On headphones, one ring is all the loop can
   usefully deliver: worn, the first ring did the job and repeats just keep ducking
