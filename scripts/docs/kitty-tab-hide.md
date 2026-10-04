@@ -51,7 +51,7 @@ space. If the panel is down, the tab is there at the next hyper+z.
 - **The panel can bring them back:** it folds stray OS windows into itself
   whenever it is created (any hyper+z that finds no panel window, as after
   kitty's launch), and on every hyper+z when Hammerspoon's
-  `kitty_panel_fold_strays` is on (`hammerspoon/core/kitty-panel.lua`). A
+  `kitty_panel_fold_strays_p` is on (`hammerspoon/core/kitty-panel.lua`). A
   folded tab is then an ordinary shown tab.
 - Hidden tabs do not outlive kitty, any more than shown ones do.
 

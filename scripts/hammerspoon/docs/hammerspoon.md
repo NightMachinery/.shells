@@ -1940,7 +1940,7 @@ kitty cannot start as a panel and the startup session always opens in a normal
 window first, it moves the tabs of every other OS window in with
 `detach-tab`, in order, and closes the shell tab the panel was born with,
 which was only scaffolding once real tabs have arrived. Windows that scripts
-open later are left alone unless the Lua global `kitty_panel_fold_strays` is
+open later are left alone unless the Lua global `kitty_panel_fold_strays_p` is
 true (default false; set it in a file that loads earlier, or from the
 console), in which case every show folds them in. Nothing before the show
 focuses anything: focusing a hidden panel activates kitty on the desktop space
@@ -2123,7 +2123,7 @@ outside it), with timings, without changing anything on screen. The fast
 window must equal the slow `active`. From a
 shell, `kitty-remote ls` piped through `jq -c '.[] | {id, wm_class, ntabs:
 (.tabs|length)}'` should show one OS window of `wm_class` `kitty-panel`; with
-the default `kitty_panel_fold_strays`, a second OS window of `wm_class`
+the default `kitty_panel_fold_strays_p`, a second OS window of `wm_class`
 `kitty` is a script's window and is expected to stay.
 In window mode, run
 `hs.inspect(hs.spaces.windowSpaces(<kitty window id>))` after a hide and check

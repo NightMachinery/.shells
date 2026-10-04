@@ -30,7 +30,7 @@ local kittyPanelClass = "kitty-panel"
 -- created, which is every kitty launch (kitty cannot start as a panel, so its
 -- startup session always opens in a normal window first). This was the zsh
 -- variable $kitty_panel_fold_strays; set it here or from the console.
-kitty_panel_fold_strays = kitty_panel_fold_strays or false
+kitty_panel_fold_strays_p = kitty_panel_fold_strays_p or false
 
 -- The screen the panel shows on: a core/screens.lua spec, resolved at every
 -- show, or false to leave the panel wherever kitty put it. The default,
@@ -571,7 +571,7 @@ local function kittyPanelEnsure(cb)
         kittyPanelList(sock, function(st, err)
             if not st then return cb(nil, nil, err) end
             if not st.win then return kittyPanelCreate(sock, cb) end
-            if kitty_panel_fold_strays then return kittyPanelFold(sock, st, nil, cb) end
+            if kitty_panel_fold_strays_p then return kittyPanelFold(sock, st, nil, cb) end
             cb(sock, st)
         end)
     end
@@ -831,7 +831,7 @@ function kittyPanelShow(label, opts)
     kittyPanelFastState(path, function(st, why)
         mark("state")
         if not st then return slow(why) end
-        if kitty_panel_fold_strays and #st.strays > 0 then return slow() end
+        if kitty_panel_fold_strays_p and #st.strays > 0 then return slow() end
 
         local output, outScreen
         if opts.screen then
