@@ -26,7 +26,7 @@
 
 - We are usually pushing to public git remotes. Be deliberate about what personal information we put into commits. Ask the user if in doubt. See **Private Information** below.
 
-- Keep a checklist in `TASKS.org` (this file should be gitignored). Tick each item when it’s done, and add anything new you find.
+- Keep a checklist in `TASKS.org` (this file should be gitignored in each repo locally). Tick each item when it’s done, and add anything new you find.
 
 ## `~/scripts`
 - If you ever need to edit anything here, read `~/scripts/AGENTS.md` first.
