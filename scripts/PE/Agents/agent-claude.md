@@ -23,3 +23,7 @@
   install`, a passphrase-free `ssh-add`) does not need me: run it under a
   pseudo-TTY with `script -q <log> <command> </dev/null`, read the log
   afterwards. Only reach for me when it needs a secret I hold or a decision.
+
+## Workflow Guidelines
+
+-  Do not launch large reviewer fan-outs (many review plus verify agents) without user confirmation. Give the user to choose from among various levels of fan-out. Large review fanouts burn quota very fast and slow the development cycle.
