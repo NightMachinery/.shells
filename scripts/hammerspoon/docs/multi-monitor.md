@@ -427,6 +427,12 @@ Found in real use on 2026-10-04:
   never reached the handler or took one of its early exits (another move
   still marked as running, no focused window, no other screen), which drew
   a band but logged nothing. Those exits now print too.
+- **After the switch and the restart,** a scratch Finder window moved to
+  the laptop and back with `Screens.moveWindowNext` in 61 and 47 ms, and
+  came back within a point of its frame.
+- **Choosers on the monitor,** now primary: a first native show and a fresh
+  wrapped one both landed a quarter of the way down the free height (0.251,
+  0.249). The laptop, no longer primary, has not had one yet.
 
 Still unmeasured:
 
@@ -445,11 +451,12 @@ Still unmeasured:
   leaves alone windows at or above the modal-panel level, and any window whose
   subrole says it is a dialog, on the strength of AppKit's constants. No real
   dialog's layer has been read right after its app was activated.
-- **The new blackout restore.** The blackout that ended before the reload was
-  restored by the old code, so the UUID rows, the last-good fallback and the
-  floors (see `docs/external-display-brightness.md`) have been tested only
-  against fake m1ddc and brightness binaries. One F1/F2 cycle would settle
-  it.
+- **The new blackout restore** has had one real cycle (2026-10-04): the
+  blackout remembered the monitor at brightness 0.88 and contrast 0.51 and
+  the laptop at 0.59, and its end wrote 88 and 51 back to the monitor. Making
+  the monitor the primary display had moved it from m1ddc display 2 to
+  display 1 in between, and the restore found it by UUID. The last-good
+  fallback and the floors are still tested only against fake binaries.
 - **The pointer keys**: avy on the monitor, and an app-mode overlay
   following focus, have not been pressed for real. `cursorHide` has: since
   it passes over every screen, it puts away a stuck bar in real use.
