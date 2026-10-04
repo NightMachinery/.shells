@@ -466,6 +466,31 @@ Found in real use on 2026-10-04:
   `hammerspoon_cli_log_file`. See `core/ipc-fix.lua` for the earlier IPC
   problem.
 
+### InstantSpaceSwitcher: tried, not adopted
+
+Most apps here live in their own fullscreen Spaces, so an app hotkey usually
+switches Spaces. InstantSpaceSwitcher (github.com/jurplel/InstantSpaceSwitcher)
+skips the switch animation by posting a synthetic trackpad swipe with a very
+high velocity, and its CLI (`ISSCli index N`) jumps to the Nth Space of the
+display under the pointer, numbered as `hs.spaces.spacesForScreen` numbers
+them. The idea was to jump to the target app's Space first and activate the
+app after.
+
+Measured on 2026-10-04, with Reduce Motion on, switching between two adjacent
+fullscreen apps on the monitor eight times each way:
+
+- Activating the app as the app hotkeys do put its window on screen in 250 to
+  300 ms.
+- `ISSCli index N` and then the same activation took 340 to 480 ms. The CLI
+  alone took 76 to 150 ms (56 to 63 ms for a call that did not switch), and
+  the switch after it was no faster than the native one.
+
+So it would only add latency here. It might compare better with Reduce
+Motion off, which was not measured. Run straight from Homebrew, the CLI was
+still quarantined and took 1.5 to 19 s per call until
+`/usr/bin/xattr -dr com.apple.quarantine` was run on the app; the anaconda
+`xattr` earlier on PATH has no `-r`.
+
 ### Which display macOS counts as active
 
 The active display is the one with the lit menu bar. It is where Maccy
