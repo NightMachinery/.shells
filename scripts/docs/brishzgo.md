@@ -399,6 +399,8 @@ The active shell/config callers now use the installed Go client:
 - Emacs, zopen, STT, lock/unlock/audio hooks, reminder notifications and the
   audio-guard launcher use the Go client. STT keeps its input file until the
   synchronous call finishes and then removes it, including on failure.
+  File-owning STT and `bsh.dash` callers clear inherited `brishz_async` so
+  cleanup cannot race a detached worker.
 - Scheduled alarms quote the absolute client path into the `at` job.
 - Claude Code and Antigravity report delegation, and Maccy image export, use
   [agfi:brishz] with `brishz_binary=y`. This replaces the legacy output-file

@@ -95,8 +95,9 @@ sys.exit(int(os.environ.get('CLIENT_STATUS','0')))
             assert row["async"] == "y" and row["args"][2:] == ["JOKER_MARKER", "zopen", strange]
 
     run(["dash", str(ROOT / "zshlang/wrappers/stt_filter.sh")],
-        b"input\x00\xff\n\n", extra={"CLIENT_STATUS": "17"}, status=17)
+        b"input\x00\xff\n\n", extra={"CLIENT_STATUS": "17", "brishz_async": "y"}, status=17)
     row = calls()[0]
+    assert row["async"] == "", "STT detached before consuming its file"
     assert bytes.fromhex(row["file_input"]) == b"input\x00\xff\n\n"
     assert not Path(row["args"][2]).exists(), "STT input file leaked"
 
@@ -133,9 +134,10 @@ sys.exit(int(os.environ.get('CLIENT_STATUS','0')))
     # Compatibility launcher names now use Go with their old raw/session forms.
     source_input = "printf '%s' '€ source'\n\n".encode()
     run(["dash", str(ROOT / "zshlang/wrappers/brishz/bsh.dash")], source_input,
-        extra={"CLIENT_STATUS": "17"}, status=17)
+        extra={"CLIENT_STATUS": "17", "brishz_async": "y"}, status=17)
     row = calls()[0]
     assert row["session"] == "bsh" and row["noquote"] == "y"
+    assert row["async"] == "", "bsh detached before sourcing its file"
     assert bytes.fromhex(row["source_input"]) == source_input
     assert not Path(row["source_path"]).exists(), "bsh source file leaked"
     run(["dash", str(ROOT / "zshlang/wrappers/brishz/bsh_old.dash")], source_input,

@@ -10,6 +10,6 @@ trap 'exit 129' HUP
 trap 'exit 130' INT
 trap 'exit 143' TERM
 command cat > "$tmp" || exit $?
-brishz_session=bsh brishz_noquote=y "$brishzgo" -- \
+brishz_async= brishz_session=bsh brishz_noquote=y "$brishzgo" -- \
     "$(command gprintf 'cd %q\nsource %q' "$PWD" "$tmp")"
 exit $?
