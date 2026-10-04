@@ -1,9 +1,9 @@
 // Command brishzgo runs one zsh command in a BrishGarden and passes on its
 // stdout, stderr and exit status: a faster drop-in for brishzq.zsh, with the
 // same argv, environment variables and exit statuses. It talks to the
-// garden's raw API, and falls back to the JSON API for a garden without one.
-// With brishz_stream=y it uses the streaming API instead, which passes the
-// output on as the command makes it. brishz_binary=y asks either API for
+// garden's streaming API, which passes output on as the command makes it,
+// and falls back to the raw and JSON APIs for a garden without one.
+// brishz_stream=n skips streaming. brishz_binary=y asks either API for
 // exact bytes, and falls back to the JSON API's binary transport. See
 // docs/brishzgo.md in the scripts repository.
 package main
@@ -51,7 +51,7 @@ type config struct {
 
 	binary bool // brishz_binary
 	raw    bool // brishz_raw, on unless set to a false value
-	stream bool // brishz_stream, off unless set to a true value
+	stream bool // brishz_stream, on unless set to a false value
 	debug  bool // brishz_debug
 
 	// The endpoint is on this machine (apikeyEndpointRe), so the garden
@@ -98,7 +98,8 @@ func newConfig(args []string, env lookupEnv, pwd, home string) config {
 	c.binary = boolP(env.get("brishz_binary"))
 	rawOpt := env.get("brishz_raw")
 	c.raw = rawOpt == "" || boolP(rawOpt)
-	c.stream = boolCoreP(env.get("brishz_stream"))
+	streamOpt := env.get("brishz_stream")
+	c.stream = streamOpt == "" || boolCoreP(streamOpt)
 	c.debug = boolP(env.get("brishz_debug"))
 
 	// As in brishzq.zsh: local requests send the API key file's header

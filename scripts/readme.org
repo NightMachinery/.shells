@@ -11,6 +11,15 @@ There are some non-FOSS resources in this repo that I have included only for my 
 
 ** =/scripts/resources/= unless otherwise specified
 
+* BrishGarden client
+
+[agfi:brishz] now uses =brishzgo= with streaming enabled by default. Output
+arrives while the command runs, and interrupting the client stops the garden
+command when streaming is supported. Older gardens fall back to raw/JSON.
+=brishz_stream=n= disables streaming; add =brishz_raw=n= to use JSON directly.
+[agfi:brishz-v1] keeps the previous shell implementation, including its
+clipboard option. See [[NIGHTDIR:docs/brishzgo.md][usage and migration candidates]].
+
 * Hammerspoon
 
 Hammerspoon shortcut notes are tracked in =./hammerspoon/docs/hammerspoon.md=.

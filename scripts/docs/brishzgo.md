@@ -4,17 +4,28 @@
 stderr and exit status. It takes the same argv and environment variables as
 `brishzq.zsh` and, except for the cases under "Where it differs", exits with
 the same statuses, but it is one static binary: no `zsh -f` start, no `jq`,
-no `base64`, no `curl`. It talks to the garden's **raw API**
-(`POST /zsh/raw/`, bytes as bytes), and falls back to the JSON API for a
-garden that has none or refuses the request. With `brishz_stream=y` it uses
-the **streaming API** (`POST /zsh/stream/`) instead, which passes the output
+no `base64`, no `curl`. By default it uses the garden's **streaming API**
+(`POST /zsh/stream/`), which passes the output
 on while the command runs, and stops the command when `brishzgo` is
-interrupted.
+interrupted. It falls back to the **raw API** (`POST /zsh/raw/`, bytes as
+bytes) and then JSON when a garden lacks streaming. A refusal goes straight
+to JSON. `brishz_stream=n` selects the previous raw/JSON behavior.
 
 The source is `golang/brishzgo/`; its `readme.org` covers building and the
-tests. Nothing calls it yet: Hammerspoon, `lua/pipe.lua`, the agent hooks and
-the zsh functions all still run `brishzq.zsh` or `brishz.dash`. Switching a
-caller is a separate decision.
+tests. [agfi:brishz] now runs it, including callers of [agfi:bsh],
+[agfi:brishzr] and [agfi:brishz-all]. The previous shell implementation is
+[agfi:brishz-v1], still using `brishzq.zsh`. Hammerspoon, `lua/pipe.lua`,
+the agent hooks and standalone wrappers keep their existing clients.
+
+The shell wrapper builds or refreshes the binary through [agfi:go-local-dep],
+exports `brishz_in`, `brishz_nolog` and `brishz_session` (including the
+`brishz_s` shorthand), and passes argv unchanged. `brishz_in=MAGIC_READ_STDIN`
+reads the caller's stdin directly; other non-empty values are literal input.
+[agfi:brishz-in] uses that direct stdin path, preserving trailing newlines
+and avoiding a whole-input shell buffer.
+The old clipboard option `brishz_copy` / `brishz_c` remains available through
+[agfi:brishz-v1]; the Go client ignores it. A remote garden needing basic
+auth requires `GARDEN_PASS0` exported before calling the Go client.
 
 ## Install
 
@@ -33,6 +44,8 @@ Exactly like `brishzq.zsh`:
 brishzgo print -r -- ok
 brishz_in=MAGIC_READ_STDIN brishzgo cat < x.bin | cmp - x.bin
 brishz_session=demo brishzgo typeset -g x=1
+brishz_stream=n brishzgo print -r -- buffered
+brishz_stream=n brishz_raw=n brishzgo print -r -- json
 ```
 
 A leading `-c` is dropped, as `brishzq.zsh` does.
@@ -76,11 +89,11 @@ only joined by spaces, with no wrapping and no forwarding.
   are false, and anything else is true, `false` included, as in
   `brishzq.zsh`. See "Transport" for what it changes here.
 - `brishz_raw`: the raw API, on unless set to a false value (`n`, `no`, `0`).
-  `brishz_raw=n` uses the JSON API directly, unless `brishz_stream=y`
-  sends the request to the streaming API first.
-- `brishz_stream`: the streaming API, off unless set to a true value, parsed
-  like the `bool` of `zshlang/basic/core.zsh`: empty, `n`, `no`, `0` and
-  `false` (in any case) are false, and anything else is true. See "The
+  With streaming enabled, this controls its fallback. To use JSON directly,
+  set both `brishz_stream=n` and `brishz_raw=n`.
+- `brishz_stream`: the streaming API, on when unset or empty. Explicit `n`,
+  `no`, `0` and `false` (in any case) disable it; other non-empty values
+  enable it, following `bool` in `zshlang/basic/core.zsh`. See "The
   streaming API" below. `brishzq.zsh` has no such mode, and ignores the
   variable.
 - `brishz_debug`: a true value (as for `brishz_binary`) prints the request
@@ -208,13 +221,13 @@ the command while `brishzgo` withholds its output and exits 201. Only a
 legacy-mode garden older than the `binary=1` option can still run the
 command, in text mode.
 
-`brishz_raw=n` keeps the opt-in on the JSON API's binary transport, as
-before. With `brishz_stream=y` too, the streaming API comes first, as it
-does without the opt-in, and the JSON API is its fallback.
+With `brishz_raw=n`, the streaming API still comes first by default, and
+JSON is its fallback. Also set `brishz_stream=n` to keep the opt-in directly
+on the JSON API's binary transport.
 
 ### The streaming API
 
-`brishz_stream=y` sends the raw request, unchanged, to `/zsh/stream/` (or
+By default, the client sends the raw request, unchanged, to `/zsh/stream/` (or
 `/zsh/stream/nolog/`). The garden answers at once with its headers and then
 sends the output in **frames** while the command runs: a type byte (1
 stdout, 2 stderr, 3 exit), the payload's length as 4 bytes big-endian, and
@@ -339,9 +352,50 @@ As `brishzq.zsh`'s, except where "Where it differs" below says otherwise:
   `brishzgo` decodes it whole.
 - A JSON reply that is valid JSON but not a command's result is a notice
   (exit 200); `brishzq.zsh` would print its `.out` as `null`.
-- `brishz_stream=y`, the streaming API, is `brishzgo`'s alone; see above.
+- The streaming API, enabled by default, is `brishzgo`'s alone; see above.
+
+## Suggested caller migrations
+
+These are follow-up candidates, not changes made by the default switch:
+
+- **Quoted Hammerspoon calls:** `gardenBrishzq` in
+  `hammerspoon/core/helpers.lua` can use the Go client with the same argv and
+  command status. Add it to the quoted-client failure classification, since
+  a command can itself return a curl-like error code. Use `hs.task`'s stream
+  callback to drain output; switching the client alone does not fix its
+  existing large-output pipe limit. Timeouts would also stop the garden
+  command when streaming is available.
+- **fzf reloads and agent picker setup:** the date parser in
+  `datetime, calendar, reminders.zsh`, search postprocessing in
+  `search/fuzzy.zsh`, and the row/parts calls in `agent-session-pick.zsh`
+  already pass quoted argv and want the command's own status. Faster startup
+  helps repeated calls, and cancelled reloads can stop obsolete work.
+- **Menubar queries:** `zshlang/menubar/date.sh` repeatedly starts a client.
+  Use quoted argv for ordinary function calls and `eval` for deliberate
+  command text. Output is collected into variables, so the benefit is fewer
+  subprocesses rather than visible streaming.
+- **Standalone quoted actions:** `emacs.dash`, `zopen.bash`, `stt_filter.sh`,
+  kitty open actions and the Sioyek command are straightforward argv callers.
+  Give GUI/launchd callers an installed absolute binary path, since their PATH
+  can omit `~/go/bin`.
+- **Lua pipe helpers:** the quoted branch in `lua/pipe.lua` is a candidate,
+  but `pipe_simple` writes all stdin, then drains stdout, then stderr. A client
+  streaming both outputs makes its pipe deadlock easier to hit. Drain all
+  channels concurrently before migrating it; review `evalFile` / `outFile`,
+  which the Go client ignores.
+
+Keep async agent hooks (`brishz_async=y`), `brishzb.dash`, JSON-envelope
+consumers such as `brishz_para.dash`, and file-mode callers on their current
+clients until their contracts are adapted. The Go client ignores
+`brishz_async` and the file flags, emits plain output rather than a requested
+JSON envelope, and returns the command's status rather than only the HTTP
+client's status. Raw command-string callers need `eval` or `brishz_noquote=y`
+when switched.
 
 ## Measurements
+
+The measurements below predate the default change: their plain `brishzgo`
+calls used the raw API, equivalent to today's `brishz_stream=n`.
 
 On 2026-10-01, on a laptop at load average 7 to 9, against smoke gardens
 with 4 workers: wall time per call including process start, 200

@@ -85,12 +85,19 @@ func runWith(t *testing.T, g *fakeGarden, stdin string, args []string, kv ...str
 	return result{code, out.String(), errb.String()}
 }
 
+// runBufferedWith keeps raw/JSON tests on their intended transport. Explicit
+// brishz_stream values in kv override the opt-out.
+func runBufferedWith(t *testing.T, g *fakeGarden, stdin string, args []string, kv ...string) result {
+	t.Helper()
+	return runWith(t, g, stdin, args, append([]string{"brishz_stream", "n"}, kv...)...)
+}
+
 func TestRawRoundTrip(t *testing.T) {
 	g := newFakeGarden(t, func(w http.ResponseWriter, r *http.Request, body []byte) {
 		n, _ := strconv.Atoi(r.Header.Get("X-Brish-Cmd-Length"))
 		rawReply(w, "out:"+string(body[n:]), "err\x00\xff", 7, "1")
 	})
-	got := runWith(t, g, "\x00a\r\n\n", []string{"cat"}, "brishz_in", "MAGIC_READ_STDIN", "brishz_session", "s 1", "brishz_nolog", "y", "brishz_failure_expected", "1")
+	got := runBufferedWith(t, g, "\x00a\r\n\n", []string{"cat"}, "brishz_in", "MAGIC_READ_STDIN", "brishz_session", "s 1", "brishz_nolog", "y", "brishz_failure_expected", "1")
 	if got.code != 7 || got.out != "out:\x00a\r\n\n" || got.errOut != "err\x00\xff" {
 		t.Errorf("got %+v", got)
 	}
@@ -100,12 +107,12 @@ func TestRawRoundTrip(t *testing.T) {
 	}
 	// Any non-empty value is true, as on the JSON API, whose request
 	// carries the value as it is.
-	runWith(t, g, "", []string{"true"}, "brishz_nolog", "n", "brishz_failure_expected", "0")
+	runBufferedWith(t, g, "", []string{"true"}, "brishz_nolog", "n", "brishz_failure_expected", "0")
 	if r := g.reqs[1]; r.path != "/zsh/raw/nolog/" || r.query != "failure_expected=1&nolog=1" {
 		t.Errorf("n and 0: request %s?%s", r.path, r.query)
 	}
 	g.reqs = nil
-	runWith(t, g, "", []string{"true"}, "brishz_nolog", "n", "brishz_failure_expected", "0", "brishz_raw", "n")
+	runBufferedWith(t, g, "", []string{"true"}, "brishz_nolog", "n", "brishz_failure_expected", "0", "brishz_raw", "n")
 	if f := requestField(t, g.reqs[0].body, "failure_expected"); g.reqs[0].path != "/zsh/nolog/" || f != "0" {
 		t.Errorf("JSON: %s, failure_expected %q", g.reqs[0].path, f)
 	}
@@ -126,7 +133,7 @@ func TestRawLiteralStdinAndRetcodes(t *testing.T) {
 		rawReply(w, "", "", rc, "1")
 	})
 	for _, rc := range []int{0, 1, 255, 9000, -1} {
-		got := runWith(t, g, "", []string{"true"}, "brishz_in", strconv.Itoa(rc))
+		got := runBufferedWith(t, g, "", []string{"true"}, "brishz_in", strconv.Itoa(rc))
 		if got.code != rc {
 			t.Errorf("retcode %d: exit %d", rc, got.code)
 		}
@@ -145,7 +152,7 @@ func TestRawNotice(t *testing.T) {
 		w.Header().Set("X-Brish-Notice", "1")
 		rawReply(w, "Empty command received.\n\n", "", 0, "1")
 	})
-	got := runWith(t, g, "", nil, "brishz_noquote", "y")
+	got := runBufferedWith(t, g, "", nil, "brishz_noquote", "y")
 	if got.code != 200 || got.out != "Empty command received.\n" {
 		t.Errorf("got %+v", got)
 	}
@@ -155,14 +162,14 @@ func TestRawNotARawReply(t *testing.T) {
 	g := newFakeGarden(t, func(w http.ResponseWriter, r *http.Request, body []byte) {
 		io.WriteString(w, "hello")
 	})
-	if got := runWith(t, g, "", []string{"true"}); got.code != 200 || got.out != "hello\n" {
+	if got := runBufferedWith(t, g, "", []string{"true"}); got.code != 200 || got.out != "hello\n" {
 		t.Errorf("got %+v", got)
 	}
 	// With brishz_binary=y, a reply without X-Brish-Binary: 1 is withheld,
 	// and has no retcode to tell.
 	g.reqs = nil
 	want := result{201, "", fmt.Sprintf(textModeMessage, textModeRanPhrase, "unknown")}
-	if got := runWith(t, g, "", []string{"true"}, "brishz_binary", "y"); got != want {
+	if got := runBufferedWith(t, g, "", []string{"true"}, "brishz_binary", "y"); got != want {
 		t.Errorf("binary: got %+v", got)
 	}
 	if len(g.reqs) != 1 || g.reqs[0].path != "/zsh/raw/" {
@@ -182,12 +189,12 @@ func TestRawLegacyGarden(t *testing.T) {
 		}
 		rawReply(w, "text", "", 0, "0")
 	})
-	if got := runWith(t, g, "", []string{"true"}); got.code != 0 || got.out != "text" {
+	if got := runBufferedWith(t, g, "", []string{"true"}); got.code != 0 || got.out != "text" {
 		t.Errorf("got %+v", got)
 	}
 	g.reqs = nil
 	want := result{201, "", fmt.Sprintf(textModeMessage, textModeRanPhrase, "0")}
-	if got := runWith(t, g, "", []string{"true"}, "brishz_binary", "1"); got != want {
+	if got := runBufferedWith(t, g, "", []string{"true"}, "brishz_binary", "1"); got != want {
 		t.Errorf("binary: got %+v", got)
 	}
 	if len(g.reqs) != 1 || g.reqs[0].path != "/zsh/raw/" {
@@ -206,7 +213,7 @@ func TestHTTPErrors(t *testing.T) {
 			{"brishz_binary", "y"},
 			{"brishz_binary", "y", "brishz_stream", "y"},
 		} {
-			if got := runWith(t, g, "", []string{"true"}, kv...); got.code != 22 || got.out != "" || got.errOut != "" {
+			if got := runBufferedWith(t, g, "", []string{"true"}, kv...); got.code != 22 || got.out != "" || got.errOut != "" {
 				t.Errorf("HTTP %d, %q: got %+v", status, kv, got)
 			}
 		}
@@ -217,7 +224,7 @@ func TestHTTPErrors(t *testing.T) {
 // raw API, and a canned CmdResult on /zsh/.
 func jsonGarden(t *testing.T, reply func(req map[string]any) (string, string)) *fakeGarden {
 	return newFakeGardenLazy(t, func(w http.ResponseWriter, r *http.Request, body func() []byte) {
-		if strings.HasPrefix(r.URL.Path, "/zsh/raw/") {
+		if strings.HasPrefix(r.URL.Path, "/zsh/raw/") || strings.HasPrefix(r.URL.Path, "/zsh/stream/") {
 			http.NotFound(w, r)
 			return
 		}
@@ -284,7 +291,7 @@ func TestFallbackToJSON(t *testing.T) {
 		{"binary", "\xff\x00\r", []string{"brishz_in", "MAGIC_READ_STDIN", "brishz_binary", "y"}, 3, "\xff\x00\r", "e\xff"},
 	} {
 		g.reqs = nil
-		got := runWith(t, g, c.stdin, []string{"cat"}, c.kv...)
+		got := runBufferedWith(t, g, c.stdin, []string{"cat"}, c.kv...)
 		if got.code != c.code || got.out != c.out || got.errOut != c.errOut {
 			t.Errorf("%s: got %d %q %q", c.name, got.code, trunc(got.out), got.errOut)
 		}
@@ -323,7 +330,7 @@ func TestFallbackReplay(t *testing.T) {
 	stdin := strings.Repeat("0123456789", 10000)
 	check := func(name string) {
 		t.Helper()
-		got := runWith(t, g, stdin, []string{"cat"}, "brishz_in", "MAGIC_READ_STDIN", "brishz_debug", "y")
+		got := runBufferedWith(t, g, stdin, []string{"cat"}, "brishz_in", "MAGIC_READ_STDIN", "brishz_debug", "y")
 		if got.code != 4 || got.out != stdin {
 			t.Errorf("%s: got %d %q", name, got.code, trunc(got.out))
 		}
@@ -378,13 +385,13 @@ func TestRawRefused(t *testing.T) {
 		io.WriteString(w, d)
 	})
 	stdin := "a\x00b\xff"
-	got := runWith(t, g, stdin, []string{"cat"}, "brishz_in", "MAGIC_READ_STDIN")
+	got := runBufferedWith(t, g, stdin, []string{"cat"}, "brishz_in", "MAGIC_READ_STDIN")
 	if got.code != 4 || got.out != "a\x00b\ufffd" || got.errOut != "e" || len(g.reqs) != 2 {
 		t.Errorf("refused: got %+v after %d requests", got, len(g.reqs))
 	}
 	refuse = false
 	g.reqs = nil
-	got = runWith(t, g, stdin, []string{"cat"}, "brishz_in", "MAGIC_READ_STDIN")
+	got = runBufferedWith(t, g, stdin, []string{"cat"}, "brishz_in", "MAGIC_READ_STDIN")
 	if got.code != 9000 || got.out != "" || !strings.HasPrefix(got.errOut, "brishgarden: ") || len(g.reqs) != 1 {
 		t.Errorf("not refused: got %+v after %d requests", got, len(g.reqs))
 	}
@@ -394,11 +401,11 @@ func TestJSONNotices(t *testing.T) {
 	g := jsonGarden(t, func(req map[string]any) (string, string) {
 		return "text/plain", "Empty command received.\n"
 	})
-	if got := runWith(t, g, "", []string{"true"}); got.code != 200 || got.out != "Empty command received.\n" {
+	if got := runBufferedWith(t, g, "", []string{"true"}); got.code != 200 || got.out != "Empty command received.\n" {
 		t.Errorf("got %+v", got)
 	}
 	// With brishz_binary, the fake sends the header; a non-CmdResult is a notice.
-	if got := runWith(t, g, "", []string{"true"}, "brishz_binary", "y"); got.code != 200 {
+	if got := runBufferedWith(t, g, "", []string{"true"}, "brishz_binary", "y"); got.code != 200 {
 		t.Errorf("binary: got %+v", got)
 	}
 }
@@ -412,7 +419,7 @@ func TestJSONBinaryWithoutHeader(t *testing.T) {
 		io.WriteString(w, `{"retcode":0,"out":"","err":"Empty command received."}`)
 	})
 	want := "brishzgo: garden lacks binary support (no X-Brish-Binary header); it predates binary mode or runs with BRISH_BINARY=0\n"
-	if got := runWith(t, g, "", []string{"true"}, "brishz_binary", "y"); got.code != 201 || got.out != "" || got.errOut != want {
+	if got := runBufferedWith(t, g, "", []string{"true"}, "brishz_binary", "y"); got.code != 201 || got.out != "" || got.errOut != want {
 		t.Errorf("got %+v", got)
 	}
 }
@@ -457,7 +464,7 @@ func TestJSONStdinFile(t *testing.T) {
 		return echoReply(req)
 	})
 	stdin := "a\x00b\xff\r\n"
-	got := runWith(t, g, stdin, []string{"cat"}, "brishz_in", "MAGIC_READ_STDIN", "brishz_raw", "n")
+	got := runBufferedWith(t, g, stdin, []string{"cat"}, "brishz_in", "MAGIC_READ_STDIN", "brishz_raw", "n")
 	if got.code != 4 || got.out != "a\x00b\ufffd\r\n" {
 		t.Errorf("got %+v", got)
 	}
@@ -512,7 +519,7 @@ func TestJSONRemoteStdin(t *testing.T) {
 	defer g.Close()
 	for _, c := range []struct{ stdin, field string }{{"text\n", "stdin"}, {"\xff\x00", "stdin_b64"}} {
 		g.reqs = nil
-		got := runWith(t, g, c.stdin, []string{"cat"}, "brishz_in", "MAGIC_READ_STDIN")
+		got := runBufferedWith(t, g, c.stdin, []string{"cat"}, "brishz_in", "MAGIC_READ_STDIN")
 		if got.code != 4 || requestStdin(map[string]any{c.field: requestField(t, g.reqs[1].body, c.field)}) != c.stdin {
 			t.Errorf("%q: got %+v, request %s", c.stdin, got, g.reqs[1].body)
 		}
@@ -557,7 +564,7 @@ func TestKeyHeadersSentAndRedacted(t *testing.T) {
 	os.MkdirAll(filepath.Join(home, ".keys"), 0o700)
 	os.WriteFile(filepath.Join(home, ".keys", "brishgarden"), []byte("X-Test-Key: synthetic-secret\n"), 0o600)
 	var out, errb bytes.Buffer
-	code := run([]string{"true"}, envOf("bshEndpoint", g.URL, "brishz_debug", "y"), "/x", home, strings.NewReader(""), &out, &errb)
+	code := run([]string{"true"}, envOf("bshEndpoint", g.URL, "brishz_stream", "n", "brishz_debug", "y"), "/x", home, strings.NewReader(""), &out, &errb)
 	if code != 0 || g.reqs[0].header.Get("X-Test-Key") != "synthetic-secret" {
 		t.Errorf("exit %d, key header %q", code, g.reqs[0].header.Get("X-Test-Key"))
 	}
@@ -617,7 +624,7 @@ func TestPartialReply(t *testing.T) {
 		w.Header().Set("X-Brish-Out-Length", "10")
 		io.WriteString(w, "abc")
 	})
-	if got := runWith(t, g, "", []string{"true"}); got.code != 18 {
+	if got := runBufferedWith(t, g, "", []string{"true"}); got.code != 18 {
 		t.Errorf("got %+v", got)
 	}
 }
@@ -690,7 +697,7 @@ func TestRawTextModeUnmarked9000(t *testing.T) {
 		rawReply(w, "", "brishgarden: refused", 9000, "0")
 	})
 	want := result{201, "", fmt.Sprintf(textModeMessage, textModeMaybePhrase, "9000")}
-	if got := runWith(t, g, "", []string{"true"}, "brishz_binary", "y"); got != want {
+	if got := runBufferedWith(t, g, "", []string{"true"}, "brishz_binary", "y"); got != want {
 		t.Errorf("got %+v, want %+v", got, want)
 	}
 }

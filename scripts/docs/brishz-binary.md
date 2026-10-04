@@ -35,8 +35,8 @@ empty string mean off, anything else means on.
 
 ## How it travels
 
-Every client first sends the request to the garden's **raw API**
-(`POST /zsh/raw/`), or, in `brishzgo` with `brishz_stream=y`, to its
+The shell clients first send the request to the garden's **raw API**
+(`POST /zsh/raw/`); `brishzgo` defaults to the
 **streaming API** (`POST /zsh/stream/`). Both carry the command, stdin,
 stdout and stderr as bytes, with no JSON and no base64 (see
 [brishz-raw](brishz-raw.md) and [brishzgo](brishzgo.md)). The
@@ -57,9 +57,8 @@ GNU and Homebrew (John Walker's) `base64` all work: the garden ignores the
 line breaks some of them add.
 
 Options that need the JSON API go straight to the binary transport, as they
-always did: `brishz_raw=n` (in any client, except that `brishzgo` with
-`brishz_stream=y` still sends the streaming request first, as it does
-without the opt-in, and falls back to the JSON API),
+always did: `brishz_raw=n` (for `brishzgo`, also set `brishz_stream=n` to
+skip its default streaming request),
 `brishzq.zsh`'s `brishz_out_file_p` and `brishz_eval_file_p`, and
 `brishz.dash`'s `brishz_json_output` other than `0`.
 
@@ -92,14 +91,14 @@ without the opt-in, and falls back to the JSON API),
   pass the opt-in through unchanged. The opt-in path appends
   `/usr/local/bin` and `/opt/homebrew/bin` to `PATH` for `jq`, so it works
   under launchd's bare `PATH` like the rest.
-- `brishzgo` sends the raw request, or with `brishz_stream=y` the streaming
-  request (`POST /zsh/stream/`), with `binary=1`, and handles an exact reply
-  as without the opt-in. A refusal, or a 404 or 405 from either API, sends
+- `brishzgo` sends the streaming request (`POST /zsh/stream/`) by default,
+  or the raw request with `brishz_stream=n`, with `binary=1`. It handles an
+  exact reply as without the opt-in. A refusal, or a 404 or 405 from either API, sends
   it to the JSON API's binary transport. See [brishzgo](brishzgo.md).
 
 Remote endpoints (`bshEndpoint`) work too, since stdin travels in the
-request. Pipe into the client directly: the zsh function `brishz-in` reads
-stdin with `$(cat)` first, which drops trailing newlines.
+request. Pipe into the client directly, or use [agfi:brishz-in], which now
+passes stdin directly to the Go client without dropping trailing newlines.
 
 ## What each garden does
 
@@ -171,8 +170,8 @@ between three openings:
   with retcode 9000 and nothing marks it. Streaming replies never get this
   opening: the streaming API came after `X-Brish-Refused`.
 
-`brishzgo` with `brishz_stream=y` reads the stream to its exit frame first,
-dropping the output, so that its going away does not kill the command half
+`brishzgo` with streaming enabled (the default) reads the stream to its exit
+frame first, dropping the output, so that its going away does not kill the command half
 way.
 
 `brishz.dash` with `brishz_async=y` reads no reply, so it checks nothing:

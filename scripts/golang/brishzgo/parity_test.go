@@ -131,7 +131,7 @@ func TestParityWithBrishzq(t *testing.T) {
 	}
 	runGo := func(args []string, stdin []byte, kv ...string) parityReq {
 		var out, errb bytes.Buffer
-		run(args, envOf(kv...), dir, home, bytes.NewReader(stdin), &out, &errb)
+		run(args, envOf(append([]string{"brishz_stream", "n"}, kv...)...), dir, home, bytes.NewReader(stdin), &out, &errb)
 		return last()
 	}
 

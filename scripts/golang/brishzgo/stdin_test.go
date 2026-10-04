@@ -57,7 +57,7 @@ func TestFallbackKeepsStdinOrder(t *testing.T) {
 	for i := 0; i < 5; i++ {
 		stdin, want := slowStdin(200, 200*time.Microsecond)
 		var out, errb bytes.Buffer
-		env := envOf("bshEndpoint", g.URL, "brishz_in", "MAGIC_READ_STDIN", "brishz_debug", "y")
+		env := envOf("brishz_stream", "n", "bshEndpoint", g.URL, "brishz_in", "MAGIC_READ_STDIN", "brishz_debug", "y")
 		code := run([]string{"cat"}, env, "/x", t.TempDir(), stdin, &out, &errb)
 		if code != 0 || !bytes.Equal(out.Bytes(), want) {
 			t.Fatalf("run %d: exit %d, got %d bytes, starting %q\n%s", i, code, out.Len(), trunc(out.String()), errb.String())
@@ -71,7 +71,7 @@ func TestFallbackSendsNoStdinBefore404(t *testing.T) {
 	g := jsonGarden(t, echoReply)
 	stdin, want := slowStdin(50, 100*time.Microsecond)
 	var out, errb bytes.Buffer
-	env := envOf("bshEndpoint", g.URL, "brishz_in", "MAGIC_READ_STDIN", "brishz_debug", "y")
+	env := envOf("brishz_stream", "n", "bshEndpoint", g.URL, "brishz_in", "MAGIC_READ_STDIN", "brishz_debug", "y")
 	code := run([]string{"cat"}, env, "/x", t.TempDir(), stdin, &out, &errb)
 	if code != 4 || !bytes.Equal(out.Bytes(), want) {
 		t.Fatalf("exit %d, got %q", code, trunc(out.String()))

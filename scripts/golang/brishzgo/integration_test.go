@@ -139,6 +139,8 @@ func (e itEnv) run(t *testing.T, stdin []byte, args []string, kv ...string) itRe
 	cmd.Env = []string{"PATH=" + os.Getenv("PATH"), "HOME=" + e.home, "PWD=" + cmd.Dir, "bshEndpoint=" + e.endpoint}
 	if e.stream {
 		cmd.Env = append(cmd.Env, "brishz_stream=y")
+	} else {
+		cmd.Env = append(cmd.Env, "brishz_stream=n")
 	}
 	for i := 0; i+1 < len(kv); i += 2 {
 		cmd.Env = append(cmd.Env, kv[i]+"="+kv[i+1])

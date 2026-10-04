@@ -195,7 +195,7 @@ func TestBinaryOptInGenerations(t *testing.T) {
 				} else {
 					kv = append(kv, "brishz_in", stdin)
 				}
-				got := runWith(t, g.fakeGarden, pipe, []string{"cat"}, kv...)
+				got := runBufferedWith(t, g.fakeGarden, pipe, []string{"cat"}, kv...)
 
 				first := "/zsh/" + api + "/"
 				var want result
@@ -244,7 +244,7 @@ func TestBinaryOptInNotices(t *testing.T) {
 	for _, stream := range []string{"n", "y"} {
 		for _, gen := range allGens {
 			g := newGenGarden(t, gen)
-			got := runWith(t, g.fakeGarden, "", nil, "brishz_binary", "y", "brishz_noquote", "y", "brishz_stream", stream)
+			got := runBufferedWith(t, g.fakeGarden, "", nil, "brishz_binary", "y", "brishz_noquote", "y", "brishz_stream", stream)
 			want := result{200, genNotice + "\n", ""}
 			switch gen {
 			case genOldLegacy:
@@ -277,14 +277,14 @@ func TestBinaryOptInRoutes(t *testing.T) {
 		{[]string{"brishz_binary", "y", "brishz_session", "s", "brishz_nolog", "y", "brishz_failure_expected", "y"}, "/zsh/raw/nolog/", "binary=1&failure_expected=1&nolog=1&session=s"},
 	} {
 		g := newGenGarden(t, genBinary)
-		got := runWith(t, g.fakeGarden, "", []string{"true"}, c.kv...)
+		got := runBufferedWith(t, g.fakeGarden, "", []string{"true"}, c.kv...)
 		if got.code != 300 || g.paths() != c.paths || g.reqs[0].query != c.query {
 			t.Errorf("%q: got %+v, requests %s?%s", c.kv, got, g.paths(), g.reqs[0].query)
 		}
 	}
 	// A refusal of the streaming request with brishz_raw=n: the JSON API.
 	g := newGenGarden(t, genLegacy)
-	got := runWith(t, g.fakeGarden, "", []string{"true"}, "brishz_binary", "y", "brishz_raw", "n", "brishz_stream", "y")
+	got := runBufferedWith(t, g.fakeGarden, "", []string{"true"}, "brishz_binary", "y", "brishz_raw", "n", "brishz_stream", "y")
 	if got.code != 201 || g.paths() != "/zsh/stream/ /zsh/" || g.runs.Load() != 0 {
 		t.Errorf("refused stream, brishz_raw=n: got %+v, requests %s", got, g.paths())
 	}
@@ -315,7 +315,7 @@ func TestBinaryStreamTextModeDrains(t *testing.T) {
 		}
 		wrote <- err
 	})
-	got := runWith(t, g, "", []string{"cat"}, "brishz_stream", "y", "brishz_binary", "y", "brishz_noquote", "y")
+	got := runBufferedWith(t, g, "", []string{"cat"}, "brishz_stream", "y", "brishz_binary", "y", "brishz_noquote", "y")
 	if want := (result{201, "", fmt.Sprintf(textModeMessage, textModeRanPhrase, "3")}); got != want {
 		t.Errorf("got %+v, want %+v", got, want)
 	}
@@ -323,7 +323,7 @@ func TestBinaryStreamTextModeDrains(t *testing.T) {
 		t.Errorf("the client went away before the exit frame: %v", err)
 	}
 
-	got = runWith(t, g, "", []string{"cut"}, "brishz_stream", "y", "brishz_binary", "y", "brishz_noquote", "y")
+	got = runBufferedWith(t, g, "", []string{"cut"}, "brishz_stream", "y", "brishz_binary", "y", "brishz_noquote", "y")
 	<-wrote
 	if want := (result{201, "", fmt.Sprintf(textModeMessage, textModeRanPhrase, "unknown")}); got != want {
 		t.Errorf("cut short: got %+v, want %+v", got, want)

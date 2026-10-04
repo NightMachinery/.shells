@@ -120,12 +120,14 @@ func TestProxyUsed(t *testing.T) {
 	proxy := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		got = append(got, r.Method+" "+r.URL.String())
 		io.ReadAll(r.Body)
-		rawReply(w, "via proxy", "", 0, "1")
+		w.Header().Set("X-Brish-Stream", "1")
+		w.Write(frameOf(frameStdout, []byte("via proxy")))
+		w.Write(exitFrameOf(0))
 	}))
 	defer proxy.Close()
 	var out, errb bytes.Buffer
 	code := run([]string{"true"}, envOf("bshEndpoint", "http://127.0.0.1:1", "http_proxy", proxy.URL), "/x", "", strings.NewReader(""), &out, &errb)
-	if code != 0 || out.String() != "via proxy" || len(got) != 1 || got[0] != "POST http://127.0.0.1:1/zsh/raw/" {
+	if code != 0 || out.String() != "via proxy" || len(got) != 1 || got[0] != "POST http://127.0.0.1:1/zsh/stream/" {
 		t.Errorf("exit %d, out %q, proxy saw %q", code, out.String(), got)
 	}
 	// An unsupported proxy is curl's exit 7, and a refused one too.

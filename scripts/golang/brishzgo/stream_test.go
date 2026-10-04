@@ -264,15 +264,30 @@ func TestStreamRoundTrip(t *testing.T) {
 	if got.code != 300 || got.out != "lit" || g.reqs[0].path != "/zsh/stream/" || g.reqs[0].header.Get("Expect") != "" {
 		t.Errorf("literal: got %+v, %+v", got, g.reqs)
 	}
-	// brishz_stream is off by default, and with a false value, false
-	// included (core.zsh's bool).
-	for _, v := range []string{"", "n", "0", "no", "false", "FALSE"} {
+	// Explicit false values disable streaming (core.zsh's bool).
+	for _, v := range []string{"n", "N", "0", "no", "NO", "false", "FALSE"} {
 		gr := newFakeGarden(t, func(w http.ResponseWriter, r *http.Request, body []byte) {
 			rawReply(w, "", "", 0, "1")
 		})
 		runWith(t, gr, "", []string{"true"}, "brishz_stream", v)
 		if len(gr.reqs) != 1 || gr.reqs[0].path != "/zsh/raw/" {
 			t.Errorf("brishz_stream=%q: %+v", v, gr.reqs)
+		}
+	}
+}
+
+// TestStreamDefault checks both an absent and empty setting, including
+// brishz_raw=n: disabling raw alone does not disable streaming.
+func TestStreamDefault(t *testing.T) {
+	for _, kv := range [][]string{nil, {"brishz_stream", ""}, {"brishz_raw", "n"}} {
+		g := streamGarden(t, func(w http.ResponseWriter, cmd, stdin []byte) {
+			w.Write(frameOf(frameStdout, stdin))
+			w.Write(frameOf(frameStderr, []byte("err")))
+			w.Write(exitFrameOf(7))
+		})
+		got := runWith(t, g, "", []string{"cat"}, append(kv, "brishz_in", "literal\n")...)
+		if got != (result{7, "literal\n", "err"}) || len(g.reqs) != 1 || g.reqs[0].path != "/zsh/stream/" {
+			t.Errorf("%q: got %+v, requests %+v", kv, got, g.reqs)
 		}
 	}
 }
@@ -302,7 +317,7 @@ func TestStreamProgressive(t *testing.T) {
 	done := make(chan int, 1)
 	go func() {
 		var errb bytes.Buffer
-		done <- run([]string{"true"}, envOf("bshEndpoint", g.URL, "brishz_stream", "y"), "/x", t.TempDir(), strings.NewReader(""), out, &errb)
+		done <- run([]string{"true"}, envOf("bshEndpoint", g.URL), "/x", t.TempDir(), strings.NewReader(""), out, &errb)
 	}()
 	select {
 	case s := <-first:
@@ -386,7 +401,7 @@ func TestStreamFallbacks(t *testing.T) {
 			}
 		})
 		stdin := strings.Repeat("stdin ", 1000)
-		got := runWith(t, g, stdin, []string{"cat"}, "brishz_in", "MAGIC_READ_STDIN", "brishz_stream", "y",
+		got := runWith(t, g, stdin, []string{"cat"}, "brishz_in", "MAGIC_READ_STDIN",
 			"brishz_raw", c.rawOpt, "brishz_debug", "y")
 		var paths []string
 		for _, r := range g.reqs {

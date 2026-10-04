@@ -78,7 +78,7 @@ func TestBuildCommandEmacsForwarding(t *testing.T) {
 func TestNewConfig(t *testing.T) {
 	home := t.TempDir()
 	c := newConfig([]string{"-c", "true"}, envOf(), "/x", home)
-	if c.endpoint != "http://127.0.0.1:7230/zsh/" || len(c.args) != 1 || !c.raw || c.binary || c.apikeyFile != "" {
+	if c.endpoint != "http://127.0.0.1:7230/zsh/" || len(c.args) != 1 || !c.raw || !c.stream || c.binary || c.apikeyFile != "" {
 		t.Errorf("defaults: %+v", c)
 	}
 	c = newConfig(nil, envOf("GARDEN_PORT", "7292", "brishz_raw", "n", "brishz_binary", "No"), "/x", home)

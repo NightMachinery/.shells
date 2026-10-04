@@ -52,6 +52,18 @@ function brishz-alive-p {
 }
 ##
 function brishz {
+    : "Runs a command through brishzgo, streaming output by default."
+    local nightdir="${NIGHTDIR}"
+    local -x brishz_in="${brishz_in}"
+    local -x brishz_session="${brishz_session:-${brishz_s}}"
+    local -x brishz_nolog="${brishz_nolog}"
+
+    go-local-dep brishzgo "${nightdir}/golang/brishzgo" @RET
+    command brishzgo "$@"
+}
+
+function brishz-v1 {
+    : "The previous brishz implementation, using brishzq.zsh."
     ## PERF:
     # `hyperfine --warmup 5 'brishzq.zsh ec hi' "brishz_quote=y brishz.dash 'ec hi'" "brishz_quote='' brishz.dash 'ec hi'"` 81ms, 34ms, 24ms
     ##
@@ -67,9 +79,10 @@ function brishz {
         print -nr -- "$stdin" | brishz_in='MAGIC_READ_STDIN' brishzq.zsh "$@"
     fi
 }
+@opts-setprefix brishz-v1 brishz
 
 function brishz-in {
-    brishz_in="$(cat)" brishz "$@"
+    brishz_in=MAGIC_READ_STDIN brishz "$@"
 }
 
 aliasfn bsh-er bshEndpoint=https://garden.lilf.ir/api/v1 # bsh eval remote

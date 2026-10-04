@@ -1,8 +1,10 @@
 #+TITLE: brishzgo
 
 A Go drop-in for =zshlang/wrappers/brishz/brishzq.zsh=: it runs one zsh command
-in a BrishGarden over the garden's raw API (or with =brishz_stream=y= its
-streaming API), with the same argv, environment variables and exit statuses. What it does, how it differs from =brishzq.zsh=
+in a BrishGarden over the streaming API by default, falling back to raw and
+JSON for older gardens. =brishz_stream=n= skips streaming; also set
+=brishz_raw=n= to use JSON directly. It takes the same argv, environment
+variables and exit statuses. What it does, how it differs from =brishzq.zsh=
 and how fast it is are in [[NIGHTDIR:docs/brishzgo.md][docs/brishzgo.md]]; this readme is about building and
 testing it.
 
@@ -14,6 +16,16 @@ go-install-local "${NIGHTDIR}/golang/brishzgo"
 #+end_src
 
 That puts =brishzgo= in =~/go/bin=. It is registered in =setup/setup_go=.
+
+[agfi:brishz] uses this binary and builds or refreshes it on demand through
+[agfi:go-local-dep]. [agfi:brishz-v1] preserves the previous shell client.
+Streaming passes output through while the command runs; interrupting the
+client stops that command when the garden supports streaming.
+
+Check the zsh wrapper separately with
+=zsh -f zshlang/tests/brishz-default.zsh= from the scripts root. It uses mock
+clients to check argv, stdin, status, session shorthand and the dependency
+guard without touching a garden.
 
 * Layout
 - =main.go=: the environment, the configuration and the dispatch.
@@ -80,7 +92,8 @@ Two more are skipped unless pointed at something:
   such as =0fd2752=), =old-binary= / =old-legacy= (no raw API, such as
   =42ddc9d=), or =pre-binary= (no binary mode at all, such as =cc390bc=).
   Every kind runs every command; the output is compared exactly where that
-  garden can carry it. =BRISHZGO_IT_STREAM=y= runs them all with
+  garden can carry it. The integration harness explicitly disables streaming
+  for its raw/JSON checks. =BRISHZGO_IT_STREAM=y= runs them all with
   =brishz_stream=y= as well; the =TestITStream= ones set it themselves, and
   one of them sends a real Ctrl-C (SIGINT) mid command and checks that the
   command never finishes:
