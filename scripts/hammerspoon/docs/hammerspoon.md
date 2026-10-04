@@ -1822,9 +1822,9 @@ centres it on the screen it is on.
 
 `core/screens.lua` replaces the `show` method in the chooser metatable once,
 so no caller changes. A `show()` with no point becomes `show(topLeft)` on the
-target screen, centred across it and set above centre (`kChooserTopShare`),
-which Apple's docs say is where `-center` puts a window; the share itself is
-not yet compared with a measured native placement. A caller that passes its own
+target screen, centred across it and set above centre where `-center` puts
+it (`kChooserTopShare`, measured from a native show on the laptop,
+2026-10-04). A caller that passes its own
 point is left alone. The upstream method stays reachable as
 `Screens.chooserShowNative`.
 
@@ -1835,12 +1835,13 @@ The point needs the window's size:
   fixed bounds. The rule reads `mainScreen`, so it does too.
 - **Height** cannot be read from Lua. After each show, the chooser's window
   is found in the window list (ours, above layer 0, of that width) and its
-  height is kept per row count in `hs.settings`
-  (`kChooserHeightsKey`), so it survives reloads. Before a height has been
+  height is kept per row count and screen in `hs.settings`
+  (`kChooserHeightsKey`), so it survives reloads. Per screen, because the
+  same ten rows measured 621 pt on the laptop and 514 on the monitor. Before a height has been
   seen, a chooser bound for the primary screen takes the native `show()`,
   which records it, and one bound elsewhere is placed with a guessed height
   (`kChooserHeightGuess`): on the right screen, but possibly a little off
-  vertically, once per row count.
+  vertically, once per row count and screen.
 
 `hs.screen.mainScreen()` lags the focused screen (see "Where focus is" in
 `docs/multi-monitor.md`), so right after focus moves screens the width can
