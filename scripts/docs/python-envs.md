@@ -9,6 +9,12 @@ Python lives in two separate places, split by what a package is used for.
   `NIGHT_PY_VERSION`). Its `bin` comes first in `PATH`, so it is the default
   `python`. The manifest is `python/requirements.txt`, installed by
   [agfi:ins-pip].
+
+  Older servers set up by `setup/minimal_proxy` use a micromamba env named
+  `p314` instead, activated by a micromamba hook in host-local shell config
+  that `~/.shared.sh` does not touch. A service that imports libraries in
+  process, such as betterborg, needs them in this env; `launchers/various.zsh`
+  keeps betterborg on the previous env until its tests pass on the new one.
 - **Tools** (Python programs used as commands: `yq`, `gallery-dl`, `llm`,
   `brishgarden`, ...) each get their own venv through `uv tool install`, with
   their executables in `~/.local/bin`. The manifest is `python/uv-tools.txt`,
