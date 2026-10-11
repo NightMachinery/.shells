@@ -22,6 +22,19 @@ Start here:
 
 Everything below is why those five work, and what to change when they do not.
 
+The shared session picker keeps rows in their supplied order while you search.
+Live and annotated rows default to most recent conversation activity first;
+`agent_session_rows_sort=user` uses your last message instead, and an explicit
+empty value preserves the caller's order.
+
+Paste a full session UUID, or its first eight hexadecimal characters, into
+the fzf query to search by ID. [agfi:h-agent-session-fz-id-cmd] automatically
+reveals the caller key, including a full Paseo UUID, while the query contains
+such a token. `paseo:` prefixes and fzf's exact-match quote
+are supported. Switching back to a title query hides that extra field again.
+The kitty overlay uses the same command. Selection and preview still use
+the original row's fields.
+
 To switch between Claude and Codex, use the separate
 [conversation handoff helpers](agent-handoff.md), including native-import and
 compaction versions with project and all-project pickers. The

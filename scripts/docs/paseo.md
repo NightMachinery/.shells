@@ -307,7 +307,9 @@ with the same two-level layout, because it needs fields such as `lastError`.
 
 - [agfi:paseo-ls]: one row per listed agent: uuid, native agent, native
   session id, status, provider, title, cwd. `--json` prints objects with the
-  same fields. Every helper below reads the records through it, so a layout
+  same fields plus `parentAgentId`, `lastActivityAt`, and `lastUserMessageAt`.
+  The tab-separated layout remains seven columns. Every helper below reads
+  the records through it, so a layout
   change in a Paseo upgrade is fixed in one place.
 - [agfi:paseo-ls-check]: compares `paseo-ls` with the daemon's own
   `paseo ls --global --json`. It fails when they list different agents, and
@@ -319,6 +321,13 @@ with the same two-level layout, because it needs fields such as `lastError`.
 - [agfi:h-paseo-agent-pairs]: the agents as picker rows, with the native
   transcript in the transcript column so the preview works unchanged, and a
   `🧭` badge (`paseo_agent_badge`).
+
+Picker rows exclude records labelled `paseo.parent-agent-id` unless
+`agent_session_fz_subagents_p=y`. The complete `paseo-ls` listing still
+contains children so duplicate filtering also hides their native sessions.
+For rows without transcript metadata, the stored activity timestamp supplies
+the newest-first sort key and displayed timestamp. `agent_session_rows_sort=user`
+uses the stored last-user-message timestamp as that fallback instead.
 
 **A picker that shows Paseo agents shows each one once, as its Paseo row.** The
 native row is dropped. Setting `agent_session_paseo_p=y` around

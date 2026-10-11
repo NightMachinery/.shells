@@ -91,8 +91,39 @@ expect-eq "${kept}" "w2"$'\t'"${other_t}"$'\t'claude$'\t'other 'filter drops the
 
 # Pairs: the live agent's transcript from the listing, the idle one's by glob.
 pairs="$(h-paseo-agent-pairs paseo: | command sort)"
-expect-eq "${pairs}" "paseo:${a_live}"$'\t'"${native_t}"$'\t'claude$'\t'"paseo:${a_live[1,8]}  Live one (running)"$'\t'"${paseo_agent_badge}"$'\n'"paseo:${a_idle}"$'\t'"${idle_t}"$'\t'codex$'\t'"paseo:${a_idle[1,8]}  Idle one (idle)"$'\t'"${paseo_agent_badge}" \
+expect-eq "${pairs}" "paseo:${a_live}"$'\t'"${native_t}"$'\t'claude$'\t'"paseo:${a_live[1,8]}  Live one (running)"$'\t'"${paseo_agent_badge}"$'\t0\t?\n'"paseo:${a_idle}"$'\t'"${idle_t}"$'\t'codex$'\t'"paseo:${a_idle[1,8]}  Idle one (idle)"$'\t'"${paseo_agent_badge}"$'\t0\t?' \
     'picker pairs'
+
+# Parent labels identify workflow children, while the complete listing still
+# hides their native sessions. Missing transcripts have a stored timestamp.
+typeset -g a_child=aaaaaaaa-0000-4000-8000-000000000004
+typeset -g child_id=55555555-5555-4555-8555-555555555555
+typeset -g child_t="${t}/claude/projects/-p/${child_id}.jsonl"
+: > "${child_t}"
+paseo-agents-test-record "${a_child}" claude "${child_id}" idle 'Workflow child'
+command jq --arg parent "${a_live}" '.labels={"paseo.parent-agent-id":$parent}' \
+    "${t}/home/agents/-p/${a_child}.json" > "${t}/child.json"
+command mv -- "${t}/child.json" "${t}/home/agents/-p/${a_child}.json"
+expect-eq "$(paseo-ls --json | command jq --raw-output 'length')" 3 'listing retains children'
+expect-eq "$(h-paseo-agent-pairs paseo: | command cut -f1 | command sort)" \
+    "paseo:${a_live}"$'\n'"paseo:${a_idle}" 'picker excludes children'
+expect-eq "$(agent_session_fz_subagents_p=y h-paseo-agent-pairs paseo: | command cut -f1 | command sort)" \
+    "paseo:${a_live}"$'\n'"paseo:${a_idle}"$'\n'"paseo:${a_child}" 'picker child opt-in'
+function h-agent-session-live-list {
+    printf '1\t%s\tnative\t/p\t%s\t-\tbusy\tinteractive\n' "${live_id}" "${native_t}"
+    printf '2\tother\tother\t/p\t%s\t-\tidle\tinteractive\n' "${other_t}"
+    printf '3\t%s\tchild\t/p\t%s\t-\tidle\tinteractive\n' "${child_id}" "${child_t}"
+}
+kept="$(printf 'w1\t%s\tclaude\tchild\nw2\t%s\tclaude\tother\n' "${child_t}" "${other_t}" | h-paseo-filter-pairs)"
+expect-eq "${kept}" "w2"$'\t'"${other_t}"$'\t'claude$'\t'other 'child native stays hidden'
+command jq '.lastActivityAt="2026-10-11T12:00:00.123Z" | .lastUserMessageAt="2026-10-11T11:00:00Z"' \
+    "${t}/home/agents/-p/${a_idle}.json" > "${t}/stamp.json"
+command mv -- "${t}/stamp.json" "${t}/home/agents/-p/${a_idle}.json"
+expect-eq "$(h-paseo-agent-pairs paseo: | command tail -n1 | command cut -f6,7)" \
+    $'1791720000\t2026-10-11T12:00:00.123Z' 'stored activity fallback'
+expect-eq "$(agent_session_rows_sort=user h-paseo-agent-pairs paseo: | command tail -n1 | command cut -f6,7)" \
+    $'1791716400\t2026-10-11T11:00:00Z' 'stored user timestamp'
+command rm -- "${t}/home/agents/-p/${a_child}.json"
 
 # A remote daemon is refused, and the filter then passes everything through.
 if PASEO_HOST=remote:1 paseo-ls 2>/dev/null ; then
@@ -201,4 +232,22 @@ if test -e "${agent_auto_continue_dir}/claude-work/claude-plain" ; then
     print -ru2 -- 'FAIL: the picked native registration survived' ; exit 1
 fi
 
+# Registered children stay excluded even when off-fz would otherwise produce
+# a fallback row, while an explicit opt-in can still remove the registration.
+paseo-agents-test-record "${a_child}" claude "${child_id}" idle 'Workflow child'
+command jq --arg parent "${a_live}" '.labels={"paseo.parent-agent-id":$parent}' \
+    "${t}/home/agents/-p/${a_child}.json" > "${t}/child.json"
+command mv -- "${t}/child.json" "${t}/home/agents/-p/${a_child}.json"
+command mkdir -p -- "${agent_auto_continue_dir}/claude-default"
+printf 'claude\t%s\t%s\ttmux:%%1\t1\n' "${child_id}" "${child_t}" \
+    > "${agent_auto_continue_dir}/claude-default/claude-${child_id}"
+function h-paseo-auto-continue {
+    [[ "${1}" == list ]] && printf '%s\t%s\tclaude/default\twaiting\n' "${a_child}" "${paseo_home}"
+}
+function h-agent-session-fz { command tee "${t}/child-offered" ; }
+agent-auto-continue-off-fz >/dev/null 2>&1 && { print -ru2 -- 'FAIL: hidden child was offered'; exit 1; }
+test -e "${agent_auto_continue_dir}/claude-default/claude-${child_id}"
+agent_session_fz_subagents_p=y agent-auto-continue-off-fz >/dev/null
+expect-eq "$(command cut -f1 "${t}/child-offered")" "paseo:${a_child}" 'off-fz child opt-in'
+test ! -e "${agent_auto_continue_dir}/claude-default/claude-${child_id}"
 print -r -- 'Paseo agent row checks passed'

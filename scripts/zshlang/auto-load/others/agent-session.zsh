@@ -226,6 +226,24 @@ aliasfn h-agent-session-to-org h-agent-session-to-org-pandoc
 ##
 #: Picking a transcript
 ##
+function h-agent-session-fz-id-cmd {
+    #: fzf searches only its displayed fields. Reveal the caller key while a
+    #: query contains a UUID (or an eight-character prefix), then hide it
+    #: again for title searches. Query text travels in fzf's environment,
+    #: never interpolated into shell code. Shared with the overlay picker.
+    #: Avoid numeric regex quantifiers in braces: fzf would substitute them
+    #: as field placeholders before running Perl.
+    ensure-cmd perl @RET
+    local code='
+        my $q = $ENV{FZF_QUERY} // "";
+        my $prefix = "[0-9a-f]" x 8;
+        my $id = qr/(?<!\S)[\x27^]?(?:paseo:)?$prefix(?:-[0-9a-f]*)*\$?(?!\S)/i;
+        my $nth = $q =~ $id ? "1,4.." : "4..";
+        print "change-with-nth($nth)" if ($ENV{FZF_WITH_NTH} // "") ne $nth;
+    '
+    gquote command perl -e "${code//$'\n'/ }"
+}
+
 function h-agent-session-fz {
     #: The one fzf every session picker goes through. Rows on stdin, tab
     #: separated: a caller column, the transcript, the agent, and then whatever
@@ -246,9 +264,10 @@ function h-agent-session-fz {
     shift
     assert-args multi @RET
 
-    local preview_cmd open_cmd
+    local preview_cmd open_cmd id_cmd
     preview_cmd="$(h-agent-session-preview-cmd '{3}')" @RET
     open_cmd="$(h-agent-session-open-cmd)" @RET
+    id_cmd="$(h-agent-session-fz-id-cmd)" @RET
 
     #: An array, so an empty header is no `--header' at all rather than a blank
     #: row: a caller that does not want the advertisement sets the knob to the
@@ -261,10 +280,11 @@ function h-agent-session-fz {
     test -n "${header}" && header_opt=( --header "${header}" )
 
     fz_no_preview=y fz \
-        --delimiter=$'\t' --with-nth='4..' "--${multi}" --ansi \
+        --delimiter=$'\t' --with-nth='4..' "--${multi}" --ansi --no-sort \
         --preview "${preview_cmd} {2}" \
         --preview-window 'down,60%,wrap' \
         --bind "alt-enter:execute-silent(${open_cmd} {2})" \
+        --bind "start:transform(${id_cmd}),change:transform(${id_cmd})" \
         "${header_opt[@]}" \
         "$@"
 }
@@ -2044,21 +2064,22 @@ function h-agent-session-annotate-rows {
     #: the agent glyph rather than inside the label. The glyph is prepended
     #: here, so a caller that put its badge in the label would get
     #: `🍼 💀 name' when what it meant was `💀 🍼 name'.
-    #: [agfi:h-agent-session-tmux-dead-rows] is the one caller that sets it;
-    #: everything else emits four columns and is untouched.
+    #: Dead tmux rows and Paseo rows use it. Paseo also supplies an optional
+    #: sixth and seventh column, an epoch and stamp to use if the transcript
+    #: metadata is missing. They are consumed here, not added to the output.
     #:
     #: Shared by [agfi:h-agent-session-live-rows] and
     #: [agfi:h-agent-session-tmux-rows]: what a picker knows on its own is the
     #: first column and the label, and everything else is read out of the
     #: transcripts the same way for all of them.
     #:
-    #: agent_session_rows_sort orders the result: empty (the default) keeps the
-    #: caller's order, `last' puts the most recently active session first, and
+    #: agent_session_rows_sort orders the result: empty keeps the caller's
+    #: order, `last' (the default) puts the most recently active session first, and
     #: `user' does the same by your last message rather than the agent's last
     #: word. The sort is done on an epoch-prefixed copy of the rows and the
     #: prefix cut off again, so the row layout never sees it.
     ##
-    local sort_by="${agent_session_rows_sort}"
+    local sort_by="${agent_session_rows_sort-last}"
 
     local pairs
     pairs="$(command cat)" @RET
@@ -2149,17 +2170,18 @@ function h-agent-session-annotate-rows {
                 #: Outside the glyph, so the badge is the first thing read.
                 if ($5 != "") label = $5 " " label
 
-                #: A transcript the join missed sorts last rather than first.
-                if (sort_p != "") printf "%s\t", (ep[path] ? ep[path] : 0)
+                #: Paseo supplies a fallback epoch/stamp for rows without
+                #: transcript metadata. Other unmatched rows sort last.
+                if (sort_p != "") printf "%s\t", (ep[path] ? ep[path] : ($6 + 0))
 
                 print $1, path, agent, label, profile, \
-                    (when[path] ? when[path] : "?"), \
+                    (when[path] ? when[path] : ($7 != "" ? $7 : "?")), \
                     (rel[path] ? rel[path] : path), \
                     snip[path]
             }
         ' <(ec "${glyphs}") <(ec "${meta}") - |
         if test -n "${sort_p}" ; then
-            command sort -t $'\t' -k1,1nr | command cut -f2-
+            command sort -s -t $'\t' -k1,1nr | command cut -f2-
         else
             command cat
         fi
@@ -2701,8 +2723,9 @@ function h-agent-session-open-cmd {
 typeset -g agent_session_fz_header="${agent_session_fz_header:-alt+enter: → org in emacs, in the background (again cancels)}"
 
 function h-agent-session-fz-parts {
-    #: The three things a picker outside zshlang needs from us, one per line:
-    #: the preview command, the alt+enter command, and the header. For
+    #: The four things a picker outside zshlang needs from us, one per line:
+    #: the preview command, the alt+enter command, the header, and the ID
+    #: search command. For
     #: =zshlang/wrappers/agent-session-pick.zsh=, which runs under `zsh -f' in
     #: a kitty overlay and can only reach us through the garden.
     #:
@@ -2713,6 +2736,7 @@ function h-agent-session-fz-parts {
     h-agent-session-preview-cmd '{3}' @RET
     h-agent-session-open-cmd @RET
     ec "${agent_session_fz_header}"
+    h-agent-session-fz-id-cmd
 }
 
 function h-agent-session-preview {

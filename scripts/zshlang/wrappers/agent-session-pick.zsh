@@ -42,10 +42,10 @@ if ! rows="$("${brishzgo}" -- h-agent-session-pick-rows)" || [[ -z "${rows}" ]] 
     exit 1
 fi
 
-#: The preview command, the alt+enter command and the header, in one round trip.
+#: Preview, alt+enter, header and ID search commands, in one round trip.
 #: Bare command names when the garden could not be reached, rather than empty
 #: strings: `--preview " {2}"' would have fzf try to run the transcript path.
-parts=( ${(@f)"$("${brishzgo}" -- h-agent-session-fz-parts)"} )
+parts=( "${(@f)$("${brishzgo}" -- h-agent-session-fz-parts)}" )
 preview_cmd="${parts[1]:-agent_session {3} preview}"
 open_cmd="${parts[2]:-brishz_async=y ${(qq)brishzgo} -- agent-view-session-toggle}"
 #: An array, not `${header:+--header "${header}"}': zsh does not word-split an
@@ -55,14 +55,18 @@ typeset -a header_opt=()
 if [[ -n "${parts[3]}" ]] ; then
     header_opt=( --header "${parts[3]}" )
 fi
+typeset -a id_opt=()
+if [[ -n "${parts[4]}" ]] ; then
+    id_opt=( --bind "start:transform(${parts[4]}),change:transform(${parts[4]})" )
+fi
 
 selected="$(print -r -- "${rows}" |
-    fzf --delimiter=$'\t' --with-nth='4..' --no-multi --ansi \
+    fzf --delimiter=$'\t' --with-nth='4..' --no-multi --ansi --no-sort \
         --prompt='Agent session> ' \
         --preview "${preview_cmd} {2}" \
         --preview-window 'down,60%,wrap' \
         --bind "alt-enter:execute-silent(${open_cmd} {2})" \
-        "${header_opt[@]}")" || exit 0
+        "${header_opt[@]}" "${id_opt[@]}")" || exit 0
 
 fields=( "${(@ps:\t:)selected}" )
 transcript="${fields[2]}"

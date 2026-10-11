@@ -58,6 +58,15 @@ and `CLAUDE_CONFIG_DIR`, `CODEX_THREAD_ID`, `ANTIGRAVITY_CONVERSATION_ID`, and
 instead of typing `/auto-continue` into each one. It offers every live session
 plus the Paseo agents, multi-select, with the usual transcript preview.
 
+Rows appear newest first and retain that order while filtering. Searching
+with a full UUID or its first eight hexadecimal characters reveals the full
+Paseo ID for matching; ordinary title searches keep the compact labels.
+Paseo workflow children (records with a `paseo.parent-agent-id` label) are
+hidden by default, including their duplicate native rows. Set
+`agent_session_fz_subagents_p=y` around either picker to include children,
+for example `agent_session_fz_subagents_p=y agent-auto-continue-off-fz` to
+remove a child's existing registration.
+
 - A Paseo agent appears once, as its `🧭` Paseo row; the native session it runs
   is left out (see "Native sessions" in `docs/paseo.md`). Picking it runs
   [agfi:paseo-auto-continue-on], so its watcher sends through Paseo.

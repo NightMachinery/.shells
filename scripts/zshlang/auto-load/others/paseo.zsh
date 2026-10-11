@@ -193,7 +193,10 @@ id, status, provider, title, cwd; \`-' where unknown. --json prints objects."
               nativeAgent: (.persistence.metadata.provider // "-"),
               nativeSessionId: (.persistence.nativeHandle // .runtimeInfo.sessionId // "-"),
               status: (.lastStatus // "-"), provider: (.provider // "-"),
-              title: (.title // "-"), cwd: (.cwd // "-") } ]'
+              title: (.title // "-"), cwd: (.cwd // "-"),
+              parentAgentId: (.labels["paseo.parent-agent-id"] // null),
+              lastActivityAt: (.lastActivityAt // null),
+              lastUserMessageAt: (.lastUserMessageAt // null) } ]'
 
     if bool "${json_p}" ; then
         command jq --null-input "${agents}" "${records[@]}"
@@ -277,7 +280,8 @@ function h-paseo-filter-pairs {
 
 function h-paseo-agent-pairs {
     #: The Paseo agents as rows for [agfi:h-agent-session-annotate-rows]:
-    #: `<prefix><uuid><TAB><transcript><TAB><agent><TAB><label><TAB><badge>'.
+    #: `<prefix><uuid><TAB><transcript><TAB><agent><TAB><label><TAB><badge>
+    #: <TAB><fallback epoch><TAB><fallback stamp>'.
     #: The transcript is the native session's, so the pickers' preview and
     #: alt+enter work on these rows unchanged; `-' when none is on disk.
     #:
@@ -288,10 +292,24 @@ function h-paseo-agent-pairs {
     ##
     setopt localoptions bareglobqual
 
+    local subagents_p="${agent_session_fz_subagents_p:-n}"
+    local sort_by="${agent_session_rows_sort-last}"
     local prefix="${1}"
+    bool "${subagents_p}" && subagents_p=y
 
     local paseo_rows
-    paseo_rows="$(paseo-ls)" @RET
+    #: Keep paseo-ls complete: the duplicate filter needs to hide children's
+    #: native processes too. Only the picker applies this parent filter.
+    paseo_rows="$(paseo-ls --json | command jq --raw-output \
+        --arg subagents "${subagents_p}" --arg sort_by "${sort_by}" '
+        .[]
+        | select($subagents == "y" or (.parentAgentId // "") == "")
+        | (if $sort_by == "user" then (.lastUserMessageAt // .lastActivityAt)
+           else .lastActivityAt end) as $stamp
+        | (try ($stamp | sub("\\.[0-9]+Z$"; "Z") | fromdateiso8601) catch 0) as $epoch
+        | [ .id, .nativeAgent, .nativeSessionId, .status, .provider, .title, .cwd,
+            $epoch, ($stamp // "?") ]
+        | map(tostring | gsub("[\t\n]"; " ")) | join("\t")')" @RET
     test -n "${paseo_rows}" || return 0
 
     local -A live_t
@@ -327,7 +345,7 @@ function h-paseo-agent-pairs {
             t="${hits[1]:-}"
         fi
 
-        printf '%s%s\t%s\t%s\t%s  %s (%s)\t%s\n' "${prefix}" "${f[1]}" "${t:--}" \
-            "${f[2]}" "paseo:${f[1][1,8]}" "${f[6]}" "${f[4]}" "${paseo_agent_badge}"
+        printf '%s%s\t%s\t%s\t%s  %s (%s)\t%s\t%s\t%s\n' "${prefix}" "${f[1]}" "${t:--}" \
+            "${f[2]}" "paseo:${f[1][1,8]}" "${f[6]}" "${f[4]}" "${paseo_agent_badge}" "${f[8]}" "${f[9]}"
     done
 }

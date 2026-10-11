@@ -885,6 +885,24 @@ turns it off for each."
     #: it.
     ##
     local badge="${paseo_agent_badge:-🧭}"
+    local subagents_p="${agent_session_fz_subagents_p:-n}"
+    local hidden_registered_p=n
+
+    #: A filtered child's registered row must not return as a fallback row,
+    #: or as a separate native registration. Opt in with the usual picker
+    #: subagent knob when intentionally turning a child registration off.
+    local -A hidden_paseo hidden_native
+    local child
+    local -a child_fields
+    if ! bool "${subagents_p}" ; then
+        for child in ${(f)"$(paseo-ls --json 2>/dev/null | command jq --raw-output '
+            .[] | select((.parentAgentId // "") != "")
+            | [.id, .nativeSessionId] | join("\t")' 2>/dev/null)"} ; do
+            child_fields=( "${(@ps:\t:)child}" )
+            hidden_paseo[${child_fields[1]}]=y
+            [[ "${child_fields[2]}" != '-' ]] && hidden_native[${child_fields[2]}]=y
+        done
+    fi
 
     #: uuid -> home, from the watcher's own listing.
     local -A paseo_home_of
@@ -910,6 +928,10 @@ turns it off for each."
     for scope in ${(f)"$(h-agent-auto-continue-scopes)"} ; do
         for reg in ${(f)"$(h-agent-auto-continue-registrations "${scope}")"} ; do
             f=( "${(@ps:\t:)reg}" )
+            if (( ${+hidden_native[${f[2]}]} )) ; then
+                hidden_registered_p=y
+                continue
+            fi
             if (( ${+paseo_of_native[${f[2]}]} )) ; then
                 shadowed[${paseo_of_native[${f[2]}]}]+="${scope} ${f[1]} ${f[2]}"$'\n'
                 continue
@@ -925,6 +947,10 @@ turns it off for each."
         done
         local uuid
         for uuid in ${(k)paseo_home_of} ; do
+            if (( ${+hidden_paseo[${uuid}]} )) ; then
+                hidden_registered_p=y
+                continue
+            fi
             if (( ${+pair_of[${uuid}]} )) ; then
                 pairs+="${pair_of[${uuid}]}"$'\n'
             else
@@ -934,7 +960,11 @@ turns it off for each."
     fi
 
     if test -z "${pairs}" ; then
-        ecerr "$0: nothing is registered for auto-continue"
+        if bool "${hidden_registered_p}" ; then
+            ecerr "$0: only hidden children are registered; set agent_session_fz_subagents_p=y to include them"
+        else
+            ecerr "$0: nothing is registered for auto-continue"
+        fi
         return 1
     fi
 

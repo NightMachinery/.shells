@@ -216,6 +216,13 @@ account polls the usage and, once it is blocked, arms the same job with the
 registered sessions as targets, so they resume at the reset with nothing to
 pick.
 
+[agfi:agent-auto-continue-fz] and [agfi:agent-auto-continue-off-fz] offer
+newest-first session pickers. Paste a UUID or its first eight hexadecimal
+characters to reveal and search the full Paseo ID; title searches keep the
+compact labels. Paseo workflow children are excluded by default. Set
+=agent_session_fz_subagents_p=y= to include them, including when removing a
+child's existing registration.
+
 * Global npm installs
 
 pnpm cannot install any package whose tarball is larger than roughly 50MB: it
