@@ -1067,9 +1067,8 @@ function str-center-justify {
   fi
 }
 
-#: =jalali-calendar-cli= provides =jalali-calendar=, =jcal-all=, =gcal=, =gcal-lmu=, =gcal-lmu-iran=, =jcal-iran-lmu= and their =-all= year views. They use 24-bit colors when the terminal advertises them; pass =--true-color= to force it.
+#: =jalali-calendar-cli= provides =jcal= (=jalali-calendar=), =jcal-all=, =gcal=, =gcal-lmu=, =gcal-lmu-iran=, =jcal-iran-lmu= and their =-all= year views. They use 24-bit colors when the terminal advertises them; pass =--true-color= to force it.
 #: @seeAlso `python -m calendar`
-alias jcal='jalali-calendar'
 alias jcala='jcal-all'
 ##
 function jalali-from-natural {
