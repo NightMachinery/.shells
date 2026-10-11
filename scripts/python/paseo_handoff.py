@@ -2,9 +2,11 @@
 """Transfer one verified native coding-agent session to a local Paseo daemon.
 
 The shell prepares a private plan and launches ``run`` in an independent tmux
-session. No shell commands, native-source process groups, prompts, or environment
+session. No shell commands, native-source process groups, or environment
 snapshots are used. Each external CLI gets its own process group for timeout
-cleanup. External-command output is deliberately not echoed.
+cleanup. External-command output is deliberately not echoed. After the import,
+a best-effort follow-up carries the source model and effort over and sends the
+agent one fixed briefing about what the move broke.
 """
 
 import argparse
@@ -17,6 +19,7 @@ import os
 from pathlib import Path
 import re
 import shlex
+import shutil
 import signal
 import stat
 import subprocess
@@ -38,6 +41,14 @@ PS_RE = re.compile(
     r"(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+"
     r"\d{1,2}\s+\d{2}:\d{2}:\d{2}\s+\d{4})\s+(.+?)\s*$"
 )
+# Model ids such as claude-opus-5-5[1m], claude-haiku-4-5-20251001 or
+# gpt-6.1-sol. The daemon stores a model without checking it, so this only
+# refuses garbage; the value itself must come from the source transcript.
+MODEL_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9._:@-]{0,99}(?:\[[0-9]{1,4}[km]\])?\Z")
+EFFORTS = frozenset({"none", "minimal", "low", "medium", "high", "xhigh", "max",
+                     "ultra", "ultracode", "auto"})
+MODEL_SOURCES = (None, "attachment", "reply", "turn_context")
+MODEL_HELPER = Path(__file__).resolve().with_name("paseo_set_model.mjs")
 
 
 class HandoffError(Exception):
@@ -169,18 +180,21 @@ def private_directory(directory):
         raise HandoffError("Plan directory must belong to you and have mode 0700")
 
 
-def write_private(filename, value):
+def write_private_text(filename, text):
     flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL
     flags |= getattr(os, "O_NOFOLLOW", 0)
     try:
         fd = os.open(filename, flags, 0o600)
     except OSError as exc:
         raise HandoffError("Private state already exists or cannot be created") from exc
-    with os.fdopen(fd, "w") as handle:
-        json.dump(value, handle, sort_keys=True, indent=2)
-        handle.write("\n")
+    with os.fdopen(fd, "w", encoding="utf-8") as handle:
+        handle.write(text)
         handle.flush()
         os.fsync(handle.fileno())
+
+
+def write_private(filename, value):
+    write_private_text(filename, json.dumps(value, sort_keys=True, indent=2) + "\n")
 
 
 def read_private(filename):
@@ -271,6 +285,87 @@ def verify_native(plan):
         raise HandoffError("Native metadata does not match the requested UUID and cwd")
 
 
+def warn(text):
+    print("paseo-handoff: warning: " + text, file=sys.stderr, flush=True)
+
+
+def valid_model(value):
+    return isinstance(value, str) and MODEL_RE.match(value) is not None
+
+
+def scan_transcript(agent, transcript):
+    """Return the latest model candidates and effort seen in a native transcript.
+
+    Keys are present only when the transcript has that kind of record. Claude's
+    ``model`` attachment keeps a context suffix such as ``[1m]`` that its
+    replies' ``message.model`` drops; Codex records both in ``turn_context``.
+    """
+    found = {}
+    with open(transcript, "rb") as handle:
+        for line in handle:
+            # Skip the bulk of the transcript without parsing it.
+            if agent == "claude" and b'"attachment"' not in line and b'"assistant"' not in line:
+                continue
+            if agent == "codex" and b'"turn_context"' not in line:
+                continue
+            try:
+                record = json.loads(line)
+            except ValueError:
+                continue  # A line the live session is still writing.
+            if not isinstance(record, dict) or record.get("isSidechain") is True:
+                continue
+            if agent == "codex":
+                if record.get("type") == "turn_context":
+                    payload = record.get("payload")
+                    payload = payload if isinstance(payload, dict) else {}
+                    found["turn_context"] = payload.get("model")
+                    found["effort"] = payload.get("effort")
+                continue
+            attachment = record.get("attachment")
+            if isinstance(attachment, dict) and attachment.get("type") == "model":
+                identity = attachment.get("identity")
+                found["attachment"] = identity.get("modelId") if isinstance(identity, dict) else None
+            if record.get("type") == "assistant":
+                message = record.get("message")
+                model = message.get("model") if isinstance(message, dict) else None
+                # Synthetic replies (API errors and the like) carry no real
+                # model or effort. A real reply without an effort, such as
+                # Haiku's, means none applies: do not carry an older one over.
+                if model != "<synthetic>":
+                    found["reply"] = model
+                    found["effort"] = record.get("effort")
+    return found
+
+
+def source_settings(agent, transcript):
+    """Return (model, model source, effort) the native session last used.
+
+    Each is None when unknown. Missing or malformed values only warn: these
+    settings must never block a handoff.
+    """
+    try:
+        found = scan_transcript(agent, transcript)
+    except Exception:  # Best effort by design: see the docstring.
+        warn("cannot read the source model and effort; Paseo provider defaults apply")
+        return None, None, None
+    order = ("attachment", "reply") if agent == "claude" else ("turn_context",)
+    source = next((key for key in order if key in found), None)
+    model = found.get(source)
+    if source is None or model is None:
+        warn("source model unknown; the Paseo agent keeps its provider default model")
+        model = source = None
+    elif not valid_model(model):
+        warn("source model is malformed; the Paseo agent keeps its provider default model")
+        model = source = None
+    effort = found.get("effort")
+    if effort is None:
+        warn("source effort unknown; the Paseo agent keeps its provider default effort")
+    elif not isinstance(effort, str) or effort not in EFFORTS:
+        warn("source effort is not a known level; the Paseo agent keeps its provider default effort")
+        effort = None
+    return model, source, effort
+
+
 def prepare(args):
     plan = {"version": 1, "uid": os.getuid(), "agent": args.agent,
             "id": valid_uuid(args.id), "wait_exit": bool(args.wait_exit),
@@ -292,6 +387,9 @@ def prepare(args):
         plan["source_ancestors"] = [asdict(p) for p in reversed(launchers[1:])]
     plan["caller"] = asdict(caller)
     verify_native(plan)
+    # Always present, even when null: their presence marks a plan that expects
+    # the post-import follow-up (see follow_up).
+    plan["model"], plan["model_source"], plan["effort"] = source_settings(args.agent, plan["transcript"])
     output = absolute_path(args.output)
     private_directory(Path(output).parent)
     write_private(output, plan)
@@ -310,6 +408,12 @@ def validate_plan(plan):
                       ("paseo", "executable"), ("agent_session", "executable"), ("paseo_home", None)):
         if absolute_path(plan.get(key), kind=kind) != plan[key]:
             raise HandoffError("Handoff path changed since preparation")
+    if plan.get("model") is not None and not valid_model(plan["model"]):
+        raise HandoffError("Invalid saved source model")
+    if plan.get("effort") is not None and (not isinstance(plan["effort"], str) or plan["effort"] not in EFFORTS):
+        raise HandoffError("Invalid saved source effort")
+    if plan.get("model_source") not in MODEL_SOURCES:
+        raise HandoffError("Invalid saved source model origin")
     try:
         source, caller = Process(**plan["source"]), Process(**plan["caller"])
         owner = Process(**plan["owner"]) if "owner" in plan else source
@@ -538,6 +642,117 @@ def recovery_command(plan):
     return "cd " + shlex.quote(cwd) + " && " + shlex.join(argv)
 
 
+def model_helper_argv(plan):
+    """Run the model helper with the Node.js the Paseo pnpm shim itself prefers."""
+    sibling = Path(plan["paseo"]).parent / "node"
+    if sibling.is_file() and os.access(sibling, os.X_OK):
+        node = str(sibling)
+    else:
+        node = shutil.which("node")
+        if node is None:
+            raise HandoffError("Node.js is unavailable for the model update")
+    return [node, str(MODEL_HELPER)]
+
+
+def set_model(plan, agent_id, model):
+    command(model_helper_argv(plan) + ["--paseo", plan["paseo"], "--home", plan["paseo_home"],
+                                       "--agent-id", agent_id, "--model", model], timeout=45)
+
+
+def set_effort(plan, agent_id, effort):
+    command([plan["paseo"], "agent", "update", agent_id, "--thinking", effort,
+             "--home", plan["paseo_home"]], timeout=45)
+
+
+def failure_text(exc):
+    # HandoffError texts are generic on purpose: CLI output stays withheld.
+    return str(exc) if isinstance(exc, HandoffError) else type(exc).__name__ + ": " + str(exc)
+
+
+def attempt(value, step, *, skipped=None):
+    if value is None or skipped:
+        return {"value": value, "status": "skipped",
+                "detail": skipped or "unknown in the source transcript"}
+    try:
+        step(value)
+    except Exception as exc:  # Best effort: record the failure and continue.
+        return {"value": value, "status": "failed", "detail": failure_text(exc)}
+    return {"value": value, "status": "ok", "detail": None}
+
+
+def outcome_text(step):
+    if step["status"] == "ok":
+        return "succeeded"
+    return ("failed" if step["status"] == "failed" else "was skipped") + " (" + step["detail"] + ")"
+
+
+def followup_prompt(plan, agent_id, record):
+    source = "Claude Code" if plan["agent"] == "claude" else "Codex"
+    model = plan.get("model") or "unknown"
+    if plan.get("model_source") == "reply":
+        model += " (read from your last reply, which omits a context suffix such as [1m])"
+    effort = plan.get("effort") or "unknown"
+    return "\n\n".join([
+        "You are now running in Paseo as agent " + agent_id + ". 2paseo imported you from the native "
+        + source + " session " + plan["id"] + " (working directory " + plan["cwd"] + ") and stopped "
+        "the original process.",
+        "Continue the task you were doing before the move. First, check what the move broke and repair it:",
+        "\n".join([
+            "- Scheduled tasks and cron jobs created in the old session died with it. Recreate the ones "
+            "you still need as Paseo schedules or heartbeats, with the `paseo` skill.",
+            "- In-process subagents, background tasks and background shells are gone. Check their "
+            "outputs, results and worktrees, and relaunch whatever was unfinished.",
+            "- Resume stopped workflows, and re-arm monitors.",
+            "- Holds the old process owned ended with it, and its screen banner may still be up. Take "
+            "again the holds you still need, and turn off a banner you no longer need.",
+        ]),
+        "Then confirm that your model and effort match the source session (model " + model + ", effort "
+        + effort + ") with the `paseo-model-update` skill in status-only mode, and fix them with "
+        "update_agent if they differ. An unknown value could not be read; keep the current one. When "
+        "2paseo tried, setting the model " + outcome_text(record["model"]) + ", and setting the effort "
+        + outcome_text(record["effort"]) + ".",
+    ]) + "\n"
+
+
+def follow_up(plan, status_dir, agent_id):
+    """Carry the source model and effort over, then brief the agent, once.
+
+    Model first: Paseo checks an effort against the agent's current model.
+    Every step is best effort; a failure is recorded in followup.json and in
+    the briefing, and never fails or rolls back the handoff. The record is
+    written last, so a worker killed midway repeats the follow-up on its next
+    run: the setters are idempotent, and a second briefing is harmless.
+    """
+    if "model" not in plan:
+        return None  # Prepared before the follow-up existed; its agent moved on.
+    recordfile = status_dir / "followup.json"
+    if os.path.lexists(recordfile):
+        return None
+    record = {"planDigest": fingerprint(plan), "sourceId": plan["id"], "agentId": agent_id}
+    record["model"] = attempt(plan.get("model"), lambda model: set_model(plan, agent_id, model))
+    # No provider takes "auto" as a thinking option; it means the default.
+    auto = "auto keeps the provider default" if plan.get("effort") == "auto" else None
+    record["effort"] = attempt(plan.get("effort"), lambda effort: set_effort(plan, agent_id, effort),
+                               skipped=auto)
+    promptfile = status_dir / "followup-prompt.txt"
+    try:
+        if os.path.lexists(promptfile):
+            os.unlink(promptfile)  # Left by an interrupted earlier run.
+        write_private_text(promptfile, followup_prompt(plan, agent_id, record))
+        command([plan["paseo"], "send", "--no-wait", "--home", plan["paseo_home"],
+                 "--prompt-file", str(promptfile), agent_id], timeout=60)
+        record["message"] = {"status": "ok", "detail": None, "promptFile": str(promptfile)}
+    except Exception as exc:  # Best effort: record the failure and continue.
+        record["message"] = {"status": "failed", "detail": failure_text(exc), "promptFile": str(promptfile)}
+    try:
+        write_private(recordfile, record)
+    except (HandoffError, OSError) as exc:
+        warn("cannot record the follow-up: " + failure_text(exc))
+    print("Paseo follow-up: model " + record["model"]["status"] + ", effort " + record["effort"]["status"]
+          + ", briefing " + record["message"]["status"] + "; details in " + str(recordfile), flush=True)
+    return record
+
+
 def run(filename):
     if Path(filename).is_symlink():
         raise HandoffError("Handoff plan must not be a symbolic link")
@@ -558,7 +773,9 @@ def run(filename):
                 raise HandoffError("Saved result belongs to another handoff")
             valid_uuid(result.get("agentId"))
             # The imported provider may now write the original native
-            # transcript. This branch only attaches to an already saved ID.
+            # transcript. This branch only attaches to an already saved ID,
+            # after finishing a follow-up an earlier worker did not record.
+            follow_up(plan, status_dir, result["agentId"])
             attach(plan, result["agentId"])
             return
         importfile = status_dir / "import-request.json"
@@ -592,6 +809,7 @@ def run(filename):
             raise HandoffError("Imported session provider or cwd does not match the source")
         write_private(resultfile, {"planDigest": fingerprint(plan), "agentId": agent_id,
                                    "sourceId": plan["id"], "provider": provider, "cwd": plan["cwd"]})
+        follow_up(plan, status_dir, agent_id)
         attach(plan, agent_id)
 
 

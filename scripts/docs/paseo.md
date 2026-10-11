@@ -62,19 +62,77 @@ uppercase one, and Paseo opens `<id>.jsonl` exactly as spelled. A mixed-case
 ID is refused.
 
 This resumes saved history in a new provider process. It does not adopt the
-original process. Source history is retained. The importer sends no task prompt;
-continue the conversation through Paseo when ready.
+original process. Source history is retained. Right after the import, the
+worker sets the source's model and effort and sends the agent one fixed
+briefing, so it resumes on its own (see [Follow-up after import](#follow-up-after-import)).
 
 `paseo attach` streams output and does not provide an interactive coding-agent
 prompt. Use the Paseo desktop/mobile client, or another shell for commands such
 as `paseo send <agent-id> "continue"` and `paseo permit ls`. Ctrl+C detaches the
 output observer. The bundle's `status/result.json` contains the imported Paseo
-agent ID. Re-running `python3 "$NIGHTDIR/python/paseo_handoff.py" run
+agent ID, and `status/followup.json` what the post-import follow-up did.
+Re-running `python3 "$NIGHTDIR/python/paseo_handoff.py" run
 <bundle>/plan.json` attaches that saved result without importing again. If
 `status/import-request.json` exists without a result, inspect Paseo before
 retrying: the import's outcome is unknown, so automatic replay is refused.
 If already inside a Paseo agent, `2paseo` opens an observer for that agent
 without importing or stopping it.
+
+## Follow-up after import
+
+`prepare` reads the model and effort the source session last used from its
+transcript, and stores them in the plan as `model` and `effort`:
+
+- Claude: the model comes from the latest `model` attachment
+  (`attachment.identity.modelId`), which keeps a context suffix such as
+  `[1m]`. Only a transcript without such an attachment falls back to the
+  latest reply's `message.model`, which drops that suffix. The effort is the
+  latest reply's top-level `effort`. Synthetic replies are skipped, and a real
+  reply without an effort (Haiku's) means none applies.
+- Codex: the latest `turn_context` record's `payload.model` and
+  `payload.effort`.
+
+A value that is missing, or does not look like a model id or a known effort
+level, becomes null with a warning. It never blocks the handoff.
+
+After a successful import and before attaching, the worker runs three steps:
+
+1. When the model is known, it sets it with `python/paseo_set_model.mjs`. The
+   CLI has no model flag, so this helper loads the installed `@getpaseo/cli`
+   package, found through the `paseo` executable or its pnpm shim at run time
+   rather than a fixed version path. It connects the way
+   `paseo agent update --home` does and calls the daemon client's
+   `setAgentModel`. The daemon stores a model without checking it, and a wrong
+   one can break the conversation, which is why only the source's own model
+   is ever sent.
+2. When the effort is known, it runs
+   `paseo agent update <id> --thinking <effort> --home <home>`. The model goes
+   first because Paseo checks an effort against the agent's current model.
+   `auto` is skipped: no provider accepts it, and it means the default.
+3. It always sends one fixed briefing with
+   `paseo send --no-wait --prompt-file`. The briefing tells the agent that it
+   now runs in Paseo and that the original process was stopped, and asks it to
+   repair what the move broke before continuing: scheduled tasks and cron jobs
+   (recreated as Paseo schedules or heartbeats), in-process subagents and
+   background shells, stopped workflows, monitors, holds and screen banners.
+   It then asks the agent to confirm its model and effort with the
+   `paseo-model-update` skill, and says which of the first two steps
+   succeeded. The text is kept in `status/followup-prompt.txt`.
+
+Each step is best effort. A failure is recorded and the next step still runs;
+none of them fails or rolls back the handoff. `status/followup.json` records
+each step's value and outcome: `ok`, `failed` with a generic reason (CLI output
+stays withheld), or `skipped`. A re-run that finds a saved result but no
+`followup.json` does the follow-up once before attaching. Once `followup.json`
+exists, a re-run only attaches. A bundle prepared before this follow-up existed
+has no `model` key in its plan and is never briefed, so re-attaching to an old
+agent sends it nothing.
+
+To check that the helper can reach the local daemon without changing anything:
+
+```sh
+node python/paseo_set_model.mjs --paseo "$(command -v paseo)" --home "$HOME/.paseo" --check
+```
 
 ## Controls and recovery
 
@@ -111,8 +169,11 @@ existing settings. A conflicting alias or concurrent configuration edit is
 refused before source termination.
 Default Claude imports verify the daemon's default configuration directory.
 The daemon cannot obtain an account profile merely from the import client's
-environment. Model, permission mode, and effort may follow Paseo provider
-defaults; every original launch override is not automatically restored.
+environment. Model and effort follow the source session when its transcript
+records them (see [Follow-up after import](#follow-up-after-import)).
+Permission mode still follows the provider entry's default mode
+(`paseo provider ls`), and other launch overrides of the original process are
+not restored.
 
 Private plans and results live under
 `${XDG_STATE_HOME:-$HOME/.local/state}/agent-handoffs/paseo.*`.
@@ -148,3 +209,7 @@ Run the isolated checks with:
 zsh -f zshlang/tests/paseo.zsh
 python3 -m unittest discover -s python/tests -p test_paseo_handoff.py
 ```
+
+The Python suite drives every external CLI through fakes that only log their
+arguments. It also runs the model helper against a fake `@getpaseo/cli`
+package, and skips those helper tests when Node.js is missing.

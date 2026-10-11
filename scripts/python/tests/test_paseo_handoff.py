@@ -1,10 +1,16 @@
-"""Safety-boundary tests: all process inspection and signals are mocked."""
+"""Safety-boundary tests: all process inspection and signals are mocked.
+
+External CLIs are fakes that only log their arguments and print an inert
+sentinel; no test reaches a real Paseo daemon.
+"""
 import argparse
 from contextlib import ExitStack
 import importlib.util
+import io
 import json
 import os
 from pathlib import Path
+import shutil
 import signal
 import stat
 import subprocess
@@ -21,6 +27,22 @@ sys.modules[SPEC.name] = h
 SPEC.loader.exec_module(h)
 SOURCE_ID = "12345678-1234-1234-1234-123456789abc"
 IMPORTED_ID = "abcdef12-1234-1234-1234-123456789abc"
+HELPER = MODULE.with_name("paseo_set_model.mjs")
+
+
+def fake_cli(filename, log, label, fail=None):
+    """Write a fake CLI that logs its arguments and prints an inert sentinel.
+
+    It exits 1 when its first argument matches the `case` pattern `fail`.
+    """
+    filename.write_text(
+        "#!/bin/sh\n"
+        f"printf '%s' '{label}' >> '{log}'\n"
+        f"for arg in \"$@\"; do printf ' %s' \"$arg\" >> '{log}'; done\n"
+        f"printf '\\n' >> '{log}'\n"
+        "printf sentinel\n"
+        f"case \"$1\" in {fail or '__never__'}) exit 1 ;; esac\n")
+    filename.chmod(0o700)
 
 
 class HandoffTests(unittest.TestCase):
@@ -29,6 +51,17 @@ class HandoffTests(unittest.TestCase):
         self.addCleanup(self.temp.cleanup)
         self.directory = Path(self.temp.name).resolve()
         self.directory.chmod(0o700)
+        self.warnings = []
+        warned = patch.object(h, "warn", side_effect=self.warnings.append)
+        warned.start()
+        self.addCleanup(warned.stop)
+        self.stdout = io.StringIO()
+        quiet = patch.object(sys, "stdout", self.stdout)
+        quiet.start()
+        self.addCleanup(quiet.stop)
+        self.log = self.directory / "cli.log"
+        self.helper = self.directory / "model-helper"
+        fake_cli(self.helper, self.log, "model")
         self.home = self.directory / "profile"
         self.home.mkdir()
         root = self.home / "projects" / "project"
@@ -82,6 +115,8 @@ class HandoffTests(unittest.TestCase):
         }))
         killed = stack.enter_context(patch.object(h.os, "kill"))
         attached = stack.enter_context(patch.object(h, "attach"))
+        # Never the real Node helper: it would talk to the real daemon.
+        stack.enter_context(patch.object(h, "model_helper_argv", return_value=[str(self.helper)]))
         return imported, killed, attached, wait
 
     def test_prepare_checks_ancestry_metadata_and_private_output(self):
@@ -666,6 +701,360 @@ class HandoffTests(unittest.TestCase):
             command = h.recovery_command(plan)
         self.assertIn("-u CLAUDE_CONFIG_DIR", command)
         self.assertNotIn("CLAUDE_CONFIG_DIR=", command)
+
+    # Source model and effort, and the post-import follow-up.
+
+    def write_transcript(self, *records):
+        self.transcript.write_text("".join(
+            (record if isinstance(record, str) else json.dumps(record)) + "\n" for record in records))
+
+    def settings(self, plan):
+        return plan["model"], plan["model_source"], plan["effort"]
+
+    def test_claude_model_attachment_wins_and_effort_follows_latest_reply(self):
+        self.write_transcript(
+            attachment("claude-opus-5[1m]"), reply("claude-opus-5", "high"),
+            attachment("claude-opus-5-5[1m]"), reply("claude-opus-5-5", "high"),
+            reply("claude-haiku-4-5", "low", isSidechain=True),
+            {"type": "user", "message": {"content": 'quotes "assistant" and "attachment"'}},
+            reply("claude-opus-5-5", "xhigh"), reply("<synthetic>"),
+            '{"type": "assistant", "message": {"model": "still-being-writ')
+        plan = self.make_plan()
+        self.assertEqual(self.settings(plan), ("claude-opus-5-5[1m]", "attachment", "xhigh"))
+        self.assertEqual(self.warnings, [])
+        h.validate_plan(plan)
+
+    def test_claude_reply_model_is_only_a_fallback_and_effort_needs_a_real_reply(self):
+        self.write_transcript(reply("claude-opus-5-5", "xhigh"), reply("claude-sonnet-5", "max"),
+                              reply("<synthetic>"))
+        self.assertEqual(h.source_settings("claude", str(self.transcript)), ("claude-sonnet-5", "reply", "max"))
+        self.assertEqual(self.warnings, [])
+        # Haiku replies carry no effort; an older level must not carry over.
+        self.write_transcript(reply("claude-opus-5-5", "xhigh"), reply("claude-haiku-4-5-20251001"))
+        self.assertEqual(h.source_settings("claude", str(self.transcript)),
+                         ("claude-haiku-4-5-20251001", "reply", None))
+        self.assertEqual(len(self.warnings), 1)
+
+    def test_codex_reads_the_latest_turn_context(self):
+        self.use_codex()
+        self.write_transcript(
+            {"type": "session_meta", "payload": {"id": SOURCE_ID}}, turn("gpt-5.5", "high"),
+            {"type": "response_item", "payload": {"text": 'prose naming "turn_context"'}},
+            turn("gpt-6.1-sol", "xhigh"), {"type": "event_msg", "payload": {"type": "agent_message"}})
+        plan = self.make_plan(self.proxy_table(agent="codex"))
+        self.assertEqual(self.settings(plan), ("gpt-6.1-sol", "turn_context", "xhigh"))
+        h.validate_plan(plan)
+
+    def test_missing_or_malformed_settings_become_null_and_never_block(self):
+        cases = [
+            [{}],
+            [reply("<synthetic>")],
+            ["not json", "[1, 2]", '"assistant"'],
+            [attachment("claude opus; $(printf sentinel)"), reply("claude-opus-5-5", "turbo")],
+            [{"type": "attachment", "attachment": {"type": "model", "identity": "claude-opus-5-5"}},
+             reply("claude-opus-5-5", ["high"])],
+            [attachment("c" * 200), reply("claude-opus-5-5", 5)],
+            [reply(None, None), {"type": "assistant", "message": "claude-opus-5-5", "effort": {}}],
+        ]
+        for records in cases:
+            with self.subTest(records=records):
+                self.warnings.clear()
+                if self.planfile.exists():
+                    self.planfile.unlink()
+                self.write_transcript(*records)
+                plan = self.make_plan()
+                self.assertEqual(self.settings(plan), (None, None, None))
+                self.assertEqual(len(self.warnings), 2)
+                h.validate_plan(plan)
+        self.use_codex()
+        self.write_transcript({"type": "turn_context", "payload": "gpt-5.5"})
+        self.assertEqual(h.source_settings("codex", str(self.transcript)), (None, None, None))
+        with patch.object(h, "scan_transcript", side_effect=OSError("private path")):
+            self.assertEqual(h.source_settings("claude", str(self.transcript)), (None, None, None))
+        self.assertNotIn("private path", " ".join(self.warnings))
+
+    def test_saved_model_effort_or_origin_invalid_refused(self):
+        self.write_transcript(attachment("claude-opus-5-5[1m]"), reply("claude-opus-5-5", "xhigh"))
+        plan = self.make_plan()
+        for changed in ({"model": "bad model"}, {"model": ["claude-opus-5-5"]}, {"effort": "turbo"},
+                        {"effort": ["high"]}, {"model_source": "guess"}):
+            with self.subTest(changed=changed), self.assertRaises(h.HandoffError):
+                h.validate_plan(plan | changed)
+
+    def followup_flow(self, *, fail=None, helper_fail=False, records=None):
+        fake_cli(self.executable, self.log, "paseo", fail=fail)
+        if helper_fail:
+            fake_cli(self.helper, self.log, "model", fail="*")
+        self.write_transcript(*(records or [attachment("claude-opus-5-5[1m]"), reply("claude-opus-5-5", "xhigh")]))
+        return self.flow()
+
+    def log_lines(self):
+        return self.log.read_text().splitlines() if self.log.exists() else []
+
+    def expected_calls(self, *, model="claude-opus-5-5[1m]", effort="xhigh"):
+        home, status = self.args.paseo_home, self.directory / "status"
+        calls = []
+        if model:
+            calls.append(f"model --paseo {self.executable} --home {home} --agent-id {IMPORTED_ID} --model {model}")
+        if effort:
+            calls.append(f"paseo agent update {IMPORTED_ID} --thinking {effort} --home {home}")
+        calls.append(f"paseo send --no-wait --home {home} --prompt-file {status / 'followup-prompt.txt'} {IMPORTED_ID}")
+        return calls
+
+    def followup_record(self):
+        return json.loads((self.directory / "status" / "followup.json").read_text())
+
+    def test_followup_sets_model_then_effort_then_briefs_before_attach(self):
+        _, _, attached, _ = self.followup_flow()
+        status = self.directory / "status"
+        attached.side_effect = lambda *args: self.assertTrue((status / "followup.json").exists())
+        h.run(str(self.planfile))
+        attached.assert_called_once()
+        self.assertEqual(self.log_lines(), self.expected_calls())
+        record = self.followup_record()
+        self.assertEqual(stat.S_IMODE((status / "followup.json").stat().st_mode), 0o600)
+        self.assertEqual((record["agentId"], record["sourceId"]), (IMPORTED_ID, SOURCE_ID))
+        self.assertEqual([record[step]["status"] for step in ("model", "effort", "message")], ["ok"] * 3)
+        self.assertEqual((record["model"]["value"], record["effort"]["value"]), ("claude-opus-5-5[1m]", "xhigh"))
+        prompt = status / "followup-prompt.txt"
+        self.assertEqual(stat.S_IMODE(prompt.stat().st_mode), 0o600)
+        text = prompt.read_text()
+        for expected in ("running in Paseo as agent " + IMPORTED_ID,
+                         "native Claude Code session " + SOURCE_ID,
+                         "(working directory " + str(self.directory) + ")", "stopped the original process",
+                         "Continue the task", "cron jobs", "Paseo schedules or heartbeats", "`paseo` skill",
+                         "subagents", "worktrees", "workflows", "monitors", "Holds", "banner",
+                         "model claude-opus-5-5[1m], effort xhigh",
+                         "`paseo-model-update` skill in status-only mode", "update_agent",
+                         "setting the model succeeded, and setting the effort succeeded"):
+            self.assertIn(expected, text)
+        self.assertFalse({"\u2014", "\u2013"} & set(text))  # no em or en dashes
+        self.assertIn("model ok, effort ok, briefing ok", self.stdout.getvalue())
+        attached.side_effect = None
+        h.run(str(self.planfile))
+        self.assertEqual(attached.call_count, 2)
+        self.assertEqual(self.log_lines(), self.expected_calls())  # nothing repeated
+
+    def test_followup_failures_are_recorded_and_never_stop_the_handoff(self):
+        _, _, attached, _ = self.followup_flow(fail="agent", helper_fail=True)
+        h.run(str(self.planfile))
+        attached.assert_called_once()
+        self.assertEqual(self.log_lines(), self.expected_calls())  # effort still tried after the model
+        record = self.followup_record()
+        self.assertEqual([record[step]["status"] for step in ("model", "effort", "message")],
+                         ["failed", "failed", "ok"])
+        self.assertIn("withheld", record["model"]["detail"])
+        self.assertNotIn("sentinel", json.dumps(record))
+        text = (self.directory / "status" / "followup-prompt.txt").read_text()
+        self.assertIn("setting the model failed (External command failed", text)
+        self.assertIn("setting the effort failed (External command failed", text)
+
+    def test_briefing_or_node_failure_is_recorded_and_attach_still_runs(self):
+        _, _, attached, _ = self.followup_flow(fail="send")
+        with patch.object(h, "model_helper_argv", side_effect=h.HandoffError("Node.js is unavailable for the model update")):
+            h.run(str(self.planfile))
+        attached.assert_called_once()
+        self.assertTrue((self.directory / "status" / "result.json").exists())
+        self.assertEqual(self.log_lines(), self.expected_calls()[1:])
+        record = self.followup_record()
+        self.assertEqual(record["model"], {"value": "claude-opus-5-5[1m]", "status": "failed",
+                                           "detail": "Node.js is unavailable for the model update"})
+        self.assertEqual((record["effort"]["status"], record["message"]["status"]), ("ok", "failed"))
+        self.assertIn("briefing failed", self.stdout.getvalue())
+
+    def test_auto_or_unknown_settings_are_skipped_but_the_briefing_is_sent(self):
+        cases = [([reply("claude-opus-5-5", "auto")], "claude-opus-5-5", None),
+                 ([{}], None, None)]
+        for records, model, effort in cases:
+            with self.subTest(records=records):
+                for leftover in (self.planfile, self.log):
+                    if leftover.exists():
+                        leftover.unlink()
+                shutil.rmtree(self.directory / "status", ignore_errors=True)
+                _, _, attached, _ = self.followup_flow(records=records)
+                h.run(str(self.planfile))
+                attached.assert_called_once()
+                self.assertEqual(self.log_lines(), self.expected_calls(model=model, effort=effort))
+                record = self.followup_record()
+                self.assertEqual(record["effort"]["status"], "skipped")
+                text = (self.directory / "status" / "followup-prompt.txt").read_text()
+                if model:
+                    self.assertIn("auto keeps the provider default", text)
+                    self.assertIn("omits a context suffix", text)
+                else:
+                    self.assertIn("model unknown, effort unknown", text)
+                    self.assertIn("setting the model was skipped (unknown in the source transcript)", text)
+
+    def test_rerun_after_an_unrecorded_followup_does_it_once(self):
+        imported, _, attached, _ = self.followup_flow()
+        with patch.object(h, "follow_up") as interrupted:  # The worker died after saving the result.
+            h.run(str(self.planfile))
+        interrupted.assert_called_once()
+        self.assertEqual(self.log_lines(), [])
+        stale = self.directory / "status" / "followup-prompt.txt"
+        stale.write_text("stale\n")
+        h.run(str(self.planfile))
+        self.assertEqual(self.log_lines(), self.expected_calls())
+        self.assertNotIn("stale", stale.read_text())
+        h.run(str(self.planfile))
+        self.assertEqual(self.log_lines(), self.expected_calls())
+        imported.assert_called_once()
+        self.assertEqual(attached.call_count, 3)
+
+    def test_plan_from_before_the_followup_never_briefs_an_old_agent(self):
+        plan = self.make_plan()
+        for key in ("model", "model_source", "effort"):
+            del plan[key]
+        h.validate_plan(plan)
+        status = self.directory / "status"
+        status.mkdir(mode=0o700)
+        fake_cli(self.executable, self.log, "paseo")
+        self.assertIsNone(h.follow_up(plan, status, IMPORTED_ID))
+        self.assertFalse((status / "followup.json").exists())
+        self.assertEqual(self.log_lines(), [])
+
+    def test_model_helper_prefers_the_node_beside_the_paseo_shim(self):
+        plan = {"paseo": str(self.executable)}
+        with patch.object(h.shutil, "which", return_value="/test/node"):
+            self.assertEqual(h.model_helper_argv(plan), ["/test/node", str(HELPER)])
+        sibling = self.directory / "node"
+        fake_cli(sibling, self.log, "node")
+        self.assertEqual(h.model_helper_argv(plan), [str(sibling), str(HELPER)])
+        sibling.unlink()
+        with patch.object(h.shutil, "which", return_value=None), self.assertRaisesRegex(h.HandoffError, "Node.js"):
+            h.model_helper_argv(plan)
+
+
+def attachment(model):
+    return {"type": "attachment", "isSidechain": False, "attachment": {
+        "type": "model", "identity": {"modelId": model, "marketingName": "M", "knowledgeCutoff": "K"}}}
+
+
+def reply(model, effort=None, **extra):
+    record = {"type": "assistant", "isSidechain": False, "message": {"model": model}}
+    if effort is not None:
+        record["effort"] = effort
+    return record | extra
+
+
+def turn(model, effort):
+    return {"type": "turn_context", "payload": {"model": model, "effort": effort, "cwd": "/"}}
+
+
+FAKE_CLIENT = """\
+import { appendFileSync } from "node:fs";
+const log = (line) => appendFileSync(process.env.FAKE_CLIENT_LOG, line + "\\n");
+export async function connectToDaemon(options) {
+    log("connect " + JSON.stringify(options));
+    if (process.env.FAKE_CLIENT_FAIL === "connect")
+        throw { code: "DAEMON_UNREACHABLE", message: "no daemon sentinel" };
+    return {
+        getLastServerInfoMessage: () => ({ version: "fake-daemon" }),
+        setAgentModel: async (agentId, model) => {
+            log("setAgentModel " + agentId + " " + model);
+            if (process.env.FAKE_CLIENT_FAIL === "set") throw new Error("rejected sentinel");
+        },
+        close: async () => log("close"),
+    };
+}
+"""
+FAKE_TARGET = """\
+export function selectDaemonTarget(options, env, localOnly) {
+    return { kind: "instance", home: options.home, env: Object.keys(env), localOnly };
+}
+"""
+
+
+@unittest.skipUnless(shutil.which("node"), "Node.js is not installed")
+class ModelHelperTests(unittest.TestCase):
+    """The Node helper against a fake @getpaseo/cli package: no daemon involved."""
+
+    def setUp(self):
+        temp = tempfile.TemporaryDirectory()
+        self.addCleanup(temp.cleanup)
+        self.root = Path(temp.name).resolve()
+        self.log = self.root / "client.log"
+        self.home = str(self.root / "paseo-home")
+        package = self.root / "pnpm" / "global" / "5" / ".pnpm" / "cli" / "node_modules" / "@getpaseo" / "cli"
+        (package / "bin").mkdir(parents=True)
+        (package / "dist" / "utils").mkdir(parents=True)
+        (package / "package.json").write_text(json.dumps({"name": "@getpaseo/cli", "version": "9.9.9",
+                                                          "type": "module"}))
+        (package / "bin" / "paseo").write_text("#!/bin/sh\nprintf sentinel\n")
+        (package / "dist" / "utils" / "client.js").write_text(FAKE_CLIENT)
+        (package / "dist" / "utils" / "daemon-target.js").write_text(FAKE_TARGET)
+        self.entry = package / "bin" / "paseo"
+        # Like a pnpm shim: paths relative to $basedir, and the last one runs.
+        self.shim = self.root / "pnpm" / "paseo"
+        self.shim.write_text(
+            '#!/bin/sh\nbasedir=$(dirname "$0")\n'
+            'exec node "$basedir/global/5/.pnpm/stale/node_modules/@getpaseo/cli/bin/paseo" "$@"\n'
+            'exec node "$basedir/global/5/.pnpm/cli/node_modules/@getpaseo/cli/bin/paseo" "$@"\n')
+
+    def helper(self, *args, fail=None):
+        env = dict(os.environ, FAKE_CLIENT_LOG=str(self.log), PASEO_HOST="127.0.0.1:1")
+        if fail:
+            env["FAKE_CLIENT_FAIL"] = fail
+        return subprocess.run(["node", str(HELPER), *args], capture_output=True, text=True, env=env, timeout=60)
+
+    def log_lines(self):
+        return self.log.read_text().splitlines() if self.log.exists() else []
+
+    def connect_line(self):
+        target = {"kind": "instance", "home": self.home, "env": [], "localOnly": False}
+        return "connect " + json.dumps({"target": target}, separators=(",", ":"))
+
+    def test_sets_the_model_through_the_cli_behind_a_pnpm_shim(self):
+        done = self.helper("--paseo", str(self.shim), "--home", self.home,
+                           "--agent-id", IMPORTED_ID, "--model", "claude-opus-5-5[1m]")
+        self.assertEqual(done.returncode, 0, done.stderr)
+        self.assertEqual(json.loads(done.stdout), {"ok": True, "mode": "set", "agentId": IMPORTED_ID,
+                                                   "model": "claude-opus-5-5[1m]"})
+        self.assertEqual(self.log_lines(), [self.connect_line(),
+                                            "setAgentModel " + IMPORTED_ID + " claude-opus-5-5[1m]", "close"])
+
+    def test_check_only_connects_and_disconnects_also_through_a_direct_link(self):
+        link = self.root / "paseo-link"
+        link.symlink_to(self.entry)
+        for executable in (self.shim, link):
+            with self.subTest(executable=executable):
+                self.log.unlink(missing_ok=True)
+                done = self.helper("--paseo", str(executable), "--home", self.home, "--check")
+                self.assertEqual(done.returncode, 0, done.stderr)
+                self.assertEqual(json.loads(done.stdout), {"ok": True, "mode": "check", "cliVersion": "9.9.9",
+                                                           "daemonVersion": "fake-daemon"})
+                self.assertEqual(self.log_lines(), [self.connect_line(), "close"])
+
+    def test_daemon_failures_exit_nonzero_and_still_close(self):
+        args = ("--paseo", str(self.shim), "--home", self.home, "--agent-id", IMPORTED_ID, "--model", "gpt-6.1-sol")
+        done = self.helper(*args, fail="set")
+        self.assertEqual(done.returncode, 1)
+        self.assertIn("rejected sentinel", done.stderr)
+        self.assertEqual(self.log_lines()[-1], "close")
+        self.log.unlink()
+        done = self.helper(*args, fail="connect")
+        self.assertEqual(done.returncode, 1)
+        self.assertIn("no daemon sentinel", done.stderr)
+        self.assertEqual(self.log_lines(), [self.connect_line()])
+
+    def test_refuses_bad_arguments_and_unknown_installs_before_connecting(self):
+        base = ("--paseo", str(self.shim), "--home", self.home)
+        for args in ((*base, "--agent-id", IMPORTED_ID, "--model", "claude opus"),
+                     (*base, "--agent-id", IMPORTED_ID, "--model", "-rf"),
+                     (*base, "--agent-id", "not-a-uuid", "--model", "gpt-6.1-sol"),
+                     (*base, "--check", "--model", "gpt-6.1-sol"),
+                     ("--paseo", str(self.shim), "--home", "relative", "--check"),
+                     ("--home", self.home, "--check"),
+                     (*base, "--check", "--unknown")):
+            with self.subTest(args=args):
+                done = self.helper(*args)
+                self.assertEqual(done.returncode, 64, done.stderr)
+        other = self.root / "other-paseo"
+        other.write_text("#!/bin/sh\nprintf sentinel\n")
+        done = self.helper("--paseo", str(other), "--home", self.home, "--check")
+        self.assertEqual(done.returncode, 1)
+        self.assertIn("cannot find the @getpaseo/cli package", done.stderr)
+        self.assertEqual(self.log_lines(), [])
 
 
 if __name__ == "__main__":
