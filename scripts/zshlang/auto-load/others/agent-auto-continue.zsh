@@ -509,7 +509,6 @@ Registers the calling agent session to be resumed when its usage limit resets,
 and starts the watcher for its scope. Meant to be run by the shared
 /auto-continue skill from the agent's own shell tool."
     ##
-    local poll_s="${agent_auto_continue_poll_s:-300}"
     local frontmost_p=n
 
     while (( $# )) ; do
@@ -524,8 +523,6 @@ and starts the watcher for its scope. Meant to be run by the shared
         esac
     done
 
-    zmodload zsh/datetime 2>/dev/null
-
     local here
     here="$(h-agent-auto-continue-here)" @RET
     local -a h
@@ -535,6 +532,30 @@ and starts the watcher for its scope. Meant to be run by the shared
     local -a targets
     targets=( ${(f)"$(agent_auto_continue_frontmost_p="${frontmost_p}" h-agent-auto-continue-targets "${agent}" "${id}" "${transcript}")"} ) @RET
     (( ${#targets} )) || return 1
+
+    h-agent-auto-continue-register "${agent}" "${id}" "${transcript}" "${scope}" "${targets[@]}"
+}
+
+function h-agent-auto-continue-register {
+    #: Records one session's registration and makes sure its scope's watcher
+    #: is running: the back half of [agfi:agent-auto-continue-on], shared with
+    #: [agfi:agent-auto-continue-fz], which registers sessions picked from
+    #: another shell.
+    #: Usage: h-agent-auto-continue-register <agent> <id> <transcript> <scope> <target>...
+    ##
+    local poll_s="${agent_auto_continue_poll_s:-300}"
+
+    local agent="${1}" id="${2}" transcript="${3}" scope="${4}"
+    assert-args agent id scope @RET
+    shift 4
+    local -a targets
+    targets=( "$@" )
+    if (( ${#targets} == 0 )) ; then
+        ecerr "$0: no target to resume ${agent} ${id} through"
+        return 1
+    fi
+
+    zmodload zsh/datetime 2>/dev/null
 
     local file
     file="$(h-agent-auto-continue-file "${scope}" "${agent}" "${id}")" @RET
@@ -568,10 +589,26 @@ cancels the scope's armed job and stops its watcher."
     h=( "${(@ps:\t:)here}" )
     local agent="${h[1]}" id="${h[2]}" scope="${h[4]}"
 
+    h-agent-auto-continue-unregister "${scope}" "${agent}" "${id}"
+}
+
+function h-agent-auto-continue-unregister {
+    #: Forgets one session's registration, and with nothing left in its scope
+    #: cancels the scope's armed job and stops its watcher: the back half of
+    #: [agfi:agent-auto-continue-off], shared with
+    #: [agfi:agent-auto-continue-off-fz].
+    #: `agent_auto_continue_who' names the session in the messages.
+    #: Usage: h-agent-auto-continue-unregister <scope> <agent> <id>
+    ##
+    local who="${agent_auto_continue_who:-this session}"
+
+    local scope="${1}" agent="${2}" id="${3}"
+    assert-args scope agent id @RET
+
     local file
     file="$(h-agent-auto-continue-file "${scope}" "${agent}" "${id}")" @RET
     if ! test -e "${file}" ; then
-        ec "auto-continue was not on for this session"
+        ec "auto-continue was not on for ${who}"
         return 0
     fi
     command rm -f -- "${file}" @RET
@@ -591,7 +628,7 @@ cancels the scope's armed job and stops its watcher."
         command rmdir -- "${file:h}" 2>/dev/null || true
         ec "auto-continue off: ${scope} has no registered session left; its watcher is stopped"
     else
-        ec "auto-continue off for this session; ${scope} still has $(ec "${left}" | command wc -l | tr -d ' ') registered"
+        ec "auto-continue off for ${who}; ${scope} still has $(ec "${left}" | command wc -l | tr -d ' ') registered"
     fi
 }
 
