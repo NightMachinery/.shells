@@ -59,6 +59,25 @@ data falls outside this research scope.
 
 - Skip running `npx @sveltejs/mcp svelte-autofixer`. It often hangs and gives useless output.
 
+## Web Pages: Put a Content Hash in Every Asset URL
+
+Do not rely on `Cache-Control` to get a changed script or stylesheet to readers.
+A layer between the server and the browser can rewrite it: Cloudflare turned an
+origin's `no-cache` into `max-age=14400` on every `.js` and `.css` (seen
+2026-10), so a deploy could leave a reader on the old `app.js` for four hours. A
+URL that changes whenever the content does cannot be served stale by any cache.
+
+- Reference each script, stylesheet and other changing asset by a URL that
+  carries a short hash of its content, `app.js?v=ab12cd34` or
+  `app.ab12cd34.js`. Compute it in the generator or build step, never by hand.
+- The query form is enough when every cache keys on the query string, as
+  Cloudflare does by default (checked: a new `?v=` is a `MISS`). It needs no
+  renaming and leaves no old files behind. Hash the filename instead when some
+  layer ignores the query, and then prune the old files.
+- Keep stable names for what is found by URL: the HTML page itself (serve it
+  `no-cache`), a service worker script, a web app manifest, and the icons that
+  manifests and home screens point to.
+
 ## VPS / Local Machine Detection
 
 - Only check whether the machine is a VPS if you actually need to know.
