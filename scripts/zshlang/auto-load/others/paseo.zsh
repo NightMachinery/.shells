@@ -9,6 +9,8 @@ function paseo-install {
     local -a npm_install_pnpm_opts=(--allow-build=esbuild,msgpackr-extract,node-pty)
     npm-install "${package}" @RET
     h-npm-install-report paseo
+    #: An upgrade is when Paseo could change the records paseo-ls reads.
+    paseo-ls-check >/dev/null || ecerr "$0: paseo-ls no longer matches \`paseo ls'; run paseo-ls-check"
 }
 
 function 2paseo {
@@ -149,19 +151,29 @@ function h-paseo-home {
     ec "${paseo_home:-${PASEO_HOME:-${HOME}/.paseo}}"
 }
 
-function h-paseo-agent-rows {
-    #: One row per agent `paseo ls --global' would list, tab separated: uuid,
-    #: native agent (`claude' or `codex'), native session id, status,
-    #: provider, name; `-' where the record has nothing.
-    #:
-    #: Read from the stored records rather than asked of the daemon: the same
-    #: agents and statuses (checked against Paseo 0.10.2), in 20ms instead of
-    #: 900ms, and with the one field the CLI does not print. That field,
-    #: `.persistence.nativeHandle', is the id of the native session the agent
-    #: runs, which the live listing also reports as a session in its own
-    #: right; see [agfi:h-paseo-filter-pairs].
+function paseo-ls {
+    : "usage: paseo-ls [--json]
+The agents \`paseo ls --global' lists, read from the daemon's stored records
+without asking the daemon. Tab separated: uuid, native agent, native session
+id, status, provider, title, cwd; \`-' where unknown. --json prints objects."
+    ##
+    #: The one reader of the records, so a Paseo upgrade that changes their
+    #: layout is fixed here once; [agfi:paseo-ls-check] says when it has.
+    #: The same agents and statuses as the CLI (checked against 0.10.2), in
+    #: 20ms instead of 900ms, plus the one field the CLI does not print:
+    #: `.persistence.nativeHandle', the native session the agent runs, which
+    #: the live listing also reports as a session in its own right; see
+    #: [agfi:h-paseo-filter-pairs].
     ##
     setopt localoptions bareglobqual
+
+    local json_p=n
+    case "${1:-}" in
+        '') ;;
+        --json) json_p=y ;;
+        *) ecerr "$0: unknown argument: ${1}" ; return 64 ;;
+    esac
+
     ensure-cmd jq @RET
 
     local home
@@ -169,16 +181,58 @@ function h-paseo-agent-rows {
 
     local -a records
     records=( "${home}"/agents/*.json(N.) "${home}"/agents/*/*.json(N.) )
-    (( ${#records} )) || return 0
+    if (( ${#records} == 0 )) ; then
+        bool "${json_p}" && ec '[]'
+        return 0
+    fi
 
-    command jq --null-input --raw-output '
-        inputs
-        | select((.archivedAt // null) == null and (.internal // false) == false)
-        | [ .id,
-            (.persistence.metadata.provider // "-"),
-            (.persistence.nativeHandle // .runtimeInfo.sessionId // "-"),
-            (.lastStatus // "-"), (.provider // "-"), (.title // "-") ]
-        | map(tostring | gsub("[\t\n]"; " ")) | join("\t")' "${records[@]}"
+    local agents='
+        [ inputs
+          | select((.archivedAt // null) == null and (.internal // false) == false)
+          | { id,
+              nativeAgent: (.persistence.metadata.provider // "-"),
+              nativeSessionId: (.persistence.nativeHandle // .runtimeInfo.sessionId // "-"),
+              status: (.lastStatus // "-"), provider: (.provider // "-"),
+              title: (.title // "-"), cwd: (.cwd // "-") } ]'
+
+    if bool "${json_p}" ; then
+        command jq --null-input "${agents}" "${records[@]}"
+    else
+        command jq --null-input --raw-output "${agents}"'
+            | .[]
+            | [ .id, .nativeAgent, .nativeSessionId, .status, .provider, .title, .cwd ]
+            | map(tostring | gsub("[\t\n]"; " ")) | join("\t")' "${records[@]}"
+    fi
+}
+
+function paseo-ls-check {
+    : "usage: paseo-ls-check
+Compares paseo-ls with the daemon's own \`paseo ls --global'. Fails when they
+list different agents, which means Paseo changed its stored records."
+    ##
+    #: Ids must agree. A status may differ, as an agent can finish between the
+    #: two calls, so that is only reported.
+    ##
+    ensure-cmd paseo jq @RET
+
+    local home ours theirs
+    home="$(h-paseo-home)" @RET
+    ours="$(paseo-ls --json)" @RET
+    theirs="$(command paseo ls --global --json --home "${home}")" @TRET
+
+    local report
+    report="$(command jq --null-input --raw-output --argjson ours "${ours}" --argjson theirs "${theirs}" '
+        ($ours | map({key: .id, value: .status}) | from_entries) as $o
+        | ($theirs | map({key: .id, value: .status}) | from_entries) as $t
+        | ([$t | keys[] | select($o[.] == null) | "missing from paseo-ls: \(.)"]
+           + [$o | keys[] | select($t[.] == null) | "extra in paseo-ls: \(.)"]) as $bad
+        | ([$o | keys[] | select($t[.] != null and $t[.] != $o[.]) | "status \($o[.]) here, \($t[.]) per the daemon: \(.)"]) as $note
+        | ($bad | map("error: " + .)) + ($note | map("note: " + .))
+          + ["\($bad | length) mismatched of \($t | length) agents"]
+        | .[]')" @TRET
+
+    ec "${report}"
+    [[ "${report}" == *$'\n'"0 mismatched of "* || "${report}" == "0 mismatched of "* ]]
 }
 
 function h-paseo-filter-pairs {
@@ -194,7 +248,7 @@ function h-paseo-filter-pairs {
     #: home never empties a picker.
     ##
     local paseo_rows
-    paseo_rows="$(h-paseo-agent-rows 2>/dev/null)" || paseo_rows=''
+    paseo_rows="$(paseo-ls 2>/dev/null)" || paseo_rows=''
     if test -z "${paseo_rows}" ; then
         command cat
         return 0
@@ -237,7 +291,7 @@ function h-paseo-agent-pairs {
     local prefix="${1}"
 
     local paseo_rows
-    paseo_rows="$(h-paseo-agent-rows)" @RET
+    paseo_rows="$(paseo-ls)" @RET
     test -n "${paseo_rows}" || return 0
 
     local -A live_t

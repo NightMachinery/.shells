@@ -79,9 +79,11 @@ function expect-eq {
 }
 
 # Rows: archived agents are left out; tabs in a title cannot break columns.
-rows="$(h-paseo-agent-rows | command sort)"
-expect-eq "${rows}" "${a_live}"$'\t'claude$'\t'"${live_id}"$'\t'running$'\t'p-claude$'\t''Live one'$'\n'"${a_idle}"$'\t'codex$'\t'"${idle_id}"$'\t'idle$'\t'p-codex$'\t''Idle one' \
+rows="$(paseo-ls | command sort)"
+expect-eq "${rows}" "${a_live}"$'\t'claude$'\t'"${live_id}"$'\t'running$'\t'p-claude$'\t''Live one'$'\t-\n'"${a_idle}"$'\t'codex$'\t'"${idle_id}"$'\t'idle$'\t'p-codex$'\t''Idle one'$'\t-' \
     'rows from stored records'
+expect-eq "$(paseo-ls --json | command jq --raw-output 'map(.nativeSessionId) | sort | join(" ")')" "${live_id} ${idle_id}" \
+    'paseo-ls --json'
 
 # The filter drops exactly the native row a Paseo agent runs.
 kept="$(printf 'w1\t%s\tclaude\tnative\nw2\t%s\tclaude\tother\n' "${native_t}" "${other_t}" | h-paseo-filter-pairs)"
@@ -93,7 +95,7 @@ expect-eq "${pairs}" "paseo:${a_live}"$'\t'"${native_t}"$'\t'claude$'\t'"paseo:$
     'picker pairs'
 
 # A remote daemon is refused, and the filter then passes everything through.
-if PASEO_HOST=remote:1 h-paseo-agent-rows 2>/dev/null ; then
+if PASEO_HOST=remote:1 paseo-ls 2>/dev/null ; then
     print -ru2 -- 'FAIL: PASEO_HOST was not refused' ; exit 1
 fi
 kept="$(printf 'w1\t%s\tclaude\tnative\n' "${native_t}" | PASEO_HOST=remote:1 h-paseo-filter-pairs 2>/dev/null)"
@@ -109,11 +111,12 @@ cat > "${t}/bin/paseo" <<'SH'
 #!/bin/sh
 printf '%s\n' "$*" >> "${PASEO_TEST_LOG}"
 [ "$1" = inspect ] && printf '%s\n' "${PASEO_TEST_INSPECT}"
+[ "$1" = ls ] && printf '%s\n' "${PASEO_TEST_LS}"
 exit 0
 SH
 command chmod 700 "${t}/bin/paseo"
 path=("${t}/bin" "${path[@]}")
-typeset -gx PASEO_TEST_LOG="${t}/paseo.log" PASEO_TEST_INSPECT=''
+typeset -gx PASEO_TEST_LOG="${t}/paseo.log" PASEO_TEST_INSPECT='' PASEO_TEST_LS=''
 
 function paseo-agents-test-send {
     #: Usage: paseo-agents-test-send <inspect-json> <target>; prints the log.
@@ -135,6 +138,17 @@ done
 
 out="$(paseo-agents-test-send '{}' 'paseo:not-a-uuid')"
 expect-eq "${out}" refused 'a malformed id is refused before any call'
+
+# paseo-ls-check: the same ids pass even with a status that moved on; a
+# missing agent fails.
+PASEO_TEST_LS="[{\"id\":\"${a_live}\",\"status\":\"idle\"},{\"id\":\"${a_idle}\",\"status\":\"idle\"}]"
+out="$(paseo-ls-check)"
+expect-eq "${out}" "note: status running here, idle per the daemon: ${a_live}"$'\n''0 mismatched of 2 agents' 'paseo-ls-check agreement'
+PASEO_TEST_LS="[{\"id\":\"${a_live}\",\"status\":\"running\"},{\"id\":\"${a_arch}\",\"status\":\"closed\"}]"
+if out="$(paseo-ls-check)" ; then
+    print -ru2 -- 'FAIL: paseo-ls-check accepted a mismatch' ; exit 1
+fi
+expect-eq "${out}" "error: missing from paseo-ls: ${a_arch}"$'\n'"error: extra in paseo-ls: ${a_idle}"$'\n''2 mismatched of 2 agents' 'paseo-ls-check mismatch'
 
 # Scopes of sessions picked from another shell come from the transcript path.
 typeset -gA claude_code_profile_homes=(default .claude work .claude-work)

@@ -26,6 +26,7 @@ SH
 command chmod 700 "${handoff_test_tmp}/bin/"*
 path=("${handoff_test_tmp}/bin" "${path[@]}")
 function npm-install { print -r -- "install ${(j: :)${(qq)@}}" >> "${handoff_test_log}"; }
+function paseo-ls-check { print -r -- "ls-check" >> "${handoff_test_log}"; }
 function h-npm-install-report { print -r -- "report ${1}" >> "${handoff_test_log}"; }
 function tmux-job-start { print -r -- "job ${(j: :)${(qq)@}}" >> "${handoff_test_log}"; }
 function tmux-job-running-p { return 1; }

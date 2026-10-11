@@ -301,10 +301,19 @@ names that session as `.persistence.nativeHandle`, with
 `zshlang/auto-load/others/paseo.zsh` read the records directly rather than
 asking the daemon: they give the same agents and statuses as
 `paseo ls --global` (checked on Paseo 0.10.2) in about 20ms instead of 900ms,
-plus the native handle the CLI does not print.
+plus the native handle the CLI does not print. The Python watcher
+(`python/paseo_auto_continue.py`) still reads one full record by id on its own,
+with the same two-level layout, because it needs fields such as `lastError`.
 
-- [agfi:h-paseo-agent-rows]: one row per listed agent: uuid, native agent,
-  native session id, status, provider, title.
+- [agfi:paseo-ls]: one row per listed agent: uuid, native agent, native
+  session id, status, provider, title, cwd. `--json` prints objects with the
+  same fields. Every helper below reads the records through it, so a layout
+  change in a Paseo upgrade is fixed in one place.
+- [agfi:paseo-ls-check]: compares `paseo-ls` with the daemon's own
+  `paseo ls --global --json`. It fails when they list different agents, and
+  only notes a status that differs, since an agent can finish between the two
+  calls. [agfi:paseo-install] runs it after every install or upgrade and warns
+  when it fails.
 - [agfi:h-paseo-filter-pairs]: drops picker rows whose transcript belongs to a
   listed agent's native session.
 - [agfi:h-paseo-agent-pairs]: the agents as picker rows, with the native

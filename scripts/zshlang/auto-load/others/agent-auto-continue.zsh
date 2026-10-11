@@ -898,7 +898,7 @@ turns it off for each."
     #: native id -> uuid, for the Paseo agents registered here.
     local -A paseo_of_native
     if (( ${#paseo_home_of} )) ; then
-        for row in ${(f)"$(h-paseo-agent-rows 2>/dev/null)"} ; do
+        for row in ${(f)"$(paseo-ls 2>/dev/null)"} ; do
             f=( "${(@ps:\t:)row}" )
             (( ${+paseo_home_of[${f[1]}]} )) && [[ "${f[3]}" != '-' ]] && paseo_of_native[${f[3]}]="${f[1]}"
         done
