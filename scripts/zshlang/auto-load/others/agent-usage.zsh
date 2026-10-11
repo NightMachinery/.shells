@@ -36,9 +36,24 @@ typeset -g agent_usage_continue_paseo_p="${agent_usage_continue_paseo_p:-y}"
 #: notification is harmless, an early resume is spent on a session that is
 #: still blocked.
 typeset -g agent_usage_continue_grace_s="${agent_usage_continue_grace_s:-60}"
-#: Only resume when the keyboard has been untouched at least this long. If you
-#: are at the machine you get a notification instead and can resume yourself.
+#: How long the keyboard must have been untouched before a resume may go to a
+#: target, in seconds, per kind of target; 0 means no idle check. A target held
+#: back gets a notification instead, so you can resume it yourself.
+#:
+#: Only `frontmost' waits by default, since it alone types blind into whatever
+#: has the focus. The rest address one exact window, pane, thread or agent
+#: without needing the focus, a lit display or an unlocked screen, so they
+#: are reliable whether or not you are at the machine.
+#: `agent_usage_continue_idle_min_s' is what `frontmost' and any kind without
+#: a setting of its own use.
 typeset -g agent_usage_continue_idle_min_s="${agent_usage_continue_idle_min_s:-600}"
+typeset -g agent_usage_continue_idle_min_s_kitty="${agent_usage_continue_idle_min_s_kitty:-0}"
+typeset -g agent_usage_continue_idle_min_s_tmux="${agent_usage_continue_idle_min_s_tmux:-0}"
+typeset -g agent_usage_continue_idle_min_s_codex="${agent_usage_continue_idle_min_s_codex:-0}"
+typeset -g agent_usage_continue_idle_min_s_paseo="${agent_usage_continue_idle_min_s_paseo:-0}"
+typeset -g agent_usage_continue_idle_min_s_claude_bg="${agent_usage_continue_idle_min_s_claude_bg:-0}"
+#: The kinds that can have a setting, as they are spelled in the knob names.
+typeset -ga agent_usage_continue_target_kinds=( kitty tmux codex paseo claude_bg frontmost )
 #: What gets sent. A carriage return is appended to submit it.
 typeset -g agent_usage_continue_text="${agent_usage_continue_text:-Continue.}"
 #: One line per fire.
@@ -115,6 +130,16 @@ function h-agent-usage-arm {
     #: scoped to this call -- a test's, a preset's -- would otherwise be lost
     #: and the file's default silently used instead.
     #:
+    #: The per-kind idle settings travel the same way, but only those that
+    #: are set: an unset one must stay unset there too, to keep falling back
+    #: to `agent_usage_continue_idle_min_s'.
+    local kind name
+    local -a idle_settings
+    for kind in "${agent_usage_continue_target_kinds[@]}" ; do
+        name="agent_usage_continue_idle_min_s_${kind}"
+        (( ${+parameters[${name}]} )) && idle_settings+=( "${name}=${(P)name}" )
+    done
+
     #: =silent= because [agfi:tmux-session-processes-kill] narrates every
     #: re-arm, which would otherwise land in the middle of a usage report.
     silent tmuxnewsh2 "${session}" \
@@ -122,6 +147,7 @@ function h-agent-usage-arm {
         agent_usage_arm_action="${action}" \
         agent_usage_arm_targets="${targets}" \
         agent_usage_continue_idle_min_s="${idle_min_s}" \
+        "${idle_settings[@]}" \
         agent_usage_continue_text="${text}" \
         h-agent-usage-arm-wait "${deadline}" "${session}" "${msg}" @RET
 
@@ -341,12 +367,69 @@ function h-agent-usage-continue-send {
     kitty @ --to "${sock}" send-text --match "id:${id}" "${text}"$'\r' @RET
 }
 
+function h-agent-usage-continue-idle-min-s {
+    #: How long the keyboard must have been idle before a resume may go to
+    #: this target, from the setting for its kind; see the knobs above.
+    #: Usage: h-agent-usage-continue-idle-min-s <target>
+    ##
+    local target="${1}"
+    assert-args target @RET
+
+    #: `claude-bg:<id>' is spelled `claude_bg' in a parameter name.
+    local kind="${${target%%:*}//-/_}"
+    local name="agent_usage_continue_idle_min_s_${kind}"
+
+    if (( ${+agent_usage_continue_target_kinds[(r)${kind}]} )) && (( ${+parameters[${name}]} )) && test -n "${(P)name}" ; then
+        ec "${(P)name}"
+    else
+        ec "${agent_usage_continue_idle_min_s:-600}"
+    fi
+}
+
+function h-agent-usage-continue-held-back {
+    #: Why a resume must not go to this target now, or nothing when it may.
+    #: Failing safe: a setting that is not a number, or an idle time that
+    #: could not be read when one is needed, holds the target back. The idle
+    #: time comes from the caller's `idle_s' (seconds, or empty when it could
+    #: not be read), so one fire reads it once.
+    #: Usage: h-agent-usage-continue-held-back <target>
+    ##
+    local target="${1}"
+    assert-args target @RET
+
+    local min_s
+    if ! min_s="$(h-agent-usage-continue-idle-min-s "${target}")" ; then
+        ec 'its idle setting could not be read'
+        return 0
+    fi
+    if [[ "${min_s}" != <-> ]] ; then
+        ec "its idle setting is not a whole number of seconds: ${min_s}"
+        return 0
+    fi
+
+    if (( min_s > 0 )) ; then
+        if [[ "${idle_s}" != <-> ]] ; then
+            ec 'could not read the idle time'
+            return 0
+        fi
+        if (( idle_s < min_s )) ; then
+            ec "you were at the keyboard ($(seconds-fmt-short "${idle_s}") idle, needs $(seconds-fmt-short "${min_s}"))"
+            return 0
+        fi
+    fi
+
+    #: Synthetic keystrokes on a locked screen go to the password field, so
+    #: this holds whatever the idle setting says.
+    if [[ "${target}" == frontmost ]] && h-agent-usage-screen-locked-p ; then
+        ec 'the screen is locked'
+    fi
+}
+
 function h-agent-usage-arm-fire {
     #: What the armed job does once the deadline has passed: tell you, or
     #: resume the sessions that were blocked.
     ##
     local action="${agent_usage_arm_action:-notif}"
-    local idle_min_s="${agent_usage_continue_idle_min_s:-600}"
 
     local label="${1}" msg="${2}"
     assert-args label msg @RET
@@ -367,28 +450,28 @@ function h-agent-usage-arm-fire {
         return 0
     fi
 
-    #: Failing safe: anything we cannot establish means we do not type. The
-    #: notification goes out either way, so an unwanted resume is the worse
-    #: error of the two.
-    local idle_s reason=''
-    if ! idle_s="$(h-agent-usage-idle-s)" ; then
-        reason='could not read the idle time'
-    elif (( idle_s < idle_min_s )) ; then
-        reason="you were at the keyboard ($(seconds-fmt-short "${idle_s}") idle, needs $(seconds-fmt-short "${idle_min_s}"))"
-    elif h-agent-usage-screen-locked-p ; then
-        reason='the screen is locked'
-    fi
-
-    if test -n "${reason}" ; then
-        h-agent-usage-arm-notify "${msg} -- not resuming: ${reason}"
-        h-agent-usage-arm-log "${label}: notified only: ${reason}"
-
-        return 0
-    fi
-
-    local target
-    local -a resumed unreachable
+    #: Decided per target, since the kinds differ in whether you being at the
+    #: keyboard matters; see the knobs above. The notification goes out
+    #: either way, so an unwanted resume is the worse error of the two.
+    #: The idle time is read once, and only when some target's setting needs
+    #: it: with every kind at 0, Hammerspoon is not asked at all.
+    local idle_s='' target why min_s
     for target in "${targets[@]}" ; do
+        min_s="$(h-agent-usage-continue-idle-min-s "${target}")" || min_s=''
+        if [[ "${min_s}" == <-> ]] && (( min_s > 0 )) ; then
+            idle_s="$(h-agent-usage-idle-s)" || idle_s=''
+            break
+        fi
+    done
+
+    local -a resumed unreachable held
+    for target in "${targets[@]}" ; do
+        why="$(h-agent-usage-continue-held-back "${target}")"
+        if test -n "${why}" ; then
+            held+=("${target} (${why})")
+            continue
+        fi
+
         if h-agent-usage-continue-send "${target}" ; then
             resumed+=("${target}")
         else
@@ -399,6 +482,9 @@ function h-agent-usage-arm-fire {
     local report="${msg}"
     if (( ${#resumed} )) ; then
         report+=" -- resumed ${(j:, :)resumed}"
+    fi
+    if (( ${#held} )) ; then
+        report+=" -- not resuming ${(j:, :)held}"
     fi
     if (( ${#unreachable} )) ; then
         report+=" -- could not reach ${(j:, :)unreachable}"

@@ -197,13 +197,35 @@ reason Claude's tmux picker is narrowed to a profile.
 
 ## The idle gate, and failing safe
 
-A resume only types if the keyboard and mouse have been untouched for at
-least `agent_usage_continue_idle_min_s`. If you are at the machine you get an
-ordinary notification instead and can resume yourself. It also declines when
-the screen is locked and when the idle time cannot be read at all. The
-principle is the same in every case: the notification goes out either way, so
-an unwanted resume is the worse of the two errors, and anything that cannot be
-established counts against typing.
+Whether you are at the keyboard matters only for targets that could go
+wrong because of it, so the check is decided per target, by its kind. Each
+kind has a setting, `agent_usage_continue_idle_min_s_<kind>`: the seconds
+the keyboard and mouse must have been untouched before a resume may go to a
+target of that kind, where 0 means no idle check. The kinds are `kitty`,
+`tmux`, `codex`, `paseo`, `claude_bg` and `frontmost`.
+
+- `kitty`, `tmux`, `codex`, `paseo` and `claude_bg` default to 0. Each
+  addresses one exact window, pane, thread or agent and needs no focus, lit
+  display or unlocked screen, so it is reliable whether or not you are at the
+  machine.
+- `frontmost` has no setting of its own by default and uses
+  `agent_usage_continue_idle_min_s` (600). It types blind into whatever has
+  the focus, which is only safe when nobody is using the machine. It also
+  never types on a locked screen, whatever its setting, because synthetic
+  keystrokes there go into the password field.
+- Any other kind uses `agent_usage_continue_idle_min_s` too.
+
+For example, `agent_usage_continue_idle_min_s_tmux=600 cct` makes tmux panes
+wait for ten idle minutes for that one arm; the settings travel into the
+armed job, so a value scoped to one call is the one used when it fires.
+
+A target that may not be resumed yet is held back: the notification names
+it and the reason (`not resuming frontmost (you were at the keyboard ...)`),
+and the other targets are resumed regardless. Failing safe still holds: an
+idle time that cannot be read, or a setting that is not a whole number,
+holds back the targets that need it. The idle time is read once per fire,
+and not at all when every target's setting is 0, so a Hammerspoon that is
+down does not stop a tmux or Paseo resume.
 
 The idle time is `hs.host.idleTime()` through `h-hammerspoon-eval`, and what
 gets checked is the returned string rather than the exit status, because
@@ -229,8 +251,11 @@ defaults live.
   fires.
 - `agent_usage_continue_grace_s` -- the same for a resume; keep it the longer
   of the two.
-- `agent_usage_continue_idle_min_s` -- how long the keyboard must have been
-  untouched before typing is allowed.
+- `agent_usage_continue_idle_min_s_<kind>` -- per target kind, how long the
+  keyboard must have been untouched before a resume may go there; 0 means
+  no check. See the idle gate above.
+- `agent_usage_continue_idle_min_s` -- the same for `frontmost` and any kind
+  without its own setting.
 - `agent_usage_continue_text` -- what gets typed; the newline that submits it
   is added per mechanism.
 - `agent_usage_arm_targets` -- preset targets, skipping the picker.

@@ -11,8 +11,9 @@ Antigravity, the same way `/done` is. Typed in a running session it registers
 that session to be resumed when its account's usage limit resets, and makes
 sure a watcher is running for that account. When the limit is hit, the watcher
 arms the one-shot job from `docs/agent-usage-armed.md` with this session as its
-target, and at the reset the job types `Continue.` into the session — unless
-you are at the keyboard, in which case you get a notification instead.
+target, and at the reset the job types `Continue.` into the session. Only a
+`--frontmost` registration waits until you have left the keyboard; see the
+idle gate in `docs/agent-usage-armed.md`.
 
 The difference from `cct`, `cck`, `csc` and `agyt` is who decides *when* and
 *what*. Those are run by a person from an outside shell after the limit has

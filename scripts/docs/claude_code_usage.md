@@ -994,9 +994,9 @@ only be noise in a list you are scanning quickly. The kitty picker is left
 wide: what the reset unblocks is often one conversation among several, and
 the one waiting may be a Codex thread told to hold off until Claude is usable
 again, or an Antigravity tab. A Codex row is turned into a queue target rather
-than a window in either picker. The targets, the delivery per kind, the idle
-gate that keeps the job from typing while you are at the keyboard, and the
-knobs are all in `docs/agent-usage-armed.md`; the one caveat worth repeating
+than a window in either picker. The targets, the delivery per kind, the
+per-kind idle gate (by default only `frontmost` waits for you to leave the
+keyboard), and the knobs are all in `docs/agent-usage-armed.md`; the one caveat worth repeating
 here is that the job trusts `resets_at` and does not re-check usage when it
 fires.
 

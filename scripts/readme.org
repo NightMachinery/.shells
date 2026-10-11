@@ -201,7 +201,8 @@ windows or panes you picked.
 =./docs/agent-usage-armed.md= covers the one-shot job shared by the Claude
 Code, Codex and Antigravity notifiers: it waits in a tmux session for a reset
 time and then either notifies or types =Continue.= into kitty windows, tmux
-panes or a Codex queue chosen at arm time, unless you are at the keyboard.
+panes, a Codex queue or Paseo agents chosen at arm time. Only the blind
+=frontmost= target waits until you have left the keyboard, by default.
 Where each agent's reset time comes from, and the =cck= / =cct= / =ccfront=
 entry points, are in =./docs/claude_code_usage.md=, =./docs/codex_status.md=
 and =./docs/agy_status.md=; =agent-usage-continue-at= names the time by hand

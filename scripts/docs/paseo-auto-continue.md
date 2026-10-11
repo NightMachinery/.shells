@@ -36,7 +36,8 @@ shell"). They list Paseo agents next to ordinary sessions, each agent once.
 a one-shot job for the current Claude profile's reset and sends `Continue.`
 to the agents picked at arm time. It sends even if an agent never hit the
 limit, as long as the agent is idle with no pending permission when the job
-fires, and only after the usual keyboard idle gate. The watcher here is
+fires (a Paseo target has no keyboard idle check unless
+`agent_usage_continue_idle_min_s_paseo` sets one). The watcher here is
 failure-driven instead: it waits for that agent's own quota-failed turn and
 checks that agent's own provider quota. Do not arm both for one agent, or it
 can be sent `Continue.` twice.
