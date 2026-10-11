@@ -112,6 +112,15 @@ A target is one of four kinds, and the kind decides how the text is delivered:
   Codex accepts a message for a thread by name, so this path needs no window,
   no focus and no awake display, and it cannot land in the wrong place. Both
   pickers prefer it whenever the chosen session is a Codex one.
+- `paseo:<agent-uuid>` -- sent with `paseo send <id> --prompt <text>
+  --no-wait --json --home <home>` to the local Paseo daemon, with
+  `PASEO_AGENT_ID` removed from the environment, so a job armed from inside a
+  Paseo agent is not passed on as the sender. Like the Codex path it needs no
+  window, focus or awake display. At fire time `paseo inspect --json` must
+  show the agent unarchived, not `running` (then someone already resumed it)
+  and with no pending permission request (then it is waiting on you, not on
+  the quota); otherwise it counts as unreachable and nothing is sent. A remote
+  `PASEO_HOST` is refused at arm and at fire time.
 - `claude-bg:<session-id>` -- a Claude Code session started with `claude
   --bg`, or backgrounded from the agent view (`claude agents`). It runs under
   a pty host with no terminal of its own, so there is no pane or window to
@@ -163,7 +172,20 @@ which way is right depends on how you are working, not on who is answering.
   `agent_usage_continue_profile`, to panes whose Claude config home matches
   that profile: a Claude reset frees one profile's sessions, so the other
   profile's panes would only be noise. Also multi-select.
+- `paseo` -- `h-agent-usage-continue-targets-paseo-fz`: the Paseo agents
+  alone, in the same picker layout, from `h-paseo-agent-pairs`. Each row's
+  preview is the native session's transcript. Multi-select.
 - `frontmost` -- no picker; the single target is `frontmost`.
+
+The kitty and tmux pickers offer the Paseo agents as well, as `🧭` rows, and
+drop the native session each agent runs: that session is a headless process
+under the Paseo daemon, which the live listing reports as an ordinary session
+with a tmux session name of its own, although no window or pane holds it. Each
+agent therefore appears once, as its Paseo row. `agent_usage_continue_paseo_p=n`
+turns this off. The tmux picker's profile filter applies to a Paseo row by the
+config home of its native transcript, so a Claude seat's resume offers only
+that seat's Paseo agents, and no Codex ones. `docs/paseo.md` ("Native
+sessions") covers where the link between agent and native session comes from.
 
 Both pickers share one row-to-target mapper: a Codex row becomes
 `codex:<thread-id>` whichever picker it came from, since queueing beats
@@ -194,12 +216,14 @@ All are `typeset -g` in `agent-usage.zsh`, which is the one place their
 defaults live.
 
 - `agent_usage_arm_action` -- `notif` or `continue`.
-- `agent_usage_continue_via` -- `kitty`, `tmux`, `frontmost` or `fn`; which
-  picker runs at arm time and, for `frontmost`, that none does. `fn` calls the
+- `agent_usage_continue_via` -- `kitty`, `tmux`, `paseo`, `frontmost` or
+  `fn`; which picker runs at arm time and, for `frontmost`, that none does. `fn` calls the
   function named in `agent_usage_continue_targets_fn` instead of a picker,
   for a caller that chooses by rule; like a picker it runs only once arming
   is certain, which is how `/auto-continue` learns that the limit is really
   blocking (`docs/agent-auto-continue.md`).
+- `agent_usage_continue_paseo_p` -- whether the kitty and tmux pickers also
+  offer Paseo agents (default `y`).
 - `agent_usage_arm_poll_s` -- how often the waiting job re-reads the clock.
 - `agent_usage_arm_grace_s` -- how long after the reset a notification
   fires.
@@ -257,10 +281,10 @@ lives in its own session,
 instead of replacing one, and shows up in their status through
 `agent-usage-armed-sessions`.
 
-`agent-usage-continue-at-tmux-fz`, `agent-usage-continue-at-kitty-fz` and
-`agent-usage-continue-at-frontmost` are presets over
-`agent_usage_continue_via`, with `acat`, `acak` and `acafront` as their short
-aliases.
+`agent-usage-continue-at-tmux-fz`, `agent-usage-continue-at-kitty-fz`,
+`agent-usage-continue-at-paseo-fz` and `agent-usage-continue-at-frontmost` are
+presets over `agent_usage_continue_via`, with `acat`, `acak`, `acap` and
+`acafront` as their short aliases.
 
 ## All three reports at once
 

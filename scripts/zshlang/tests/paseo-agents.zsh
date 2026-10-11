@@ -22,6 +22,7 @@ source "${paseo_agents_test_root}/zshlang/basic/basic.plugin.zsh"
 function aliasfn { :; }
 function aliasfnq { :; }
 source "${paseo_agents_test_root}/zshlang/auto-load/others/paseo.zsh"
+source "${paseo_agents_test_root}/zshlang/auto-load/others/agent-usage.zsh"
 unalias ecerr 2>/dev/null || true
 function ecerr { print -ru2 -- "$@"; }
 setopt nounset
@@ -94,5 +95,42 @@ if PASEO_HOST=remote:1 h-paseo-agent-rows 2>/dev/null ; then
 fi
 kept="$(printf 'w1\t%s\tclaude\tnative\n' "${native_t}" | PASEO_HOST=remote:1 h-paseo-filter-pairs 2>/dev/null)"
 expect-eq "${kept}" "w1"$'\t'"${native_t}"$'\t'claude$'\t'native 'filter is a no-op without Paseo'
+
+# Picked rows: a Paseo row already names its target.
+targets="$(printf 'paseo:%s\t%s\n' "${a_live}" "${native_t}" | h-agent-usage-continue-rows-to-targets tmux)"
+expect-eq "${targets}" "paseo:${a_live}" 'a Paseo row maps to its own target'
+
+# Sending: a stub CLI logs its argv and answers `inspect' from a fixture.
+command mkdir -p -- "${t}/bin"
+cat > "${t}/bin/paseo" <<'SH'
+#!/bin/sh
+printf '%s\n' "$*" >> "${PASEO_TEST_LOG}"
+[ "$1" = inspect ] && printf '%s\n' "${PASEO_TEST_INSPECT}"
+exit 0
+SH
+command chmod 700 "${t}/bin/paseo"
+path=("${t}/bin" "${path[@]}")
+typeset -gx PASEO_TEST_LOG="${t}/paseo.log" PASEO_TEST_INSPECT=''
+
+function paseo-agents-test-send {
+    #: Usage: paseo-agents-test-send <inspect-json> <target>; prints the log.
+    : > "${PASEO_TEST_LOG}"
+    PASEO_TEST_INSPECT="${1}"
+    h-agent-usage-continue-send "${2}" >/dev/null 2>&1 || print -r -- refused
+    command cat -- "${PASEO_TEST_LOG}"
+}
+
+out="$(paseo-agents-test-send '{"Archived":false,"Status":"idle","PendingPermissions":[]}' "paseo:${a_idle}")"
+expect-eq "${out}" "inspect ${a_idle} --home ${paseo_home} --json"$'\n'"send ${a_idle} --prompt Continue. --no-wait --json --home ${paseo_home}" \
+    'an idle agent is sent to'
+
+for case in '{"Archived":true,"Status":"idle"}' '{"Archived":false,"Status":"running"}' \
+        '{"Archived":false,"Status":"idle","PendingPermissions":[{"id":1}]}' ; do
+    out="$(paseo-agents-test-send "${case}" "paseo:${a_idle}")"
+    expect-eq "${out}" "refused"$'\n'"inspect ${a_idle} --home ${paseo_home} --json" "no send when ${case}"
+done
+
+out="$(paseo-agents-test-send '{}' 'paseo:not-a-uuid')"
+expect-eq "${out}" refused 'a malformed id is refused before any call'
 
 print -r -- 'Paseo agent row checks passed'

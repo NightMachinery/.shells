@@ -19,14 +19,19 @@ typeset -g agent_usage_arm_action="${agent_usage_arm_action:-notif}"
 #: How the resume reaches the session, and hence which picker arming opens:
 #: =kitty= types into a kitty window, =tmux= types into a tmux pane, and
 #: =frontmost= types wherever the keyboard focus happens to be, with no picker
-#: at all. A Codex thread is queued rather than typed into whichever is chosen;
-#: see [agfi:h-agent-usage-continue-rows-to-targets]. =fn= is for a caller
+#: at all, and =paseo= sends to Paseo agents with `paseo send'. A Codex thread
+#: is queued rather than typed into whichever is chosen, and a Paseo agent the
+#: kitty or tmux picker offers is sent to; see
+#: [agfi:h-agent-usage-continue-rows-to-targets]. =fn= is for a caller
 #: that picks by rule rather than by hand: the function named in
 #: `agent_usage_continue_targets_fn' prints the targets, and is called only
 #: once arming has been decided, which is what lets that caller learn that the
 #: limit is in fact blocking ([agfi:agent-auto-continue-check]).
 typeset -g agent_usage_continue_via="${agent_usage_continue_via:-kitty}"
 typeset -g agent_usage_continue_targets_fn="${agent_usage_continue_targets_fn}"
+#: Whether the kitty and tmux pickers also offer Paseo agents (and hide the
+#: native sessions they run); see [agfi:h-paseo-filter-pairs].
+typeset -g agent_usage_continue_paseo_p="${agent_usage_continue_paseo_p:-y}"
 #: Resuming waits longer after a reset than a notification does: an early
 #: notification is harmless, an early resume is spent on a session that is
 #: still blocked.
@@ -212,6 +217,7 @@ function h-agent-usage-continue-send {
     #: Delivers the resume text to one target: `kitty:<window-id>` types into
     #: that window, `tmux:<pane-id>` types into that pane,
     #: `codex:<thread-id>` queues the message with Codex itself,
+    #: `paseo:<agent-uuid>` sends it through the local Paseo daemon,
     #: `claude-bg:<session-id>` attaches a scratch terminal to a background
     #: Claude Code session and types there, and `frontmost` types wherever
     #: the keyboard focus happens to be.
@@ -228,6 +234,45 @@ function h-agent-usage-continue-send {
         #: the thread id comes from.
         ensure-cmd codex @RET
         reval-ec command codex queue --thread "${target#codex:}" --message "${text}"
+        return $?
+    fi
+
+    if [[ "${target}" == paseo:* ]] ; then
+        #: Paseo, like Codex, takes a message for an agent by id, so this
+        #: needs no window, no focus and no awake display.
+        local agent_id="${target#paseo:}"
+        if [[ ! "${agent_id}" =~ '^[0-9a-fA-F]{8}-([0-9a-fA-F]{4}-){3}[0-9a-fA-F]{12}$' ]] ; then
+            ecerr "$0: not a Paseo agent id: ${agent_id}"
+            return 1
+        fi
+
+        ensure-cmd paseo jq @RET
+        local home
+        home="$(h-paseo-home)" @RET
+
+        #: Asked again now, at fire time, as the tmux branch asks about its
+        #: pane: hours have passed since the pick. An agent already running
+        #: was resumed by someone else, and one with a pending permission is
+        #: waiting on you, not on the quota.
+        local info why
+        if ! info="$(command paseo inspect "${agent_id}" --home "${home}" --json 2>/dev/null)" ; then
+            ecerr "$0: Paseo agent ${agent_id} could not be inspected"
+            return 1
+        fi
+        why="$(ec "${info}" | command jq --raw-output '
+            if .Archived then "is archived"
+            elif .Status == "running" then "is already running"
+            elif ((.PendingPermissions // []) | length) > 0 then "is waiting on a permission request"
+            else "" end')" @TRET
+        if test -n "${why}" ; then
+            ecerr "$0: Paseo agent ${agent_id} ${why}"
+            return 1
+        fi
+
+        #: Without `PASEO_AGENT_ID', which a job armed from inside a Paseo
+        #: agent would otherwise pass on as the sender.
+        reval-ec command env -u PASEO_AGENT_ID paseo send "${agent_id}" \
+            --prompt "${text}" --no-wait --json --home "${home}"
         return $?
     fi
 
@@ -376,6 +421,7 @@ function h-agent-usage-continue-targets {
     case "${via}" in
         kitty) h-agent-usage-continue-targets-kitty-fz ;;
         tmux) h-agent-usage-continue-targets-tmux-fz ;;
+        paseo) h-agent-usage-continue-targets-paseo-fz ;;
         frontmost)
             #: Nothing to pick: there is one frontmost window, and which one it
             #: will be is not knowable now anyway.
@@ -393,7 +439,7 @@ function h-agent-usage-continue-targets {
             "${fn}"
             ;;
         *)
-            ecerr "$0: unknown agent_usage_continue_via: ${via} (kitty, tmux, frontmost, fn)"
+            ecerr "$0: unknown agent_usage_continue_via: ${via} (kitty, tmux, paseo, frontmost, fn)"
             return 1
             ;;
     esac
@@ -405,8 +451,9 @@ function h-agent-usage-continue-rows-to-targets {
     #: $1 (`kitty' or `tmux').
     #:
     #: A Codex thread is reachable without a window at all, which is strictly
-    #: better than typing, so it is queued whichever picker found it; anything
-    #: else is typed into the window or pane the picker named.
+    #: better than typing, so it is queued whichever picker found it; a Paseo
+    #: row already names its target, `paseo:<uuid>'; anything else is typed
+    #: into the window or pane the picker named.
     #: Usage: ... | h-agent-usage-continue-rows-to-targets <kitty|tmux>
     ##
     local kind="${1}"
@@ -432,6 +479,12 @@ function h-agent-usage-continue-rows-to-targets {
         #: prepends, which names no session at all.
         if [[ "${f[1]}" == frontmost ]] ; then
             ec frontmost
+            continue
+        fi
+
+        #: [agfi:h-paseo-agent-pairs] puts the whole target in column 1.
+        if [[ "${f[1]}" == paseo:* ]] ; then
+            ec "${f[1]}"
             continue
         fi
 
@@ -467,6 +520,9 @@ function h-agent-usage-continue-targets-kitty-fz {
     #: noise here. The binding still works, it is just not announced.
     local agent_session_fz_header=''
 
+    #: Paseo agents too, each once; see [agfi:h-paseo-filter-pairs].
+    local agent_session_paseo_p="${agent_usage_continue_paseo_p:-y}"
+
     local selected
     selected="$(agent-session-live-fz)" @RET
 
@@ -490,12 +546,31 @@ function h-agent-usage-continue-targets-tmux-fz {
     #: `local'.
     ##
     local profile="${agent_usage_continue_profile}"
+    local paseo_p="${agent_usage_continue_paseo_p:-y}"
 
     #: No header, for the reason given in the kitty picker.
     local agent_session_fz_header=''
 
-    local rows
-    rows="$(h-agent-session-tmux-panes | h-agent-session-annotate-rows)" || rows=''
+    #: Paseo agents join the panes, and the native sessions they run leave
+    #: them, as in the kitty picker. No pane holds such a session, so the
+    #: filter rarely has anything to drop here; it is there for a daemon that
+    #: was started from inside a pane, whose children the walk would place in
+    #: it.
+    local pairs paseo_pairs='' rows=''
+    pairs="$(h-agent-session-tmux-panes)" || pairs=''
+    if bool "${paseo_p}" ; then
+        pairs="$(ec "${pairs}" | h-paseo-filter-pairs)"
+        paseo_pairs="$(h-paseo-agent-pairs paseo: 2>/dev/null)" || paseo_pairs=''
+    fi
+    if test -n "${pairs}${paseo_pairs}" ; then
+        rows="$(
+            {
+                test -n "${pairs}" && ec "${pairs}"
+                test -n "${paseo_pairs}" && ec "${paseo_pairs}"
+                true
+            } | h-agent-session-annotate-rows
+        )" || rows=''
+    fi
     if test -z "${rows}" ; then
         ecerr "$0: no live agent session in a tmux pane"
         return 1
@@ -522,6 +597,28 @@ function h-agent-usage-continue-targets-tmux-fz {
     #: The display columns were only ever for the person choosing.
     ec "${selected}" | command cut -f1,2 |
         h-agent-usage-continue-rows-to-targets tmux
+}
+function h-agent-usage-continue-targets-paseo-fz {
+    #: Picks among the Paseo agents alone. Prints one `paseo:<uuid>` target
+    #: per line.
+    #:
+    #: Left wide, every provider offered, for the kitty picker's reason: the
+    #: agent waiting may be on either Claude seat, or on Codex.
+    ##
+    local agent_session_fz_header=''
+
+    local pairs
+    pairs="$(h-paseo-agent-pairs paseo:)" @RET
+    if test -z "${pairs}" ; then
+        ecerr "$0: no Paseo agent to resume"
+        return 1
+    fi
+
+    local selected
+    selected="$(ec "${pairs}" | h-agent-session-annotate-rows | h-agent-session-fz multi)" @TRET
+    test -n "${selected}" || return 1
+
+    ec "${selected}" | command cut -f1
 }
 ##
 #: A deadline you name yourself
@@ -579,11 +676,13 @@ function agent-usage-continue-at {
 #: The mechanism goes in the name, as it does for the Claude entry points.
 aliasfnq agent-usage-continue-at-kitty-fz agent_usage_continue_via=kitty agent-usage-continue-at
 aliasfnq agent-usage-continue-at-tmux-fz agent_usage_continue_via=tmux agent-usage-continue-at
+aliasfnq agent-usage-continue-at-paseo-fz agent_usage_continue_via=paseo agent-usage-continue-at
 aliasfnq agent-usage-continue-at-frontmost agent_usage_continue_via=frontmost agent-usage-continue-at
 
 #: `a' for agent, `ca' for continue-at, then the mechanism.
 aliasfn acak agent-usage-continue-at-kitty-fz
 aliasfn acat agent-usage-continue-at-tmux-fz
+aliasfn acap agent-usage-continue-at-paseo-fz
 aliasfn acafront agent-usage-continue-at-frontmost
 ##
 #: Bookkeeping, over whatever sessions the caller's agent owns
