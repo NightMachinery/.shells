@@ -25,6 +25,19 @@ Rebuild the site from the registry. Does not touch the mirror."
     assert python3 "${lilf_pages_deployment}/package_linroute.py" @RET
 }
 ##
+function lilf-pages-tunnel-start {
+    : "usage: lilf-pages-tunnel-start
+On the mirror host: start, or restart, the Cloudflare tunnel in the tmux session
+cloudflared-pages, restarting it whenever it fails."
+
+    #: The tunnel once died with nothing to restart it and no trace of why. `retry' runs it
+    #: again 5 s after any non-zero exit and prints the exit code, and the pane's scrollback
+    #: keeps what it logged before dying. The one place that starts it: the boot launcher
+    #: and the deployment's deploy.sh both call this.
+    local cloudflared="${commands[cloudflared]:-${HOME}/bin/cloudflared}"
+    tmuxnewsh2 cloudflared-pages retry_sleep=5 retry "${cloudflared}" tunnel run
+}
+##
 function lilf-pages-package-linroute {
     : "usage: lilf-pages-package-linroute
 Add linroute's shared browser assets to the already-built tree."

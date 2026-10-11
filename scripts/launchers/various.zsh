@@ -98,7 +98,7 @@ if test -e "${HOME}/html-reports/Caddyfile" ; then
     #: what a reboot forgets -- it had been running unsupervised, reparented to init, and
     #: would not have come back.
     tmuxnewsh2 pages-caddy caddy run --config "${HOME}/html-reports/Caddyfile" --adapter caddyfile
-    tmuxnewsh2 cloudflared-pages "${HOME}/bin/cloudflared" tunnel run
+    lilf-pages-tunnel-start
 fi
 ##
 # launch-musicf.zsh
