@@ -39,8 +39,8 @@ terminal watcher or a scheduled deadline for Paseo.
 
 For other targets, once, in one or two sentences: a watcher now polls this account's usage;
 when it is blocked, a job is armed for the reset that types `Continue.` into
-this session, but only if the keyboard has been idle for a while — otherwise a
-notification is sent instead. `/auto-continue off` undoes it.
+this session. With `--frontmost` it only types once the keyboard has been idle
+for a while, and otherwise sends a notification instead. `/auto-continue off` undoes it.
 
 Do nothing else. Do not edit hooks or settings, do not start anything yourself,
 and do not continue with other work unless the user asked for that separately.
