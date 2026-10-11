@@ -118,7 +118,9 @@ After a successful import and before attaching, the worker runs three steps:
    It then asks the agent to confirm its model and effort with the
    `paseo-model-update` skill, and says which of the first two steps
    succeeded. After a move to another account (`--to`, below), it also says
-   so. The text is kept in `status/followup-prompt.txt`.
+   so, and with `--skip-subagents` that the subagent transcripts were not
+   imported and where they remain. The text is kept in
+   `status/followup-prompt.txt`.
 
 Each step is best effort. A failure is recorded and the next step still runs;
 none of them fails or rolls back the handoff. `status/followup.json` records
@@ -183,8 +185,14 @@ imports:
   and is not copied.
 - The source transcript and sidecar are never modified or deleted.
 
+With `--skip-subagents`, the copy leaves out `<id>/subagents/`, the subagent
+transcripts (see [Large sessions](#large-sessions)); everything else in the
+sidecar is copied as usual.
+
 `status/copy.json` records both paths, the transcript's size and SHA-256, and
-the sidecar's file, directory, byte and skipped counts. The import then runs
+the sidecar's file, directory, byte and skipped counts. With
+`--skip-subagents` it also has `skipSubagents: true` and, under
+`sidecar.skippedSubagents`, the path, file count and bytes left out. The import then runs
 with the target's provider, and `status/import-request.json` names the copied
 transcript.
 
@@ -220,12 +228,73 @@ The original transcript always stays where it was. Resuming it natively after
 the move works, but forks the conversation: Paseo continues the copy in the
 target account.
 
+## Large sessions
+
+To load a Claude session, Paseo 0.10 reads these files, each whole into memory
+as a string, and then parses them:
+
+- the transcript, `<id>.jsonl`;
+- every `*.jsonl` and `agent-*.meta.json` at any depth under `<id>/subagents/`,
+  which holds the subagent transcripts, including the workflow agents' under
+  `subagents/workflows/<run>/`;
+- every `*.json` directly in `<id>/workflows/`.
+
+It does this at import, and again whenever it resumes or reloads the agent:
+after a daemon restart, a settings change, or reopening an archived agent. A
+long session with many workflow runs can hold far more than the daemon's heap
+allows. One with a 21 MB transcript and 745 MB of subagent transcripts in 314
+files crashed the Paseo 0.10.2 daemon ("Reached heap limit", at about 3 GB)
+during `paseo agent import`, which stops every Paseo agent with it. The tool
+results under `<id>/tool-results/` are not read.
+
+So `prepare` measures what Paseo would read, for every Claude handoff with or
+without `--to`, and refuses before anything is stopped when it exceeds the
+limit, 200 MB (decimal megabytes) by default. The refusal states the sizes of
+the transcript, the subagent transcripts (with their file count) and the
+workflow files, and prints the commands to run instead. The worker measures
+again before it stops the source and once more after the source has exited,
+because the session can keep growing in between (`--wait-exit` leaves it
+running for up to ten minutes). A refusal after the exit imports nothing and
+prints the native recovery command, like any failure at that point. A Codex
+session is not measured: Paseo's Codex provider reads no sidecar.
+
+```zsh
+! 2paseo --to ~/.claude --skip-subagents     # leave the subagent transcripts behind
+! 2paseo --max-import-mb 900                 # the daemon has more heap
+```
+
+`--max-import-mb <n>` raises the limit. Use it only when you know the daemon
+has the heap for it (Node's `--max-old-space-size`).
+
+`--skip-subagents` leaves the subagent transcripts out of the import. Claude
+Code resumes the conversation from the main transcript alone; the subagent
+transcripts only feed Paseo's history view, which then lacks the subagents'
+detail. The briefing tells the agent so, and where the originals are.
+
+`--skip-subagents` works only with `--to`. The copy in the target account
+leaves `<id>/subagents/` out, the originals stay where they are, and since
+Paseo only ever reads the copy, they stay out of every later reload too.
+Within one account Paseo reads `<id>/subagents/` where it lies, so 2paseo
+would have to move the user's files to keep them out. A temporary rename for
+the duration of the import was considered and rejected: the next reload of the
+agent, which can be the model update right after the import, would read them
+again and crash the daemon anyway. So 2paseo refuses `--skip-subagents`
+without `--to` and says why.
+
+If you cannot move accounts, you can set the folder aside yourself, knowing
+that Paseo then never shows those subagents: after the session has exited,
+`mv <id>/subagents <id>/subagents.set-aside` in its project folder, and run the
+handoff from a fresh `claude --resume`. Renaming it back later makes Paseo
+read it again on its next reload.
+
 ## Controls and recovery
 
 ```zsh
 ! 2paseo --no-switch                 # leave the current tmux client in place
 ! 2paseo --wait-exit --no-switch     # queue import, then exit the source yourself
 ! 2paseo --to ~/.claude              # move to another account (see above)
+! 2paseo --to ~/.claude --skip-subagents   # ... without the subagent transcripts
+! 2paseo --max-import-mb 900         # raise the import size limit (see Large sessions)
 ```
 
 Automatic termination requires a source process belonging to the current user,
@@ -299,4 +368,6 @@ python3 -m unittest discover -s python/tests -p test_paseo_handoff.py
 
 The Python suite drives every external CLI through fakes that only log their
 arguments. It also runs the model helper against a fake `@getpaseo/cli`
-package, and skips those helper tests when Node.js is missing.
+package, and skips those helper tests when Node.js is missing. The size
+preflight tests use sparse files, so their hundreds of megabytes take no disk
+space and are never read.

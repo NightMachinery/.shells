@@ -12,6 +12,10 @@ With ``--target-home`` (``2paseo --to``), a Claude session moves to another
 account: once the source has exited, its transcript and sidecar directory are
 copied into the target config directory, never overwriting anything, and the
 copy is imported with the target's provider. The source files stay untouched.
+
+Paseo reads a Claude session's subagent transcripts whole into memory, so a
+size preflight refuses a session likely to crash its daemon. With
+``--skip-subagents`` (only together with ``--to``) the copy leaves them out.
 """
 
 import argparse
@@ -56,6 +60,18 @@ EFFORTS = frozenset({"none", "minimal", "low", "medium", "high", "xhigh", "max",
                      "ultra", "ultracode", "auto"})
 MODEL_SOURCES = (None, "attachment", "reply", "turn_context")
 MODEL_HELPER = Path(__file__).resolve().with_name("paseo_set_model.mjs")
+# Paseo 0.10.2's daemon ran out of its roughly 3 GB heap importing a session
+# whose subagent transcripts held 745 MB: it keeps each file as a string and
+# then parses it. 200 MB leaves a wide margin; --max-import-mb raises it.
+MB = 1_000_000
+DEFAULT_MAX_IMPORT_MB = 200
+SUBAGENT_META_RE = re.compile(r"agent-.+\.meta\.json\Z")
+SKIP_NEEDS_TARGET = (
+    "--skip-subagents needs --to. Within one account Paseo reads the subagent transcripts where they lie, "
+    "at import and again whenever it resumes or reloads the agent (after a daemon restart, a settings "
+    "change or reopening it), so 2paseo cannot leave them out without moving your files, and hiding them "
+    "only for the import would crash the daemon later instead. Move the session to another account with "
+    "--to <claude-config-dir> --skip-subagents: the copy leaves them out, and the originals stay here.")
 
 
 class HandoffError(Exception):
@@ -331,6 +347,153 @@ def check_destination(plan):
             raise HandoffError("Destination already exists, and 2paseo never overwrites it: " + path)
 
 
+def regular_size(path):
+    """Return a regular file's size, or None for anything else, without following a link."""
+    try:
+        info = os.lstat(path)
+    except OSError:
+        return None
+    return info.st_size if stat.S_ISREG(info.st_mode) else None
+
+
+def import_footprint(transcript, session_id, skip_subagents=False):
+    """Measure what Paseo reads into memory to load a Claude session.
+
+    Paseo 0.10's Claude provider reads, each whole into a string, the
+    transcript, every ``*.jsonl`` and ``agent-*.meta.json`` at any depth under
+    ``<id>/subagents/`` (``subagents/workflows/<run>/`` included), and every
+    ``*.json`` directly in ``<id>/workflows/``. It does so at import and again
+    whenever it resumes or reloads the agent. Like Paseo, this counts regular
+    files only and never descends into a linked directory. With
+    ``skip_subagents`` the subagent files are measured but left out of the total.
+    """
+    side = Path(sidecar_path(transcript, session_id))
+    found = {"transcript": os.stat(transcript).st_size,
+             "subagents": {"files": 0, "transcripts": 0, "bytes": 0}, "workflows": {"files": 0, "bytes": 0}}
+    try:
+        entries = sorted(os.scandir(side / "workflows"), key=lambda entry: entry.name)
+    except OSError:
+        entries = []
+    for entry in entries:
+        size = regular_size(entry.path) if entry.name.endswith(".json") else None
+        if size is not None:
+            found["workflows"]["files"] += 1
+            found["workflows"]["bytes"] += size
+    for root, _, files in os.walk(side / "subagents"):
+        for name in files:
+            if name.endswith(".jsonl") or SUBAGENT_META_RE.match(name):
+                size = regular_size(os.path.join(root, name))
+                if size is not None:
+                    found["subagents"]["files"] += 1
+                    found["subagents"]["transcripts"] += name.endswith(".jsonl")
+                    found["subagents"]["bytes"] += size
+    found["skipSubagents"] = bool(skip_subagents)
+    found["total"] = found["transcript"] + found["workflows"]["bytes"] + (
+        0 if skip_subagents else found["subagents"]["bytes"])
+    return found
+
+
+def count_text(count, noun):
+    return str(count) + " " + noun + ("" if count == 1 else "s")
+
+
+def megabytes(count):
+    return "{:.1f} MB".format(count / MB)
+
+
+def max_import_bytes(plan):
+    # A plan prepared before the preflight existed gets the default limit.
+    return plan.get("max_import_bytes") or DEFAULT_MAX_IMPORT_MB * MB
+
+
+def display_path(path):
+    """Spell a path as the user would type it: ~/ for one under the home directory."""
+    home = Path.home().resolve()
+    candidate = Path(path)
+    if candidate.is_relative_to(home) and candidate != home:
+        relative = str(candidate.relative_to(home))
+        if re.fullmatch(r"[A-Za-z0-9._/-]+", relative):
+            return "~/" + relative
+    return shlex.quote(path)
+
+
+def rerun_command(plan, *, target=None, skip=False, limit_mb=None):
+    """The 2paseo invocation that repeats this handoff with the given changes."""
+    argv = ["2paseo"]
+    if plan.get("wait_exit"):
+        argv.append("--wait-exit")
+    target = target or plan.get("target_home")
+    if target:
+        argv += ["--to", target if target.startswith("<") else display_path(target)]
+    if skip or plan.get("skip_subagents"):
+        argv.append("--skip-subagents")
+    if limit_mb is None and plan.get("max_import_bytes", DEFAULT_MAX_IMPORT_MB * MB) != DEFAULT_MAX_IMPORT_MB * MB:
+        limit_mb = plan["max_import_bytes"] // MB
+    if limit_mb is not None:
+        argv += ["--max-import-mb", str(limit_mb)]
+    return " ".join(argv)
+
+
+def other_account(plan):
+    """Suggest a config directory to move to: ~/.claude, unless the session already lives there."""
+    default = Path(default_claude_home())
+    if str(default) != plan["provider_home"] and (default / "projects").is_dir():
+        return str(default)
+    return "<another Claude config dir>"
+
+
+STAGE_TEXT = {
+    "prepare": "Nothing was stopped: the session keeps running.",
+    "run": "2paseo stopped nothing.",
+    "stopped": "The source has already exited, and nothing was imported.",
+}
+
+
+def size_refusal(plan, found, limit, stage):
+    subagents, workflows = found["subagents"], found["workflows"]
+    parts = ["the transcript (" + megabytes(found["transcript"]) + ")"]
+    if subagents["files"]:
+        metadata = subagents["files"] - subagents["transcripts"]
+        parts.append(count_text(subagents["transcripts"], "subagent transcript")
+                     + (" with " + count_text(metadata, "metadata file") if metadata else "")
+                     + " (" + megabytes(subagents["bytes"]) + (", skipped)" if found["skipSubagents"] else ")"))
+    if workflows["files"]:
+        parts.append(count_text(workflows["files"], "workflow file") + " (" + megabytes(workflows["bytes"]) + ")")
+    lines = [
+        "Session too large to import: Paseo would read " + megabytes(found["total"]) + " of it into memory, "
+        "over the " + megabytes(limit) + " limit. It holds " + ", ".join(parts) + ".",
+        "Paseo loads all of this into memory at import, and again whenever it resumes the agent, so it is "
+        "likely to crash the Paseo daemon (a heap-limit crash), which stops every Paseo agent.",
+        STAGE_TEXT[stage],
+    ]
+    limit_mb = -(-found["total"] // (100 * MB)) * 100 + 100  # the total rounded up, plus 100 MB of slack
+    if subagents["bytes"] and not found["skipSubagents"]:
+        lines.append("Claude Code resumes from the main transcript; the subagent transcripts only feed "
+                     "Paseo's history view. To leave them out, run:")
+        if plan.get("target_home"):
+            lines.append("  " + rerun_command(plan, skip=True))
+        else:
+            lines.append("  " + rerun_command(plan, target=other_account(plan), skip=True))
+            lines.append("Within one account Paseo reads them where they lie, so leaving them out needs a "
+                         "move to another account with --to. The originals stay where they are.")
+        lines.append("If your daemon has more heap, raise the limit instead:")
+    else:
+        lines.append("If your daemon has more heap, raise the limit:")
+    lines.append("  " + rerun_command(plan, limit_mb=limit_mb))
+    return "\n".join(lines)
+
+
+def check_import_size(plan, transcript, *, skip_subagents, stage):
+    """Refuse a Claude session that Paseo would read too much of into memory."""
+    if plan["agent"] != "claude":
+        return None  # Paseo's Codex provider reads no sidecar.
+    found = import_footprint(transcript, plan["id"], skip_subagents)
+    limit = max_import_bytes(plan)
+    if found["total"] > limit:
+        raise HandoffError(size_refusal(plan, found, limit, stage))
+    return found
+
+
 def verify_native(plan):
     root = Path(store_root(plan)).resolve()
     transcript = Path(plan["transcript"])
@@ -441,6 +604,16 @@ def prepare(args):
     target = getattr(args, "target_home", None)
     if target is not None:
         plan["target_home"], plan["target_transcript"] = target_layout(plan, target)
+    plan["skip_subagents"] = bool(getattr(args, "skip_subagents", False))
+    if plan["skip_subagents"] and "target_home" not in plan:
+        raise HandoffError(SKIP_NEEDS_TARGET)
+    limit_mb = getattr(args, "max_import_mb", None)
+    if limit_mb is not None and (type(limit_mb) is not int or limit_mb <= 0):
+        raise HandoffError("--max-import-mb needs a positive whole number of megabytes")
+    plan["max_import_bytes"] = (limit_mb or DEFAULT_MAX_IMPORT_MB) * MB
+    # Before anything else, and long before anything is stopped. The copy
+    # holds exactly what the source holds, minus the skipped subagents.
+    check_import_size(plan, plan["transcript"], skip_subagents=plan["skip_subagents"], stage="prepare")
     table = process_table()
     owner, caller = table.get(args.source_pid), table.get(args.caller_pid)
     if owner is None or caller is None or owner.pid <= 1 or owner.pid == caller.pid:
@@ -485,6 +658,11 @@ def validate_plan(plan):
         raise HandoffError("Invalid saved source effort")
     if plan.get("model_source") not in MODEL_SOURCES:
         raise HandoffError("Invalid saved source model origin")
+    if type(plan.get("skip_subagents", False)) is not bool or (plan.get("skip_subagents") and "target_home" not in plan):
+        raise HandoffError("Invalid saved subagent choice")
+    limit = plan.get("max_import_bytes", MB)
+    if type(limit) is not int or limit <= 0:
+        raise HandoffError("Invalid saved import size limit")
     if any(key in plan for key in ("target_home", "target_transcript", "target_provider")):
         try:
             layout = target_layout(plan, plan.get("target_home"))
@@ -724,18 +902,33 @@ def raise_walk_error(exc):
     raise exc
 
 
-def copy_tree(source, destination):
+def tree_size(directory):
+    """Count the regular files under a directory and their bytes, never following a link."""
+    totals = {"files": 0, "bytes": 0}
+    for root, _, files in os.walk(directory):
+        for name in files:
+            size = regular_size(os.path.join(root, name))
+            if size is not None:
+                totals["files"] += 1
+                totals["bytes"] += size
+    return totals
+
+
+def copy_tree(source, destination, exclude=frozenset()):
     """Copy a sidecar directory into a new, empty private directory.
 
     Returns what was copied. Directories get mode 0700 and files 0600.
     Anything that is neither a regular file nor a directory, such as a
-    symbolic link, is skipped and counted rather than followed.
+    symbolic link, is skipped and counted rather than followed. Top-level
+    directories named in ``exclude`` are left out and not counted.
     """
     totals = {"files": 0, "directories": 0, "bytes": 0, "skipped": 0}
     for root, directories, files in os.walk(source, onerror=raise_walk_error):
         target = Path(destination) / Path(root).relative_to(source)
         kept = []
         for name in directories:
+            if root == source and name in exclude:
+                continue
             if Path(root, name).is_symlink():
                 totals["skipped"] += 1
                 continue
@@ -785,10 +978,15 @@ def copy_session(plan, recordfile):
             os.mkdir(destination_side, 0o700)  # Exclusive, so the cleanup only ever removes our own tree.
             created.append(("tree", destination_side))
             os.chmod(destination_side, 0o700)
-            sidecar = copy_tree(source_side, destination_side)
-            sidecar.update(source=source_side, destination=destination_side)
+            skip = plan.get("skip_subagents", False)
+            sidecar = copy_tree(source_side, destination_side, frozenset({"subagents"} if skip else ()))
+            sidecar.update(source=source_side, destination=destination_side, skippedSubagents=None)
+            subagents = os.path.join(source_side, "subagents")
+            if skip and os.path.isdir(subagents) and not os.path.islink(subagents):
+                sidecar["skippedSubagents"] = dict(tree_size(subagents), path=subagents)
         record = {"planDigest": fingerprint(plan), "sourceId": plan["id"], "source": source,
-                  "destination": destination, "bytes": size, "sha256": digest, "sidecar": sidecar}
+                  "destination": destination, "bytes": size, "sha256": digest, "sidecar": sidecar,
+                  "skipSubagents": plan.get("skip_subagents", False)}
         write_private(recordfile, record)
     except BaseException as exc:  # Including Ctrl+C in the worker's pane: never leave a partial copy.
         for kind, path in reversed(created):
@@ -806,8 +1004,11 @@ def copy_session(plan, recordfile):
         raise HandoffError("Cannot copy the session from " + source + " to " + destination + ": "
                            + failure_text(exc) + ". Nothing was imported, and the original transcript is "
                            "untouched.") from exc
+    skipped = sidecar and sidecar["skippedSubagents"]
     print("Copied the session to " + destination + (
-        "" if sidecar is None else " with " + str(sidecar["files"]) + " sidecar files"), flush=True)
+        "" if sidecar is None else " with " + str(sidecar["files"]) + " sidecar files") + (
+        "" if not skipped else "; left out " + str(skipped["files"]) + " subagent files ("
+        + megabytes(skipped["bytes"]) + "), which stay at " + skipped["path"]), flush=True)
     return record
 
 
@@ -927,9 +1128,9 @@ def followup_prompt(plan, agent_id, record):
     if plan.get("model_source") == "reply":
         model += " (read from your last reply, which omits a context suffix such as [1m])"
     effort = plan.get("effort") or "unknown"
-    account = []
+    notes = []
     if plan.get("target_home"):
-        account = [
+        notes = [
             "You also moved accounts: 2paseo copied your transcript from the Claude config directory "
             + plan["provider_home"] + " to " + plan["target_home"] + ", and Paseo now runs you under "
             + plan["target_home"] + ". The original transcript stays untouched at " + plan["transcript"]
@@ -937,11 +1138,18 @@ def followup_prompt(plan, agent_id, record):
             "connectors and quotas differ between the two config directories. Re-read your project "
             "instructions, and check that the tools and skills you rely on are present.",
         ]
+    if plan.get("skip_subagents"):
+        notes.append(
+            "2paseo did not import your subagent transcripts (2paseo --skip-subagents), because Paseo "
+            "loads them all into memory and they were large. Your own conversation is complete, but "
+            "Paseo's history view lacks the subagents' detail. They remain at "
+            + os.path.join(sidecar_path(plan["transcript"], plan["id"]), "subagents")
+            + "; read them there if you need what a subagent did.")
     return "\n\n".join([
         "You are now running in Paseo as agent " + agent_id + ". 2paseo imported you from the native "
         + source + " session " + plan["id"] + " (working directory " + plan["cwd"] + ") and stopped "
         "the original process.",
-        *account,
+        *notes,
         "Continue the task you were doing before the move. First, check what the move broke and repair it:",
         "\n".join([
             "- Scheduled tasks and cron jobs created in the old session died with it. Recreate the ones "
@@ -1033,6 +1241,10 @@ def run(filename):
         copied = read_copy_record(plan, copyfile) if moving and os.path.lexists(copyfile) else None
         if moving and copied is None:
             check_destination(plan)
+        skip = plan.get("skip_subagents", False)
+        if copied is None:
+            # The session may have grown since prepare; refuse while it still runs.
+            check_import_size(plan, plan["transcript"], skip_subagents=skip, stage="run")
         provider = provider_preflight(plan)
         if moving and provider != plan["target_provider"]:
             raise HandoffError("Target Paseo provider changed since preparation; native source preserved")
@@ -1052,6 +1264,8 @@ def run(filename):
                     pass
                 wait_gone(source, 30)
             ensure_no_writer(plan)
+            # The final size, now that nothing writes the session; before a copy, too.
+            check_import_size(plan, plan["transcript"], skip_subagents=skip, stage="stopped")
             if moving:
                 # The source has exited and no writer remains: this is the final transcript.
                 copied = copy_session(plan, copyfile)
@@ -1060,6 +1274,8 @@ def run(filename):
             # it. Never signal again; check that nothing changed since.
             ensure_no_writer(plan)
             verify_copy(plan, copied)
+            # Paseo reads the copy, which already lacks any skipped subagents.
+            check_import_size(plan, plan["target_transcript"], skip_subagents=False, stage="stopped")
         # Import is an external mutation. An interrupted or invalid response
         # cannot prove it failed, so leave a durable marker and refuse replay.
         write_private(importfile, {"planDigest": fingerprint(plan), "sourceId": plan["id"],
@@ -1088,6 +1304,11 @@ def main(argv=None):
         preparing.add_argument("--" + name, required=True, type=int)
     preparing.add_argument("--wait-exit", action="store_true")
     preparing.add_argument("--target-home", help="move a Claude session to this config directory")
+    preparing.add_argument("--skip-subagents", action="store_true",
+                           help="with --target-home, leave the subagent transcripts out of the copy")
+    preparing.add_argument("--max-import-mb", type=int,
+                           help="refuse a Claude session Paseo would read more of into memory "
+                           "(default " + str(DEFAULT_MAX_IMPORT_MB) + ")")
     running = subparsers.add_parser("run")
     running.add_argument("plan")
     args = parser.parse_args(argv)

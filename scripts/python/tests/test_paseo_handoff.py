@@ -960,7 +960,9 @@ class HandoffTests(unittest.TestCase):
         entries = {".": (None, stat.S_IMODE(root.lstat().st_mode))}
         for entry in sorted(root.rglob("*")):
             info = entry.lstat()
-            data = entry.read_bytes() if stat.S_ISREG(info.st_mode) else None
+            data = None
+            if stat.S_ISREG(info.st_mode):  # a large (sparse) file by its size alone: never read it whole
+                data = entry.read_bytes() if info.st_size <= 1 << 20 else ("size", info.st_size)
             entries[str(entry.relative_to(root))] = (data, stat.S_IMODE(info.st_mode))
         return entries
 
@@ -1254,6 +1256,260 @@ class HandoffTests(unittest.TestCase):
         self.assertEqual(record["message"]["status"], "ok")
         plain = {k: v for k, v in json.loads(self.planfile.read_text()).items() if not k.startswith("target_")}
         self.assertNotIn("moved accounts", h.followup_prompt(plain, IMPORTED_ID, record))
+        self.assertNotIn("subagent transcripts", text)
+
+    # The import size preflight and --skip-subagents.
+
+    def big(self, path, size):
+        """A sparse file: its size counts, but it takes no disk space and nothing reads it."""
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with open(path, "wb") as handle:
+            handle.truncate(size)
+
+    def use_big_subagents(self):
+        """Give the session 250 MB of subagent transcripts beside a small sidecar."""
+        side = self.transcript.parent / SOURCE_ID
+        self.big(side / "subagents" / "agent-a.jsonl", 100 * h.MB)
+        self.big(side / "subagents" / "workflows" / "run-1" / "agent-b.jsonl", 150 * h.MB - 20)
+        (side / "subagents" / "agent-a.meta.json").write_text('{"x": 1}\n' + " " * 11)
+        (side / "subagents" / "notes.txt").write_text("not read by Paseo\n")
+        (side / "subagents" / "linked.jsonl").symlink_to(self.log)
+        (side / "workflows").mkdir()
+        (side / "workflows" / "w.json").write_text("{}\n")
+        (side / "workflows" / "deeper").mkdir()
+        (side / "workflows" / "deeper" / "x.json").write_text("{}\n")
+        (side / "tool-results").mkdir(exist_ok=True)
+        (side / "tool-results" / "r.txt").write_text("result\n")
+
+    def test_footprint_counts_what_paseo_reads(self):
+        self.write_transcript(reply("claude-opus-5-5", "xhigh"))
+        self.use_big_subagents()
+        found = h.import_footprint(str(self.transcript), SOURCE_ID)
+        transcript = self.transcript.stat().st_size
+        # Two transcripts and the meta file; not the text file, the link or deeper workflow files.
+        self.assertEqual(found["subagents"], {"files": 3, "transcripts": 2, "bytes": 250 * h.MB})
+        self.assertEqual(found["workflows"], {"files": 1, "bytes": 3})
+        self.assertEqual(found["total"], transcript + 250 * h.MB + 3)
+        skipped = h.import_footprint(str(self.transcript), SOURCE_ID, skip_subagents=True)
+        self.assertEqual(skipped["subagents"], found["subagents"])  # still measured, for the message
+        self.assertEqual(skipped["total"], transcript + 3)
+        bare = h.import_footprint(str(self.transcript), IMPORTED_ID)  # no sidecar at all
+        self.assertEqual((bare["total"], bare["subagents"]["files"]), (transcript, 0))
+        self.args.max_import_mb = 300
+        plan = self.make_plan() | {"agent": "codex"}
+        self.assertIsNone(h.check_import_size(plan, str(self.transcript), skip_subagents=False, stage="run"))
+
+    def test_size_preflight_refuses_before_anything_runs_and_names_the_way_out(self):
+        self.write_transcript(reply("claude-opus-5-5", "xhigh"))
+        self.use_big_subagents()
+        (self.directory / ".claude" / "projects").mkdir(parents=True)
+        self.args.wait_exit = True
+        with patch.object(h.Path, "home", return_value=self.directory), \
+                patch.object(h, "process_table", side_effect=AssertionError("inspected processes")), \
+                patch.object(h, "command", side_effect=AssertionError("ran a command")), \
+                patch.object(h, "provider_preflight", side_effect=AssertionError("started the daemon")):
+            with self.assertRaises(h.HandoffError) as caught:
+                h.prepare(self.args)
+        self.assertFalse(self.planfile.exists())
+        message = str(caught.exception)
+        for expected in ("Session too large to import: Paseo would read 250.0 MB of it into memory, over "
+                         "the 200.0 MB limit", "the transcript (0.0 MB)", "2 subagent transcripts with 1 metadata file (250.0 MB)",
+                         "1 workflow file (0.0 MB)", "loads all of this into memory", "crash the Paseo daemon",
+                         "Nothing was stopped", "only feed Paseo's history view",
+                         "\n  2paseo --wait-exit --to ~/.claude --skip-subagents\n",
+                         "needs a move to another account with --to",
+                         "\n  2paseo --wait-exit --max-import-mb 400"):
+            self.assertIn(expected, message)
+        self.assertFalse({"—", "–"} & set(message))
+        # Through main, the refusal is printed and prepare exits 1.
+        argv = ["prepare", "--agent", "claude", "--id", SOURCE_ID]
+        for name in ("transcript", "cwd", "provider_home", "paseo", "agent_session", "paseo_home",
+                     "tmux_session", "output"):
+            argv += ["--" + name.replace("_", "-"), getattr(self.args, name)]
+        argv += ["--source-pid", "100", "--caller-pid", "200"]
+        errors = io.StringIO()
+        with patch.object(sys, "stderr", errors), patch.object(h, "process_table") as inspect:
+            self.assertEqual(h.main(argv), 1)
+        inspect.assert_not_called()
+        self.assertIn("paseo-handoff: Session too large", errors.getvalue())
+        self.assertFalse(self.planfile.exists())
+
+    def test_size_limit_override(self):
+        self.use_big_subagents()
+        self.args.max_import_mb = 300
+        plan = self.make_plan()
+        self.assertEqual(plan["max_import_bytes"], 300 * h.MB)
+        h.validate_plan(plan)
+        self.planfile.unlink()
+        self.args.max_import_mb = 250  # the session is just over 250 MB
+        with patch.object(h.Path, "home", return_value=self.directory), \
+                self.assertRaisesRegex(h.HandoffError, "over the 250.0 MB limit") as caught:
+            self.make_plan()  # no ~/.claude to suggest here
+        self.assertIn("2paseo --to <another Claude config dir> --skip-subagents --max-import-mb 250",
+                      str(caught.exception))
+        for bad in (0, -5):
+            self.args.max_import_mb = bad
+            with self.subTest(bad=bad), self.assertRaisesRegex(h.HandoffError, "positive whole number"):
+                self.make_plan()
+        self.assertFalse(self.planfile.exists())
+        self.args.max_import_mb = None
+        for changed in ({"max_import_bytes": 0}, {"max_import_bytes": "300"}, {"max_import_bytes": 1.5}):
+            with self.subTest(changed=changed), self.assertRaises(h.HandoffError):
+                h.validate_plan(plan | changed)
+        old = {k: v for k, v in plan.items() if k not in ("max_import_bytes", "skip_subagents")}
+        h.validate_plan(old)  # a plan from before the preflight gets the default limit
+        self.assertEqual(h.max_import_bytes(old), 200 * h.MB)
+        base = ["prepare", "--agent", "claude"]
+        for name in ("id", "transcript", "cwd", "provider-home", "paseo", "agent-session",
+                     "paseo-home", "tmux-session", "output"):
+            base += ["--" + name, "/x"]
+        base += ["--source-pid", "1", "--caller-pid", "2"]
+        with patch.object(h, "prepare", return_value="plan") as prepared:
+            self.assertEqual(h.main(base + ["--max-import-mb", "900", "--skip-subagents"]), 0)
+            self.assertEqual((prepared.call_args.args[0].max_import_mb,
+                              prepared.call_args.args[0].skip_subagents), (900, True))
+            self.assertEqual(h.main(base), 0)
+            self.assertEqual((prepared.call_args.args[0].max_import_mb,
+                              prepared.call_args.args[0].skip_subagents), (None, False))
+
+    def test_skip_subagents_without_to_is_refused_and_moves_nothing(self):
+        self.use_big_subagents()
+        side = self.transcript.parent / SOURCE_ID
+        before = self.snapshot(side)
+        self.args.skip_subagents = True
+        with self.assertRaisesRegex(h.HandoffError, "--skip-subagents needs --to") as caught:
+            self.make_plan()
+        for expected in ("reads the subagent transcripts where they lie", "again whenever it resumes or reloads",
+                         "--to <claude-config-dir> --skip-subagents", "the originals stay here"):
+            self.assertIn(expected, str(caught.exception))
+        self.assertFalse(self.planfile.exists())
+        self.assertEqual(self.snapshot(side), before)
+        # A saved plan cannot ask for it either.
+        self.args.skip_subagents = False
+        self.args.max_import_mb = 300
+        plan = self.make_plan()
+        for changed in ({"skip_subagents": True}, {"skip_subagents": "yes"}):
+            with self.subTest(changed=changed), self.assertRaisesRegex(h.HandoffError, "subagent choice"):
+                h.validate_plan(plan | changed)
+
+    def test_to_refusal_suggests_skipping_and_skip_brings_it_under_the_limit(self):
+        self.use_target()
+        self.use_big_subagents()
+        with patch.object(h.Path, "home", return_value=self.directory):
+            with self.assertRaises(h.HandoffError) as caught:
+                self.make_plan()
+        message = str(caught.exception)
+        self.assertIn("\n  2paseo --to ~/personal --skip-subagents\n", message)
+        self.assertIn("\n  2paseo --to ~/personal --max-import-mb 400", message)
+        self.assertNotIn("Within one account", message)
+        self.assertFalse(self.planfile.exists())
+        self.args.skip_subagents = True
+        plan = self.make_plan()
+        self.assertTrue(plan["skip_subagents"])
+        h.validate_plan(plan)
+
+    def test_still_too_large_without_subagents_only_suggests_the_limit(self):
+        self.use_target()
+        self.big(self.source_side / "workflows" / "huge.json", 290 * h.MB)
+        self.args.skip_subagents = True
+        with patch.object(h.Path, "home", return_value=self.directory):
+            with self.assertRaises(h.HandoffError) as caught:
+                self.make_plan()
+        message = str(caught.exception)
+        self.assertIn("1 subagent transcript (0.0 MB, skipped)", message)
+        self.assertIn("1 workflow file (290.0 MB)", message)
+        self.assertNotIn("To leave them out", message)
+        self.assertIn("\n  2paseo --to ~/personal --skip-subagents --max-import-mb 400", message)
+
+    def test_to_with_skip_copies_everything_but_the_subagents(self):
+        self.use_target()
+        self.use_big_subagents()
+        (self.source_side / "workflows" / "w.json").write_text('{"run": 1}\n')
+        self.args.skip_subagents = True
+        fake_cli(self.executable, self.log, "paseo")
+        before = self.source_state()
+        imported, killed, attached, _ = self.flow(provider=self.alias)
+        h.run(str(self.planfile))
+        killed.assert_called_once()
+        imported.assert_called_once()
+        attached.assert_called_once()
+        self.assertEqual(self.source_state(), before)  # the originals stay, subagents included
+        self.assertEqual(self.destination.read_bytes(), self.transcript.read_bytes())
+        copied = self.snapshot(self.destination_side)
+        expected = {name for name in before[3] if name != "outside" and name.split("/")[0] != "subagents"}
+        self.assertEqual(set(copied), expected)
+        self.assertIn("workflows/deeper/x.json", copied)
+        for name, (data, _) in copied.items():
+            self.assertEqual(data, before[3][name][0], name)  # byte-identical
+        record = json.loads((self.directory / "status" / "copy.json").read_text())
+        self.assertTrue(record["skipSubagents"])
+        self.assertEqual(record["sidecar"]["skippedSubagents"], {
+            "path": str(self.source_side / "subagents"), "files": 4, "bytes": 250 * h.MB + 18})  # notes.txt too
+        self.assertIn("left out 4 subagent files (250.0 MB), which stay at " + str(self.source_side / "subagents"),
+                      self.stdout.getvalue())
+        text = (self.directory / "status" / "followup-prompt.txt").read_text()
+        for expected_text in ("did not import your subagent transcripts", "--skip-subagents",
+                              "history view lacks the subagents' detail",
+                              "They remain at " + str(self.source_side / "subagents")):
+            self.assertIn(expected_text, text)
+        self.assertFalse({"—", "–"} & set(text))
+        # A re-run attaches without copying or measuring again.
+        with patch.object(h, "import_footprint", side_effect=AssertionError("measured again")):
+            h.run(str(self.planfile))
+        self.assertEqual(attached.call_count, 2)
+
+    def test_to_with_skip_and_no_subagents_records_nothing_skipped(self):
+        self.use_target()
+        shutil.rmtree(self.source_side / "subagents")
+        self.args.skip_subagents = True
+        self.flow(provider=self.alias)
+        h.run(str(self.planfile))
+        record = json.loads((self.directory / "status" / "copy.json").read_text())
+        self.assertTrue(record["skipSubagents"])
+        self.assertIsNone(record["sidecar"]["skippedSubagents"])
+
+    def test_growth_after_prepare_refuses_before_stopping(self):
+        self.use_target()
+        imported, killed, attached, wait = self.flow(provider=self.alias)
+        self.use_big_subagents()
+        with self.assertRaisesRegex(h.HandoffError, "2paseo stopped nothing"):
+            h.run(str(self.planfile))
+        killed.assert_not_called()
+        wait.assert_not_called()
+        imported.assert_not_called()
+        attached.assert_not_called()
+        self.assertFalse(self.destination.parent.exists())
+
+    def test_growth_while_stopping_refuses_before_the_copy_and_the_import(self):
+        for moving in (True, False):
+            with self.subTest(moving=moving):
+                for leftover in (self.planfile,):
+                    if leftover.exists():
+                        leftover.unlink()
+                shutil.rmtree(self.directory / "status", ignore_errors=True)
+                shutil.rmtree(self.transcript.parent / SOURCE_ID, ignore_errors=True)
+                if moving:
+                    self.use_target(sidecar=False)
+                else:
+                    self.args.target_home = None
+                imported, killed, attached, wait = self.flow(provider=self.alias if moving else "claude")
+                # The session writes 250 MB of subagent transcripts while it shuts down.
+                wait.side_effect = lambda process, seconds: process.pid == 100 and self.use_big_subagents()
+                with self.assertRaises(h.HandoffError) as caught:
+                    h.run(str(self.planfile))
+                self.assertIn("The source has already exited, and nothing was imported", str(caught.exception))
+                killed.assert_called_once()
+                imported.assert_not_called()
+                attached.assert_not_called()
+                self.assertFalse((self.directory / "status" / "import-request.json").exists())
+                if moving:
+                    self.assertFalse(self.destination.parent.exists())  # nothing copied
+                    self.assertFalse((self.directory / "status" / "copy.json").exists())
+                errors = io.StringIO()
+                with patch.object(sys, "stderr", errors):
+                    self.assertEqual(h.main(["run", str(self.planfile)]), 1)
+                self.assertIn("Session too large", errors.getvalue())
+                self.assertIn("Native recovery", errors.getvalue())
 
 
 def attachment(model):

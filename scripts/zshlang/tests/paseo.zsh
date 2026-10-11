@@ -7,6 +7,8 @@ command mkdir -- "${handoff_test_tmp}/bin"
 cat > "${handoff_test_tmp}/bin/python3" <<'SH'
 #!/bin/sh
 printf 'prepare %s\n' "$*" >> "$PASEO_TEST_LOG"
+#: A refusing preflight, such as the import size check, exits 1 before writing a plan.
+if [ -n "${PASEO_TEST_PREPARE_FAIL:-}" ]; then printf 'paseo-handoff: refused\n' >&2; exit 1; fi
 while [ "$#" -gt 0 ]; do
     if [ "$1" = --output ]; then shift; printf '{}\n' > "$1"; break; fi
     shift
@@ -104,4 +106,35 @@ if 2paseo --to "${handoff_test_personal}" ; then exit 1; fi
 handoff_test_owner=claude
 if PASEO_AGENT_ID="${handoff_test_id}" 2paseo --to "${handoff_test_personal}" ; then exit 1; fi
 [[ ! -s "${handoff_test_log}" ]]
+#: --skip-subagents and --max-import-mb are passed through; paseo_handoff.py decides.
+: > "${handoff_test_log}"
+2paseo --to "${handoff_test_personal}" --skip-subagents --no-switch
+expect-log "--target-home ${handoff_test_personal} --skip-subagents"
+[[ "$(<"${handoff_test_log}")" != *--max-import-mb* ]]
+: > "${handoff_test_log}"
+2paseo --max-import-mb 900 --to "${handoff_test_personal}" --skip-subagents
+expect-log "--target-home ${handoff_test_personal} --skip-subagents --max-import-mb 900"
+: > "${handoff_test_log}"
+2paseo --max-import-mb=450
+expect-log "--max-import-mb 450"
+[[ "$(<"${handoff_test_log}")" != *--skip-subagents* ]]
+[[ "$(<"${handoff_test_log}")" != *--target-home* ]]
+: > "${handoff_test_log}"
+#: Without --to the flag still reaches paseo_handoff.py, which refuses it with the reason.
+2paseo --skip-subagents
+expect-log "--skip-subagents"
+: > "${handoff_test_log}"
+if 2paseo --max-import-mb ; then exit 1; fi
+if 2paseo --max-import-mb 0 ; then exit 1; fi
+if 2paseo --max-import-mb=-5 ; then exit 1; fi
+if 2paseo --max-import-mb 2e9 ; then exit 1; fi
+if 2paseo --max-import-mb '' ; then exit 1; fi
+if PASEO_AGENT_ID="${handoff_test_id}" 2paseo --skip-subagents ; then exit 1; fi
+if PASEO_AGENT_ID="${handoff_test_id}" 2paseo --max-import-mb 900 ; then exit 1; fi
+[[ ! -s "${handoff_test_log}" ]]
+#: A refused preflight starts no worker, so nothing is ever stopped.
+if PASEO_TEST_PREPARE_FAIL=y 2paseo --to "${handoff_test_personal}" ; then exit 1; fi
+expect-log "prepare "
+[[ "$(<"${handoff_test_log}")" != *job* ]]
+[[ "$(<"${handoff_test_log}")" != *switch-client* ]]
 print 'ok: Paseo handoff orchestration'
