@@ -8,35 +8,52 @@
 ///
 "use strict";
 
+// System Events addresses each notification group by its position
+// (`groups.at(i)`), and dismissing one shifts every later group up a slot. So
+// we close from the last group to the first, which leaves the positions still
+// to visit intact. Closing first-to-last skipped every other notification and
+// then died with "Invalid index" (-1719) once many were open.
+//
+// Each pass reads all action names in one Apple event; per-action reads cost
+// about 8 s for 20 notifications. Passes repeat until the list is empty, which
+// also catches notifications that arrive, or are only drawn, mid-run.
+const MAX_PASSES = 10;
+
 function run() {
   const SystemEvents = Application("System Events");
   const NotificationCenter = SystemEvents.processes.byName("NotificationCenter");
   const notificationGroups = () => {
     const windows = NotificationCenter.windows;
     return windows.length === 0
-      ? []
-      : windows.at(0).groups.at(0).scrollAreas.at(0).uiElements.at(0).groups();
+      ? null
+      : windows.at(0).groups.at(0).scrollAreas.at(0).uiElements.at(0).groups;
   };
 
-  const findCloseAction = (group) => {
-    const [closeAllAction, closeAction] = group.actions().reduce(
-      (matches, action) => {
-        switch (action.description()) {
-          case "Clear All":
-            return [action, matches[1]];
-          case "Close":
-            return [matches[0], action];
-          default:
-            return matches;
-        }
-      },
-      [null, null]
-    );
-    return closeAllAction ?? closeAction;
+  // Index of the action that dismisses a group: "Clear All" for a stack,
+  // "Close" for a single notification.
+  const closeActionIndex = (names) => {
+    const clearAll = names.indexOf("Clear All");
+    return clearAll >= 0 ? clearAll : names.indexOf("Close");
   };
 
-  const actions = notificationGroups().map(findCloseAction);
-  for (const action of actions) {
-    action?.perform();
+  let remaining = 0;
+  for (let pass = 0; pass < MAX_PASSES; pass++) {
+    const groups = notificationGroups();
+    if (groups === null) return;
+    const actionNames = groups.actions.description();
+    remaining = actionNames.length;
+    if (remaining === 0) return;
+
+    for (let i = remaining - 1; i >= 0; i--) {
+      const j = closeActionIndex(actionNames[i]);
+      if (j < 0) continue;
+      try {
+        groups.at(i).actions.at(j).perform();
+      } catch (e) {
+        // Gone already, or replaced mid-run; the next pass re-reads the list.
+      }
+    }
+    delay(0.3);
   }
+  throw new Error(`${remaining} notification group(s) remain after ${MAX_PASSES} passes`);
 }
