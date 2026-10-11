@@ -25,6 +25,22 @@ five-minute default (minimum 30 seconds). Run the watcher on the daemon host,
 where its agent state and provider credentials are available. Remote
 `PASEO_HOST` connections are rejected. `--frontmost` is unsupported for Paseo.
 
+To pick agents instead of passing UUIDs, use `agent-auto-continue-fz` and
+`agent-auto-continue-off-fz` (see `docs/agent-auto-continue.md`, "From another
+shell"). They list Paseo agents next to ordinary sessions, each agent once.
+
+### Compared with `paseo-continue-fz`
+
+`paseo-continue-fz` (alias of `claude-code-usage-continue-paseo-fz`, see
+`docs/agent-usage-armed.md`) is the other way to resume Paseo agents. It arms
+a one-shot job for the current Claude profile's reset and sends `Continue.`
+to the agents picked at arm time. It sends even if an agent never hit the
+limit, as long as the agent is idle with no pending permission when the job
+fires, and only after the usual keyboard idle gate. The watcher here is
+failure-driven instead: it waits for that agent's own quota-failed turn and
+checks that agent's own provider quota. Do not arm both for one agent, or it
+can be sent `Continue.` twice.
+
 ## When it resumes
 
 A private registration binds the exact agent ID, daemon home, provider

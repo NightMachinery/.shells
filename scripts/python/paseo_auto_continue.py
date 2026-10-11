@@ -271,15 +271,42 @@ def start_worker(path):
         command(['tmux', 'new-session', '-d', '-s', session_name(path), *argv], timeout=10)
 
 
+def registrations(directory):
+    """Enabled registrations as (agent id, home, agent/profile, status) rows.
+
+    For pickers in another shell, so they need not parse the state files.
+    """
+    directory = Path(directory)
+    if not directory.is_dir():
+        return []
+    rows = []
+    for path in sorted(directory.glob('*.json')):
+        try:
+            state = read_json(path)
+        except (OSError, ValueError, HandoffError):
+            continue
+        if not state.get('enabled'):
+            continue
+        binding = state.get('binding') or {}
+        rows.append((state.get('agent_id', ''), state.get('home', ''),
+                     str(binding.get('agent', '?')) + '/' + str(binding.get('profile', '?')),
+                     str(state.get('status', ''))))
+    return [row for row in rows if row[0] and row[1]]
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('action', choices=('on', 'off', 'status', 'watch', 'check'))
+    parser.add_argument('action', choices=('on', 'off', 'status', 'list', 'watch', 'check'))
     parser.add_argument('agent_id', nargs='?', default=os.environ.get('PASEO_AGENT_ID'))
     parser.add_argument('--home', default=os.environ.get('PASEO_HOME') or str(Path.home() / '.paseo'))
     parser.add_argument('--poll', type=int, default=300)
     parser.add_argument('--state')
     parser.add_argument('--state-dir', default=str(Path(os.environ.get('XDG_STATE_HOME', Path.home() / '.local/state')) / 'agent-sessions/auto-continue-paseo'))
     args = parser.parse_args()
+    if args.action == 'list':
+        for row in registrations(Path(args.state_dir).expanduser()):
+            print('\t'.join(' '.join(field.split()) for field in row))
+        return
     if args.action in ('watch', 'check'):
         if not args.state:
             parser.error('--state is required')

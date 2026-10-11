@@ -222,6 +222,16 @@ class PaseoAutoContinueTests(unittest.TestCase):
             mod.main()
         self.assertEqual(mod.read_json(target)['claimed_failure'], 'already-sent')
 
+    def test_registrations_lists_enabled_only(self):
+        directory = Path(self.temp.name) / 'regs'
+        directory.mkdir()
+        mod.atomic_write(directory / 'a.json', self.state)
+        mod.atomic_write(directory / 'b.json', {**self.state, 'agent_id': 'other', 'enabled': False})
+        (directory / 'c.json').write_text('not json')
+        self.assertEqual(mod.registrations(directory),
+                         [('agent-id', str(self.home), 'codex/codex', '')])
+        self.assertEqual(mod.registrations(Path(self.temp.name) / 'missing'), [])
+
     def test_registration_mode_is_private(self):
         self.assertEqual(self.path.stat().st_mode & 0o777, 0o600)
 

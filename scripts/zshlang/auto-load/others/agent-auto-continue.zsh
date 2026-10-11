@@ -414,9 +414,14 @@ function h-agent-auto-continue-targets {
     #: pane needs no window manager, focus or awake display; a kitty window
     #: needs kitty's remote control. `frontmost' -- blind typing into whatever
     #: holds the keyboard -- is never chosen here; `--frontmost' asks for it.
+    #:
+    #: `agent_auto_continue_outside_p=y' is for a session picked from another
+    #: shell ([agfi:agent-auto-continue-fz]): this shell's `TMUX_PANE' is not
+    #: the session's, so its pane is looked up by transcript instead.
     #: Usage: h-agent-auto-continue-targets <agent> <id> <transcript>
     ##
     local frontmost_p="${agent_auto_continue_frontmost_p:-n}"
+    local outside_p="${agent_auto_continue_outside_p:-n}"
 
     local agent="${1}" id="${2}" transcript="${3}"
     assert-args agent id @RET
@@ -443,7 +448,23 @@ function h-agent-auto-continue-targets {
         ec "claude-bg:${id}"
         return 0
     fi
-    if test -n "${TMUX_PANE}" ; then
+    if bool "${outside_p}" ; then
+        local pane='' prow
+        local -a pf
+        rows="$(h-agent-session-tmux-panes 2>/dev/null)" || rows=''
+        for prow in ${(f)rows} ; do
+            pf=( "${(@ps:\t:)prow}" )
+            if test -n "${transcript}" && [[ "${pf[2]}" == "${transcript}" ]] ; then
+                pane="${pf[1]}"
+                break
+            fi
+        done
+        if test -n "${pane}" ; then
+            ec "tmux:${pane}"
+            return 0
+        fi
+        tried+=( "no tmux pane holds this session" )
+    elif test -n "${TMUX_PANE}" ; then
         #: The pane is ours by construction -- this shell runs inside it --
         #: but it must hold a *live agent* for the engine to type into it
         #: later, and asking now is what makes a "no" readable.
@@ -731,6 +752,217 @@ watchers and armed jobs. --prune forgets the dead ones."
         done
         h-agent-auto-continue-scope-status "${scope}" | command sed 's/^/  /'
     done
+}
+##
+#: From another shell
+##
+function h-agent-auto-continue-scope-of {
+    #: The scope of a session picked from another shell: what
+    #: [agfi:h-agent-auto-continue-scope] answers inside it, read from the
+    #: transcript's location instead of the environment. A Claude transcript
+    #: sits under its seat's config home; a Codex rollout under its
+    #: `CODEX_HOME', whose active auth names the scope.
+    #: Usage: h-agent-auto-continue-scope-of <agent> <transcript>
+    ##
+    local agent="${1}" transcript="${2}"
+    assert-args agent @RET
+
+    case "${agent}" in
+        claude)
+            local home="${${transcript%%/projects/*}:t}" p
+            for p in ${(k)claude_code_profile_homes} ; do
+                if [[ "${claude_code_profile_homes[$p]}" == "${home}" ]] ; then
+                    ec "claude-${p}"
+                    return 0
+                fi
+            done
+            ecerr "$0: no Claude Code profile has the config home of: ${transcript}"
+            return 1
+            ;;
+        codex)
+            local codex_home="${transcript%%/sessions/*}"
+            if test -z "${transcript}" || [[ "${codex_home}" == "${transcript}" ]] ; then
+                ecerr "$0: not under a Codex home: ${transcript}"
+                return 1
+            fi
+            local auth_alias
+            auth_alias="$(CODEX_HOME="${codex_home}" h-codex-status-active-alias 2>/dev/null)" || auth_alias=auth
+            ec "codex-${auth_alias}"
+            ;;
+        agy)
+            ec agy
+            ;;
+        *)
+            ecerr "$0: unknown agent: ${agent}"
+            return 1
+            ;;
+    esac
+}
+
+function h-agent-auto-continue-register-outside {
+    #: Registers one session picked from another shell, as `/auto-continue'
+    #: typed in it would have.
+    #: Usage: h-agent-auto-continue-register-outside <agent> <transcript>
+    ##
+    local frontmost_p="${agent_auto_continue_frontmost_p:-n}"
+
+    local agent="${1}" transcript="${2}"
+    assert-args agent transcript @RET
+
+    local id scope
+    id="$(h-agent-session-call "${agent}" id-of "${transcript}")" @TRET
+    scope="$(h-agent-auto-continue-scope-of "${agent}" "${transcript}")" @RET
+
+    local -a targets
+    targets=( ${(f)"$(agent_auto_continue_outside_p=y agent_auto_continue_frontmost_p="${frontmost_p}" \
+        h-agent-auto-continue-targets "${agent}" "${id}" "${transcript}")"} ) @RET
+    (( ${#targets} )) || return 1
+
+    h-agent-auto-continue-register "${agent}" "${id}" "${transcript}" "${scope}" "${targets[@]}"
+}
+
+function agent-auto-continue-fz {
+    : "usage: agent-auto-continue-fz [--frontmost] [--poll SECONDS]
+Picks live sessions and Paseo agents, and registers each for /auto-continue as
+if it had been typed there. --poll applies to Paseo agents."
+    ##
+    #: Paseo agents are offered once each, as their Paseo row, and the native
+    #: session each one runs is left out ([agfi:h-paseo-filter-pairs]); a
+    #: Paseo row goes to [agfi:paseo-auto-continue-on], whose watcher sends
+    #: through Paseo itself.
+    ##
+    local frontmost_p=n
+    local -a poll_opt
+    while (( $# )) ; do
+        case "${1}" in
+            --frontmost) frontmost_p=y ; shift ;;
+            --poll)
+                (( $# >= 2 )) || { ecerr "$0: --poll needs a number of seconds"; return 64; }
+                poll_opt=( --poll "${2}" )
+                shift 2
+                ;;
+            *)
+                ecerr "$0: unknown argument: ${1}"
+                return 64
+                ;;
+        esac
+    done
+
+    local agent_session_live_list_cache
+    agent_session_live_list_cache="$(h-agent-session-live-list)" @TRET
+    local agent_session_paseo_p=y agent_session_live_rows_scope=all agent_session_fz_header=''
+
+    local rows selected
+    rows="$(h-agent-session-live-rows)" @RET
+    selected="$(ec "${rows}" | h-agent-session-fz multi)" @TRET
+    test -n "${selected}" || return 1
+
+    local row
+    local -a f
+    integer failed=0
+    for row in ${(f)selected} ; do
+        f=( "${(@ps:\t:)row}" )
+        if [[ "${f[1]}" == paseo:* ]] ; then
+            paseo-auto-continue-on "${f[1]#paseo:}" "${poll_opt[@]}" || failed+=1
+        else
+            agent_auto_continue_frontmost_p="${frontmost_p}" \
+                h-agent-auto-continue-register-outside "${f[3]}" "${f[2]}" || failed+=1
+        fi
+    done
+
+    (( failed == 0 ))
+}
+
+function agent-auto-continue-off-fz {
+    : "usage: agent-auto-continue-off-fz
+Picks among the sessions and Paseo agents registered for /auto-continue, and
+turns it off for each."
+    ##
+    #: A native registration of a session that a registered Paseo agent runs
+    #: is not offered on its own: turning the Paseo row off removes it too, so
+    #: the agent is listed once, as in [agfi:agent-auto-continue-fz]. With no
+    #: Paseo row to stand for it, it is offered, being the only way to remove
+    #: it.
+    ##
+    local badge="${paseo_agent_badge:-🧭}"
+
+    #: uuid -> home, from the watcher's own listing.
+    local -A paseo_home_of
+    local row
+    local -a f
+    for row in ${(f)"$(h-paseo-auto-continue list 2>/dev/null)"} ; do
+        f=( "${(@ps:\t:)row}" )
+        test -n "${f[1]}" && paseo_home_of[${f[1]}]="${f[2]}"
+    done
+
+    #: native id -> uuid, for the Paseo agents registered here.
+    local -A paseo_of_native
+    if (( ${#paseo_home_of} )) ; then
+        for row in ${(f)"$(h-paseo-agent-rows 2>/dev/null)"} ; do
+            f=( "${(@ps:\t:)row}" )
+            (( ${+paseo_home_of[${f[1]}]} )) && [[ "${f[3]}" != '-' ]] && paseo_of_native[${f[3]}]="${f[1]}"
+        done
+    fi
+
+    #: uuid -> the hidden native registrations (`scope agent id' lines).
+    local -A shadowed
+    local pairs='' scope reg
+    for scope in ${(f)"$(h-agent-auto-continue-scopes)"} ; do
+        for reg in ${(f)"$(h-agent-auto-continue-registrations "${scope}")"} ; do
+            f=( "${(@ps:\t:)reg}" )
+            if (( ${+paseo_of_native[${f[2]}]} )) ; then
+                shadowed[${paseo_of_native[${f[2]}]}]+="${scope} ${f[1]} ${f[2]}"$'\n'
+                continue
+            fi
+            pairs+="reg:${scope}:${f[1]}:${f[2]}"$'\t'"${f[3]:--}"$'\t'"${f[1]}"$'\t'"${scope}  -"$'\n'
+        done
+    done
+
+    if (( ${#paseo_home_of} )) ; then
+        local -A pair_of
+        for row in ${(f)"$(h-paseo-agent-pairs paseo: 2>/dev/null)"} ; do
+            pair_of[${${row%%$'\t'*}#paseo:}]="${row}"
+        done
+        local uuid
+        for uuid in ${(k)paseo_home_of} ; do
+            if (( ${+pair_of[${uuid}]} )) ; then
+                pairs+="${pair_of[${uuid}]}"$'\n'
+            else
+                pairs+="paseo:${uuid}"$'\t-\t-\t'"paseo:${uuid[1,8]}  (registered)"$'\t'"${badge}"$'\n'
+            fi
+        done
+    fi
+
+    if test -z "${pairs}" ; then
+        ecerr "$0: nothing is registered for auto-continue"
+        return 1
+    fi
+
+    local selected
+    selected="$(ecn "${pairs}" | h-agent-session-annotate-rows | h-agent-session-fz multi)" @TRET
+    test -n "${selected}" || return 1
+
+    local id line
+    local -a r
+    integer failed=0
+    for row in ${(f)selected} ; do
+        f=( "${(@ps:\t:)row}" )
+        if [[ "${f[1]}" == paseo:* ]] ; then
+            id="${f[1]#paseo:}"
+            paseo-auto-continue-off "${id}" --home "${paseo_home_of[${id}]}" || failed+=1
+            for line in ${(f)shadowed[${id}]:-} ; do
+                r=( ${=line} )
+                agent_auto_continue_who="${r[2]} ${r[3]}" \
+                    h-agent-auto-continue-unregister "${r[1]}" "${r[2]}" "${r[3]}" || failed+=1
+            done
+        else
+            r=( "${(@s.:.)f[1]#reg:}" )
+            agent_auto_continue_who="${r[2]} ${r[3]}" \
+                h-agent-auto-continue-unregister "${r[1]}" "${r[2]}" "${r[3]}" || failed+=1
+        fi
+    done
+
+    (( failed == 0 ))
 }
 ##
 #: The watcher

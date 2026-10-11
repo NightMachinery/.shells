@@ -51,6 +51,36 @@ shell inherits the environment that names the session — `CLAUDE_CODE_SESSION_I
 and `CLAUDE_CONFIG_DIR`, `CODEX_THREAD_ID`, `ANTIGRAVITY_CONVERSATION_ID`, and
 `TMUX_PANE` — which a garden shell does not have.
 
+## From another shell
+
+`agent-auto-continue-fz` does the same registration for sessions you pick,
+instead of typing `/auto-continue` into each one. It offers every live session
+plus the Paseo agents, multi-select, with the usual transcript preview.
+
+- A Paseo agent appears once, as its `🧭` Paseo row; the native session it runs
+  is left out (see "Native sessions" in `docs/paseo.md`). Picking it runs
+  [agfi:paseo-auto-continue-on], so its watcher sends through Paseo.
+  `--poll SECONDS` is passed on to it.
+- Any other row is registered as `/auto-continue` would register it from
+  inside. The difference is where the facts come from: the scope is read from
+  the transcript's location, not the environment
+  ([agfi:h-agent-auto-continue-scope-of]). A Claude transcript sits under its
+  seat's config home, and a Codex rollout under its `CODEX_HOME`, whose active
+  auth names the scope. The tmux pane is found by transcript in
+  `h-agent-session-tmux-panes`, since this shell's `TMUX_PANE` is not the
+  session's. `--frontmost` works as it does inside.
+
+Each pick is tried on its own: a failure is reported and the rest go ahead,
+and the exit status says whether any failed.
+
+`agent-auto-continue-off-fz` lists what is registered, native and Paseo alike,
+and turns auto-continue off for each pick. The Paseo registrations come from
+`paseo_auto_continue.py list`, so the shell never parses the watcher's state
+files. If a registered Paseo agent's native session also has a native
+registration, only the Paseo row is offered, and turning it off removes both.
+A native registration with no Paseo row standing for it is offered normally,
+since that is the only way to remove it.
+
 ## Scopes
 
 A registration lives under a *scope*: the account whose limit the session

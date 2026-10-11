@@ -23,6 +23,9 @@ function aliasfn { :; }
 function aliasfnq { :; }
 source "${paseo_agents_test_root}/zshlang/auto-load/others/paseo.zsh"
 source "${paseo_agents_test_root}/zshlang/auto-load/others/agent-usage.zsh"
+source "${paseo_agents_test_root}/zshlang/auto-load/others/agent-auto-continue.zsh"
+source "${paseo_agents_test_root}/zshlang/auto-load/others/codex-session.zsh"
+source "${paseo_agents_test_root}/zshlang/auto-load/others/codex.zsh"
 unalias ecerr 2>/dev/null || true
 function ecerr { print -ru2 -- "$@"; }
 setopt nounset
@@ -132,5 +135,56 @@ done
 
 out="$(paseo-agents-test-send '{}' 'paseo:not-a-uuid')"
 expect-eq "${out}" refused 'a malformed id is refused before any call'
+
+# Scopes of sessions picked from another shell come from the transcript path.
+typeset -gA claude_code_profile_homes=(default .claude work .claude-work)
+expect-eq "$(h-agent-auto-continue-scope-of claude "${t}/.claude-work/projects/-p/x.jsonl")" claude-work 'Claude scope'
+command mkdir -p -- "${t}/ch/sessions"
+print -r -- a > "${t}/ch/auth.json" ; print -r -- a > "${t}/ch/auth_team.json"
+expect-eq "$(h-agent-auto-continue-scope-of codex "${t}/ch/sessions/2026/x.jsonl")" codex-team 'Codex scope'
+if h-agent-auto-continue-scope-of claude "${t}/.other/projects/x.jsonl" 2>/dev/null ; then
+    print -ru2 -- 'FAIL: an unknown Claude home got a scope' ; exit 1
+fi
+
+# agent-auto-continue-fz: a Paseo row goes to the Paseo watcher, a native row
+# is registered from outside.
+typeset -g ac_log="${t}/ac.log"
+function h-agent-session-live-rows {
+    printf 'paseo:%s\t%s\tclaude\tlabel\n' "${a_live}" "${native_t}"
+    printf 'w2\t%s\tclaude\tother\n' "${other_t}"
+}
+function h-agent-session-fz { command cat ; }
+function h-agent-session-annotate-rows { command cat ; }
+function paseo-auto-continue-on { print -r -- "paseo-on $*" >> "${ac_log}" ; }
+function paseo-auto-continue-off { print -r -- "paseo-off $*" >> "${ac_log}" ; }
+function h-agent-auto-continue-register-outside { print -r -- "register ${agent_auto_continue_frontmost_p} $*" >> "${ac_log}" ; }
+: > "${ac_log}"
+agent-auto-continue-fz --poll 90
+expect-eq "$(<"${ac_log}")" "paseo-on ${a_live} --poll 90"$'\n'"register n claude ${other_t}" 'agent-auto-continue-fz dispatch'
+
+# agent-auto-continue-off-fz: the native registration of a registered Paseo
+# agent is not offered, and goes when the Paseo row does.
+typeset -g agent_auto_continue_dir="${t}/ac"
+command mkdir -p -- "${agent_auto_continue_dir}/claude-default" "${agent_auto_continue_dir}/claude-work"
+printf 'claude\t%s\t%s\ttmux:%%1\t1\n' "${live_id}" "${native_t}" > "${agent_auto_continue_dir}/claude-default/claude-${live_id}"
+printf 'claude\tplain\t\tkitty:4\t1\n' > "${agent_auto_continue_dir}/claude-work/claude-plain"
+function h-paseo-auto-continue { [[ "${1}" == list ]] && printf '%s\t%s\tclaude/default\twaiting\n' "${a_live}" "${paseo_home}" ; }
+function agent-auto-continue-check { : ; }
+function h-agent-auto-continue-watch-stop { : ; }
+function h-agent-session-fz { command tee "${t}/offered" | command grep -e '^paseo:' ; }
+: > "${ac_log}"
+agent-auto-continue-off-fz >/dev/null
+expect-eq "$(command cut -f1 "${t}/offered" | command sort)" "paseo:${a_live}"$'\n'"reg:claude-work:claude:plain" 'off-fz offers each agent once'
+expect-eq "$(<"${ac_log}")" "paseo-off ${a_live} --home ${paseo_home}" 'off-fz turns the Paseo watcher off'
+if test -e "${agent_auto_continue_dir}/claude-default/claude-${live_id}" ; then
+    print -ru2 -- 'FAIL: the hidden native registration survived' ; exit 1
+fi
+test -e "${agent_auto_continue_dir}/claude-work/claude-plain"
+
+function h-agent-session-fz { command grep -e '^reg:' ; }
+agent-auto-continue-off-fz >/dev/null
+if test -e "${agent_auto_continue_dir}/claude-work/claude-plain" ; then
+    print -ru2 -- 'FAIL: the picked native registration survived' ; exit 1
+fi
 
 print -r -- 'Paseo agent row checks passed'
