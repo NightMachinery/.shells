@@ -287,6 +287,40 @@ that Paseo then never shows those subagents: after the session has exited,
 handoff from a fresh `claude --resume`. Renaming it back later makes Paseo
 read it again on its next reload.
 
+## Native sessions
+
+A Paseo agent runs a native Claude or Codex session: a headless
+`--input-format stream-json` process (or a Codex `app-server`) under the Paseo
+daemon. The live session listing reports that process as an ordinary session,
+and may even give it a tmux session name, though no window or pane holds it and
+only Paseo can talk to it.
+
+The agent's stored record, `${PASEO_HOME:-~/.paseo}/agents/<dir>/<uuid>.json`,
+names that session as `.persistence.nativeHandle`, with
+`.persistence.metadata.provider` saying `claude` or `codex`. The helpers in
+`zshlang/auto-load/others/paseo.zsh` read the records directly rather than
+asking the daemon: they give the same agents and statuses as
+`paseo ls --global` (checked on Paseo 0.10.2) in about 20ms instead of 900ms,
+plus the native handle the CLI does not print.
+
+- [agfi:h-paseo-agent-rows]: one row per listed agent: uuid, native agent,
+  native session id, status, provider, title.
+- [agfi:h-paseo-filter-pairs]: drops picker rows whose transcript belongs to a
+  listed agent's native session.
+- [agfi:h-paseo-agent-pairs]: the agents as picker rows, with the native
+  transcript in the transcript column so the preview works unchanged, and a
+  `🧭` badge (`paseo_agent_badge`).
+
+**A picker that shows Paseo agents shows each one once, as its Paseo row.** The
+native row is dropped. Setting `agent_session_paseo_p=y` around
+[agfi:h-agent-session-live-rows] turns both halves on; the resume pickers in
+`docs/agent-usage-armed.md` and `agent-auto-continue-fz` use it. An archived
+agent is not listed, so its native session is not hidden either: after a
+reverse handoff, that session is an ordinary terminal one again.
+
+A remote `PASEO_HOST` is refused, because the records are only on the daemon's
+disk. Run these on the daemon host.
+
 ## Controls and recovery
 
 ```zsh
@@ -363,6 +397,7 @@ Run the isolated checks with:
 
 ```sh
 zsh -f zshlang/tests/paseo.zsh
+zsh -f zshlang/tests/paseo-agents.zsh
 python3 -m unittest discover -s python/tests -p test_paseo_handoff.py
 ```
 

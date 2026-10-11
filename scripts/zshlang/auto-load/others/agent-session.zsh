@@ -1985,20 +1985,36 @@ function h-agent-session-live-rows {
     #: [agfi:h-agent-session-all-pairs], `-' in the window column when none
     #: shows it.
     local scope="${agent_session_live_rows_scope:-${claude_code_session_live_rows_scope:-windows}}"
+    #: `y' also offers each Paseo agent, as a row whose caller column is
+    #: `paseo:<uuid>', and drops the native session it runs, which would
+    #: otherwise be listed a second time; see [agfi:h-paseo-filter-pairs].
+    local paseo_p="${agent_session_paseo_p:-n}"
 
-    local pairs
+    #: The Paseo filter and pairs each read the live listing too; one listing
+    #: serves all three.
+    if bool "${paseo_p}" ; then
+        local agent_session_live_list_cache="${agent_session_live_list_cache:-$(h-agent-session-live-list)}"
+    fi
+
+    local pairs paseo_pairs=''
     if [[ "${scope}" == all ]] ; then
         pairs="$(h-agent-session-all-pairs)" @RET
     else
         pairs="$(h-agent-session-live-pairs)" @RET
     fi
-    if test -z "${pairs}" ; then
+    if bool "${paseo_p}" ; then
+        pairs="$(ec "${pairs}" | h-paseo-filter-pairs)"
+        paseo_pairs="$(h-paseo-agent-pairs paseo: 2>/dev/null)" || paseo_pairs=''
+    fi
+    if test -z "${pairs}${paseo_pairs}" ; then
         ecerr "$0: no live agent session with a transcript to show"
         return 1
     fi
 
-    pairs="$(ec "${pairs}" | h-agent-session-exclude-pairs)"
-    if test -z "${pairs}" ; then
+    if test -n "${pairs}" ; then
+        pairs="$(ec "${pairs}" | h-agent-session-exclude-pairs)"
+    fi
+    if test -z "${pairs}${paseo_pairs}" ; then
         ecerr "$0: every live agent session is excluded (agent_session_exclude_pcres)"
         return 1
     fi
@@ -2006,11 +2022,15 @@ function h-agent-session-live-rows {
     #: The kitty label is this picker's own, so it is built here and the
     #: annotator is left generic. A name still unknown at this point is left as
     #: `-' for [agfi:h-agent-session-annotate-rows] to fill in from the
-    #: transcript, in the label's last position.
-    ec "${pairs}" |
-        gawk -F'\t' -v OFS='\t' \
-            '{ print $1, $2, $3, (($1 == "-") ? $4 : ("w" $1 "  " $4)) }' |
-        h-agent-session-annotate-rows
+    #: transcript, in the label's last position. The Paseo rows come labelled
+    #: and badged already, so they join after it.
+    {
+        test -n "${pairs}" && ec "${pairs}" |
+            gawk -F'\t' -v OFS='\t' \
+                '{ print $1, $2, $3, (($1 == "-") ? $4 : ("w" $1 "  " $4)) }'
+        test -n "${paseo_pairs}" && ec "${paseo_pairs}"
+        true
+    } | h-agent-session-annotate-rows
 }
 
 function h-agent-session-annotate-rows {
