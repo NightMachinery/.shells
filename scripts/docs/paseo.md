@@ -117,7 +117,8 @@ After a successful import and before attaching, the worker runs three steps:
    background shells, stopped workflows, monitors, holds and screen banners.
    It then asks the agent to confirm its model and effort with the
    `paseo-model-update` skill, and says which of the first two steps
-   succeeded. The text is kept in `status/followup-prompt.txt`.
+   succeeded. After a move to another account (`--to`, below), it also says
+   so. The text is kept in `status/followup-prompt.txt`.
 
 Each step is best effort. A failure is recorded and the next step still runs;
 none of them fails or rolls back the handoff. `status/followup.json` records
@@ -134,11 +135,97 @@ To check that the helper can reach the local daemon without changing anything:
 node python/paseo_set_model.mjs --paseo "$(command -v paseo)" --home "$HOME/.paseo" --check
 ```
 
+## Moving to another account
+
+Each Claude account is a config directory, such as `~/.claude` and
+`~/.claude-work`. Without options, `2paseo` imports a session into the account
+it came from. `--to` moves it to another one instead, for example to spend a
+quota that is about to reset:
+
+```zsh
+! 2paseo --to ~/.claude
+! 2paseo --to=~/.claude --wait-exit --no-switch
+```
+
+The value is an absolute path or a `~/` path (a quoted `~/` is expanded too).
+It must be an existing Claude config directory with a `projects/` folder,
+other than the session's own and not sharing its `projects/`. Only Claude
+sessions can move; `--to` is refused for Codex, and inside a Paseo agent.
+
+The destination is the source's own layout under the target:
+`<target>/projects/<project folder>/<id>.jsonl`, plus the session's sidecar
+directory `<id>/` beside it (subagent transcripts, tool results, workflow
+state). Paseo finds the copy there because it derives the same project folder
+name from the same working directory.
+
+`prepare` refuses, before anything is stopped, when either destination path
+already exists, or when the target has no usable provider entry. It resolves
+the target's provider exactly as it would for a source home: the daemon's
+default Claude config (`~/.claude`) gets the built-in `claude` entry, and any
+other directory gets or reuses its `handoff-claude-<hash>` alias. The provider
+diagnostic must report the target as the entry's config directory. The worker
+repeats both checks before it stops the source, since either can change in
+between.
+
+### The copy
+
+The worker copies once the source has exited and the checks that no writer
+remains have passed, so the copy is the final transcript, and before it
+imports:
+
+- Every file is created exclusively, so nothing is ever overwritten. Files get
+  mode 0600 and directories 0700, like the bundle's private files, and files
+  keep the source's times.
+- The transcript is checked byte for byte against its source by SHA-256.
+- Symbolic links and special files in the sidecar are skipped and counted, not
+  followed.
+- Project memory (`projects/<project folder>/memory/`) belongs to the account
+  and is not copied.
+- The source transcript and sidecar are never modified or deleted.
+
+`status/copy.json` records both paths, the transcript's size and SHA-256, and
+the sidecar's file, directory, byte and skipped counts. The import then runs
+with the target's provider, and `status/import-request.json` names the copied
+transcript.
+
+### What changes for the agent
+
+Model and effort follow as for any handoff. Everything that belongs to the
+account does not: memory directories, account-level instructions such as a
+profile overlay `CLAUDE.md`, connectors and MCP servers, installed skills,
+settings and hooks, and quotas. The briefing tells the agent it moved from
+the source config directory to the target, and asks it to re-read its project
+instructions and check that the tools and skills it relies on are present.
+
+### When the copy fails
+
+A failed copy removes only what it created, imports nothing, and names both
+paths in its error. By then the source has stopped, so resume the original
+natively in its own account with the printed recovery command, and run
+`2paseo --to` again from there if you still want to move. Its transcript is
+exactly as it was.
+
+Ctrl+C in the worker's pane cleans up the same way. Only a worker killed
+outright in the middle of a copy (by a signal, or with its tmux session) leaves
+its partial destination behind. `2paseo` will not overwrite it: inspect it,
+and delete it yourself before retrying.
+
+A re-run of the same plan after a completed copy neither stops nor copies
+again. It checks that no writer has appeared and that both transcripts still
+match the recorded SHA-256, then imports. An import whose outcome is unknown
+(`status/import-request.json` without a result) is never retried, as for any
+handoff.
+
+The original transcript always stays where it was. Resuming it natively after
+the move works, but forks the conversation: Paseo continues the copy in the
+target account.
+
 ## Controls and recovery
 
 ```zsh
 ! 2paseo --no-switch                 # leave the current tmux client in place
 ! 2paseo --wait-exit --no-switch     # queue import, then exit the source yourself
+! 2paseo --to ~/.claude              # move to another account (see above)
 ```
 
 Automatic termination requires a source process belonging to the current user,

@@ -12,14 +12,30 @@ function paseo-install {
 }
 
 function 2paseo {
-    : "usage: 2paseo [--wait-exit] [--no-switch]"
-    local wait_p=n switch_p=y arg
-    for arg in "$@" ; do
-        case "${arg}" in
+    : "usage: 2paseo [--wait-exit] [--no-switch] [--to <claude-config-dir>]
+--to moves a Claude session to another account's config directory, e.g. --to ~/.claude."
+    local wait_p=n switch_p=y to=''
+    while (( $# )) ; do
+        case "${1}" in
             --wait-exit) wait_p=y ;;
             --no-switch) switch_p=n ;;
-            *) ecerr "$0: unsupported option: ${arg}"; return 64 ;;
+            --to|--to=*)
+                if [[ "${1}" == --to ]] ; then
+                    (( $# >= 2 )) || { ecerr "$0: --to needs a Claude config directory"; return 64; }
+                    to="${2}"
+                    shift
+                else
+                    to="${1#--to=}"
+                fi
+                #: A quoted `~/' arrives unexpanded. Expand it; refuse any other relative path.
+                [[ "${to}" == '~' || "${to}" == '~/'* ]] && to="${HOME}${to#\~}"
+                [[ "${to}" == /* ]] || { ecerr "$0: --to needs an absolute or ~/ path: ${to}"; return 64; }
+                #: paseo_handoff.py checks that it is another Claude config directory.
+                to="${to:A}"
+                ;;
+            *) ecerr "$0: unsupported option: ${1}"; return 64 ;;
         esac
+        shift
     done
     ensure-cmd paseo python3 tmux gmktemp @RET
     h-tmux-env-repair || true
@@ -29,6 +45,7 @@ function 2paseo {
     local name id="${PASEO_AGENT_ID:-}"
     if [[ -n "${id}" ]] ; then
         [[ "${id}" =~ ${uuid_re} ]] || { ecerr "$0: invalid Paseo agent ID"; return 1; }
+        [[ -z "${to}" ]] || { ecerr "$0: already a Paseo agent; --to only moves a native session"; return 1; }
         name="paseo-${id}"
         if ! tmux-job-running-p "${name}" ; then
             tmux-job-start "${name}" "${paseo_bin}" attach "${id}" --home "${paseo_home}" @RET
@@ -40,6 +57,7 @@ function 2paseo {
         local -a fields opts=()
         agent="$(agent-session-current-agent)" @RET
         [[ "${agent}" == (claude|codex) ]] || { ecerr "$0: only Claude and Codex sessions can be imported"; return 1; }
+        [[ -z "${to}" || "${agent}" == claude ]] || { ecerr "$0: --to moves Claude sessions only; a Codex session keeps its CODEX_HOME"; return 1; }
         transcript="$(agent-session-current-file)" @RET
         id="$(h-agent-session-call "${agent}" id-of "${transcript}")" @RET
         [[ "${id}" =~ ${uuid_re} ]] || { ecerr "$0: current session has no exact UUID"; return 1; }
@@ -68,6 +86,7 @@ function 2paseo {
         )" @RET
         zmodload zsh/system @RET
         [[ "${wait_p}" == y ]] && opts+=(--wait-exit)
+        [[ -n "${to}" ]] && opts+=(--target-home "${to}")
         command python3 "${NIGHTDIR}/python/paseo_handoff.py" prepare \
             --agent "${agent}" --id "${id}" --transcript "${transcript}" \
             --cwd "${dir}" --provider-home "${provider_home}" \
@@ -82,6 +101,7 @@ function 2paseo {
         else
             ecerr "$0: Paseo preflight will run, then gracefully stop the validated native process"
         fi
+        [[ -z "${to}" ]] || ecerr "$0: once it has exited, the session is copied to ${to} and imported there"
         ecerr "$0: recovery state: ${bundle}"
     fi
     if [[ "${switch_p}" == y && -n "${TMUX:-}" ]] ; then

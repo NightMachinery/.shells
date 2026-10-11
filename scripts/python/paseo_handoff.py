@@ -7,6 +7,11 @@ snapshots are used. Each external CLI gets its own process group for timeout
 cleanup. External-command output is deliberately not echoed. After the import,
 a best-effort follow-up carries the source model and effort over and sends the
 agent one fixed briefing about what the move broke.
+
+With ``--target-home`` (``2paseo --to``), a Claude session moves to another
+account: once the source has exited, its transcript and sidecar directory are
+copied into the target config directory, never overwriting anything, and the
+copy is imported with the target's provider. The source files stay untouched.
 """
 
 import argparse
@@ -268,6 +273,62 @@ def store_root(plan):
     return str(Path(plan["provider_home"]) / ("projects" if plan["agent"] == "claude" else "sessions"))
 
 
+def default_claude_home():
+    return str((Path.home() / ".claude").resolve())
+
+
+def provider_name(agent, home):
+    """Name the Paseo provider entry for a config home.
+
+    The daemon's default Claude config uses the built-in entry; every other
+    home gets an alias named after it.
+    """
+    if agent == "claude" and home == default_claude_home():
+        return agent
+    return "handoff-" + agent + "-" + hashlib.sha256(home.encode()).hexdigest()[:12]
+
+
+def import_home(plan):
+    """Return the config home Paseo resumes the session under."""
+    return plan.get("target_home") or plan["provider_home"]
+
+
+def sidecar_path(transcript, session_id):
+    # Subagent transcripts and tool results live beside <id>.jsonl in <id>/.
+    return str(Path(transcript).parent / session_id)
+
+
+def target_layout(plan, target):
+    """Validate a --to config directory and return it with the destination transcript.
+
+    The copy keeps the source's project folder name. Paseo derives that name
+    from the same cwd, so its import finds the copy under the target.
+    """
+    if plan["agent"] != "claude":
+        raise HandoffError("--to moves Claude sessions only; a Codex session keeps its CODEX_HOME")
+    home = absolute_path(target, kind="dir")
+    if home == plan["provider_home"]:
+        raise HandoffError("--to names the session's own config directory; drop --to to stay there")
+    projects = Path(home) / "projects"
+    if not projects.is_dir():
+        raise HandoffError("--to is not a Claude config directory (it has no projects/): " + home)
+    transcript = Path(plan["transcript"])
+    source_projects = Path(store_root(plan)).resolve()
+    if transcript.parent.parent != source_projects:
+        raise HandoffError("Transcript is not in a project folder of its config directory")
+    projects = projects.resolve()
+    if projects == source_projects:
+        raise HandoffError("--to shares its projects/ with the session's own config directory")
+    return home, str(projects / transcript.parent.name / transcript.name)
+
+
+def check_destination(plan):
+    """Refuse a destination that exists: the copy never overwrites."""
+    for path in (plan["target_transcript"], sidecar_path(plan["target_transcript"], plan["id"])):
+        if os.path.lexists(path):
+            raise HandoffError("Destination already exists, and 2paseo never overwrites it: " + path)
+
+
 def verify_native(plan):
     root = Path(store_root(plan)).resolve()
     transcript = Path(plan["transcript"])
@@ -375,6 +436,9 @@ def prepare(args):
     for key, kind in (("transcript", "file"), ("cwd", "dir"), ("provider_home", "dir"),
                       ("paseo", "executable"), ("agent_session", "executable"), ("paseo_home", None)):
         plan[key] = absolute_path(getattr(args, key), kind=kind)
+    target = getattr(args, "target_home", None)
+    if target is not None:
+        plan["target_home"], plan["target_transcript"] = target_layout(plan, target)
     table = process_table()
     owner, caller = table.get(args.source_pid), table.get(args.caller_pid)
     if owner is None or caller is None or owner.pid <= 1 or owner.pid == caller.pid:
@@ -387,6 +451,11 @@ def prepare(args):
         plan["source_ancestors"] = [asdict(p) for p in reversed(launchers[1:])]
     plan["caller"] = asdict(caller)
     verify_native(plan)
+    if "target_home" in plan:
+        # Refuse here, while the source still runs; run repeats both checks
+        # before it stops anything, since either can change in between.
+        check_destination(plan)
+        plan["target_provider"] = provider_preflight(plan)
     # Always present, even when null: their presence marks a plan that expects
     # the post-import follow-up (see follow_up).
     plan["model"], plan["model_source"], plan["effort"] = source_settings(args.agent, plan["transcript"])
@@ -414,6 +483,14 @@ def validate_plan(plan):
         raise HandoffError("Invalid saved source effort")
     if plan.get("model_source") not in MODEL_SOURCES:
         raise HandoffError("Invalid saved source model origin")
+    if any(key in plan for key in ("target_home", "target_transcript", "target_provider")):
+        try:
+            layout = target_layout(plan, plan.get("target_home"))
+        except KeyError as exc:
+            raise HandoffError("Invalid saved target account") from exc
+        if (layout != (plan["target_home"], plan.get("target_transcript"))
+                or plan.get("target_provider") != provider_name("claude", plan["target_home"])):
+            raise HandoffError("Target account paths changed since preparation")
     try:
         source, caller = Process(**plan["source"]), Process(**plan["caller"])
         owner = Process(**plan["owner"]) if "owner" in plan else source
@@ -518,13 +595,13 @@ def merge_provider_alias(home, provider, alias):
 
 def provider_preflight(plan):
     paseo, home, agent = plan["paseo"], plan["paseo_home"], plan["agent"]
+    # With --to, the provider is the target account's; otherwise the source's own.
+    config_dir = import_home(plan)
     command([paseo, "daemon", "start", "--home", home, "--timeout", "45", "--json"], timeout=60)
-    provider = agent
-    if agent == "codex" or plan["provider_home"] != str((Path.home() / ".claude").resolve()):
-        digest = hashlib.sha256(plan["provider_home"].encode()).hexdigest()[:12]
-        provider = "handoff-" + agent + "-" + digest
+    provider = provider_name(agent, config_dir)
+    if provider != agent:
         alias = {"extends": agent, "label": "Imported " + agent.capitalize() + " profile",
-                 "env": {"CLAUDE_CONFIG_DIR" if agent == "claude" else "CODEX_HOME": plan["provider_home"]}}
+                 "env": {"CLAUDE_CONFIG_DIR" if agent == "claude" else "CODEX_HOME": config_dir}}
         merge_provider_alias(home, provider, alias)
         command([paseo, "daemon", "reload", "--home", home, "--json"])
     value = json_command([paseo, "provider", "diagnostic", provider, "--home", home, "--json"])
@@ -540,8 +617,9 @@ def provider_preflight(plan):
             config_home = absolute_path(auth.get("configDirectory"), kind="dir")
         except (ValueError, AttributeError, HandoffError) as exc:
             raise HandoffError("Cannot verify Claude authentication profile; native source preserved") from exc
-        if config_home != plan["provider_home"]:
-            raise HandoffError("Paseo Claude profile differs from native source; native source preserved")
+        if config_home != config_dir:
+            raise HandoffError("Paseo Claude profile differs from the requested config directory; "
+                               "native source preserved")
     return provider
 
 
@@ -597,6 +675,161 @@ def ensure_no_writer(plan, seconds=5):
         time.sleep(0.2)
 
 
+def file_digest(filename):
+    digest = hashlib.sha256()
+    with open(filename, "rb") as handle:
+        while chunk := handle.read(1 << 20):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def copy_file(source, destination):
+    """Copy one regular file byte for byte into a new private file.
+
+    The destination is created exclusively with mode 0600, and keeps the
+    source's times, so Claude's session lists still order it by its last
+    turn. A destination left by a failed copy is removed. Returns its size.
+    """
+    flags = os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0)
+    with open(os.open(source, flags), "rb") as reader:
+        before = os.fstat(reader.fileno())
+        if not stat.S_ISREG(before.st_mode):
+            raise HandoffError("Not a regular file: " + source)
+        fd = os.open(destination, os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, "O_NOFOLLOW", 0), 0o600)
+        try:
+            size = 0
+            with os.fdopen(fd, "wb") as writer:
+                os.fchmod(writer.fileno(), 0o600)
+                while chunk := reader.read(1 << 20):
+                    writer.write(chunk)
+                    size += len(chunk)
+                writer.flush()
+                os.fsync(writer.fileno())
+            after = os.fstat(reader.fileno())
+            if size != after.st_size or (before.st_size, before.st_mtime_ns) != (after.st_size, after.st_mtime_ns):
+                raise HandoffError("Source changed while copying: " + source)
+            os.utime(destination, ns=(before.st_atime_ns, before.st_mtime_ns), follow_symlinks=False)
+        except BaseException:
+            try:
+                os.unlink(destination)
+            except OSError:
+                warn("cannot remove the partial copy " + destination)
+            raise
+    return size
+
+
+def raise_walk_error(exc):
+    raise exc
+
+
+def copy_tree(source, destination):
+    """Copy a sidecar directory into a new, empty private directory.
+
+    Returns what was copied. Directories get mode 0700 and files 0600.
+    Anything that is neither a regular file nor a directory, such as a
+    symbolic link, is skipped and counted rather than followed.
+    """
+    totals = {"files": 0, "directories": 0, "bytes": 0, "skipped": 0}
+    for root, directories, files in os.walk(source, onerror=raise_walk_error):
+        target = Path(destination) / Path(root).relative_to(source)
+        kept = []
+        for name in directories:
+            if Path(root, name).is_symlink():
+                totals["skipped"] += 1
+                continue
+            os.mkdir(target / name, 0o700)
+            os.chmod(target / name, 0o700)
+            totals["directories"] += 1
+            kept.append(name)
+        directories[:] = kept
+        for name in files:
+            if not stat.S_ISREG(Path(root, name).lstat().st_mode):
+                totals["skipped"] += 1
+                continue
+            totals["bytes"] += copy_file(str(Path(root, name)), str(target / name))
+            totals["files"] += 1
+    return totals
+
+
+def copy_session(plan, recordfile):
+    """Copy the final transcript and its sidecar into the target account.
+
+    Called only after the source has exited and no writer remains. It never
+    overwrites, never touches the source, and removes what it created when it
+    fails. The record it writes keeps a re-run from copying again.
+    """
+    source, destination = plan["transcript"], plan["target_transcript"]
+    source_side = sidecar_path(source, plan["id"])
+    destination_side = sidecar_path(destination, plan["id"])
+    project = Path(destination).parent
+    created = []
+    try:
+        check_destination(plan)
+        if not os.path.lexists(project):
+            os.mkdir(project, 0o700)
+            created.append(("directory", project))
+        info = project.lstat()
+        if not stat.S_ISDIR(info.st_mode) or info.st_uid != os.getuid():
+            raise HandoffError("Destination project folder must be your own directory: " + str(project))
+        size = copy_file(source, destination)
+        created.append(("file", destination))
+        digest = file_digest(source)
+        if file_digest(destination) != digest:
+            raise HandoffError("Copied transcript differs from its source")
+        sidecar = None
+        if os.path.lexists(source_side):
+            if not Path(source_side).is_dir() or Path(source_side).is_symlink():
+                raise HandoffError("Session sidecar is not a directory: " + source_side)
+            os.mkdir(destination_side, 0o700)  # Exclusive, so the cleanup only ever removes our own tree.
+            created.append(("tree", destination_side))
+            os.chmod(destination_side, 0o700)
+            sidecar = copy_tree(source_side, destination_side)
+            sidecar.update(source=source_side, destination=destination_side)
+        record = {"planDigest": fingerprint(plan), "sourceId": plan["id"], "source": source,
+                  "destination": destination, "bytes": size, "sha256": digest, "sidecar": sidecar}
+        write_private(recordfile, record)
+    except BaseException as exc:  # Including Ctrl+C in the worker's pane: never leave a partial copy.
+        for kind, path in reversed(created):
+            try:
+                if kind == "tree":
+                    shutil.rmtree(path)
+                elif kind == "file":
+                    os.unlink(path)
+                else:
+                    os.rmdir(path)
+            except OSError:
+                warn("cannot remove the partial copy " + str(path))
+        if not isinstance(exc, Exception):
+            raise
+        raise HandoffError("Cannot copy the session from " + source + " to " + destination + ": "
+                           + failure_text(exc) + ". Nothing was imported, and the original transcript is "
+                           "untouched.") from exc
+    print("Copied the session to " + destination + (
+        "" if sidecar is None else " with " + str(sidecar["files"]) + " sidecar files"), flush=True)
+    return record
+
+
+def read_copy_record(plan, recordfile):
+    record = read_private(recordfile)
+    if (not isinstance(record, dict) or record.get("planDigest") != fingerprint(plan)
+            or record.get("sourceId") != plan["id"] or record.get("destination") != plan["target_transcript"]
+            or not isinstance(record.get("sha256"), str)):
+        raise HandoffError("Saved copy record belongs to another handoff")
+    return record
+
+
+def verify_copy(plan, record):
+    """Check that neither transcript changed since an earlier worker copied it."""
+    for label, path in (("original", plan["transcript"]), ("copied", plan["target_transcript"])):
+        try:
+            unchanged = file_digest(path) == record["sha256"]
+        except OSError as exc:
+            raise HandoffError("Cannot read the " + label + " transcript " + path) from exc
+        if not unchanged:
+            raise HandoffError("The " + label + " transcript changed since the copy; inspect " + path
+                               + " before retrying")
+
+
 def fingerprint(plan):
     return hashlib.sha256(json.dumps(plan, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
 
@@ -636,7 +869,7 @@ def recovery_command(plan):
         argv.extend(["-u", marker])
     if agent == "codex":
         argv.append("CODEX_HOME=" + home)
-    elif home != str((Path.home() / ".claude").resolve()):
+    elif home != default_claude_home():
         argv.append("CLAUDE_CONFIG_DIR=" + home)
     argv.extend([agent, "--resume" if agent == "claude" else "resume", plan["id"]])
     return "cd " + shlex.quote(cwd) + " && " + shlex.join(argv)
@@ -692,10 +925,21 @@ def followup_prompt(plan, agent_id, record):
     if plan.get("model_source") == "reply":
         model += " (read from your last reply, which omits a context suffix such as [1m])"
     effort = plan.get("effort") or "unknown"
+    account = []
+    if plan.get("target_home"):
+        account = [
+            "You also moved accounts: 2paseo copied your transcript from the Claude config directory "
+            + plan["provider_home"] + " to " + plan["target_home"] + ", and Paseo now runs you under "
+            + plan["target_home"] + ". The original transcript stays untouched at " + plan["transcript"]
+            + ". Memory directories, account-level instructions (for example a profile overlay CLAUDE.md), "
+            "connectors and quotas differ between the two config directories. Re-read your project "
+            "instructions, and check that the tools and skills you rely on are present.",
+        ]
     return "\n\n".join([
         "You are now running in Paseo as agent " + agent_id + ". 2paseo imported you from the native "
         + source + " session " + plan["id"] + " (working directory " + plan["cwd"] + ") and stopped "
         "the original process.",
+        *account,
         "Continue the task you were doing before the move. First, check what the move broke and repair it:",
         "\n".join([
             "- Scheduled tasks and cron jobs created in the old session died with it. Recreate the ones "
@@ -782,26 +1026,43 @@ def run(filename):
         if importfile.exists():
             raise HandoffError("An earlier import may have succeeded; inspect Paseo before retrying")
         verify_native(plan)
+        moving = "target_home" in plan
+        copyfile = status_dir / "copy.json"
+        copied = read_copy_record(plan, copyfile) if moving and os.path.lexists(copyfile) else None
+        if moving and copied is None:
+            check_destination(plan)
         provider = provider_preflight(plan)
-        wait_gone(caller, 30)
-        if plan["wait_exit"]:
-            wait_gone(source, 600)
+        if moving and provider != plan["target_provider"]:
+            raise HandoffError("Target Paseo provider changed since preparation; native source preserved")
+        if copied is None:
+            wait_gone(caller, 30)
+            if plan["wait_exit"]:
+                wait_gone(source, 600)
+            else:
+                verify_process_identities(source, owner)
+                verify_live_source(plan, owner, live_rows(plan))
+                # Check identity after the live scan too, immediately before signal.
+                verify_process_identities(source, owner)
+                print("Terminating native source PID " + str(source.pid), flush=True)
+                try:
+                    os.kill(source.pid, signal.SIGTERM)
+                except ProcessLookupError:
+                    pass
+                wait_gone(source, 30)
+            ensure_no_writer(plan)
+            if moving:
+                # The source has exited and no writer remains: this is the final transcript.
+                copied = copy_session(plan, copyfile)
         else:
-            verify_process_identities(source, owner)
-            verify_live_source(plan, owner, live_rows(plan))
-            # Check identity after the live scan too, immediately before signal.
-            verify_process_identities(source, owner)
-            print("Terminating native source PID " + str(source.pid), flush=True)
-            try:
-                os.kill(source.pid, signal.SIGTERM)
-            except ProcessLookupError:
-                pass
-            wait_gone(source, 30)
-        ensure_no_writer(plan)
+            # An earlier worker stopped the source, found no writer and copied
+            # it. Never signal again; check that nothing changed since.
+            ensure_no_writer(plan)
+            verify_copy(plan, copied)
         # Import is an external mutation. An interrupted or invalid response
         # cannot prove it failed, so leave a durable marker and refuse replay.
         write_private(importfile, {"planDigest": fingerprint(plan), "sourceId": plan["id"],
-                                   "provider": provider, "cwd": plan["cwd"]})
+                                   "provider": provider, "cwd": plan["cwd"],
+                                   "transcript": plan.get("target_transcript", plan["transcript"])})
         value = json_command([plan["paseo"], "import", plan["id"], "--provider", provider,
                               "--cwd", plan["cwd"], "--home", plan["paseo_home"], "--json"])
         agent_id = valid_uuid(value.get("agentId"))
@@ -824,6 +1085,7 @@ def main(argv=None):
     for name in ("source-pid", "caller-pid"):
         preparing.add_argument("--" + name, required=True, type=int)
     preparing.add_argument("--wait-exit", action="store_true")
+    preparing.add_argument("--target-home", help="move a Claude session to this config directory")
     running = subparsers.add_parser("run")
     running.add_argument("plan")
     args = parser.parse_args(argv)
@@ -840,6 +1102,10 @@ def main(argv=None):
                 plan = read_private(args.plan)
                 print("Native recovery (after the original session has exited and Paseo is not using it): "
                       + recovery_command(plan), file=sys.stderr)
+                if "target_transcript" in plan:
+                    print("That resumes the untouched original in its own account. A completed copy for "
+                          + plan["target_home"] + " stays at " + plan["target_transcript"]
+                          + " (status/copy.json records it).", file=sys.stderr)
             except (HandoffError, KeyError, TypeError):
                 pass
         return 1

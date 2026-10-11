@@ -76,4 +76,32 @@ if 2paseo ; then exit 1; fi
 handoff_test_live=$'42\tid\tname\tcwd\t'"${handoff_test_source}"$'\t-\tworking\n43\tid\tname\tcwd\t'"${handoff_test_source}"
 if 2paseo ; then exit 1; fi
 [[ ! -s "${handoff_test_log}" ]]
+#: --to: parsing and ~/ expansion here; paseo_handoff.py checks the directory itself.
+handoff_test_live=$'42\t'"${handoff_test_id}"$'\tsource\tcwd\t'"${handoff_test_source}"$'\ttmux\tworking\tinteractive'
+handoff_test_owner=claude
+command mkdir -p -- "${handoff_test_tmp}/home/.claude/projects"
+typeset -g handoff_test_personal="${handoff_test_tmp:A}/home/.claude"
+: > "${handoff_test_log}"
+2paseo --to "${handoff_test_tmp}/home/./.claude"
+expect-log "--provider-home ${handoff_test_tmp}/work-profile"
+expect-log "--target-home ${handoff_test_personal}"
+expect-log "tmux switch-client -t =paseo-${handoff_test_id}"
+: > "${handoff_test_log}"
+HOME="${handoff_test_tmp}/home" 2paseo --wait-exit '--to=~/.claude' --no-switch
+expect-log '--wait-exit'
+expect-log "--target-home ${handoff_test_personal}"
+[[ "$(<"${handoff_test_log}")" != *switch-client* ]]
+: > "${handoff_test_log}"
+HOME="${handoff_test_tmp}/home" 2paseo --no-switch --to '~/.claude'
+expect-log "--target-home ${handoff_test_personal}"
+: > "${handoff_test_log}"
+if 2paseo --to ; then exit 1; fi
+if 2paseo --to '' ; then exit 1; fi
+if 2paseo --to relative/.claude ; then exit 1; fi
+if 2paseo --to '~other/.claude' ; then exit 1; fi
+handoff_test_owner=codex
+if 2paseo --to "${handoff_test_personal}" ; then exit 1; fi
+handoff_test_owner=claude
+if PASEO_AGENT_ID="${handoff_test_id}" 2paseo --to "${handoff_test_personal}" ; then exit 1; fi
+[[ ! -s "${handoff_test_log}" ]]
 print 'ok: Paseo handoff orchestration'

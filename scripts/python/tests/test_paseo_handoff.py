@@ -85,19 +85,22 @@ class HandoffTests(unittest.TestCase):
         )
         self.meta = SOURCE_ID + "\tprivate name\t" + str(self.directory) + "\n"
 
-    def make_plan(self, table=None):
+    def make_plan(self, table=None, preflight=None):
+        # Only a --to plan runs the provider preflight in prepare.
+        resolve = preflight or (lambda plan: h.provider_name(plan["agent"], h.import_home(plan)))
         with patch.object(h, "process_table", return_value=table or {100: self.source, 200: self.caller}), \
-                patch.object(h, "command", return_value=self.meta):
+                patch.object(h, "command", return_value=self.meta), \
+                patch.object(h, "provider_preflight", side_effect=resolve):
             h.prepare(self.args)
         return json.loads(self.planfile.read_text())
 
     def flow(self, *, rows=None, response=None, identities=None, wait_error=False, preflight_error=False,
-             plan_table=None):
+             plan_table=None, provider="claude"):
         plan = self.make_plan(plan_table)
         stack = ExitStack()
         self.addCleanup(stack.close)
         stack.enter_context(patch.object(h, "verify_native"))
-        preflight = stack.enter_context(patch.object(h, "provider_preflight", return_value="claude"))
+        preflight = stack.enter_context(patch.object(h, "provider_preflight", return_value=provider))
         if preflight_error:
             preflight.side_effect = h.HandoffError("provider failed")
         wait = stack.enter_context(patch.object(h, "wait_gone"))
@@ -111,7 +114,7 @@ class HandoffTests(unittest.TestCase):
             rows = [[(100, SOURCE_ID, str(self.transcript), "interactive")], []]
         stack.enter_context(patch.object(h, "live_rows", side_effect=rows))
         imported = stack.enter_context(patch.object(h, "json_command", return_value=response or {
-            "agentId": IMPORTED_ID, "provider": "claude", "cwd": str(self.directory), "status": "running",
+            "agentId": IMPORTED_ID, "provider": provider, "cwd": str(self.directory), "status": "running",
         }))
         killed = stack.enter_context(patch.object(h.os, "kill"))
         attached = stack.enter_context(patch.object(h, "attach"))
@@ -923,6 +926,327 @@ class HandoffTests(unittest.TestCase):
         sibling.unlink()
         with patch.object(h.shutil, "which", return_value=None), self.assertRaisesRegex(h.HandoffError, "Node.js"):
             h.model_helper_argv(plan)
+
+    # Moving a Claude session to another account (2paseo --to).
+
+    def use_target(self, *, sidecar=True):
+        self.target = self.directory / "personal"
+        (self.target / "projects").mkdir(parents=True)
+        self.args.target_home = str(self.target)
+        self.alias = "handoff-claude-" + h.hashlib.sha256(str(self.target).encode()).hexdigest()[:12]
+        self.destination = self.target / "projects" / "project" / (SOURCE_ID + ".jsonl")
+        self.destination_side = self.destination.parent / SOURCE_ID
+        self.write_transcript(attachment("claude-opus-5-5[1m]"), reply("claude-opus-5-5", "xhigh"))
+        self.transcript.chmod(0o644)
+        self.source_side = self.transcript.parent / SOURCE_ID
+        if sidecar:
+            (self.source_side / "subagents").mkdir(parents=True)
+            (self.source_side / "tool-results").mkdir()
+            (self.source_side / "subagents" / "agent-a.jsonl").write_bytes(b'{"a": 1}\n\x00\xff\r\n')
+            (self.source_side / "tool-results" / "r.txt").write_text("result\n")
+            for entry in self.source_side.rglob("*"):
+                entry.chmod(0o755 if entry.is_dir() else 0o644)
+            (self.source_side / "outside").symlink_to(self.log)
+
+    def snapshot(self, root):
+        """Every path under root with its bytes (files) and permission bits."""
+        entries = {".": (None, stat.S_IMODE(root.lstat().st_mode))}
+        for entry in sorted(root.rglob("*")):
+            info = entry.lstat()
+            data = entry.read_bytes() if stat.S_ISREG(info.st_mode) else None
+            entries[str(entry.relative_to(root))] = (data, stat.S_IMODE(info.st_mode))
+        return entries
+
+    def source_state(self):
+        info = self.transcript.stat()
+        side = self.snapshot(self.source_side) if self.source_side.exists() else None
+        return self.transcript.read_bytes(), stat.S_IMODE(info.st_mode), info.st_mtime_ns, side
+
+    def test_to_option_is_parsed_for_prepare_only(self):
+        base = ["prepare", "--agent", "claude"]
+        for name in ("id", "transcript", "cwd", "provider-home", "paseo", "agent-session",
+                     "paseo-home", "tmux-session", "output"):
+            base += ["--" + name, "/x"]
+        base += ["--source-pid", "1", "--caller-pid", "2"]
+        with patch.object(h, "prepare", return_value="plan") as prepared:
+            self.assertEqual(h.main(base + ["--target-home", "/target"]), 0)
+            self.assertEqual(prepared.call_args.args[0].target_home, "/target")
+            self.assertEqual(h.main(base), 0)
+            self.assertIsNone(prepared.call_args.args[0].target_home)
+        with patch.object(sys, "stderr", io.StringIO()), self.assertRaises(SystemExit):
+            h.main(["run", "plan.json", "--target-home", "/target"])
+
+    def test_to_records_target_paths_and_resolves_its_provider_like_a_source_home(self):
+        self.use_target()
+        seen = []
+        plan = self.make_plan(preflight=lambda plan: seen.append(dict(plan)) or self.alias)
+        self.assertEqual((plan["target_home"], plan["target_transcript"], plan["target_provider"]),
+                         (str(self.target), str(self.destination), self.alias))
+        self.assertEqual(seen[0]["target_home"], str(self.target))  # preflight ran in prepare
+        self.assertEqual(h.provider_name("claude", str(self.target)), self.alias)
+        self.assertFalse(self.destination.parent.exists())  # prepare copies nothing
+        h.validate_plan(plan)
+        # The daemon's default Claude config gets the built-in entry.
+        self.planfile.unlink()
+        default_home = self.directory / ".claude"
+        (default_home / "projects").mkdir(parents=True)
+        self.args.target_home = str(default_home)
+        with patch.object(h.Path, "home", return_value=self.directory):
+            plan = self.make_plan()
+            self.assertEqual(plan["target_provider"], "claude")
+            h.validate_plan(plan)
+
+    def test_to_refusals_leave_no_plan_and_copy_nothing(self):
+        self.use_target()
+        bare = self.directory / "bare"
+        bare.mkdir()
+        shared = self.directory / "shared"
+        shared.mkdir()
+        (shared / "projects").symlink_to(self.home / "projects")
+        cases = [
+            ("own config directory", str(self.home), None),
+            ("own config directory", str(self.home) + "/projects/..", None),
+            ("no projects/", str(bare), None),
+            ("absolute path", "personal", None),
+            ("does not exist", str(self.directory / "missing"), None),
+            ("shares its projects/", str(shared), None),
+            ("already exists", str(self.target), "transcript"),
+            ("already exists", str(self.target), "sidecar"),
+        ]
+        for expected, target, occupied in cases:
+            with self.subTest(target=target, occupied=occupied):
+                self.args.target_home = target
+                if occupied == "transcript":
+                    self.destination.parent.mkdir(parents=True)
+                    self.destination.write_text("someone else's\n")
+                elif occupied == "sidecar":
+                    self.destination_side.mkdir(parents=True)
+                with self.assertRaisesRegex(h.HandoffError, expected):
+                    self.make_plan()
+                self.assertFalse(self.planfile.exists())
+                if occupied == "transcript":
+                    self.assertEqual(self.destination.read_text(), "someone else's\n")
+                if occupied:
+                    shutil.rmtree(self.destination.parent)
+        # A target provider that is not ready refuses too, before anything stops.
+        self.args.target_home = str(self.target)
+        failing = Mock(side_effect=h.HandoffError("Paseo provider is not ready; native source preserved"))
+        with self.assertRaisesRegex(h.HandoffError, "not ready"):
+            self.make_plan(preflight=failing)
+        self.assertFalse(self.planfile.exists())
+        self.use_codex()
+        with self.assertRaisesRegex(h.HandoffError, "Claude sessions only"):
+            self.make_plan(self.proxy_table(agent="codex"))
+        self.assertFalse(self.planfile.exists())
+        self.assertFalse(self.destination.parent.exists())
+
+    def test_to_preflight_verifies_the_target_config_directory(self):
+        self.use_target()
+        plan = self.make_plan()
+        with patch.object(h, "command"), patch.object(h, "json_command",
+                                                      return_value=self.diagnostic(self.alias, self.target)):
+            self.assertEqual(h.provider_preflight(plan), self.alias)
+        config = json.loads((self.daemon_home / "config.json").read_text())
+        self.assertEqual(config["agents"]["providers"][self.alias]["env"], {"CLAUDE_CONFIG_DIR": str(self.target)})
+        with patch.object(h, "command"), patch.object(h, "json_command",
+                                                      return_value=self.diagnostic(self.alias, self.home)):
+            with self.assertRaisesRegex(h.HandoffError, "differs"):
+                h.provider_preflight(plan)
+
+    def test_saved_target_tampering_refused(self):
+        self.use_target()
+        plan = self.make_plan()
+        other = self.directory / "other"
+        (other / "projects").mkdir(parents=True)
+        for changed in ({"target_transcript": str(self.destination.with_name("x.jsonl"))},
+                        {"target_provider": "claude"}, {"target_home": str(other)},
+                        {"target_home": None}, {"agent": "codex"}):
+            with self.subTest(changed=changed), self.assertRaises(h.HandoffError):
+                h.validate_plan(plan | changed)
+        for key in ("target_home", "target_transcript"):
+            with self.subTest(missing=key), self.assertRaises(h.HandoffError):
+                h.validate_plan({k: v for k, v in plan.items() if k != key})
+
+    def test_to_copies_after_the_writer_checks_and_before_the_import(self):
+        self.use_target()
+        before = self.source_state()
+        imported, killed, attached, _ = self.flow(provider=self.alias)
+        events = []
+        killed.side_effect = lambda *args: events.append("kill")
+        real_check = h.ensure_no_writer
+        def no_writer(plan, seconds=5):
+            self.assertFalse(self.destination.exists())
+            events.append("no-writer")
+            return real_check(plan, seconds)
+        def import_session(argv, **kwargs):
+            events.append("import")
+            self.assertEqual(self.destination.read_bytes(), self.transcript.read_bytes())
+            return {"agentId": IMPORTED_ID, "provider": self.alias, "cwd": str(self.directory)}
+        imported.side_effect = import_session
+        with patch.object(h, "ensure_no_writer", side_effect=no_writer):
+            h.run(str(self.planfile))
+        self.assertEqual(events, ["kill", "no-writer", "import"])
+        self.assertEqual(imported.call_args.args[0][:5], [str(self.executable), "import", SOURCE_ID,
+                                                          "--provider", self.alias])
+        attached.assert_called_once()
+        # Byte for byte, private, with the source's times; the source untouched.
+        self.assertEqual(self.source_state(), before)
+        self.assertEqual(self.destination.read_bytes(), before[0])
+        self.assertEqual(stat.S_IMODE(self.destination.stat().st_mode), 0o600)
+        self.assertEqual(self.destination.stat().st_mtime_ns, before[2])
+        self.assertEqual(stat.S_IMODE(self.destination.parent.stat().st_mode), 0o700)
+        copied = self.snapshot(self.destination_side)
+        original = before[3]
+        self.assertEqual(set(copied), set(original) - {"outside"})  # the symlink is skipped
+        for name, (data, mode) in copied.items():
+            self.assertEqual(data, original[name][0])
+            self.assertEqual(mode, 0o600 if data is not None else 0o700)
+        record = json.loads((self.directory / "status" / "copy.json").read_text())
+        self.assertEqual(stat.S_IMODE((self.directory / "status" / "copy.json").stat().st_mode), 0o600)
+        self.assertEqual((record["source"], record["destination"]), (str(self.transcript), str(self.destination)))
+        self.assertEqual(record["sha256"], h.hashlib.sha256(before[0]).hexdigest())
+        self.assertEqual({k: record["sidecar"][k] for k in ("files", "directories", "skipped")},
+                         {"files": 2, "directories": 2, "skipped": 1})
+        request = json.loads((self.directory / "status" / "import-request.json").read_text())
+        self.assertEqual((request["provider"], request["transcript"]), (self.alias, str(self.destination)))
+        # A re-run attaches to the saved agent: no second copy, import or signal.
+        imported.reset_mock()
+        killed.reset_mock()
+        with patch.object(h, "copy_file", side_effect=AssertionError("copied twice")):
+            h.run(str(self.planfile))
+        imported.assert_not_called()
+        killed.assert_not_called()
+        self.assertEqual(attached.call_count, 2)
+
+    def test_to_without_a_sidecar_copies_the_transcript_alone(self):
+        self.use_target(sidecar=False)
+        imported, _, attached, _ = self.flow(provider=self.alias)
+        h.run(str(self.planfile))
+        self.assertEqual(self.destination.read_bytes(), self.transcript.read_bytes())
+        self.assertFalse(self.destination_side.exists())
+        self.assertIsNone(json.loads((self.directory / "status" / "copy.json").read_text())["sidecar"])
+        imported.assert_called_once()
+        attached.assert_called_once()
+
+    def test_copy_file_is_exclusive(self):
+        self.use_target()
+        occupied = self.directory / "occupied"
+        occupied.write_text("keep\n")
+        with self.assertRaises(FileExistsError):
+            h.copy_file(str(self.transcript), str(occupied))
+        self.assertEqual(occupied.read_text(), "keep\n")
+        link = self.directory / "link"
+        link.symlink_to(self.directory / "elsewhere")
+        with self.assertRaises(OSError):
+            h.copy_file(str(self.transcript), str(link))
+        self.assertFalse((self.directory / "elsewhere").exists())
+
+    def test_failed_copy_imports_nothing_names_both_paths_and_cleans_up(self):
+        self.use_target()
+        before = self.source_state()
+        unreadable = self.source_side / "tool-results" / "r.txt"
+        unreadable.chmod(0)
+        self.addCleanup(unreadable.chmod, 0o644)
+        imported, killed, attached, _ = self.flow(provider=self.alias)
+        with self.assertRaises(h.HandoffError) as caught:
+            h.run(str(self.planfile))
+        message = str(caught.exception)
+        self.assertIn(str(self.transcript), message)
+        self.assertIn(str(self.destination), message)
+        self.assertIn("Nothing was imported", message)
+        killed.assert_called_once()  # the copy runs only after the source stopped
+        imported.assert_not_called()
+        attached.assert_not_called()
+        status = self.directory / "status"
+        for name in ("copy.json", "import-request.json", "result.json"):
+            self.assertFalse((status / name).exists(), name)
+        self.assertFalse(self.destination.parent.exists())  # our own partial copy is removed
+        unreadable.chmod(0o644)
+        self.assertEqual(self.source_state(), before)
+
+    def test_interrupted_copy_cleans_up_and_still_interrupts(self):
+        self.use_target()
+        imported, _, attached, _ = self.flow(provider=self.alias)
+        with patch.object(h, "copy_tree", side_effect=KeyboardInterrupt), self.assertRaises(KeyboardInterrupt):
+            h.run(str(self.planfile))
+        self.assertFalse(self.destination.parent.exists())
+        self.assertFalse((self.directory / "status" / "copy.json").exists())
+        imported.assert_not_called()
+        attached.assert_not_called()
+
+    def test_destination_appearing_after_prepare_refuses_before_stopping(self):
+        self.use_target()
+        imported, killed, attached, wait = self.flow(provider=self.alias)
+        self.destination_side.mkdir(parents=True)
+        with self.assertRaisesRegex(h.HandoffError, "already exists"):
+            h.run(str(self.planfile))
+        killed.assert_not_called()
+        wait.assert_not_called()
+        imported.assert_not_called()
+        self.assertEqual(list(self.destination_side.iterdir()), [])
+
+    def test_rerun_after_an_unimported_copy_neither_signals_nor_copies_again(self):
+        self.use_target()
+        imported, killed, attached, wait = self.flow(provider=self.alias)
+        real_copy = h.copy_session
+        def copy_then_die(plan, recordfile):
+            real_copy(plan, recordfile)
+            raise h.HandoffError("worker died after the copy")
+        with patch.object(h, "copy_session", side_effect=copy_then_die), self.assertRaisesRegex(h.HandoffError, "died"):
+            h.run(str(self.planfile))
+        imported.assert_not_called()
+        original = self.transcript.read_bytes()
+        for changed in ("original", "copied", None):
+            with self.subTest(changed=changed):
+                killed.reset_mock()
+                wait.reset_mock()
+                self.transcript.write_bytes(original + b'{"late": true}\n' if changed == "original" else original)
+                self.destination.write_bytes(original + b"{}\n" if changed == "copied" else original)
+                with patch.object(h, "copy_file", side_effect=AssertionError("copied twice")), \
+                        patch.object(h, "process_table", side_effect=AssertionError("signalled again")), \
+                        patch.object(h, "live_rows", return_value=[]):
+                    if changed:
+                        with self.assertRaisesRegex(h.HandoffError, "transcript changed since the copy"):
+                            h.run(str(self.planfile))
+                        imported.assert_not_called()
+                    else:
+                        h.run(str(self.planfile))
+                        imported.assert_called_once()
+                        attached.assert_called_once()
+                killed.assert_not_called()
+                wait.assert_not_called()
+
+    def test_ambiguous_import_after_a_copy_is_never_retried(self):
+        self.use_target()
+        imported, killed, attached, _ = self.flow(provider=self.alias, response={"agentId": "invalid"})
+        with self.assertRaises(h.HandoffError):
+            h.run(str(self.planfile))
+        imported.reset_mock()
+        with patch.object(h, "copy_file", side_effect=AssertionError("copied twice")), \
+                self.assertRaisesRegex(h.HandoffError, "earlier import"):
+            h.run(str(self.planfile))
+        imported.assert_not_called()
+        attached.assert_not_called()
+        self.assertTrue(self.destination.exists())  # kept for inspection
+
+    def test_to_briefing_tells_the_agent_it_moved_accounts(self):
+        fake_cli(self.executable, self.log, "paseo")
+        self.use_target()
+        _, _, attached, _ = self.flow(provider=self.alias)
+        h.run(str(self.planfile))
+        attached.assert_called_once()
+        text = (self.directory / "status" / "followup-prompt.txt").read_text()
+        for expected in ("You also moved accounts", "from the Claude config directory " + str(self.home)
+                         + " to " + str(self.target), "original transcript stays untouched at "
+                         + str(self.transcript), "Memory directories", "profile overlay CLAUDE.md",
+                         "connectors and quotas", "Re-read your project instructions",
+                         "tools and skills you rely on are present", "running in Paseo as agent " + IMPORTED_ID):
+            self.assertIn(expected, text)
+        self.assertFalse({"\u2014", "\u2013"} & set(text))
+        record = self.followup_record()
+        self.assertEqual(record["message"]["status"], "ok")
+        plain = {k: v for k, v in json.loads(self.planfile.read_text()).items() if not k.startswith("target_")}
+        self.assertNotIn("moved accounts", h.followup_prompt(plain, IMPORTED_ID, record))
 
 
 def attachment(model):
