@@ -90,6 +90,10 @@ local hammerspoonCoreFiles = {
     "core/popclick.lua",
     "core/system-keys.lua",
     "core/choosers.lua",
+    -- After alert/ and core/helpers.lua: it alerts through alert_gateway and
+    -- times passes with hsAfter. Before core/app-hotkeys/main.lua, whose
+    -- hyper+d calls notifDismissAll.
+    "core/notif-dismiss.lua",
     -- Settings, then the engine, then the keys: bindings.lua calls the
     -- engine's appHotkey.
     "core/app-hotkeys/config.lua",

@@ -1,9 +1,13 @@
 function notif-os-dismiss-all {
-    #: @duplicateCode/b88a767cde3e47cb1bad4b855a8989b8: hyper+d runs the same
-    #: script from Lua, in hammerspoon/core/app-hotkeys/main.lua.
+    #: @duplicateCode/b88a767cde3e47cb1bad4b855a8989b8: hyper+d calls the
+    #: same notifDismissAll, in hammerspoon/core/notif-dismiss.lua. It is far
+    #: faster than the JXA script, which stays as the fallback for when
+    #: Hammerspoon is not answering.
     if isDarwin ; then
         ##
-        notif-dismiss-v2.jxa
+        if [[ "$(hammerspoon_assert_p=n hammerspoon -c 'notifDismissAll() return "ok"' 2>/dev/null)" != ok ]] ; then
+            notif-dismiss-v2.jxa
+        fi
         ##
         # notif-dismiss.as
         ##

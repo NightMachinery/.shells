@@ -73,10 +73,13 @@ log show --last 30m --style compact --predicate 'subsystem == "com.apple.TCC"'
   its global environment, so every pane inherits them. Code that tests those
   variables thinks each pane is an ssh session.
 
-Since 2026-09-30 hyper+d no longer goes through the garden: Hammerspoon runs
-`notif-dismiss-v2.jxa` itself (`hammerspoon/core/app-hotkeys/main.lua`), so the
-Automation and Accessibility grants that decide it are Hammerspoon's, whoever
-started tmux. `notif-os-dismiss-all` from a shell still depends on them.
+Since 2026-09-30 hyper+d no longer goes through the garden, and since
+2026-10-11 it no longer uses osascript either: Hammerspoon presses the close
+buttons over Accessibility itself (`notifDismissAll` in
+`hammerspoon/core/notif-dismiss.lua`), so only Hammerspoon's own Accessibility
+grant decides it, whoever started tmux. `notif-os-dismiss-all` from a shell
+calls the same function, and falls back to `notif-dismiss-v2.jxa`, which still
+needs the shell's grants, only when Hammerspoon does not answer.
 
 ## Prevention: `tmux-server-ensure`
 

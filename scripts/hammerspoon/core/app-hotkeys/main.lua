@@ -914,18 +914,6 @@ end
 -- end
 -- @upstreamBug https://github.com/Hammerspoon/hammerspoon/issues/2879 hs.hotkey.bind cannot bind punctuation keys such as /
 
--- hyper+d: dismiss every notification, with the script zsh uses, run here
--- rather than through BrishGarden so it works while the garden is down. It
--- drives NotificationCenter through System Events, so the first run from
--- Hammerspoon has macOS ask once whether Hammerspoon may control System
--- Events.
--- @duplicateCode/b88a767cde3e47cb1bad4b855a8989b8: notif-os-dismiss-all in
--- zshlang/auto-load/others/notifications.zsh, which runs the same script.
-hyper_bind_v1("d", function()
-    local script = (nightdir or (os.getenv("HOME") .. "/scripts")) .. "/applescript/notif-dismiss-v2.jxa"
-    gardenTask("/usr/bin/osascript", { "-l", "JavaScript", script }, function(code, _, err)
-        if code == 0 then return end
-        print("hyper+d: notif-dismiss-v2.jxa exited " .. tostring(code) .. ": " .. err)
-        alert_gateway("Could not dismiss notifications: " .. err, { color = "warn" })
-    end, 30, nil, "hyper+d")
-end)
+-- hyper+d: dismiss every notification, in-process over Accessibility, so it
+-- works while BrishGarden is down. See core/notif-dismiss.lua.
+hyper_bind_v1("d", function() notifDismissAll() end)

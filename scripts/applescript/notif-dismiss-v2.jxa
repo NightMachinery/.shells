@@ -8,6 +8,11 @@
 ///
 "use strict";
 
+// @duplicateCode/b88a767cde3e47cb1bad4b855a8989b8: notifDismissAll in
+// hammerspoon/core/notif-dismiss.lua does this over Accessibility, much
+// faster. This script is notif-os-dismiss-all's fallback for when Hammerspoon
+// is not answering.
+//
 // System Events addresses each notification group by its position
 // (`groups.at(i)`), and dismissing one shifts every later group up a slot. So
 // we close from the last group to the first, which leaves the positions still
