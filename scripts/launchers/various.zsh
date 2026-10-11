@@ -50,9 +50,12 @@ borg_python="$(realpath2 python3)"
 tmuxnew julia "dash -c 'cd $(gq $borgdir) && $(gq "$borg_python") $(gq $borgdir/start_server.py)'"
 tmuxnew julia_papersonegai "dash -c 'cd $(gq $borgdir) && borg_session=session_papersonegai borg_plugin_path=papersonegai_plugins borg_brish_count=1 $(gq "$borg_python") $(gq $borgdir/stdborg.py)'"
 tmuxnew julia_jlib "dash -c 'cd $(gq $borgdir) && borg_session=session_jlib borg_plugin_path=jlib_plugins borg_brish_count=10 $(gq "$borg_python") $(gq $borgdir/stdborg.py)'"
-tmuxnew betterborg_stt "dash -c 'cd $(gq $borgdir) && GEMINI_SPECIAL_HTTP_PROXY=http://127.0.0.1:2080 borg_session=session_stt borg_plugin_path=stt_plugins borg_brish_count=1 $(gq "$borg_python") $(gq $borgdir/stdborg.py)'"
-tmuxnew betterborg_tts "dash -c 'cd $(gq $borgdir) && GEMINI_SPECIAL_HTTP_PROXY=http://127.0.0.1:2080 borg_session=session_tts borg_plugin_path=tts_plugins borg_brish_count=1 $(gq "$borg_python") $(gq $borgdir/stdborg.py)'"
-tmuxnew betterborg_llm_chat "dash -c 'cd $(gq $borgdir) && GEMINI_SPECIAL_HTTP_PROXY=http://127.0.0.1:2080 borg_session=session_llm_chat borg_plugin_path=llm_chat_plugins borg_brish_count=1 $(gq "$borg_python") $(gq $borgdir/stdborg.py)'"
+#: Gemini proxy disabled: eva reaches Google's Gemini and Vertex APIs directly (2026-10-12), and nothing
+#: listens on 2080 since the 2026-10-05 reboot. If Google blocks eva again, re-add this to the three borg lines below:
+#: GEMINI_SPECIAL_HTTP_PROXY=http://127.0.0.1:2080
+tmuxnew betterborg_stt "dash -c 'cd $(gq $borgdir) && borg_session=session_stt borg_plugin_path=stt_plugins borg_brish_count=1 $(gq "$borg_python") $(gq $borgdir/stdborg.py)'"
+tmuxnew betterborg_tts "dash -c 'cd $(gq $borgdir) && borg_session=session_tts borg_plugin_path=tts_plugins borg_brish_count=1 $(gq "$borg_python") $(gq $borgdir/stdborg.py)'"
+tmuxnew betterborg_llm_chat "dash -c 'cd $(gq $borgdir) && borg_session=session_llm_chat borg_plugin_path=llm_chat_plugins borg_brish_count=1 $(gq "$borg_python") $(gq $borgdir/stdborg.py)'"
 #: Deprecated: guest mode (@<bot> .a CMD, betterborg's docs/guest_mode.md) replaces inline.py, which no longer imports on python-telegram-bot 20.
 # tmuxnew julia_inline "dash -c 'cd $(gq $borgdir) && TELEGRAM_TOKEN=$(gq $TELEGRAM_TOKEN) $(gq "$(realpath2 python3)") $(gq $borgdir/disabled/inline.py)'"
 ##
