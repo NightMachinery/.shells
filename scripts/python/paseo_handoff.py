@@ -40,8 +40,10 @@ MARKERS = {
     "PASEO_AGENT_ID", "PASEO_HOST", "CLAUDE_CONFIG_DIR", "CODEX_HOME",
 }
 UUID_RE = re.compile(r"[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\Z")
+# macOS reports some system daemons' uid as negative (nobody is -2). Such a
+# process can never be ours, since ownership is checked against os.getuid().
 PS_RE = re.compile(
-    r"^\s*(\d+)\s+(\d+)\s+(\d+)\s+"
+    r"^\s*(\d+)\s+(\d+)\s+(-?\d+)\s+"
     r"((?:Mon|Tue|Wed|Thu|Fri|Sat|Sun)\s+"
     r"(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+"
     r"\d{1,2}\s+\d{2}:\d{2}:\d{2}\s+\d{4})\s+(.+?)\s*$"

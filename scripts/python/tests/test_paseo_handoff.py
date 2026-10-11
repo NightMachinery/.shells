@@ -346,6 +346,13 @@ class HandoffTests(unittest.TestCase):
         with patch.object(h, "command", return_value="100 unknown\n"), self.assertRaises(h.HandoffError):
             h.process_table()
 
+    def test_ps_parser_accepts_negative_system_uid(self):
+        sample = "61966     1    -2 Sun Oct 11 13:07:29 2026     /usr/libexec/dhcp6d\n"
+        with patch.object(h, "command", return_value=sample):
+            process = h.process_table()[61966]
+        self.assertEqual(process.uid, -2)
+        self.assertNotEqual(process.uid, os.getuid())
+
     def test_preflight_failure_never_signals_or_imports(self):
         imported, killed, attached, _ = self.flow(preflight_error=True)
         with self.assertRaises(h.HandoffError):
