@@ -1067,26 +1067,9 @@ function str-center-justify {
   fi
 }
 
-function jalali-calendar {
-    local opts=()
-
-    #: =$array[(I)foo]= returns the index of the last occurrence of =foo= in =$array= and 0 if not found. The =e= flag is for it to be an exact match instead of a pattern match.
-    if (( ${@[(Ie)--no-true-color]} == 0 )); then
-        opts+=("--true-color")
-    fi
-
-    command jalali-calendar "$@" "${opts[@]}"
-}
+#: =jalali-calendar-cli= provides =jalali-calendar=, =jcal-all=, =gcal=, =gcal-lmu=, =gcal-lmu-iran=, =jcal-iran-lmu= and their =-all= year views. They use 24-bit colors when the terminal advertises them; pass =--true-color= to force it.
+#: @seeAlso `python -m calendar`
 alias jcal='jalali-calendar'
-
-function jcal-all {
-    #: @seeAlso `python -m calendar`
-    ##
-    local year
-    year="${1:-$(datej-year)}" @TRET
-
-    jcal_all.pl "$year"
-}
 alias jcala='jcal-all'
 ##
 function jalali-from-natural {
