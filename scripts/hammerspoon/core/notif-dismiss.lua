@@ -11,15 +11,18 @@
 --- not answering.
 --- @duplicateCode/b88a767cde3e47cb1bad4b855a8989b8: applescript/notif-dismiss-v2.jxa
 ---
+--- By default it closes one snapshot: what was on screen when it was called.
+--- A notification that arrives mid-run is one nobody has read yet, so it stays.
+--- `{ includeArrivals = true }' repeats passes until nothing new is left.
 --- A closed notification stays in the tree for about 700 ms while it animates
---- out, so a pass cannot tell "still there" from "on its way out" by counting.
---- Instead it remembers what it pressed and presses only the rest; passes
---- repeat until nothing unpressed is left, which also catches notifications
---- that arrive mid-run. A last look, once the animations are over, warns if
---- anything it pressed did not go.
+--- out, so those passes cannot tell "still there" from "on its way out" by
+--- counting; they remember what they pressed and press only the rest. Either
+--- way, a last look once the animations are over warns if anything it pressed
+--- did not go.
 ---
 --- Shell interface:
 ---   hs -c 'notifDismissAll()'
+---   hs -c 'notifDismissAll({ includeArrivals = true })'
 
 --- Per call. NotificationCenter answers in about 2 ms; this only bounds how
 --- long a hung NotificationCenter can stall Hammerspoon's main thread.
@@ -71,9 +74,11 @@ local function notifContains(elements, element)
     return false
 end
 
---- Dismisses every notification on screen. Returns at once; later passes and
---- the final check run on timers. Failures go to the console and an alert.
-function notifDismissAll()
+--- Dismisses every notification on screen; opts.includeArrivals also those
+--- that arrive while it runs. Returns at once; later passes and the final
+--- check run on timers. Failures go to the console and an alert.
+function notifDismissAll(opts)
+    local includeArrivals = opts and opts.includeArrivals
     local pressed = {}
     local pass = 0
 
@@ -106,7 +111,7 @@ function notifDismissAll()
                     pressed[#pressed + 1] = group
                 end
             end
-            if fresh == 0 then
+            if fresh == 0 or not includeArrivals then
                 if #pressed > 0 then hsAfter(notifDismissSettleSeconds, settle) end
             elseif pass >= notifDismissMaxPasses then
                 fail("notifications kept arriving for " .. pass .. " passes")

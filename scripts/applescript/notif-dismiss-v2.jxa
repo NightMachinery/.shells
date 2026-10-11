@@ -20,11 +20,14 @@
 // then died with "Invalid index" (-1719) once many were open.
 //
 // Each pass reads all action names in one Apple event; per-action reads cost
-// about 8 s for 20 notifications. Passes repeat until the list is empty, which
-// also catches notifications that arrive, or are only drawn, mid-run.
+// about 8 s for 20 notifications. By default one pass closes what was on
+// screen at the start, so a notification that arrives mid-run stays unread
+// rather than unseen-and-gone. `--include-arrivals' repeats passes until the
+// list is empty.
 const MAX_PASSES = 10;
 
-function run() {
+function run(argv) {
+  const includeArrivals = argv.includes("--include-arrivals");
   const SystemEvents = Application("System Events");
   const NotificationCenter = SystemEvents.processes.byName("NotificationCenter");
   const notificationGroups = () => {
@@ -58,6 +61,7 @@ function run() {
         // Gone already, or replaced mid-run; the next pass re-reads the list.
       }
     }
+    if (!includeArrivals) return;
     delay(0.3);
   }
   throw new Error(`${remaining} notification group(s) remain after ${MAX_PASSES} passes`);
