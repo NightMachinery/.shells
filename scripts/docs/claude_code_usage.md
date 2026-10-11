@@ -956,12 +956,16 @@ named by *how* the text is delivered, since that is what you are choosing:
   the picker offers every agent's live sessions, plus a `frontmost` row.
 - `claude-code-usage-continue-tmux-fz` (alias `cct`) — pick tmux panes; the
   picker offers only panes running Claude Code under the profile being armed.
+- `claude-code-usage-continue-paseo-fz` (aliases `ccp` and
+  `paseo-continue-fz`) — pick Paseo agents; each is sent `Continue.` with
+  `paseo send`, which needs no window. The kitty and tmux pickers offer Paseo
+  agents too, so this is the narrower list rather than the only way in.
 - `claude-code-usage-continue-frontmost` (alias `ccfront`) — no picker;
   type wherever the keyboard focus is when the reset comes.
 
 Each has `-default-` and `-work-` forms naming the profile explicitly —
 `claude-code-usage-default-continue-tmux-fz`, and so on — with aliases in the
-`cck-default`, `cct-work` shape, matching `ccu-default`. The bare forms follow
+`cck-default`, `cct-work`, `ccp-work` shape, matching `ccu-default`. The bare forms follow
 the current profile, like `ccu` itself. Under the hood they set
 `agent_usage_arm_action=continue` and `agent_usage_continue_via` on the
 matching `-notify` report and nothing else.

@@ -1123,19 +1123,21 @@ function claude-code-usage-fable-notify {
 #:
 #:   -continue-kitty-fz   pick kitty windows; typed into with `kitty @ send-text'
 #:   -continue-tmux-fz    pick tmux panes; typed into with `send-keys'
+#:   -continue-paseo-fz   pick Paseo agents; sent with `paseo send'
 #:   -continue-frontmost  no picker; typed wherever the focus is at the time
 #:
 #: A Codex thread picked in either picker is *queued* instead of typed into,
-#: which needs no window at all; see
+#: and a Paseo agent is sent its message through Paseo; neither needs a
+#: window at all. See
 #: [agfi:h-agent-usage-continue-rows-to-targets].
 #:
-#: Generated rather than written out nine times: three mechanisms by the bare
+#: Generated rather than written out twelve times: four mechanisms by the bare
 #: entry point plus the two named seats, and the only thing that varies is one
 #: knob and one function name.
 ##
 () {
     local via profile base name
-    for via in kitty-fz tmux-fz frontmost ; do
+    for via in kitty-fz tmux-fz paseo-fz frontmost ; do
         for profile in '' default work ; do
             base="claude-code-usage${profile:+-${profile}}"
             name="${base}-continue-${via}"
@@ -1160,6 +1162,13 @@ aliasfn cck-work claude-code-usage-work-continue-kitty-fz
 aliasfn cct claude-code-usage-continue-tmux-fz
 aliasfn cct-default claude-code-usage-default-continue-tmux-fz
 aliasfn cct-work claude-code-usage-work-continue-tmux-fz
+
+aliasfn ccp claude-code-usage-continue-paseo-fz
+aliasfn ccp-default claude-code-usage-default-continue-paseo-fz
+aliasfn ccp-work claude-code-usage-work-continue-paseo-fz
+#: The name asked for first. It follows the current profile, like `ccp': most
+#: Paseo agents here run Claude, so its reset is the natural deadline.
+aliasfn paseo-continue-fz claude-code-usage-continue-paseo-fz
 
 aliasfn ccfront claude-code-usage-continue-frontmost
 aliasfn ccfront-default claude-code-usage-default-continue-frontmost
