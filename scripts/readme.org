@@ -139,8 +139,9 @@ Kitty's =cmd+shift+o= resolves attached tmux clients by PID, including numeric
 session targets and clients that have switched sessions. Ambiguous live
 transcripts open the picker. See =./docs/agent-sessions.md= for lookup order
 and regression checks. Codex identity hooks resolve missing transcript paths
-by session ID and keep the latest local outcome per pane; see
-=./docs/tmux-session-rename.md= for diagnostics.
+by session ID. Claude and Codex hooks keep the latest local outcome per pane
+and report identity-write failures there while returning success; see
+[[NIGHTDIR:docs/tmux-session-rename.md][tmux identity diagnostics]].
 
 * Pandoc conversion
 

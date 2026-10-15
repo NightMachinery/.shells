@@ -137,7 +137,9 @@ hook body is a thin parser that ends in one call,
   its next prompt.
 
 Skipped or failed renames are ordinary outcomes. Identity-write failures
-propagate to the caller for diagnostics; a broken rename must not cost a prompt.
+propagate to the caller for diagnostics. The Claude and Codex hook boundaries
+record those failures and return success, so a stale pane cannot produce a
+Brish command-failure warning; a broken rename must not cost a prompt.
 
 The rename is also why [agfi:tmuxnewsh2-attach-z] cannot key on a session
 name. It records its own `@tz_key` option at launch and looks sessions up by
@@ -169,7 +171,12 @@ to record which kitty window is showing the session, under
 group `kitty-register`, leaving `tmux-autoname` alone. The two are
 independent, and neither waits on the other.
 
-### Codex identity diagnostics
+### Claude and Codex identity diagnostics
+
+[agfi:claude-code-session-tmux-autoname] records identity-write failures as
+`identity-failed` and returns success. This includes a pane disappearing before
+the asynchronous hook runs. The shared identity writer still returns errors
+to other callers that need them.
 
 [agfi:codex-session-tmux-autoname] ignores subagent events, whose `session_id`
 belongs to their parent. If `transcript_path` is null or missing, it resolves
@@ -177,28 +184,30 @@ the exact root session ID through [agfi:h-codex-session-hook-transcript]. If
 the transcript does not exist yet, the identity retains the ID with an empty
 path; a later prompt can fill it in.
 
-The latest root hook outcome is stored atomically in
-`${XDG_STATE_HOME:-$HOME/.local/state}/agent-sessions/hooks/codex-<pane-number>.json`
-by [agfi:h-agent-hook-status]. A missing or invalid pane uses `codex-no-pane.json`.
+The latest hook outcome is stored atomically in
+`${XDG_STATE_HOME:-$HOME/.local/state}/agent-sessions/hooks/<agent>-<pane-number>.json`
+by [agfi:h-agent-hook-status], where `<agent>` is `claude` or `codex`.
+A missing or invalid pane uses `<agent>-no-pane.json`.
 Records contain only agent, pane, session ID, outcome and timestamp, with mode
 600. They overwrite the previous record for that pane and omit prompts and
 payloads. Diagnostic write failures do not interrupt the hook.
 
 - `recorded`: identity written with a transcript path.
-- `recorded-id`: identity written before a transcript could be resolved.
+- `recorded-id`: identity written without a transcript path.
 - `invalid-payload` or `no-pane`: rejected before writing tmux identity.
 - `identity-failed`: tmux identity writer failed.
 - `received`: handler entered; no final outcome has replaced it yet.
 
 A missing or old record does not establish why dispatch failed: check the
 installed hooks, their trust state and transport separately. These records
-observe the Brish handler, not Codex's dispatch process, and do not report
+observe the Brish handler, not the agent's dispatch process, and do not report
 whether optional renaming succeeded.
 
-Run `zsh -f zshlang/tests/agent-tmux-codex.zsh` from the scripts directory to
-check payload handling, exact-ID fallback and diagnostic outcomes without a
-real tmux server. Restart Brish after changing hook bodies so installed hook
-commands use the new definitions.
+Run `zsh -f zshlang/tests/agent-tmux-claude.zsh` and
+`zsh -f zshlang/tests/agent-tmux-codex.zsh` from the scripts directory to check
+payload handling, identity-write failures and diagnostic outcomes without a
+real tmux server. The Codex tests also cover exact-ID fallback. Restart Brish
+after changing hook bodies so installed hook commands use the new definitions.
 
 ## Toggles
 

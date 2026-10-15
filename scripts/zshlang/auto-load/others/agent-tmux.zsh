@@ -107,16 +107,34 @@ function claude-code-session-tmux-autoname {
     #: `$1' is passed by the hook line as "$TMUX_PANE": this runs in the
     #: garden, whose environment knows nothing of the pane the agent sits in.
     ##
-    local pane="${1}"
+    local pane="${1:-}"
     local input
-    input="$(h-agent-hook-payload "${2}")"
+    input="$(h-agent-hook-payload "${2:-}")"
     test -n "${input}" || return 0
 
     local id transcript
-    id="$(ec "${input}" | jq -r '.session_id // empty' 2>/dev/null)"
-    transcript="$(ec "${input}" | jq -r '.transcript_path // empty' 2>/dev/null)"
+    if ! id="$(ec "${input}" | command jq --exit-status --raw-output \
+        '.session_id | select(type == "string" and length > 0)' 2>/dev/null)" ; then
+        h-agent-hook-status claude "${pane}" '' invalid-payload
+        return 0
+    fi
+    if [[ "${pane}" != %<-> ]] ; then
+        h-agent-hook-status claude "${pane}" "${id}" no-pane
+        return 0
+    fi
+    h-agent-hook-status claude "${pane}" "${id}" received
+    transcript="$(ec "${input}" | command jq --raw-output \
+        '.transcript_path | if type == "string" then . else "" end' 2>/dev/null)"
 
-    h-agent-tmux-autoname claude "${pane}" "${id}" "${transcript}"
+    #: A stale pane or failed identity write must not make Brish log a failed
+    #: prompt hook. Keep the failure visible in the bounded diagnostic instead.
+    if ! h-agent-tmux-autoname claude "${pane}" "${id}" "${transcript}" ; then
+        h-agent-hook-status claude "${pane}" "${id}" identity-failed
+        return 0
+    fi
+    local outcome=recorded-id
+    test -n "${transcript}" && outcome=recorded
+    h-agent-hook-status claude "${pane}" "${id}" "${outcome}"
 }
 ##
 #: Codex. Threads are named in =$CODEX_HOME/session_index.jsonl=, one line
