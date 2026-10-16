@@ -28,6 +28,28 @@ function vm_stat-h {
         perl -ne '/page size of (\d+)/ and $size=$1; /Pages\s+([^:]+)[^\d]+(\d+)/ and printf("%-16s % 16.2f Mi\n", "$1:", $2 * $size / 1048576);'
 }
 
+function memory-pressure-darwin {
+    : "prints the macOS memory pressure level as normal, warning, or critical"
+    if ! isDarwin ; then
+        ecerr "$0: only supported on macOS"
+        return 1
+    fi
+
+    local level label
+    level="$(command /usr/sbin/sysctl -n kern.memorystatus_vm_pressure_level)" @RET
+    #: The sysctl exports dispatch flags (1/2/4), not XNU's internal enum.
+    case "$level" in
+        1) label=Normal ;;
+        2) label=Warning ;;
+        4) label=Critical ;;
+        *)
+            ec "Memory pressure: Unknown (${level})"
+            return 1
+            ;;
+    esac
+    ec "Memory pressure: ${label}"
+}
+
 function memory-free-get {
     local free_ram
     if isDarwin ; then

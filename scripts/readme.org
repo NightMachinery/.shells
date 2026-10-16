@@ -357,6 +357,13 @@ boundary does not mute or unmute. Unlock restores only a mute placed by the
 guard. Installed as a LaunchAgent from =./launchers/audio-guard/=. See
 [[NIGHTDIR:docs/audio-guard.md][triggers, snooze, and restoration]].
 
+* Memory pressure
+
+[agfi:memory-pressure-darwin] reads the macOS memory-pressure sysctl and prints
+Normal, Warning, or Critical. Recognized levels return success; query failures
+and unknown values return nonzero. See
+[[NIGHTDIR:docs/memory-pressure-darwin.md][output and exit-status behavior]].
+
 * External display brightness and contrast
 
 =brightness-get= / =-set= / =-inc= / =-dec= drive external monitors over DDC/CI,
