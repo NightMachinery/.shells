@@ -351,52 +351,45 @@ function h-paseo-agent-pairs {
 }
 
 function h-paseo-archive-rows {
-    #: Internal picker protocol: full UUID, short UUID, status, age,
-    #: provider/model, title, cwd, protection. Never parse display titles as IDs.
+    #: Full UUID, short UUID, status, LAST ACTIVE, provider/model, title, cwd,
+    #: protection and cascade description. The planner reads only local records.
     emulate -L zsh
-    local scope="${1}" kind="${2}" caller="${PASEO_AGENT_ID:-}" parent="${PASEO_PARENT_AGENT_ID:-}"
-    local data records='[]'
+    local scope="${1}" kind="${2}" minimum="${3:-72h}" force="${4:-n}"
+    local show_hidden="${5:-n}" summary_p="${6:-n}"
+    local caller="${PASEO_AGENT_ID:-}" parent="${PASEO_PARENT_AGENT_ID:-}"
+    local root="${NIGHTDIR:-${HOME}/scripts}" archive_home data
+    ensure-cmd paseo python3 @RET
+    archive_home="$(h-paseo-home)" @RET
+    #: Always collect globally: a child in another directory still cascades.
+    data="$(command paseo ls --global --json)" @RET
     local -a opts=()
-    [[ "${scope}" == global ]] && opts+=(--global)
-    data="$(command paseo ls "${opts[@]}" --json)" @RET
-    #: [agfi:paseo-ls] already reads parent labels without exposing persistence
-    #: metadata (which may include credentials). Remote listings use env only.
-    if [[ -n "${caller}" ]] ; then
-        records="$(paseo-ls --json 2>/dev/null)" || records='[]'
-    fi
-    print -r -- "${data}" | command jq --raw-output \
-        --arg caller "${caller}" --arg parent "${parent}" --arg kind "${kind}" \
-        --arg scope "${scope}" --arg cwd "${PWD:A}" --arg home "${HOME}" --argjson records "${records}" '
-        def safe: tostring | gsub("[\u0000-\u001f\u007f]"; " ");
-        ($records | map({key: .id, value: .parentAgentId}) | from_entries) as $parents
-        | ([ $caller, $parent, $parents[$caller] ] | map(select(. != null and . != ""))) as $protected
-        | .[]
-        | select((.archivedAt // null) == null)
-        | select($scope == "global" or ((.cwd // "" | if startswith("~/") then $home + .[1:] else . end) == $cwd))
-        | . as $a
-        | (($protected | index($a.id)) != null) as $protect
-        | (["idle", "closed", "error", "errored", "failed", "stopped"] | index($a.status)) as $idle
-        | select($kind != "all" or ($idle != null and ($protect | not)))
-        | [ .id, (.shortId // .id[0:8]),
-            (if $protect then "PROTECTED/" + .status elif .status == "running" then "RUNNING!" else .status end),
-            (.created // .age // "?"), (.provider // "?"), (.name // .title // "(untitled)"),
-            (.cwd // "?"), (if $protect then "protected" else "selectable" end) ]
-        | map(safe) | join("\t")'
+    [[ "${force}" == y ]] && opts+=(--force)
+    [[ "${show_hidden}" == y ]] && opts+=(--show-hidden)
+    [[ "${summary_p}" == y ]] && opts+=(--summary)
+    print -r -- "${data}" | command python3 "${root}/python/paseo_archive.py" \
+        --home "${archive_home}" --scope "${scope}" --kind "${kind}" --cwd "${PWD:A}" \
+        --caller "${caller}" --parent "${parent}" --min-idle "${minimum}" "${opts[@]}"
 }
 
 function h-paseo-archive {
     emulate -L zsh
+    setopt pipefail
     local kind="${1}" ; shift
-    local scope=global dry=n yes=n force=n filter='' filter_p=n
+    local scope=global dry=n yes=n force=n filter='' filter_p=n minimum=72h show_hidden=n summary='' eligible_rows=''
     local row rows selected id failed=0 answer
     local -a fields
-    local -A allowed
+    local -A allowed covered
     while (( $# )) ; do
         case "${1}" in
             -l|--local-dir) scope=local ;;
             -g|--global) scope=global ;;
             -n|--dry-run) dry=y ;;
             -y|--yes) yes=y ;;
+            --show-hidden) show_hidden=y ;;
+            --all-ages) minimum=0 ;;
+            --min-idle)
+                (( $# >= 2 )) || { ecerr "$0: --min-idle needs 72h, 3d, 90m, or 0"; return 64; }
+                minimum="${2}" ; shift ;;
             --force)
                 [[ "${kind}" == fz ]] || { ecerr "$0: --force is only available in the picker"; return 64; }
                 force=y ;;
@@ -404,26 +397,48 @@ function h-paseo-archive {
                 (( $# >= 2 )) || { ecerr "$0: --filter needs text"; return 64; }
                 filter="${2}" filter_p=y ; shift ;;
             -h|--help)
-                print -r -- 'usage: paseo-archive-fz [-l|--local-dir] [-n|--dry-run] [--force] [--filter TEXT]
-       paseo-archive-all [-l|--local-dir] [-n|--dry-run] [-y|--yes]
-Scope defaults to agents in every directory; --local-dir (-l) limits it to
-agents started in the current directory (-g, --global is accepted and is
-the default). The picker marks running agents;
---force explicitly permits interrupting selected running agents. The caller
-and its known parent are protected. Archive-all skips running/unknown states
-and requires confirmation on a terminal, or --yes when stdin is not a terminal.
-Archiving is a soft delete. This Paseo CLI has no unarchive command; recovery
-is through the Paseo app if supported by its version. --filter selects without
-an interactive picker, useful with --dry-run or in a disposable test scope.'
+                print -r -- 'usage: paseo-archive-fz [-l] [-n] [--min-idle DUR|--all-ages] [--show-hidden] [--force] [--filter TEXT]
+       paseo-archive-all [-l] [-n] [-y] [--min-idle DUR|--all-ages] [--show-hidden]
+Default: idle agents last active at least 72 hours ago, oldest activity first,
+across every directory. --local-dir (-l) restricts cwd; --global (-g) is default.
+--min-idle accepts 72h, 3d, 90m, or 0; --all-ages is --min-idle 0.
+LAST ACTIVE uses stored lastActivityAt, then updatedAt, then createdAt.
+Archiving a parent also archives its subagents. Parents with ineligible
+children are hidden. Each row/confirmation lists the affected descendants.
+Picker --force overrides age and a selected agent running itself, but NEVER
+allows a parent with a running descendant. Pinned agents, the caller and all
+its ancestors cannot be archived, including through cascades. --show-hidden
+lists excluded rows with REASON separately; they never enter the picker.
+The footer counts hidden agents and reasons. Local-dir scope also cannot be
+bypassed, even through a cascade. Archive-all never offers running agents.
+Missing local records block planning; remote daemon targets are unsupported.
+Archive-all confirms on a terminal; otherwise --yes is required. --dry-run
+never archives. --filter uses non-interactive fzf selection.
+Archive is soft deletion; this CLI has no unarchive command. App recovery
+support depends on the installed version. paseo-keep ID pins; paseo-unkeep ID
+clears the pin by setting keep=false (the CLI has no label-delete option).'
                 return 0 ;;
             *) ecerr "$0: unknown option: ${1}"; return 64 ;;
         esac
         shift
     done
     [[ "${kind}" == fz || "${filter_p}" == n ]] || { ecerr "$0: --filter is only for the picker"; return 64; }
-    ensure-cmd paseo jq @RET
-    rows="$(h-paseo-archive-rows "${scope}" "${kind}")" @RET
+    rows="$(h-paseo-archive-rows "${scope}" "${kind}" "${minimum}" "${force}" "${show_hidden}" y)" @RET
+    for row in "${(@f)rows}" ; do
+        if [[ "${row}" == '#summary'$'\t'* ]] ; then
+            summary="${row#*$'\t'}"
+            continue
+        fi
+        fields=( "${(@ps:\t:)row}" )
+        if [[ "${fields[8]}" == hidden ]] ; then
+            print -r -- "HIDDEN ${fields[2]}  ${fields[6]}  LAST ACTIVE ${fields[4]}  REASON: ${fields[11]}"
+        else
+            eligible_rows+="${row}"$'\n'
+        fi
+    done
+    rows="${eligible_rows%$'\n'}"
     if [[ -z "${rows}" ]] ; then
+        print -r -- "${summary}"
         if [[ "${scope}" == local ]] ; then
             print -r -- 'No eligible agents in this directory; drop --local-dir to see every directory.'
         else
@@ -437,19 +452,30 @@ an interactive picker, useful with --dry-run or in a disposable test scope.'
     done
     if [[ "${kind}" == fz ]] ; then
         ensure-cmd fzf @RET
-        local -a fz_args=(--multi --delimiter=$'\t' --with-nth=2..7 \
-            --header='Archive selection: RUNNING! requires --force; caller/parent are PROTECTED')
+        local -a fz_args=(--multi --delimiter=$'\t' --with-nth=2..7,9 \
+            --header="ID | STATUS | LAST ACTIVE | PROVIDER | TITLE | CWD | CASCADE; default idle >=72h
+${summary}" \
+            --preview 'printf "%s\n" {9}' --preview-window=down:4:wrap)
         [[ "${filter_p}" == y ]] && fz_args+=(--filter "${filter}")
-        selected="$(print -r -- "${rows}" | fzf-gateway "${fz_args[@]}")" || return $?
+        selected="$(print -r -- "${rows}" | fzf-gateway "${fz_args[@]}")" || {
+            local pick_rc=$?
+            print -r -- "${summary}"
+            return "${pick_rc}"
+        }
     else
         selected="${rows}"
     fi
-    [[ -n "${selected}" ]] || return 0
-    print -r -- $'ID\tSTATUS\tAGE\tPROVIDER/MODEL\tTITLE\tCWD'
+    if [[ -z "${selected}" ]] ; then
+        print -r -- "${summary}"
+        return 0
+    fi
+    print -r -- $'ID\tSTATUS\tLAST ACTIVE\tPROVIDER/MODEL\tTITLE\tCWD'
     for row in "${(@f)selected}" ; do
         fields=( "${(@ps:\t:)row}" )
         print -r -- "${(pj:\t:)fields[2,7]}"
+        [[ "${fields[9]}" == '-' ]] || print -r -- "    ${fields[9]}"
     done
+    print -r -- "${summary}"
     [[ "${dry}" == y ]] && return 0
     if [[ "${kind}" == all && "${yes}" != y ]] ; then
         if [[ ! -t 0 ]] ; then
@@ -461,17 +487,39 @@ an interactive picker, useful with --dry-run or in a disposable test scope.'
         [[ "${answer:l}" == y || "${answer:l}" == yes ]] || return 1
     fi
     #: Fresh eligibility catches a changed caller/parent relationship or scope.
-    rows="$(h-paseo-archive-rows "${scope}" "${kind}")" @RET
+    rows="$(h-paseo-archive-rows "${scope}" "${kind}" "${minimum}" "${force}")" @RET
     allowed=()
     for row in "${(@f)rows}" ; do
         fields=( "${(@ps:\t:)row}" )
         allowed[${fields[1]}]="${fields[8]}"
+    done
+    #: If a selected parent covers another selected row, issue only the
+    #: parent's archive request. The daemon owns the asynchronous cascade.
+    local child
+    for row in "${(@f)selected}" ; do
+        fields=( "${(@ps:\t:)row}" )
+        for child in "${(@s:,:)fields[10]}" ; do
+            [[ "${child}" == '-' ]] || covered[${child}]=y
+        done
     done
     local -a archive_opts=()
     [[ "${force}" == y ]] && archive_opts+=(--force)
     for row in "${(@f)selected}" ; do
         fields=( "${(@ps:\t:)row}" )
         id="${fields[1]}"
+        [[ "${covered[$id]:-}" == y ]] && continue
+        local fresh fresh_row='' old_cascade="${fields[9]}" old_descendants="${fields[10]}"
+        fresh="$(h-paseo-archive-rows "${scope}" "${kind}" "${minimum}" "${force}")" @RET
+        for fresh_row in "${(@f)fresh}" ; do
+            [[ "${fresh_row%%$'\t'*}" == "${id}" ]] && break
+            fresh_row=''
+        done
+        fields=( "${(@ps:\t:)fresh_row}" )
+        if [[ -z "${fresh_row}" || "${fields[9]}" != "${old_cascade}" || "${fields[10]}" != "${old_descendants}" ]] ; then
+            ecerr "skip ${id}: eligibility or cascade changed; review a fresh listing"
+            failed=1
+            continue
+        fi
         if [[ "${allowed[$id]:-}" != selectable ]] ; then
             ecerr "skip ${id}: protected or no longer eligible"
             failed=1
@@ -485,14 +533,31 @@ an interactive picker, useful with --dry-run or in a disposable test scope.'
 }
 
 function paseo-archive-fz {
-    : "usage: paseo-archive-fz [-l] [-n] [--force] [--filter TEXT]
+    : "usage: paseo-archive-fz [-l] [-n] [--min-idle DUR|--all-ages] [--show-hidden] [--force] [--filter TEXT]
 Pick agents to soft-delete. See --help for running-agent protection and recovery."
     h-paseo-archive fz "$@"
 }
 
 function paseo-archive-all {
-    : "usage: paseo-archive-all [-l] [-n] [-y]
+    : "usage: paseo-archive-all [-l] [-n] [-y] [--min-idle DUR|--all-ages] [--show-hidden]
 Soft-delete idle agents in every directory (-l: only the current one),
-protecting the caller and its known parent."
+protecting the caller and all its ancestors."
     h-paseo-archive all "$@"
+}
+
+
+function paseo-keep {
+    : "usage: paseo-keep ID
+Set keep=true, protecting this agent and ancestors from archive cascades."
+    (( $# == 1 )) && [[ -n "${1}" && "${1}" != -* ]] || { ecerr "$0: one agent ID is required"; return 64; }
+    ensure-cmd paseo @RET
+    command paseo agent update "${1}" --label keep=true
+}
+
+function paseo-unkeep {
+    : "usage: paseo-unkeep ID
+Clear the pin with keep=false; the CLI has no label-delete option."
+    (( $# == 1 )) && [[ -n "${1}" && "${1}" != -* ]] || { ecerr "$0: one agent ID is required"; return 64; }
+    ensure-cmd paseo @RET
+    command paseo agent update "${1}" --label keep=false
 }

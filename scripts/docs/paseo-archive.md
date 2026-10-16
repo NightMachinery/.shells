@@ -1,37 +1,85 @@
 # Archive Paseo agents
 
-`paseo-archive-fz` opens a multi-select picker of non-archived agents. Each
-row shows short ID, status, age, provider/model, title and cwd. Running agents
-say `RUNNING!`; archiving one requires the explicit `--force` option, which
-interrupts it. The caller and its known parent say `PROTECTED` and cannot be
-archived. The picker uses the shared `fzf-gateway` helper.
+`paseo-archive-fz` and `paseo-archive-all` default to **idle agents last active
+at least 72 hours ago**, across every directory. Creation age is deliberately
+omitted: an old coordinator can still be doing active work. LAST ACTIVE uses
+stored `lastActivityAt`, falling back to `updatedAt`, then `createdAt`, and
+rows sort oldest activity first. Unknown activity timestamps are excluded by
+the default age gate.
 
-`paseo-archive-all --dry-run` lists eligible agents. Without `--dry-run`,
-`paseo-archive-all` shows the list and asks for confirmation when stdin is a
-terminal. Non-terminal invocations require `--yes` (`-y`). Only known inactive
-statuses are eligible; running and unknown states are skipped. The caller
-(`PASEO_AGENT_ID`) and its parent, discovered from local Paseo parent labels or
-`PASEO_PARENT_AGENT_ID`, are always excluded when known.
+`--min-idle DUR` changes the interval: `72h`, `3d` and `90m` are accepted.
+`--min-idle 0` or `--all-ages` disables the age gate, but keeps idle status,
+pins, caller and cascade protection. The picker alone accepts `--force`, which
+overrides age and allows a selected agent that is itself running. A parent
+with a running descendant is never eligible, including with force. Running
+rows say `RUNNING!`. Archive-all never offers a running agent and never passes
+force to the CLI. Unknown lifecycle states are excluded even with force.
 
-Both commands default to agents in every directory. `--local-dir` (`-l`)
-limits them to agents started in the current directory, with explicit cwd
-filtering so an agent-context listing cannot include other directories.
-`--global` (`-g`) is still accepted and is the default. `--dry-run` (`-n`) works in both
-commands. `paseo-archive-fz --filter TEXT` uses fzf's non-interactive selection;
-combine it with `--dry-run` when exploring real agents. Full UUIDs are retained
-as selection keys even though the picker displays short IDs.
+## Parents and cascade protection
 
-Eligibility is refreshed before archiving, and the CLI's own running-agent
-guard remains enabled for archive-all. Each archive command prints its result;
-a failure yields a nonzero exit status. Canceling the picker makes no changes.
-Parent discovery from local records is unavailable for a remote daemon unless
-the caller provides `PASEO_PARENT_AGENT_ID`.
+Paseo archives subagents when their parent is archived. An idle parent can be
+waiting for a recently active or running child. The planner checks the complete
+non-archived descendant tree, including descendants in other directories,
+before offering a parent. If any descendant is ineligible, the parent is hidden.
+`--force` can override a descendant's age guard in the picker, but never a
+running descendant, pin, caller protection or directory restriction.
 
-Archive is a soft delete. The inspected CLI has no unarchive command. Check
-the Paseo app for recovery support in the installed version; do not treat the
-CLI as offering an automated undo.
+The picker shows `archives N subagents with it: ...` and has a wrapped preview
+below the selection. Printed selections and confirmations list that cascade
+under the parent. Counts include all descendants, not just immediate children.
+If parent and child are both selected, only the parent's archive request is
+sent; Paseo handles the cascade. Eligibility is refreshed before each request;
+a changed cascade requires a fresh listing instead of silently expanding the
+confirmed scope. The daemon does not provide an atomic descendant-eligibility
+check, so a lifecycle change after the last check remains a small race.
+
+The caller (`PASEO_AGENT_ID`), all its ancestors found by walking parent
+labels, and an explicitly supplied `PASEO_PARENT_AGENT_ID` and that parent's
+ancestors are protected. This protection also applies when the picker is
+forced. From a plain terminal, which has no caller ID, pins and descendant eligibility still apply.
+
+`--show-hidden` prints excluded agents with a REASON column before the picker
+(or alongside dry-run output). They never enter the selectable fzf input.
+Reasons include recent activity, running, pinned, caller/ancestor, running
+subagent and recent subagent. A footer counts hidden agents by reason, and the
+picker header repeats that count. Without this option hidden agents are omitted
+entirely. A coordinator idle between turns is still busy when its workers run.
+
+## Pin an agent
+
+`paseo-keep ID` sets `keep=true`. Pinned agents are never offered, even with
+`--force`; their ancestors cannot be archived through a cascade either.
+`paseo-unkeep ID` clears the pin by setting `keep=false`. The installed CLI can
+set labels using `paseo agent update --label`, but has no label-delete option,
+so unpinning leaves the false label rather than removing the key. Both helpers
+change only the requested label through the CLI.
+
+## Scope and confirmation
+
+Both commands default to every directory. `--local-dir` (`-l`) restricts them
+to the current directory; `--global` (`-g`) explicitly selects the default.
+A local parent with descendants outside that directory is hidden, even with
+force. Global metadata is still collected to check those relationships.
+
+`--dry-run` (`-n`) never archives. The picker uses the shared `fzf-gateway`
+with multi-selection and stable full UUID keys, while showing short IDs,
+status, LAST ACTIVE, provider/model, title and cwd. `--filter TEXT` selects
+without an interactive picker; use it with `--dry-run` when inspecting real
+agents. Canceling the picker makes no changes.
+
+Archive-all prints its list and asks for confirmation when stdin is a terminal.
+Non-terminal invocations require `--yes` (`-y`). Each CLI archive prints its
+result, and a failure returns nonzero.
+
+These safety checks require the local daemon records under the selected
+Paseo home. Missing/inconsistent records or an unsupported remote daemon target
+block planning. The planner reads only activity, labels and display metadata;
+it does not print persistence data or credentials.
+
+Archive is soft deletion. The inspected CLI has no unarchive command. Check
+the Paseo app for recovery support in the installed version.
 
 Validation: `python3 -m unittest discover -s python/tests -p test_paseo_archive.py`.
-The integration tests place a fake CLI first in PATH, so their archive requests
-cannot reach real agents. Live testing must create its own disposable agents
-in a scratch directory and archive only those agents.
+Tests isolate both the fake CLI and fake records, so archive requests cannot
+reach real agents. Any live archive test must use only disposable agents
+created by the tester in a scratch directory.

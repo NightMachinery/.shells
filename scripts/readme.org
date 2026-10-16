@@ -479,8 +479,14 @@ input idle time and non-shell job protection. Start with =--dry-run=; use
 
 * Archive Paseo agents
 
-[agfi:paseo-archive-fz] offers multi-selection with running agents clearly
-marked. [agfi:paseo-archive-all] archives inactive agents after confirmation,
-protecting the caller and its known parent. Both cover every directory by
-default, take =--local-dir= (=-l=) for the current one, and support =--dry-run=. See
-[[NIGHTDIR:docs/paseo-archive.md][selection, confirmation and recovery limits]].
+[agfi:paseo-archive-fz] and [agfi:paseo-archive-all] offer idle agents last
+active at least 72 hours ago, oldest activity first. =--min-idle 3d= changes
+the age gate; =--all-ages= disables it. Parents with running descendants are
+never archived, even with =--force=. Other ineligible descendants also hide
+the parent, and eligible cascades are listed under it. [agfi:paseo-keep] pins
+an agent with =keep=true=; [agfi:paseo-unkeep] clears the pin. Pins and
+caller/ancestor protection survive =--force=. =--show-hidden= lists excluded
+agents with reasons without making them selectable. Both cover every directory
+by default, take =--local-dir= (=-l=) for the current one, and support
+=--dry-run=. See
+[[NIGHTDIR:docs/paseo-archive.md][activity, cascade protection and confirmation]].
