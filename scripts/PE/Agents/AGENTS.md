@@ -415,7 +415,9 @@ Inside Paseo (`PASEO_AGENT_ID` is set), pick the Paseo skill by job:
   GPT, means handing the task to a new agent.
 - `paseo-plugin`: build or troubleshoot Paseo plugins.
 - `paseo-compact`: compact an agent's context, your own or another agent's,
-  by sending it `/compact` through Paseo; also when that pays and how it
-  relates to keeping the prompt cache warm.
+  by sending it `/compact` through Paseo.
+- `paseo-cache-warmer`: keep a long-lived agent's prompt cache warm with
+  keepalive heartbeats while work runs, and decide when that pays; it
+  compacts with `paseo-compact` first.
 
 `delegate` still decides worker model, account and backend.
