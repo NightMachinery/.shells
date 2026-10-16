@@ -150,7 +150,7 @@ def terminate(server, initial, roots):
 def main():
     ap = argparse.ArgumentParser(description=__doc__, epilog='Future sessions: MOSH_SERVER_NETWORK_TMOUT exits after network silence; MOSH_SERVER_SIGNAL_TMOUT gates SIGUSR1. Set them before mosh-server starts, e.g. in ~/.zshenv. Without SIGNAL_TMOUT, SIGUSR1 can terminate connected sessions. No dotfiles are changed.')
     ap.add_argument('-n', '--dry-run', action='store_true')
-    ap.add_argument('--idle-hours', type=float, default=24)
+    ap.add_argument('--idle-hours', type=float, default=96)
     ap.add_argument('--force', action='store_true', help='allow non-shell jobs; shell-only helpers never block cleanup')
     ap.add_argument('--only', type=int, nargs='+', help='restrict to these exact mosh-server PIDs')
     opts = ap.parse_args()

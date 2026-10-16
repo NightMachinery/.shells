@@ -6,7 +6,7 @@ PID, age, input idle time, non-shell descendants and decision. It deliberately
 does not use `who`, which depends on mosh's optional utmp support.
 
 A session is eligible only when inbound traffic does not grow and its pty
-has received no input for at least 24 hours. `--idle-hours N` changes that
+has received no input for at least 96 hours (4 days). `--idle-hours N` changes that
 threshold. A sleeping laptop or suspended phone can still resume a silent
 session, which is why traffic alone is insufficient. Unknown traffic, reset
 counters and unavailable tty metadata always skip the session.
