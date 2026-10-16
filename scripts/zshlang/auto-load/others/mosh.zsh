@@ -96,3 +96,12 @@ EOF
 
     MOSH_KEY=$key mosh-client "$proxy_ip" "$proxy_port"
 }
+
+function mosh-cleanup {
+    : "usage: mosh-cleanup [-n|--dry-run] [--idle-hours N] [--force] [--only PID ...]
+Clean network-silent, input-idle mosh sessions; non-shell jobs are protected."
+    emulate -L zsh
+    local root="${NIGHTDIR:-${HOME}/scripts}"
+    ensure-cmd python3 ps nettop @RET
+    command python3 "${root}/python/mosh_cleanup.py" "$@"
+}

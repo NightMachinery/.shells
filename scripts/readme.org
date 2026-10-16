@@ -469,3 +469,10 @@ meaningful ancestor, with tmux session labels and Claude/Codex process trees.
 Shells and interpreters are charged to their owner; session totals include MCP
 servers, REPLs and browser children. See
 [[NIGHTDIR:docs/mem-report2.md][accounting, labels and limitations]].
+
+* Disconnected mosh sessions
+
+[agfi:mosh-cleanup] combines a 15-second inbound traffic sample with terminal
+input idle time and non-shell job protection. Start with =--dry-run=; use
+=--only PID ...= to restrict its scope. See
+[[NIGHTDIR:docs/mosh-cleanup.md][decisions, cleanup and future timeout settings]].
