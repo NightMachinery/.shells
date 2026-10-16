@@ -48,10 +48,10 @@ Set with `bell_auto_stop_mode`, or `@opts stop_mode <mode> @ bell-auto`.
   whether you have joined the call. Firefox does not expose tab URLs through this
   scripting interface. An inaccessible or unresponsive browser is skipped after
   at most two seconds; other running browsers are still checked.
-- `office-public-audio-p` or `headphones-p` → `bell+notif`. On office speakers the
-  colleagues hear every repeat. On headphones, one ring is all the loop can
-  usefully deliver: worn, the first ring did the job and repeats just keep ducking
-  your audio; on the desk, no number of rings reaches anyone and looping would
+- `quiet-public-audio-p` or `headphones-p` → `bell+notif`. On speakers at the
+  office or during quiet hours (22:00-06:00 local time), others hear every repeat.
+  On headphones, one ring is all the loop can usefully deliver: worn, the first
+  ring did the job and repeats just keep ducking your audio; on the desk, no number of rings reaches anyone and looping would
   only delay the notification ladder by up to `bell_auto_max_t`.
 - otherwise → `idle+timeout`. Open speakers in a private space is the one
   situation where the ringing loop earns its keep: repetition reaches a person the
@@ -443,12 +443,27 @@ bell but the answer changes when you walk somewhere.
 Add a second site by editing `office_p_domains` / `office_p_subnets` in
 `zshlang/auto-load/others/monitor/location.zsh` — a data change, not a code change.
 
-`office-public-audio-p` names the question `stop_mode=auto` actually asks: at the
-office **and** not on headphones, i.e. would a sound right now be audible to
-colleagues. It is shared with the audio leak guard, which mutes the output
-device when that holds and nobody is at the desk — see `audio-guard.md`. It takes
-the same optional `<name> <transport>` arguments as `headphones-p`, for callers
-that already know the output device and want to skip the lookup.
+`quiet-public-audio-p` names the shared speaker policy: (at the office OR during
+quiet hours) AND not on headphones. `quiet-hours-p` checks local time on every
+call, from 22:00 inclusive until 06:00 exclusive, including weekends. Office
+caching cannot delay those boundaries. `office-off` changes only the office
+signal; it does not disable quiet hours. `office-public-audio-p` retains its
+location-specific meaning.
+
+The audio guard uses the same predicate but retains its existing idle, lock, and
+output-change triggers; see `audio-guard.md`. Both audio predicates accept the
+same optional `<name> <transport>` arguments as `headphones-p`, avoiding a device
+lookup when the caller already knows the output.
+
+`quiet-status` explains the location, hours, output device, and effective speaker
+policy. At night automatic bells behave just like office bells: one ring, then
+notification when a message is provided. Headphones retain their existing
+single-ring behavior, and meetings still select notification only. Bell mode is
+resolved once at startup; crossing 22:00 does not interrupt an already-running
+bell. Explicit modes, including continuous-sound bells, retain their behavior.
+Automatic volume boosting in `hearinvisible-playfast` is disabled on quiet
+speakers as well as on headphones or a muted output. Phone escalation remains
+based on office location, not quiet hours.
 
 ### external-display-p
 

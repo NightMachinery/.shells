@@ -321,8 +321,11 @@ ntag notes are tracked in =./docs/ntag/=.
 * Bells
 
 =bell-auto= escalates from sound to a desktop notification to Telegram, and picks
-its behaviour from whether we are at the office. Claude and Codex notifications
-include the thread name when available, e.g. =Claude [scripts · Fix terminal titles]:
+its behaviour from meetings, headphones, office detection, and quiet hours
+(22:00-06:00 local time). [agfi:quiet-public-audio-p] shares the speaker policy
+with the audio guard; [agfi:quiet-status] explains it. Quiet speakers and
+headphones get one automatic bell; meetings get notification only. Claude and
+Codex notifications include the thread name when available, e.g. =Claude [scripts · Fix terminal titles]:
 needs your permission= or =Codex awaits! [scripts · Fix terminal titles]=. Lookup
 uses only the supplied Claude transcript or the Codex ID in the current
 =CODEX_HOME= index, with a two-second limit and the original format on failure.
@@ -347,9 +350,12 @@ uv tool install 'git+https://github.com/NightMachinery/cis-applications2org.git'
 
 * Audio leak guard
 
-=audio-guard= mutes the output device when audio would be audible to colleagues
-at the office and nobody is at the desk, and unmutes when you unlock. Installed
-as a LaunchAgent from =./launchers/audio-guard/=. See =./docs/audio-guard.md=.
+=audio-guard= mutes speakers when nobody is at the desk and either office
+presence or quiet hours (22:00-06:00 local time) call for restraint. Headphones
+remain exempt. Existing triggers control when muting happens; crossing a time
+boundary does not mute or unmute. Unlock restores only a mute placed by the
+guard. Installed as a LaunchAgent from =./launchers/audio-guard/=. See
+[[NIGHTDIR:docs/audio-guard.md][triggers, snooze, and restoration]].
 
 * External display brightness and contrast
 

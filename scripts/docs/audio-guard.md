@@ -1,6 +1,6 @@
 # audio-guard
 
-Mutes the output device when audio would be leaking into the shared office and
+Mutes the output device when speakers need quiet at the office or at night and
 nobody is at the desk.
 
 The laptop gets left at the desk at the office. If something is playing through
@@ -8,10 +8,28 @@ the built-in speakers, or through the DisplayPort monitor, it fills a shared
 room with nobody there to stop it. The guard notices and mutes; the unlock hook
 puts it back.
 
-The social question itself is `office-public-audio-p` in
-`zshlang/auto-load/others/monitor/location.zsh` — at the office and not on
-headphones. `bell-auto` asks exactly the same question, and now shares the
-predicate; see `bell-auto.md`.
+The shared policy is `quiet-public-audio-p` in
+`zshlang/auto-load/others/monitor/location.zsh`: (at the office OR during quiet
+hours) AND not on headphones. `quiet-hours-p` checks local time on each call:
+22:00 inclusive to 06:00 exclusive, every day. Its result is never cached with
+the office detection. `office-off` disables the office signal, not quiet hours.
+`office-public-audio-p` remains available for location-specific callers.
+
+`bell-auto` shares this policy: one bell followed by notification, with meeting
+detection still taking precedence and selecting notification only. Automatic
+bell volume boosting is also suppressed. See `bell-auto.md`.
+
+Crossing 22:00 does not itself mute anything. Existing triggers still decide
+when to act, and crossing 06:00 does not unmute anything. Unlock restoration
+still undoes only a mute owned by the guard, even during quiet hours. Headphones
+remain exempt. The default idle trigger still waits an hour and is checked every
+10 minutes. `audio-guard-snooze` suppresses muting only; it does not override bell
+selection or quiet hours.
+
+Run `quiet-status` to see office detection, quiet hours, the output device,
+headphones, and the resulting speaker policy. `audio-guard-status` additionally
+shows the active quiet reasons, trigger settings, snooze, and mute ownership.
+Mute messages include office, quiet hours, or both, plus the trigger.
 
 The logic is `zshlang/auto-load/others/audio-guard.zsh`. The periodic half is a
 LaunchAgent, installed from `launchers/audio-guard/`.
@@ -187,7 +205,7 @@ Alongside that:
   calls back into Hammerspoon to rediscover what the Lua callback already knew.
   That would be a subprocess spawned by a Hammerspoon callback making an IPC
   call into the very Hammerspoon that spawned it. `headphones-p` and
-  `office-public-audio-p` therefore take optional `<name> <transport>`
+  `quiet-public-audio-p` therefore take optional `<name> <transport>`
   arguments, classified by `h-headphones-classify-p`.
 - The periodic tick keeps Hammerspoon out of the loop entirely by resolving the
   device with `audio-output-get-system-profiler` instead. Its ~200 ms is free in

@@ -1,9 +1,9 @@
 ##
-#: Mute the output device when audio would be leaking into the shared office and
+#: Mute the output device when speakers need quiet at the office or at night and
 #: nobody is at the desk. See [[../../../docs/audio-guard.md]].
 #:
 #: Three triggers, each independently switchable; only `idle' ships enabled.
-#: The social question itself lives in [agfi:office-public-audio-p].
+#: The shared policy lives in [agfi:quiet-public-audio-p].
 ##
 typeset -g audio_guard_idle_t="${audio_guard_idle_t:-3600}"
 typeset -g audio_guard_back_t="${audio_guard_back_t:-60}"
@@ -165,7 +165,7 @@ function h-audio-guard-act-p {
     : "the gate shared by every trigger: may we mute right now?
 
 Deliberately excludes the idle test, which belongs to the idle trigger alone.
-Takes the same optional <name> <transport> as [agfi:office-public-audio-p]."
+Takes the same optional <name> <transport> as [agfi:quiet-public-audio-p]."
     isDarwin || return 1
     isLocal || return 1
 
@@ -174,7 +174,7 @@ Takes the same optional <name> <transport> as [agfi:office-public-audio-p]."
         return 1
     fi
 
-    office-public-audio-p "$@" || return 1
+    quiet-public-audio-p "$@" || return 1
 
     #: A mute we did not place is not ours to track. Never recording it as ours
     #: is what keeps restore from ever touching a deliberate mute.
@@ -198,6 +198,9 @@ plain SET with no expiry."
 
 function h-audio-guard-mute {
     local reason="${1}" name="${2}"
+    local quiet_reasons
+    quiet_reasons="$(h-quiet-reasons)"
+    reason="${quiet_reasons:+${quiet_reasons}, }no headphones, ${reason}"
     test -n "$name" || name="$(h-audio-guard-device-name)" || name=''
 
     #: Without a name there is no way to restore by name later, so the mute would
@@ -331,7 +334,7 @@ function audio-guard-tick {
 
     h-audio-guard-act-p "$name" "$transport" || return 0
 
-    h-audio-guard-mute "office, no headphones, idle $(seconds-fmt-short "${idle%.*}")" "$name"
+    h-audio-guard-mute "idle $(seconds-fmt-short "${idle%.*}")" "$name"
 }
 
 function audio-guard-on-lock {
@@ -339,7 +342,7 @@ function audio-guard-on-lock {
     audio-guard-trigger-p lock || return 0
     h-audio-guard-act-p || return 0
 
-    h-audio-guard-mute "office, no headphones, screen locked"
+    h-audio-guard-mute "screen locked"
 }
 
 function audio-guard-on-audio-change {
@@ -393,7 +396,9 @@ The only window into a job you never watch run; modelled on [agfi:office-p-expla
     ec "output: $(audio-output-get 2>/dev/null | prefixer -o ' / ' --skip-empty)"
     headphones-p && ec "headphones: yes" || ec "headphones: no"
     office-p && ec "office: yes" || ec "office: no"
-    office-public-audio-p && ec "public audio: yes" || ec "public audio: no"
+    quiet-hours-p && ec "quiet hours: yes (22:00-06:00, local time)" || ec "quiet hours: no (22:00-06:00, local time)"
+    ec "quiet reasons: $(h-quiet-reasons)"
+    quiet-public-audio-p && ec "speaker restraint: active" || ec "speaker restraint: inactive"
     volume-mute-p && ec "muted now: yes" || ec "muted now: no"
 }
 aliasfn audio-guard-explain audio-guard-status

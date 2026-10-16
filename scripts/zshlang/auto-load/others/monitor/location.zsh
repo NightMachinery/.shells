@@ -1,5 +1,5 @@
 ##
-#: Where are we physically? Currently a single question: are we at the LMU/CIS office?
+#: Physical location and quiet hours, shared by bells and the audio guard.
 #:
 #: Used by [agfi:bell-auto] to decide whether repeated audible bells are socially
 #: acceptable. See [[../../../../docs/bell-auto.md]].
@@ -136,6 +136,51 @@ for callers that already know the output device and want to avoid the lookup."
     office-p && ! headphones-p "$@"
 }
 aliasfn office-public-audio-is office-public-audio-p
+
+function quiet-hours-p {
+    : "returns 0 during local quiet hours, 22:00 inclusive to 06:00 exclusive"
+    zmodload zsh/datetime @RET
+    local hour
+    strftime -s hour '%H' "$EPOCHSECONDS" @RET
+    (( 10#$hour >= 22 || 10#$hour < 6 ))
+}
+
+function quiet-public-audio-p {
+    : "returns 0 iff office or quiet hours call for restraint on speaker audio"
+    #: Forward known <name> <transport> just as [agfi:headphones-p] does, so an
+    #: audio watcher never needs to ask Hammerspoon for its own device again.
+    { office-p || quiet-hours-p } && ! headphones-p "$@"
+}
+
+function h-quiet-reasons {
+    : "prints all active reasons for quiet, independent of the output device"
+    local reasons=()
+    office-p && reasons+=( office )
+    quiet-hours-p && reasons+=( 'quiet hours (22:00-06:00)' )
+    ec "${(j:, :)reasons}"
+}
+
+function quiet-status {
+    : "shows location, quiet hours, output, and the resulting speaker policy"
+    local office=no hours=no headphones=no
+    office-p && office=yes
+    quiet-hours-p && hours=yes
+
+    local out
+    out="$(audio-output-get)" @RET
+    local lines=( "${(@f)out}" )
+    headphones-p "${lines[1]}" "${lines[2]}" && headphones=yes
+
+    ec "office: ${office}"
+    ec "quiet hours: ${hours} (22:00-06:00, local time)"
+    ec "output: ${lines[1]} / ${lines[2]}"
+    ec "headphones: ${headphones}"
+    if [[ "$headphones" == no && ( "$office" == yes || "$hours" == yes ) ]] ; then
+        ec 'speaker restraint: active (at most one automatic bell; muting through enabled audio-guard triggers)'
+    else
+        ec 'speaker restraint: inactive'
+    fi
+}
 
 function office-p-explain {
     : "shows what each [agfi:office-p] backend thinks, bypassing the cache"

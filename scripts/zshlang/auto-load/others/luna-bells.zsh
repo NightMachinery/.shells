@@ -919,14 +919,14 @@ bell_auto_stop_mode: idle | idle+timeout | notif | bell+notif | auto (default)"
         #:   headphones play it over whoever is talking. Notification only.
         #:   [agfi:meeting-p] checks all tabs in running scriptable browsers,
         #:   including background tabs and browsers other than the default.
-        #: - At the office on speakers, the colleagues hear every repeat.
+        #: - On speakers at the office or during quiet hours, others hear every repeat.
         #: - On headphones, ring once: if they are on your ears the first ring did
         #:   the job and the loop would just keep ducking your audio; if they are
         #:   on the desk, nobody hears any number of rings and looping would only
         #:   delay the notification ladder by up to max_t.
         if meeting-p ; then
             stop_mode='notif'
-        elif office-public-audio-p || headphones-p ; then
+        elif quiet-public-audio-p || headphones-p ; then
             stop_mode='bell+notif'
         else
             stop_mode='idle+timeout'
