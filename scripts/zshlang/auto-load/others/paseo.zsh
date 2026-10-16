@@ -349,3 +349,142 @@ function h-paseo-agent-pairs {
             "${f[2]}" "paseo:${f[1][1,8]}" "${f[6]}" "${f[4]}" "${paseo_agent_badge}" "${f[8]}" "${f[9]}"
     done
 }
+
+function h-paseo-archive-rows {
+    #: Internal picker protocol: full UUID, short UUID, status, age,
+    #: provider/model, title, cwd, protection. Never parse display titles as IDs.
+    emulate -L zsh
+    local scope="${1}" kind="${2}" caller="${PASEO_AGENT_ID:-}" parent="${PASEO_PARENT_AGENT_ID:-}"
+    local data records='[]'
+    local -a opts=()
+    [[ "${scope}" == global ]] && opts+=(--global)
+    data="$(command paseo ls "${opts[@]}" --json)" @RET
+    #: [agfi:paseo-ls] already reads parent labels without exposing persistence
+    #: metadata (which may include credentials). Remote listings use env only.
+    if [[ -n "${caller}" ]] ; then
+        records="$(paseo-ls --json 2>/dev/null)" || records='[]'
+    fi
+    print -r -- "${data}" | command jq --raw-output \
+        --arg caller "${caller}" --arg parent "${parent}" --arg kind "${kind}" \
+        --arg scope "${scope}" --arg cwd "${PWD:A}" --arg home "${HOME}" --argjson records "${records}" '
+        def safe: tostring | gsub("[\u0000-\u001f\u007f]"; " ");
+        ($records | map({key: .id, value: .parentAgentId}) | from_entries) as $parents
+        | ([ $caller, $parent, $parents[$caller] ] | map(select(. != null and . != ""))) as $protected
+        | .[]
+        | select((.archivedAt // null) == null)
+        | select($scope == "global" or ((.cwd // "" | if startswith("~/") then $home + .[1:] else . end) == $cwd))
+        | . as $a
+        | (($protected | index($a.id)) != null) as $protect
+        | (["idle", "closed", "error", "errored", "failed", "stopped"] | index($a.status)) as $idle
+        | select($kind != "all" or ($idle != null and ($protect | not)))
+        | [ .id, (.shortId // .id[0:8]),
+            (if $protect then "PROTECTED/" + .status elif .status == "running" then "RUNNING!" else .status end),
+            (.created // .age // "?"), (.provider // "?"), (.name // .title // "(untitled)"),
+            (.cwd // "?"), (if $protect then "protected" else "selectable" end) ]
+        | map(safe) | join("\t")'
+}
+
+function h-paseo-archive {
+    emulate -L zsh
+    local kind="${1}" ; shift
+    local scope=local dry=n yes=n force=n filter='' filter_p=n
+    local row rows selected id failed=0 answer
+    local -a fields
+    local -A allowed
+    while (( $# )) ; do
+        case "${1}" in
+            -g|--global) scope=global ;;
+            -n|--dry-run) dry=y ;;
+            -y|--yes) yes=y ;;
+            --force)
+                [[ "${kind}" == fz ]] || { ecerr "$0: --force is only available in the picker"; return 64; }
+                force=y ;;
+            --filter)
+                (( $# >= 2 )) || { ecerr "$0: --filter needs text"; return 64; }
+                filter="${2}" filter_p=y ; shift ;;
+            -h|--help)
+                print -r -- 'usage: paseo-archive-fz [-g|--global] [-n|--dry-run] [--force] [--filter TEXT]
+       paseo-archive-all [-g|--global] [-n|--dry-run] [-y|--yes]
+Scope defaults to the current directory. The picker marks running agents;
+--force explicitly permits interrupting selected running agents. The caller
+and its known parent are protected. Archive-all skips running/unknown states
+and requires confirmation on a terminal, or --yes when stdin is not a terminal.
+Archiving is a soft delete. This Paseo CLI has no unarchive command; recovery
+is through the Paseo app if supported by its version. --filter selects without
+an interactive picker, useful with --dry-run or in a disposable test scope.'
+                return 0 ;;
+            *) ecerr "$0: unknown option: ${1}"; return 64 ;;
+        esac
+        shift
+    done
+    [[ "${kind}" == fz || "${filter_p}" == n ]] || { ecerr "$0: --filter is only for the picker"; return 64; }
+    ensure-cmd paseo jq @RET
+    rows="$(h-paseo-archive-rows "${scope}" "${kind}")" @RET
+    if [[ -z "${rows}" ]] ; then
+        print -r -- 'No eligible agents in scope.'
+        return 0
+    fi
+    for row in "${(@f)rows}" ; do
+        fields=( "${(@ps:\t:)row}" )
+        allowed[${fields[1]}]="${fields[8]}"
+    done
+    if [[ "${kind}" == fz ]] ; then
+        ensure-cmd fzf @RET
+        local -a fz_args=(--multi --delimiter=$'\t' --with-nth=2..7 \
+            --header='Archive selection: RUNNING! requires --force; caller/parent are PROTECTED')
+        [[ "${filter_p}" == y ]] && fz_args+=(--filter "${filter}")
+        selected="$(print -r -- "${rows}" | fzf-gateway "${fz_args[@]}")" || return $?
+    else
+        selected="${rows}"
+    fi
+    [[ -n "${selected}" ]] || return 0
+    print -r -- $'ID\tSTATUS\tAGE\tPROVIDER/MODEL\tTITLE\tCWD'
+    for row in "${(@f)selected}" ; do
+        fields=( "${(@ps:\t:)row}" )
+        print -r -- "${(pj:\t:)fields[2,7]}"
+    done
+    [[ "${dry}" == y ]] && return 0
+    if [[ "${kind}" == all && "${yes}" != y ]] ; then
+        if [[ ! -t 0 ]] ; then
+            ecerr 'paseo-archive-all: stdin is not a terminal; --yes is required (or use --dry-run)'
+            return 64
+        fi
+        print -rn -- 'Archive these agents? [y/N] ' >&2
+        IFS= read -r answer || return 1
+        [[ "${answer:l}" == y || "${answer:l}" == yes ]] || return 1
+    fi
+    #: Fresh eligibility catches a changed caller/parent relationship or scope.
+    rows="$(h-paseo-archive-rows "${scope}" "${kind}")" @RET
+    allowed=()
+    for row in "${(@f)rows}" ; do
+        fields=( "${(@ps:\t:)row}" )
+        allowed[${fields[1]}]="${fields[8]}"
+    done
+    local -a archive_opts=()
+    [[ "${force}" == y ]] && archive_opts+=(--force)
+    for row in "${(@f)selected}" ; do
+        fields=( "${(@ps:\t:)row}" )
+        id="${fields[1]}"
+        if [[ "${allowed[$id]:-}" != selectable ]] ; then
+            ecerr "skip ${id}: protected or no longer eligible"
+            failed=1
+            continue
+        fi
+        #: No --force in archive-all: the CLI also guards a run starting after
+        #: the fresh listing. Each command prints its own success or failure.
+        command paseo archive "${id}" "${archive_opts[@]}" || failed=1
+    done
+    return "${failed}"
+}
+
+function paseo-archive-fz {
+    : "usage: paseo-archive-fz [-g] [-n] [--force] [--filter TEXT]
+Pick agents to soft-delete. See --help for running-agent protection and recovery."
+    h-paseo-archive fz "$@"
+}
+
+function paseo-archive-all {
+    : "usage: paseo-archive-all [-g] [-n] [-y]
+Soft-delete idle agents in scope, protecting the caller and its known parent."
+    h-paseo-archive all "$@"
+}

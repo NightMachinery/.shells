@@ -476,3 +476,11 @@ servers, REPLs and browser children. See
 input idle time and non-shell job protection. Start with =--dry-run=; use
 =--only PID ...= to restrict its scope. See
 [[NIGHTDIR:docs/mosh-cleanup.md][decisions, cleanup and future timeout settings]].
+
+* Archive Paseo agents
+
+[agfi:paseo-archive-fz] offers multi-selection with running agents clearly
+marked. [agfi:paseo-archive-all] archives inactive agents after confirmation,
+protecting the caller and its known parent. Both default to the current
+directory, accept =--global=, and support =--dry-run=. See
+[[NIGHTDIR:docs/paseo-archive.md][selection, confirmation and recovery limits]].
