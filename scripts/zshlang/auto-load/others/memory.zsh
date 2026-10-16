@@ -329,3 +329,20 @@ function claude-desktop-restart() {
     print -r -- "Swap stays allocated after a reclaim; it just stops being touched."
 }
 ##
+
+function mem-report2 {
+    : "usage: mem-report2 [N]
+Physical footprint by application/ancestor, with Claude and Codex session trees."
+    emulate -L zsh
+    local root="${NIGHTDIR:-${HOME}/scripts}" n="${1:-15}"
+    (( $# <= 1 )) && [[ "${n}" == <-> ]] || { ecerr "$0: expected a nonnegative row limit"; return 64; }
+    ensure-cmd python3 ps top lsof @RET
+    local -A m
+    local line ratio=1
+    for line in ${(f)"$(mem-stats_)"} ; do
+        m[${line%%=*}]=${line#*=}
+    done
+    (( m[PAGES_OCCUPIED_BY_COMPRESSOR] > 0 )) && \
+        ratio=$(( 1.0 * m[PAGES_STORED_IN_COMPRESSOR] / m[PAGES_OCCUPIED_BY_COMPRESSOR] ))
+    command python3 "${root}/python/mem_report2.py" "${n}" --ratio "${ratio}"
+}
