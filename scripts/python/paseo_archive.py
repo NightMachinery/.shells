@@ -6,6 +6,8 @@ from pathlib import Path
 import re
 import sys
 
+INACTIVE_STATUSES = {'idle', 'closed', 'error', 'errored', 'failed', 'stopped'}
+
 
 def duration(value):
     if value == '0':
@@ -57,7 +59,7 @@ def load_records(home):
 def plan(live, records, *, scope='global', cwd='', caller='', parent='', minimum=72*3600,
          force=False, kind='fz', now=None, show_hidden=False, summary=False):
     now = datetime.now(timezone.utc).timestamp() if now is None else now
-    current = {a['id']: a for a in live}
+    current = {a['id']: a for a in live if a.get('archivedAt') is None}
     if current.keys() - records.keys():
         raise ValueError('live agents lack local records; refusing an incomplete cascade/pin check')
     active = {i: r for i, r in records.items() if r['archivedAt'] is None}
@@ -86,7 +88,7 @@ def plan(live, records, *, scope='global', cwd='', caller='', parent='', minimum
         if not in_scope(r):
             return 'outside directory'
         status = current[ident].get('status')
-        if status not in ('idle', 'running'):
+        if status not in INACTIVE_STATUSES | {'running'}:
             return 'unknown status'
         # Running descendants are ALWAYS blockers, including with --force.
         if status == 'running' and (descendant or not (force and kind == 'fz')):
@@ -98,6 +100,26 @@ def plan(live, records, *, scope='global', cwd='', caller='', parent='', minimum
             if idle < minimum:
                 return f'recent {idle / 3600:.1f}h'
         return ''
+    def short_id(ident):
+        return current.get(ident, {}).get('shortId') or ident[:7]
+    def own_category(reason):
+        return 'recent' if reason.startswith('recent ') else reason
+    def child_reason(ident, why):
+        short = short_id(ident)
+        # Keep labels and footer categories explicit, rather than truncating
+        # an English reason to its first word.
+        if why.startswith('recent '):
+            return f'recent subagent {short}', 'parents of recent subagents'
+        descriptions = {
+            'running': (f'running subagent {short}', 'parents of running subagents'),
+            'pinned': (f'pinned subagent {short}', 'parents of pinned subagents'),
+            'caller': (f'subagent {short} is the caller or its ancestor', 'parents of protected caller ancestors'),
+            'missing live metadata': (f'subagent {short} not in live listing', 'parents of subagents not in live listing'),
+            'unknown status': (f'subagent {short} has unknown status', 'parents of subagents with unknown status'),
+            'outside directory': (f'subagent {short} outside this directory', 'parents of subagents outside this directory'),
+            'unknown activity': (f'subagent {short} has unknown activity', 'parents of subagents with unknown activity'),
+        }
+        return descriptions[why]
     def descend(ident, seen=None):
         seen = {ident} if seen is None else seen
         for child in sorted(children.get(ident, []), key=lambda i: (stamp[i] or float('inf'), i)):
@@ -119,26 +141,24 @@ def plan(live, records, *, scope='global', cwd='', caller='', parent='', minimum
             blockers = [(child, own_reason(child, descendant=True)) for child in descendants]
             blockers.sort(key=lambda b: 0 if b[1] == 'running' else 1)
             reason = own_reason(ident)
+            category = own_category(reason)
             if reason not in ('pinned', 'caller', 'running'):
                 for child, why in blockers:
                     if why:
-                        reason = f'{why.split()[0]} subagent {child[:8]}'
+                        reason, category = child_reason(child, why)
                         break
         except ValueError:
-            descendants, reason = [], 'cyclic subagents'
+            descendants, reason, category = [], 'cyclic subagents', 'cyclic subagents'
         if reason:
-            category = ('parents of running subagents' if reason.startswith('running subagent') else
-                        'parents of recent subagents' if reason.startswith('recent subagent') else
-                        'recent' if reason.startswith('recent ') else reason.split(' subagent ')[0])
             hidden[category] = hidden.get(category, 0) + 1
             if not show_hidden:
                 continue
         a = current[ident]
         age = max(0, now - stamp[ident]) if stamp[ident] is not None else None
         relative = '?' if age is None else (f'{age / 86400:.1f}d ago' if age >= 86400 else f'{age / 3600:.1f}h ago' if age >= 3600 else f'{age / 60:.0f}m ago')
-        names = [f'{child[:8]} {active[child].get("title") or "(untitled)"} [{current.get(child, {}).get("status", "?")}]' for child in descendants]
+        names = [f'{short_id(child)} {active[child].get("title") or "(untitled)"} [{current.get(child, {}).get("status", "?")}]' for child in descendants]
         cascade = f'archives {len(names)} subagents with it: ' + '; '.join(names) if names else '-'
-        row = [ident, a.get('shortId') or ident[:8], 'RUNNING!' if a.get('status') == 'running' else a.get('status', '?'),
+        row = [ident, short_id(ident), 'RUNNING!' if a.get('status') == 'running' else a.get('status', '?'),
                relative, a.get('provider', '?'), a.get('name') or a.get('title') or '(untitled)', a.get('cwd', '?'),
                'hidden' if reason else 'selectable', cascade, ','.join(descendants) or '-', reason or '-']
         rows.append('\t'.join(map(safe, row)))

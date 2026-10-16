@@ -1,15 +1,19 @@
 # Archive Paseo agents
 
-`paseo-archive-fz` and `paseo-archive-all` default to **idle agents last active
+`paseo-archive-fz` and `paseo-archive-all` default to **inactive agents last active
 at least 72 hours ago**, across every directory. Creation age is deliberately
 omitted: an old coordinator can still be doing active work. LAST ACTIVE uses
 stored `lastActivityAt`, falling back to `updatedAt`, then `createdAt`, and
 rows sort oldest activity first. Unknown activity timestamps are excluded by
-the default age gate.
+the default age gate. Idle and terminal agents (`closed`, `error`, `errored`,
+`failed`, `stopped`) are eligible both as top-level rows and cascade members,
+subject to the same age, pin and ancestry checks. The CLI is queried with
+`--all` to include closed agents; stored `archivedAt` values exclude agents
+already archived, even when their displayed CLI status is also `closed`.
 
 `--min-idle DUR` changes the interval: `72h`, `3d` and `90m` are accepted.
-`--min-idle 0` or `--all-ages` disables the age gate, but keeps idle status,
-pins, caller and cascade protection. The picker alone accepts `--force`, which
+`--min-idle 0` or `--all-ages` disables the age gate, but keeps the
+non-running guard, pins, caller and cascade protection. The picker alone accepts `--force`, which
 overrides age and allows a selected agent that is itself running. A parent
 with a running descendant is never eligible, including with force. Running
 rows say `RUNNING!`. Archive-all never offers a running agent and never passes
@@ -41,8 +45,12 @@ forced. From a plain terminal, which has no caller ID, pins and descendant eligi
 `--show-hidden` prints excluded agents with a REASON column before the picker
 (or alongside dry-run output). They never enter the selectable fzf input.
 Reasons include recent activity, running, pinned, caller/ancestor, running
-subagent and recent subagent. A footer counts hidden agents by reason, and the
-picker header repeats that count. Without this option hidden agents are omitted
+subagent and recent subagent. Other reasons spell out the condition, such as
+`subagent abc1234 not in live listing`, `has unknown status`, `outside this
+directory`, or `has unknown activity`. Footer categories use complete phrases
+such as `parents of subagents outside this directory`. Short IDs match the CLI
+(seven characters when it supplies no explicit short ID). A footer counts
+hidden agents by reason, and the picker header repeats that count. Without this option hidden agents are omitted
 entirely. A coordinator idle between turns is still busy when its workers run.
 
 ## Pin an agent
@@ -74,7 +82,9 @@ result, and a failure returns nonzero.
 These safety checks require the local daemon records under the selected
 Paseo home. Missing/inconsistent records or an unsupported remote daemon target
 block planning. The planner reads only activity, labels and display metadata;
-it does not print persistence data or credentials.
+it does not print persistence data or credentials. A genuinely missing child
+in the complete CLI listing still blocks its parent. Closed children are
+normal cascade members: recent or pinned closed children still block.
 
 Archive is soft deletion. The inspected CLI has no unarchive command. Check
 the Paseo app for recovery support in the installed version.

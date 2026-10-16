@@ -42,7 +42,10 @@ class ArchiveTests(unittest.TestCase):
 import os,json,sys
 from pathlib import Path
 p=Path(os.environ['TEST_ARCHIVE_DIR'])
-if sys.argv[1]=='ls': print((p/'rows.json').read_text())
+if sys.argv[1]=='ls':
+ rows=json.loads((p/'rows.json').read_text())
+ if '--all' not in sys.argv: rows=[r for r in rows if r.get('status')!='closed']
+ print(json.dumps(rows))
 else:
  with (p/'calls').open('a') as f: f.write(json.dumps(sys.argv[1:])+'\\n')
  print('updated' if sys.argv[1]=='agent' else 'archived',sys.argv[-1])
@@ -58,6 +61,13 @@ else:
               createdAt=self.ago(1000), updatedAt=self.ago(100), lastActivityAt=self.ago(100), archivedAt=None)
         old.update(updates)
         file.write_text(json.dumps(old))
+
+    def status(self, ident, value):
+        for agent in self.agents:
+            if agent['id'] == ident:
+                agent['status'] = value
+        (self.tmp / 'rows.json').write_text(json.dumps(self.agents))
+        self.record(ident, lastStatus=value)
 
     def shell(self, command):
         script = '''
@@ -235,7 +245,7 @@ paseo-archive-fz --filter "old test"
     def test_show_hidden_has_reasons_but_cannot_select_hidden_rows(self):
         self.record(IDLE, labels={'keep': 'true'})
         r = self.shell('paseo-archive-fz --force --show-hidden --filter "old test"')
-        self.assertIn('HIDDEN 33333333', r.stdout)
+        self.assertIn('HIDDEN 3333333', r.stdout)
         self.assertIn('REASON: pinned', r.stdout)
         self.assertEqual(self.calls(), [])
         r = self.shell('paseo-archive-all --show-hidden --dry-run')
@@ -256,5 +266,104 @@ paseo-archive-fz --filter "old test"
         self.record(OTHER, lastActivityAt=self.ago(1), labels={'paseo.parent-agent-id': IDLE})
         self.record(RUNNING, labels={'paseo.parent-agent-id': OTHER})
         r = self.shell('paseo-archive-fz --force --show-hidden -n --filter "old test"')
-        self.assertIn('REASON: running subagent 44444444', r.stdout)
+        self.assertIn('REASON: running subagent 4444444', r.stdout)
         self.assertEqual(self.calls(), [])
+
+
+    def test_old_closed_child_offered_and_listed_in_cascade(self):
+        self.status(OTHER, 'closed')
+        self.record(OTHER, labels={'paseo.parent-agent-id': IDLE})
+        r = self.shell('paseo-archive-all --dry-run')
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertIn('old test', r.stdout)
+        self.assertIn('archives 1 subagents with it: 5555555 other dir [closed]', r.stdout)
+        self.assertIn('closed', r.stdout)
+        self.assertEqual(self.calls(), [])
+
+    def test_recent_closed_child_blocks_parent(self):
+        self.status(OTHER, 'closed')
+        self.record(OTHER, lastActivityAt=self.ago(1), labels={'paseo.parent-agent-id': IDLE})
+        r = self.shell('paseo-archive-all --dry-run --show-hidden')
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertIn('REASON: recent subagent 5555555', r.stdout)
+        self.assertIn('parents of recent subagents', r.stdout)
+        self.assertNotIn('\told test\t', r.stdout)
+
+    def test_pinned_closed_child_blocks_force(self):
+        self.status(OTHER, 'closed')
+        self.record(OTHER, labels={'paseo.parent-agent-id': IDLE, 'keep': 'true'})
+        r = self.shell('paseo-archive-fz --force --dry-run --show-hidden --filter "old test"')
+        self.assertIn('REASON: pinned subagent 5555555', r.stdout)
+        self.assertIn('parents of pinned subagents', r.stdout)
+        self.assertEqual(self.calls(), [])
+
+    def test_terminal_top_level_statuses_are_offered(self):
+        for value in ['closed', 'error', 'errored', 'failed', 'stopped']:
+            with self.subTest(status=value):
+                self.status(OTHER, value)
+                r = self.shell('paseo-archive-all --dry-run')
+                self.assertEqual(r.returncode, 0, r.stderr)
+                self.assertIn('other dir', r.stdout)
+                self.assertIn('\t' + value + '\t', r.stdout)
+        self.assertEqual(self.calls(), [])
+
+    def test_all_listing_archived_records_are_excluded(self):
+        self.status(OTHER, 'closed')
+        self.record(OTHER, archivedAt=self.ago(1), labels={'paseo.parent-agent-id': IDLE})
+        r = self.shell('paseo-archive-all --dry-run --show-hidden')
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertNotIn('other dir', r.stdout)
+        self.assertIn('old test', r.stdout)
+        self.assertNotIn('archives 1', r.stdout)
+
+    def test_readable_subagent_reasons_and_footer_categories(self):
+        scenarios = [
+            ('missing', 'not in live listing', 'parents of subagents not in live listing'),
+            ('status', 'has unknown status', 'parents of subagents with unknown status'),
+            ('scope', 'outside this directory', 'parents of subagents outside this directory'),
+            ('activity', 'has unknown activity', 'parents of subagents with unknown activity'),
+        ]
+        baseline = list(self.agents)
+        for condition, reason, category in scenarios:
+            with self.subTest(condition=condition):
+                self.agents = [dict(a, status=('running' if a['id']==RUNNING else 'idle')) for a in baseline]
+                self.record(OTHER, lastActivityAt=self.ago(100), updatedAt=self.ago(100), createdAt=self.ago(1000),
+                            labels={'paseo.parent-agent-id': IDLE}, cwd='/elsewhere')
+                flags = '--local-dir' if condition == 'scope' else ''
+                if condition == 'missing': self.agents = [a for a in self.agents if a['id'] != OTHER]
+                if condition == 'status':
+                    for a in self.agents:
+                        if a['id'] == OTHER: a['status']='unrecognized'
+                if condition == 'activity': self.record(OTHER, lastActivityAt=None, updatedAt=None, createdAt=None)
+                (self.tmp / 'rows.json').write_text(json.dumps(self.agents))
+                r = self.shell('paseo-archive-all --dry-run --show-hidden ' + flags)
+                self.assertEqual(r.returncode, 0, r.stderr)
+                self.assertIn('REASON: subagent 5555555 ' + reason, r.stdout)
+                self.assertIn(category, r.stdout)
+                self.assertNotIn('\told test\t', r.stdout)
+        self.assertEqual(self.calls(), [])
+
+    def test_own_unknown_and_cycle_reason_categories(self):
+        self.status(OTHER, 'unrecognized')
+        self.record(IDLE, lastActivityAt=None, updatedAt=None, createdAt=None)
+        r = self.shell('paseo-archive-all --dry-run --show-hidden')
+        self.assertIn('REASON: unknown status', r.stdout)
+        self.assertIn('1 unknown status', r.stdout)
+        self.assertIn('REASON: unknown activity', r.stdout)
+        self.assertIn('1 unknown activity', r.stdout)
+        self.record(IDLE, labels={'paseo.parent-agent-id': OTHER})
+        self.record(OTHER, labels={'paseo.parent-agent-id': IDLE})
+        r = self.shell('paseo-archive-all --dry-run --show-hidden')
+        self.assertIn('REASON: cyclic subagents', r.stdout)
+        self.assertIn('2 cyclic subagents', r.stdout)
+
+    def test_subagent_labels_reuse_cli_short_id(self):
+        for a in self.agents:
+            if a['id']==OTHER: a['shortId']='child77'
+        (self.tmp / 'rows.json').write_text(json.dumps(self.agents))
+        self.record(OTHER, lastActivityAt=self.ago(1), labels={'paseo.parent-agent-id': IDLE})
+        r = self.shell('paseo-archive-all --dry-run --show-hidden')
+        self.assertIn('REASON: recent subagent child77', r.stdout)
+        self.record(OTHER, lastActivityAt=self.ago(100))
+        r = self.shell('paseo-archive-all --dry-run')
+        self.assertIn('child77 other dir [idle]', r.stdout)

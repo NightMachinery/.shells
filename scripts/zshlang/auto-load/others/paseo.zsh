@@ -361,7 +361,8 @@ function h-paseo-archive-rows {
     ensure-cmd paseo python3 @RET
     archive_home="$(h-paseo-home)" @RET
     #: Always collect globally: a child in another directory still cascades.
-    data="$(command paseo ls --global --json)" @RET
+    data="$(command paseo ls --global --all --json)" @RET
+    #: --all includes archived rows; the planner filters stored archivedAt.
     local -a opts=()
     [[ "${force}" == y ]] && opts+=(--force)
     [[ "${show_hidden}" == y ]] && opts+=(--show-hidden)
@@ -399,9 +400,10 @@ function h-paseo-archive {
             -h|--help)
                 print -r -- 'usage: paseo-archive-fz [-l] [-n] [--min-idle DUR|--all-ages] [--show-hidden] [--force] [--filter TEXT]
        paseo-archive-all [-l] [-n] [-y] [--min-idle DUR|--all-ages] [--show-hidden]
-Default: idle agents last active at least 72 hours ago, oldest activity first,
+Default: idle or terminal agents last active at least 72 hours ago, oldest first,
 across every directory. --local-dir (-l) restricts cwd; --global (-g) is default.
 --min-idle accepts 72h, 3d, 90m, or 0; --all-ages is --min-idle 0.
+Terminal statuses: closed, error, errored, failed, stopped; archived rows are excluded.
 LAST ACTIVE uses stored lastActivityAt, then updatedAt, then createdAt.
 Archiving a parent also archives its subagents. Parents with ineligible
 children are hidden. Each row/confirmation lists the affected descendants.
@@ -453,7 +455,7 @@ clears the pin by setting keep=false (the CLI has no label-delete option).'
     if [[ "${kind}" == fz ]] ; then
         ensure-cmd fzf @RET
         local -a fz_args=(--multi --delimiter=$'\t' --with-nth=2..7,9 \
-            --header="ID | STATUS | LAST ACTIVE | PROVIDER | TITLE | CWD | CASCADE; default idle >=72h
+            --header="ID | STATUS | LAST ACTIVE | PROVIDER | TITLE | CWD | CASCADE; default inactive >=72h
 ${summary}" \
             --preview 'printf "%s\n" {9}' --preview-window=down:4:wrap)
         [[ "${filter_p}" == y ]] && fz_args+=(--filter "${filter}")
@@ -540,7 +542,7 @@ Pick agents to soft-delete. See --help for running-agent protection and recovery
 
 function paseo-archive-all {
     : "usage: paseo-archive-all [-l] [-n] [-y] [--min-idle DUR|--all-ages] [--show-hidden]
-Soft-delete idle agents in every directory (-l: only the current one),
+Soft-delete inactive agents in every directory (-l: only the current one),
 protecting the caller and all its ancestors."
     h-paseo-archive all "$@"
 }
