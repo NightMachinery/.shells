@@ -42,8 +42,21 @@ function fzf-gateway { command fzf "$@" }
         f = self.tmp / 'calls'
         return [json.loads(s) for s in f.read_text().splitlines()] if f.exists() else []
 
-    def test_all_dry_scope_protection_and_running(self):
+    def test_default_scope_is_global(self):
         r = self.shell('paseo-archive-all --dry-run')
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertIn('idle test', r.stdout)
+        self.assertIn('other dir', r.stdout)
+        self.assertEqual(self.calls(), [])
+
+    def test_local_dir_empty_message(self):
+        (self.tmp / 'empty').mkdir()
+        r = self.shell('cd empty && paseo-archive-all -l --dry-run')
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertIn('drop --local-dir', r.stdout)
+
+    def test_all_dry_scope_protection_and_running(self):
+        r = self.shell('paseo-archive-all --dry-run --local-dir')
         self.assertEqual(r.returncode, 0, r.stderr)
         self.assertIn('idle test', r.stdout)
         for label in ['caller', 'parent', 'busy', 'other dir']:

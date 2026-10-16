@@ -13,9 +13,10 @@ statuses are eligible; running and unknown states are skipped. The caller
 (`PASEO_AGENT_ID`) and its parent, discovered from local Paseo parent labels or
 `PASEO_PARENT_AGENT_ID`, are always excluded when known.
 
-Both commands default to the current directory, with explicit cwd filtering
-to avoid agent-context listings accidentally including other directories.
-`--global` (`-g`) includes every directory. `--dry-run` (`-n`) works in both
+Both commands default to agents in every directory. `--local-dir` (`-l`)
+limits them to agents started in the current directory, with explicit cwd
+filtering so an agent-context listing cannot include other directories.
+`--global` (`-g`) is still accepted and is the default. `--dry-run` (`-n`) works in both
 commands. `paseo-archive-fz --filter TEXT` uses fzf's non-interactive selection;
 combine it with `--dry-run` when exploring real agents. Full UUIDs are retained
 as selection keys even though the picker displays short IDs.

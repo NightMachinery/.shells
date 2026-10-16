@@ -387,12 +387,13 @@ function h-paseo-archive-rows {
 function h-paseo-archive {
     emulate -L zsh
     local kind="${1}" ; shift
-    local scope=local dry=n yes=n force=n filter='' filter_p=n
+    local scope=global dry=n yes=n force=n filter='' filter_p=n
     local row rows selected id failed=0 answer
     local -a fields
     local -A allowed
     while (( $# )) ; do
         case "${1}" in
+            -l|--local-dir) scope=local ;;
             -g|--global) scope=global ;;
             -n|--dry-run) dry=y ;;
             -y|--yes) yes=y ;;
@@ -403,9 +404,11 @@ function h-paseo-archive {
                 (( $# >= 2 )) || { ecerr "$0: --filter needs text"; return 64; }
                 filter="${2}" filter_p=y ; shift ;;
             -h|--help)
-                print -r -- 'usage: paseo-archive-fz [-g|--global] [-n|--dry-run] [--force] [--filter TEXT]
-       paseo-archive-all [-g|--global] [-n|--dry-run] [-y|--yes]
-Scope defaults to the current directory. The picker marks running agents;
+                print -r -- 'usage: paseo-archive-fz [-l|--local-dir] [-n|--dry-run] [--force] [--filter TEXT]
+       paseo-archive-all [-l|--local-dir] [-n|--dry-run] [-y|--yes]
+Scope defaults to agents in every directory; --local-dir (-l) limits it to
+agents started in the current directory (-g, --global is accepted and is
+the default). The picker marks running agents;
 --force explicitly permits interrupting selected running agents. The caller
 and its known parent are protected. Archive-all skips running/unknown states
 and requires confirmation on a terminal, or --yes when stdin is not a terminal.
@@ -421,7 +424,11 @@ an interactive picker, useful with --dry-run or in a disposable test scope.'
     ensure-cmd paseo jq @RET
     rows="$(h-paseo-archive-rows "${scope}" "${kind}")" @RET
     if [[ -z "${rows}" ]] ; then
-        print -r -- 'No eligible agents in scope.'
+        if [[ "${scope}" == local ]] ; then
+            print -r -- 'No eligible agents in this directory; drop --local-dir to see every directory.'
+        else
+            print -r -- 'No eligible agents.'
+        fi
         return 0
     fi
     for row in "${(@f)rows}" ; do
@@ -478,13 +485,14 @@ an interactive picker, useful with --dry-run or in a disposable test scope.'
 }
 
 function paseo-archive-fz {
-    : "usage: paseo-archive-fz [-g] [-n] [--force] [--filter TEXT]
+    : "usage: paseo-archive-fz [-l] [-n] [--force] [--filter TEXT]
 Pick agents to soft-delete. See --help for running-agent protection and recovery."
     h-paseo-archive fz "$@"
 }
 
 function paseo-archive-all {
-    : "usage: paseo-archive-all [-g] [-n] [-y]
-Soft-delete idle agents in scope, protecting the caller and its known parent."
+    : "usage: paseo-archive-all [-l] [-n] [-y]
+Soft-delete idle agents in every directory (-l: only the current one),
+protecting the caller and its known parent."
     h-paseo-archive all "$@"
 }
