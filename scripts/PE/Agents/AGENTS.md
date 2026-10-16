@@ -418,7 +418,7 @@ Inside Paseo (`PASEO_AGENT_ID` is set), pick the Paseo skill by job:
   by sending it `/compact` through Paseo. A long-running agent compacts
   itself with it at a natural endpoint, after writing its critical state to
   disk, and only once its context reaches the floor in `~/.compaction.yaml`
-  (default 100k tokens).
+  (default 128k tokens).
 - `paseo-cache-warmer`: keep a long-lived agent's prompt cache warm with
   keepalive heartbeats while work runs, and decide when that pays; it
   compacts with `paseo-compact` first.
