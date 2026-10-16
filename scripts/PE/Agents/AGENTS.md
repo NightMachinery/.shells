@@ -414,5 +414,8 @@ Inside Paseo (`PASEO_AGENT_ID` is set), pick the Paseo skill by job:
   another Claude model or effort; moving to another one, such as Claude to
   GPT, means handing the task to a new agent.
 - `paseo-plugin`: build or troubleshoot Paseo plugins.
+- `paseo-compact`: compact an agent's context, your own or another agent's,
+  by sending it `/compact` through Paseo; also when that pays and how it
+  relates to keeping the prompt cache warm.
 
 `delegate` still decides worker model, account and backend.
