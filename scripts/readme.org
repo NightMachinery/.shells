@@ -464,11 +464,12 @@ the old loop and process tree. See
 
 * Process memory tree
 
-[agfi:mem-report2] shows macOS physical footprint by owning application or
+[agfi:mem-report2] shows physical footprint by owning application or
 meaningful ancestor, with tmux session labels and Claude/Codex process trees.
 Shells and interpreters are charged to their owner; session totals include MCP
-servers, REPLs and browser children. See
-[[NIGHTDIR:docs/mem-report2.md][accounting, labels and limitations]].
+servers, REPLs and browser children. It runs =ctl-mem report=, the command-line
+side of a separate memory panel's binary (macOS and Linux), which must be on
+=PATH= as =ctl-mem=; the function says how to build it when it is missing.
 
 * Disconnected mosh sessions
 

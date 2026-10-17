@@ -333,16 +333,15 @@ function claude-desktop-restart() {
 function mem-report2 {
     : "usage: mem-report2 [N]
 Physical footprint by application/ancestor, with Claude and Codex session trees."
+    #: The report is `ctl-mem report`: the command-line side of the memory panel's
+    #: binary (the control-pages repository), which ported python/mem_report2.py and
+    #: replaced it. It works on macOS and Linux.
     emulate -L zsh
-    local root="${NIGHTDIR:-${HOME}/scripts}" n="${1:-15}"
+    local n="${1:-15}"
     (( $# <= 1 )) && [[ "${n}" == <-> ]] || { ecerr "$0: expected a nonnegative row limit"; return 64; }
-    ensure-cmd python3 ps top lsof @RET
-    local -A m
-    local line ratio=1
-    for line in ${(f)"$(mem-stats_)"} ; do
-        m[${line%%=*}]=${line#*=}
-    done
-    (( m[PAGES_OCCUPIED_BY_COMPRESSOR] > 0 )) && \
-        ratio=$(( 1.0 * m[PAGES_STORED_IN_COMPRESSOR] / m[PAGES_OCCUPIED_BY_COMPRESSOR] ))
-    command python3 "${root}/python/mem_report2.py" "${n}" --ratio "${ratio}"
+    ensure-cmd ctl-mem || {
+        ecerr "$0: build the mem binary of control-pages (make mem) and link it on PATH as ctl-mem"
+        return 127
+    }
+    command ctl-mem report "${n}"
 }
