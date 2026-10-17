@@ -115,12 +115,13 @@ as critically low, which is exactly the bug being avoided. The jq program
 guards every comparison behind `known`, i.e. `.level_percent != null`. Anything
 new that reads this JSON has to do the same.
 
-## Bose does not report charging yet
+## How Bose reports charging
 
-`bosectl` reports `charging` as `unknown`: which byte of the battery reply
-carries it has not been confirmed on a charging set. So
-`bose_battery_charging_skip_p` has nothing to act on yet, and a Bose set that is
-low will warn even while it charges.
+The battery reply itself never changes on the cable. `bosectl` reads a separate
+function that says whether a charging cable is connected, so `charging` is
+`yes` on the cable, `complete` on the cable at 100%, and `no` off it. With
+`bose_battery_charging_skip_p` at its default, a Bose set on the charger does
+not warn.
 
 ## Two triggers, deliberately
 
