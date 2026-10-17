@@ -65,7 +65,8 @@ SUMMARY
 That saves the report, asks this agent to exit, and then shows the report where
 the session was: inside tmux it replaces the pane with it and lets the pane die
 with the text still on screen, and outside tmux it prints it to the terminal
-once the agent is gone. The saved reports are listed by `agent-done-reports`
+once the agent is gone. A Paseo agent is archived instead, and a notification
+names the report. The saved reports are listed by `agent-done-reports`
 and the newest is printed by `agent-done-report-last`, so nothing is lost even
 if the terminal is closed.
 
@@ -73,4 +74,6 @@ To see what it would do without ending anything: `zsh -c 'agent-done
 --dry-run'`, with the summary on stdin the same way.
 
 Expect no reply from that command. It ends the session, so its output has
-nowhere to go — that is success, not a failure to investigate.
+nowhere to go — that is success, not a failure to investigate. If it does reply
+with a refusal, it has ended nothing: tell the user its reason and where the
+report was saved.
