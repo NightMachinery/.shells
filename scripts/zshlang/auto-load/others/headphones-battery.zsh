@@ -69,7 +69,7 @@ charging_skip_p, alert_color."
 def abbr: {"left":"L","right":"R","case":"case"}[.part] // .part;
 def threshold: if .part == "case" then $case_min else $part_min end;
 def charging_now: .charging == "yes" or .charging == "complete";
-def mark: if .charging == "yes" then "+" elif .charging == "complete" then "=" else "" end;
+def mark: if .charging == "yes" then " ⚡" elif .charging == "complete" then " ✓" else "" end;
 def known: .level_percent != null;
 def low: known
     and (($skip_charging == "y" and charging_now) | not)

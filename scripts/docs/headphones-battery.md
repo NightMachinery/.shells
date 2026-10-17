@@ -86,9 +86,10 @@ One line with every part on it, the low ones in bold and the rest dimmed:
     🎧 Bose battery  12%
 
 It only appears when something is actually low; the parts that are fine are
-there for context, not as a reason to interrupt you. In the levels, `+` means
-charging and `=` means charged. Headphones with a single battery (Bose, a Sony
-WH- model) show just the level, since the line already names them.
+there for context, not as a reason to interrupt you. After a level, `⚡` means
+charging and `✓` means charged, as in `case 40% ⚡`. Headphones with a single
+battery (Bose, a Sony WH- model) show just the level, since the line already
+names them.
 
 The emphasis uses `hs-alert-v2`'s `md` markup mode; see
 `hammerspoon/alert/markup.lua`. The jq program emits `**bold**` around the
