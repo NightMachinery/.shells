@@ -100,4 +100,15 @@ def render($lone): if low then "**\(show($lone))**" else "[\(show($lone))]{dim}"
         ecgray "$0: hs-alert failed; is Hammerspoon responsive?"
 }
 @opts-setprefix h-headphones-battery-alert-low headphones_battery
+
+function headphones-battery-alert-low {
+    : "every brand's low-battery check, for a single cron entry"
+    #: One after the other: headphones that are off answer in milliseconds,
+    #: and each brand alerts under its own id, so neither hides the other.
+    #: A brand that fails must not skip the next, hence no early return.
+    local ret=0
+    sony-battery-alert-low || ret=$?
+    bose-battery-alert-low || ret=$?
+    return $ret
+}
 ##

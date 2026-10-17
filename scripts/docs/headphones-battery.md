@@ -38,12 +38,18 @@ This split works because both tools print the same battery JSON:
     sony-battery-alert-low          # alert iff something is low; else silent
     bose-battery
     bose-battery-alert-low
+    headphones-battery-alert-low    # both -alert-low checks, one after the other
 
-The `-alert-low` commands are the ones to schedule. They say nothing when the
-headphones are fine, unreachable, or off, so they are safe to run unattended:
+The `-alert-low` commands say nothing when the headphones are fine,
+unreachable, or off, so they are safe to run unattended. Schedule
+`headphones-battery-alert-low`, which runs every brand's check, so one cron
+entry covers them all:
 
-    30 * * * * $HOME/scripts/zshlang/wrappers/brishz/brishz.dash sony-battery-alert-low
-    40 * * * * $HOME/scripts/zshlang/wrappers/brishz/brishz.dash bose-battery-alert-low
+    30 * * * * $HOME/scripts/zshlang/wrappers/brishz/brishz.dash headphones-battery-alert-low
+
+A new brand is a line in that function, not a new cron entry. The checks run
+one after the other; each is milliseconds when its headphones are off, and at
+most 30 s when a control channel is wedged.
 
 ## Knobs
 
