@@ -195,6 +195,7 @@ id, status, provider, title, cwd; \`-' where unknown. --json prints objects."
               status: (.lastStatus // "-"), provider: (.provider // "-"),
               title: (.title // "-"), cwd: (.cwd // "-"),
               parentAgentId: (.labels["paseo.parent-agent-id"] // null),
+              keep: ((.labels.keep // "") | tostring | ascii_downcase == "true"),
               lastActivityAt: (.lastActivityAt // null),
               lastUserMessageAt: (.lastUserMessageAt // null) } ]'
 

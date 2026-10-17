@@ -373,9 +373,9 @@ function h-agent-done-report {
     #: then the agent's own summary. Written as one file so the thing that
     #: displays it can be a plain `cat' -- the process doing the displaying
     #: has to be able to start in a pane whose shell is already dead.
-    #: Usage: h-agent-done-report <agent> <id> <name> <transcript> <cwd> <seat> <report-path>
+    #: Usage: h-agent-done-report <agent> <id> <name> <transcript> <cwd> <seat> <report-path> [<paseo-uuid>]
     ##
-    local agent="${1}" id="${2}" name="${3}" transcript="${4}" cwd="${5}" seat="${6}" out="${7}"
+    local agent="${1}" id="${2}" name="${3}" transcript="${4}" cwd="${5}" seat="${6}" out="${7}" paseo="${8:-}"
     assert-args agent out @RET
 
     local glyph label
@@ -390,6 +390,7 @@ function h-agent-done-report {
         #: which account did the work is worth recording.
         test -n "${seat}" && print -r -- "  seat:       ${seat}"
         test -n "${id}" && print -r -- "  id:         ${id}"
+        test -n "${paseo}" && print -r -- "  paseo:      ${paseo}"
         test -n "${transcript}" && print -r -- "  transcript: ${transcript/#${HOME}/~}"
         test -n "${cwd}" && print -r -- "  cwd:        ${cwd/#${HOME}/~}"
         print -r -- "  ended:      $(date '+%Y-%m-%d %H:%M:%S')"
@@ -528,6 +529,90 @@ function h-agent-done-watch {
     return 0
 }
 
+function h-agent-done-announce {
+    #: For a session with no screen of its own to leave the report on -- a
+    #: background Claude Code session, a Paseo agent -- a notification names
+    #: the report instead.
+    #: Usage: h-agent-done-announce <agent> <what> <name> <report>
+    ##
+    local agent="${1}" what="${2}" name="${3}" report="${4}"
+
+    local glyph label
+    glyph="$(h-agent-field "${agent}" glyph 2>/dev/null)" || glyph=''
+    label="$(h-agent-field "${agent}" label 2>/dev/null)" || label="${agent}"
+    notif_group='agent-done' notif "${glyph} ${label} ${what} finished${name:+: ${name}} -- report: ${report/#${HOME}/~}" >/dev/null 2>&1 || true
+}
+
+function h-agent-done-paseo-id {
+    #: The Paseo agent this session *is*, by its uuid; fails when it is none.
+    #: `PASEO_AGENT_ID' alone does not say so: everything a Paseo agent starts
+    #: inherits it, a `claude' it opens in a tmux pane included, and ending the
+    #: agent on that evidence would archive the parent. So the agent's own
+    #: record ([agfi:paseo-ls]) must name this very session as the native one
+    #: it runs.
+    #: Usage: h-agent-done-paseo-id <session-id>
+    ##
+    local id="${1}" uuid="${PASEO_AGENT_ID:-}"
+    test -n "${id}" && test -n "${uuid}" || return 1
+    (( ${+functions[paseo-ls]} )) || return 1
+
+    local rows
+    rows="$(paseo-ls --json 2>/dev/null)" || return 1
+    print -r -- "${rows}" | command jq --exit-status --arg uuid "${uuid}" --arg id "${id}" \
+        'any(.[]; .id == $uuid and .nativeSessionId == $id)' >/dev/null || return 1
+    ec "${uuid}"
+}
+
+function h-agent-done-paseo-blocker {
+    #: Why archiving this Paseo agent would do more than end it, or nothing.
+    #: An archive cascades to the agent's subagents, so one still running would
+    #: be interrupted along with it; and a pinned agent ([agfi:paseo-keep]) is
+    #: one the archive helpers never touch, so this does not either.
+    #: Usage: h-agent-done-paseo-blocker <uuid>
+    ##
+    local uuid="${1}"
+    assert-args uuid @RET
+
+    local rows
+    rows="$(paseo-ls --json)" @RET
+    #: `seen' guards the walk down the parent links against a cycle.
+    print -r -- "${rows}" | command jq --raw-output --arg uuid "${uuid}" '
+        . as $all
+        | def below($ids; $seen):
+            [ $all[] | select((.parentAgentId // "") | IN($ids[]))
+                     | select(.id | IN($seen[]) | not) ] as $kids
+            | if $kids == [] then []
+              else $kids + below($kids | map(.id); $seen + ($kids | map(.id))) end;
+        (map(select(.id == $uuid)) | first) as $me
+        | (below([$uuid]; [$uuid]) | map(select(.status == "running")) | length) as $busy
+        | if ($me.keep // false) then
+            "it is pinned (paseo-keep); paseo-unkeep it first, or archive it by hand"
+          elif $busy > 0 then
+            "\($busy) of its subagents \(if $busy == 1 then "is" else "are" end) still running, and archiving it would interrupt them"
+          else empty end'
+}
+
+function h-agent-done-paseo-archive {
+    #: Archives a finished Paseo agent: Paseo's own way of ending one, which
+    #: interrupts its turn and takes it off the active list, keeping its
+    #: history. Run detached by [agfi:agent-done], because the turn it
+    #: interrupts is the one running agent-done, and that takes the calling
+    #: shell with it. Its output has nowhere to go but a log beside the report,
+    #: and a failure is announced, since nothing else would say so.
+    #: Usage: h-agent-done-paseo-archive <uuid> <report>
+    ##
+    local uuid="${1}" report="${2}"
+    assert-args uuid report @RET
+
+    local log="${report}.archive.log" home
+    if home="$(h-paseo-home 2>>"${log}")" &&
+        command paseo archive --force --home "${home}" "${uuid}" >>"${log}" 2>&1 ; then
+        return 0
+    fi
+    notif_group='agent-done' notif "agent-done: could not archive Paseo agent ${uuid[1,8]}; see ${log/#${HOME}/~}" >/dev/null 2>&1 || true
+    return 1
+}
+
 function agent-done {
     : "ends this agent session, leaving an executive summary on screen
 
@@ -535,7 +620,8 @@ Reads the summary from stdin, from --summary-file, or from its arguments, and
 saves it under \$(h-agent-done-dir) with the session's name, id and transcript.
 Then it asks the agent to exit and shows the report: inside tmux by replacing
 this pane with it and letting the pane die with the text still on it, outside
-tmux by printing it to the terminal once the agent is gone.
+tmux by printing it to the terminal once the agent is gone. A Paseo agent is
+archived instead, and a notification names the report.
 
 Meant to be called by the shared /done skill, which is what decides that the
 work is actually finished. --dry-run writes the report and kills nothing."
@@ -588,6 +674,14 @@ work is actually finished. --dry-run writes the report and kills nothing."
     local pid=''
     pid="$(h-agent-done-pid "${agent}" 2>/dev/null)" || pid=''
 
+    #: A Paseo agent runs under the Paseo daemon, which owns no pane: the
+    #: `TMUX' this shell inherited is wherever the daemon was started, so the
+    #: pane checks below would only, rightly, refuse. Paseo ends one by
+    #: archiving it, and its app keeps the conversation readable, so there is
+    #: no screen to put back either. See "Paseo agents" in =docs/agent-done.md=.
+    local paseo_uuid=''
+    paseo_uuid="$(h-agent-done-paseo-id "${id}")" || paseo_uuid=''
+
     #: A background Claude Code session (`claude --bg', or one backgrounded
     #: from the agent view) runs under the daemon's pty host: no pane, no tty,
     #: and a pid that belongs to the daemon's bookkeeping. It is ended with
@@ -606,7 +700,7 @@ work is actually finished. --dry-run writes the report and kills nothing."
 
     local pane='' socket='' tty="${agent_done_tty}" cwd="${agent_done_cwd}"
     local -i pane_status=0
-    if test -z "${bg_short}" ; then
+    if test -z "${bg_short}" && test -z "${paseo_uuid}" ; then
         pane="$(h-tmux-pane-of-pid "${pid}")" || pane_status=$?
         (( pane_status <= 1 )) || pane_status=2
     fi
@@ -665,30 +759,45 @@ work is actually finished. --dry-run writes the report and kills nothing."
     report="${dir}/$(date '+%Y-%m-%dT%H%M%S')-${agent}${id:+-${id}}.txt"
     script="${report}.pane.sh"
 
-    h-agent-done-report "${agent}" "${id}" "${name}" "${transcript}" "${cwd}" "${seat}" "${report}" @RET
-    h-agent-done-pane-script "${report}" "${transcript}" "${cwd}" "${script}" @RET
+    h-agent-done-report "${agent}" "${id}" "${name}" "${transcript}" "${cwd}" "${seat}" "${report}" "${paseo_uuid}" @RET
+    #: A Paseo agent leaves no pane behind to respawn; Paseo resumes it.
+    if test -z "${paseo_uuid}" ; then
+        h-agent-done-pane-script "${report}" "${transcript}" "${cwd}" "${script}" @RET
+    fi
 
     if (( pane_status == 2 )) ; then
         ecerr "$0: cannot safely determine pane ownership; nothing ended; report: ${report}"
         return 2
     fi
 
+    if test -n "${paseo_uuid}" ; then
+        local paseo_block
+        paseo_block="$(h-agent-done-paseo-blocker "${paseo_uuid}")" ||
+            paseo_block="its Paseo records could not be read"
+        if test -n "${paseo_block}" ; then
+            ecerr "$0: not archiving Paseo agent ${paseo_uuid}: ${paseo_block}; nothing ended; report: ${report}"
+            return 2
+        fi
+    fi
+
     if bool "${dry_p}" ; then
         ec "would end: ${agent}${name:+ (${name})}${id:+ ${id}}"
         if test -n "${bg_short}" ; then
             ec "would stop the background session ${bg_short} with \`claude stop' and notify; report: ${report}"
+        elif test -n "${paseo_uuid}" ; then
+            ec "would archive the Paseo agent ${paseo_uuid} with \`paseo archive --force' and notify; report: ${report}"
         else
             ec "would kill: pid=${pid:-<unknown>} pane=${pane:-<none>} tty=${tty:-<none>} socket=${socket:-<none>}"
         fi
         ec "would forget this session's /auto-continue registration, if it has one"
         ec "report: ${report}"
-        ec "pane script (prefix-r resumes): ${script}"
+        test -n "${paseo_uuid}" || ec "pane script (prefix-r resumes): ${script}"
         return 0
     fi
 
     #: Resolving transcripts/writing a report takes time. Recheck ownership
     #: before unregistering or scheduling any destructive action.
-    if test -z "${bg_short}" ; then
+    if test -z "${bg_short}" && test -z "${paseo_uuid}" ; then
         local current_pane='' current_status=0
         current_pane="$(h-tmux-pane-of-pid "${pid}")" || current_status=$?
         if (( current_status != pane_status )) || [[ "${current_pane}" != "${pane}" ]] ; then
@@ -701,9 +810,11 @@ work is actually finished. --dry-run writes the report and kills nothing."
     #: the next reset because it once asked to be ([agfi:agent-auto-continue-off]).
     #: Guarded, since that file is independent of this one; and quiet when
     #: there was nothing to forget.
+    #: It dispatches to Paseo's registry on `PASEO_AGENT_ID', so that is the
+    #: verified agent or nothing: an inherited one is a parent's.
     if (( ${+functions[agent-auto-continue-off]} )) ; then
         local forgot
-        forgot="$(agent-auto-continue-off 2>/dev/null)" || forgot=''
+        forgot="$(PASEO_AGENT_ID="${paseo_uuid}" agent-auto-continue-off 2>/dev/null)" || forgot=''
         if [[ "${forgot}" == 'auto-continue off'* ]] ; then
             ecgray "$0: ${forgot}"
         fi
@@ -711,13 +822,18 @@ work is actually finished. --dry-run writes the report and kills nothing."
 
     if test -n "${bg_short}" ; then
         #: Announced first, then stopped: the stop takes this shell with it.
-        local glyph label
-        glyph="$(h-agent-field "${agent}" glyph 2>/dev/null)" || glyph=''
-        label="$(h-agent-field "${agent}" label 2>/dev/null)" || label="${agent}"
-        notif_group='agent-done' notif "${glyph} ${label} background session finished${name:+: ${name}} -- report: ${report/#${HOME}/~}" >/dev/null 2>&1 || true
-
+        h-agent-done-announce "${agent}" 'background session' "${name}" "${report}"
         ec "ending background ${agent}${name:+ (${name})} ${bg_short}; report: ${report}"
         h-claude-code-bg-home-run "${bg_home}" stop "${bg_short}" >/dev/null 2>&1 || true
+        return 0
+    fi
+
+    if test -n "${paseo_uuid}" ; then
+        h-agent-done-announce "${agent}" 'Paseo agent' "${name}" "${report}"
+        ec "archiving Paseo agent ${paseo_uuid}${name:+ (${name})}; report: ${report}"
+        #: Detached, like the watcher below: the archive interrupts the turn
+        #: that is running this, and this shell goes with it.
+        awaysh-sure h-agent-done-paseo-archive "${paseo_uuid}" "${report}"
         return 0
     fi
 

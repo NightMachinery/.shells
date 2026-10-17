@@ -252,4 +252,93 @@ agent-done ownership-changed </dev/null >/dev/null 2>&1 || actual_status=$?
 [[ ! -s "${agent_done_detection_calls}" ]] ||
     agent-done-detection-fail 'changed ownership must refuse before unregister or kill'
 
-print -r -- 'ok: agent-done tmux ownership detection'
+# Paseo agents. The agent runs under the Paseo daemon, which owns no pane,
+# while the shell still inherits a TMUX from wherever the daemon was started:
+# exactly the case the pane checks refuse.
+function agent-done-detection-paseo-fixture {
+    print -r -- '900|800|claude' >| "${agent_done_detection_ps}"
+    print -r -- '800|700|/bin/sh' >> "${agent_done_detection_ps}"
+    print -r -- '700|600|Paseo Daemon' >> "${agent_done_detection_ps}"
+    print -r -- '600|1|Paseo Supervisor' >> "${agent_done_detection_ps}"
+    : >| "${agent_done_detection_panes}"
+    command rm -f -- "${agent_done_detection_panes}.fail"
+    : >| "${agent_done_detection_calls}"
+}
+
+typeset -g agent_done_paseo_uuid='a6f45502-d3ea-489b-b88b-194fa5b89c6b'
+typeset -g agent_done_paseo_session='sess-own'
+typeset -g agent_done_paseo_rows=''
+function agent-done-detection-paseo-rows {
+    #: Usage: agent-done-detection-paseo-rows <native session> <keep> [<extra rows json>]
+    agent_done_paseo_rows="[{\"id\":\"${agent_done_paseo_uuid}\",\"nativeSessionId\":\"${1}\",\"status\":\"running\",\"keep\":${2},\"parentAgentId\":null}${3:+,${3}}]"
+}
+function paseo-ls { print -r -- "${agent_done_paseo_rows}"; }
+function h-agent-done-id { print -r -- "${agent_done_paseo_session}"; }
+function h-agent-done-report { command touch -- "${7}"; }
+function h-agent-done-announce { print -r -- "announce ${2}" >> "${agent_done_detection_calls}"; }
+function awaysh-sure { print -r -- "awaysh-sure ${1} ${2}" >> "${agent_done_detection_calls}"; }
+function agent-auto-continue-off { print -r -- "auto-continue [${PASEO_AGENT_ID:-}]" >> "${agent_done_detection_calls}"; }
+typeset -gx PASEO_AGENT_ID="${agent_done_paseo_uuid}" TMUX='/tmp/custom,1,0' TMUX_PANE=''
+
+agent-done-detection-paseo-fixture
+agent-done-detection-paseo-rows "${agent_done_paseo_session}" false
+actual_status=0
+output="$(agent-done --dry-run finished </dev/null 2>&1)" || actual_status=$?
+(( actual_status == 0 )) && [[ "${output}" == *"would archive the Paseo agent ${agent_done_paseo_uuid}"* ]] ||
+    agent-done-detection-fail "a Paseo agent should be archived, not refused for its inherited TMUX (status ${actual_status}): ${output}"
+[[ ! -s "${agent_done_detection_calls}" ]] ||
+    agent-done-detection-fail 'Paseo dry-run must not announce, archive or unregister'
+
+actual_status=0
+agent-done finished </dev/null >/dev/null 2>&1 || actual_status=$?
+(( actual_status == 0 )) || agent-done-detection-fail "Paseo archive should succeed, got ${actual_status}"
+[[ "$(<"${agent_done_detection_calls}")" == "auto-continue [${agent_done_paseo_uuid}]"$'\n''announce Paseo agent'$'\n'"awaysh-sure h-agent-done-paseo-archive ${agent_done_paseo_uuid}" ]] ||
+    agent-done-detection-fail "Paseo archive calls: $(<"${agent_done_detection_calls}")"
+
+# Archiving cascades to subagents, and pinned agents are never archived.
+function agent-done-detection-paseo-refuses {
+    local description="${1}" keep="${2}" extra="${3:-}"
+    agent-done-detection-paseo-fixture
+    agent-done-detection-paseo-rows "${agent_done_paseo_session}" "${keep}" "${extra}"
+    actual_status=0
+    agent-done refused </dev/null >/dev/null 2>&1 || actual_status=$?
+    (( actual_status == 2 )) || agent-done-detection-fail "${description}: expected status 2, got ${actual_status}"
+    [[ ! -s "${agent_done_detection_calls}" ]] ||
+        agent-done-detection-fail "${description}: must refuse before announce, archive or unregister"
+}
+agent-done-detection-paseo-refuses 'pinned agent' true
+agent-done-detection-paseo-refuses 'running subagent' false \
+    "{\"id\":\"child\",\"parentAgentId\":\"${agent_done_paseo_uuid}\",\"status\":\"running\"}"
+agent-done-detection-paseo-refuses 'running grandchild under an idle subagent' false \
+    "{\"id\":\"child\",\"parentAgentId\":\"${agent_done_paseo_uuid}\",\"status\":\"idle\"},{\"id\":\"grandchild\",\"parentAgentId\":\"child\",\"status\":\"running\"}"
+
+agent-done-detection-paseo-fixture
+agent-done-detection-paseo-rows "${agent_done_paseo_session}" false \
+    "{\"id\":\"child\",\"parentAgentId\":\"${agent_done_paseo_uuid}\",\"status\":\"idle\"}"
+actual_status=0
+agent-done --dry-run idle-child </dev/null >/dev/null 2>&1 || actual_status=$?
+(( actual_status == 0 )) || agent-done-detection-fail "an idle subagent should not block the archive, got ${actual_status}"
+
+# An inherited PASEO_AGENT_ID: the record names another session, so this one
+# is not that agent. It must never archive the parent: in the daemon's
+# ancestry it is refused like any pane-less tmux context...
+agent-done-detection-paseo-fixture
+agent-done-detection-paseo-rows sess-parent false
+actual_status=0
+agent-done inherited </dev/null >/dev/null 2>&1 || actual_status=$?
+(( actual_status == 2 )) || agent-done-detection-fail "an inherited Paseo id should fall back to the pane checks, got ${actual_status}"
+[[ ! -s "${agent_done_detection_calls}" ]] ||
+    agent-done-detection-fail "an inherited Paseo id must not archive: $(<"${agent_done_detection_calls}")"
+
+# ...and in a tmux pane it takes the tmux path, with the parent's id kept away
+# from auto-continue, which would otherwise unregister the parent.
+agent-done-detection-fixture
+: >| "${agent_done_detection_calls}"
+typeset -gx TMUX='' TMUX_PANE=''
+actual_status=0
+agent-done inherited-in-tmux </dev/null >/dev/null 2>&1 || actual_status=$?
+[[ "$(<"${agent_done_detection_calls}")" == 'auto-continue []' ]] ||
+    agent-done-detection-fail "an inherited Paseo id must not reach auto-continue: $(<"${agent_done_detection_calls}")"
+typeset -gx PASEO_AGENT_ID=''
+
+print -r -- 'ok: agent-done tmux ownership detection, and Paseo agents'

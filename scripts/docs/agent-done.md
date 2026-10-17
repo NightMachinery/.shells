@@ -233,6 +233,41 @@ conversation attachable and resumable) instead of a signal, and announces the
 report file with a notification; `agent-done-reports` lists it as usual. See
 "Background sessions" in `agent-sessions.md`.
 
+### Paseo agents
+
+A session that Paseo runs belongs to the Paseo daemon, not to a pane: the
+agent is a headless child of `Paseo Daemon`, while its tool shell still
+inherits `TMUX` and `TMUX_PANE` from wherever the daemon happened to be
+started. The pane checks above therefore found a tmux context with no pane
+owning the agent and refused, correctly, which is how `/done` used to fail
+under Paseo.
+
+Paseo's own way of ending an agent is to archive it: `paseo archive --force`
+interrupts its turn and takes it off the active list, keeping its history. Its
+app keeps the conversation readable, so there is no screen to put the report
+back on. `agent-done` therefore skips the pane logic for a Paseo agent, saves
+the report as always (with a `paseo:` line naming the agent), announces it
+with a notification, as for a background Claude Code session, and archives the
+agent with [agfi:h-agent-done-paseo-archive], detached with
+[agfi:awaysh-sure], because the turn it interrupts is the one running
+`agent-done`. A failed archive is announced too, with its output in
+`<report>.archive.log`. There is no unarchive command in the CLI, but the
+native session is untouched, so the report's transcript resumes as usual.
+
+**Which agent.** `PASEO_AGENT_ID` is not evidence on its own: everything a
+Paseo agent starts inherits it, a `claude` it opens in a tmux pane included,
+and archiving on that evidence would end the parent.
+[agfi:h-agent-done-paseo-id] accepts it only when that agent's record
+([agfi:paseo-ls]) names this very session as the native one it runs. Anything
+else takes the tmux path, and the inherited id is also kept away from
+[agfi:agent-auto-continue-off], which would otherwise unregister the parent.
+
+**When it refuses.** An archive cascades to the agent's subagents, so a
+running one, at any depth, would be interrupted along with it; and a pinned
+agent ([agfi:paseo-keep]) is one the archive helpers never touch. In either
+case [agfi:h-agent-done-paseo-blocker] says why, the report is still saved,
+and `agent-done` returns 2 having ended nothing.
+
 A session ending this way is finished, so `agent-done` also forgets its
 `/auto-continue` registration ([agfi:agent-auto-continue-off]), if it has one:
 a finished session must not be typed into at the next usage-limit reset because
