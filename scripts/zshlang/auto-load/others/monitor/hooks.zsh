@@ -86,6 +86,7 @@ not stop the others from running."
 
     awaysh-fast audio-guard-on-audio-change "$name" "$transport"
     awaysh-fast sony-battery-on-audio-change "$name" "$transport"
+    awaysh-fast bose-battery-on-audio-change "$name" "$transport"
 }
 ##
 function h-hook-audio-input-change {
