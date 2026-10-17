@@ -808,13 +808,12 @@ back, and stage 4 escalates to Telegram if they never do."
     test -z "$msg" && return 0
 
     #: Stage 2. Desktop only; Telegram is stage 4, deliberately later.
-    notif_tlg=n notif_ignore_dnd_p="${notif_ignore_dnd_p:-y}" notif "$msg"
+    notif_tlg=n notif_ignore_dnd_p="${notif_ignore_dnd_p:-n}" notif "$msg"
 
     if bool "${bell_auto_notif_alert:-n}" ; then
         #: Off by default: an [agfi:hs-alert] overlay is drawn outside the notification
-        #: system, so it survives Do Not Disturb -- but `notif_ignore_dnd_p` already
-        #: gets the banner through, which makes the overlay pure duplication. Turn it
-        #: back on with `bell_auto_notif_alert=y` if a banner is ever suppressed.
+        #: system, so it survives Do Not Disturb. Enable only when that bypass is
+        #: explicitly wanted, with `bell_auto_notif_alert=y`.
         #:
         #: Bounded and silenced: a wedged Hammerspoon otherwise blocks here for the
         #: 30s baked into [agfi:hammerspoon] and dumps a stacktrace, which is a silly
@@ -943,6 +942,13 @@ bell_auto_stop_mode: idle | idle+timeout | notif | bell+notif | auto (default)"
             ;;
     esac
 
+    #: Headphones are a playback limit, including explicit repeating modes.
+    #: Continuous engines need their exit/cleanup path and are handled below.
+    if test -z "$exit_cmd[*]" && [[ "$stop_mode" == (idle|idle+timeout) ]] && headphones-p ; then
+        stop_mode='bell+notif'
+        ecgray "$0: headphones limit this bell to one ring."
+    fi
+
     if test -n "$exit_cmd[*]" && [[ "$stop_mode" == (notif|bell+notif) ]] ; then
         #: Those modes do not loop, so an exit command would never run. The sc bells
         #: ([agfi:bell-auto-sc]) rely on it to stop a *continuous* sound, which would
@@ -993,6 +999,13 @@ bell_auto_stop_mode: idle | idle+timeout | notif | bell+notif | auto (default)"
             #: They are clearly not coming back for the sound. Stop making noise and
             #: leave something behind that they will find later.
             ec "$0 stopped ringing after ${max_t}s; falling back to a notification."
+            capped=y
+            break
+        fi
+
+        #: A loop started on speakers must also stop when headphones connect.
+        if test -z "$exit_cmd[*]" && headphones-p ; then
+            ecgray "$0: headphones connected; stopping repeats and notifying."
             capped=y
             break
         fi
@@ -1922,7 +1935,7 @@ not its Stop), hence the fallback. A subagent's bell follows [agfi:agent-bell-su
 
     bell_auto_sleep=10 bell_auto_notif_msg="$msg" bell_auto_notif_group="$group" \
         bell_auto_tlg="$tlg" \
-        notif_ignore_dnd_p=y notif_image="$icon" notif_group="$group" \
+        notif_app=agents notif_ignore_dnd_p="${notif_ignore_dnd_p:-n}" notif_image="$icon" notif_group="$group" \
         awaysh bell-auto "$engine"
 }
 
@@ -1987,7 +2000,7 @@ went out is edited out, the message deleted once no line is left. Payload in \$2
     local group
     group="$(h-bell-agent-group "$app" "$cwd" "$id")"
 
-    silent notif-os-remove "$group" || true
+    notif_app=agents silent notif-os-remove "$group" || true
     silent h-bell-notif-remove "$group" || true
     #: Detached, since it talks to Telegram and the agent's hook must not wait on
     #: the network. Each Telegram call inside is time-bounded.

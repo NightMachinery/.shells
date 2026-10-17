@@ -361,40 +361,53 @@ exists resolves as `main`, and so does a subagent outside tmux with no forwarded
 
 Whether a notification fades on its own is decided by its *style*, not by the
 sender: banners fade, alerts stay until closed. To make the agent notifications
-persistent, set **System Settings → Notifications → terminal-notifier → Alerts**.
+persistent, set **System Settings → Notifications → Agent Bells → Alerts**.
 Combined with the grouping above this yields one persistent, self-updating
 notification per waiting session, each with macOS's own close button — no custom
 overlay needed.
 
-The style applies to everything `terminal-notifier` posts, so casual `notif` calls
-stop fading too; that is the price of the zero-code route. `notif-os-dismiss-all`
+Agent bells use their own signed `~/Applications/Agent Bells.app`, so this style
+applies only to agent bells. Mail and generic `notif` calls keep their own settings.
+`notif-os-dismiss-agent` clears only desktop agent alerts. It does not cancel
+running bells or Telegram escalation. `notif-os-dismiss-all`
 (and the Hyper+D binding that calls it) clears alerts the same as banners.
+
+Headphones limit discrete bells to one ring even with explicit `idle` or
+`idle+timeout` mode. A repeating loop started on speakers rechecks headphones
+before each repeat and switches to notification if they connect. Continuous
+engines with an exit command retain their cleanup loop. Meetings in automatic
+mode remain notification-only.
 
 ## Do Not Disturb
 
-`notif-os` passes `-ignoreDnD` by default (`notif_ignore_dnd_p`). A notification
-raised by our own code is almost always worth seeing, whereas Do Not Disturb is aimed
-at calls and social apps. Set `notif_ignore_dnd_p=n` per call to respect it.
+Agent bells respect Do Not Disturb by default. Set `notif_ignore_dnd_p=y` around
+`bell-claude` or `bell-codex` to explicitly request bypass; `n` is the default for
+these hooks. The shared notification helper retains terminal-notifier 2's legacy
+private DND flag. Bypass is best effort and depends on macOS compatibility;
+it cannot override denied notification permission. Generic `notif-os` callers retain their existing default.
 
-If a banner is ever suppressed anyway, `bell_auto_notif_alert=y` adds a Hammerspoon
-`hs-alert` overlay, which is drawn outside the notification system entirely and so
-cannot be suppressed. It is off by default because `-ignoreDnD` already works here
-and the overlay is then pure duplication.
+`bell_auto_notif_alert=y` explicitly enables a Hammerspoon overlay, drawn outside
+the notification system. It is off by default and bypasses Focus suppression.
 
 Stage 4 sidesteps the whole question, since Telegram does not care about DnD.
 
 ## Icons
 
-macOS takes a notification's icon from the sending bundle and **silently ignores**
-`terminal-notifier -appIcon`. Verified on this machine: `-appIcon` changes nothing,
-and `-sender` hangs indefinitely.
+Agent notifications come from `Agent Bells.app`, with an original purple terminal
+icon, rather than the stock Terminal icon. `notif-app-install agents` builds,
+signs, and registers it; the first agent notification also bootstraps it if absent.
+`notif-app-install agents --check` checks the signature, build inputs, and permission.
+The same builder installs Night Mail with its own envelope icon. See
+[notification-apps.md](notification-apps.md) for the shared build and dependencies.
 
-What does work is `-contentImage`, an image inside the notification body, exposed as
-`notif_image`. `app-icon-get Claude` returns a cached PNG of an app's icon, extracting
-it from the bundle's icns on first use.
+`notif_app=agents` routes both posting and `notif-os-remove` through the agent app.
+Per-session acknowledgement uses that same identity. `notif-os-dismiss-agent`
+removes ALL delivered notifications from Agent Bells only, preserving Night Mail,
+generic terminal-notifier alerts, and every other app. It does not install a
+missing helper or touch Telegram queues. `notif-os-dismiss-all` still clears all apps.
 
-Note that `terminal-notifier` exits 0 for a nonexistent image, so `notif-os` checks
-the path itself rather than trusting the exit code.
+`notif_image` continues to attach the agent's own icon inside the body, using
+`app-icon-get`; the app icon at the side comes from the dedicated bundle.
 
 ## Configuration
 
@@ -421,8 +434,9 @@ Bell behaviour, all `@opts`-settable with the `bell_auto_` prefix:
 
 Notification plumbing:
 
-- `notif_ignore_dnd_p` — bypass Do Not Disturb. Default `y`.
+- `notif_ignore_dnd_p` — bypass Do Not Disturb. Agent-hook default `n`; explicit `y` opts in.
 - `notif_image` — path to an image for the notification body.
+- `notif_app` — notification identity: `agents`, `mail`, or empty for the generic notifier.
 
 ## Where am I?
 

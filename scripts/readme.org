@@ -335,6 +335,13 @@ sound, desktop, or Telegram transport, using their stable =thread_source= metada
 rather than their mutable title. Run =brishz-restart= after updating the hooks;
 queued text stays as captured. See =./docs/bell-auto.md= for lookup, suppression,
 and fallback details.
+Agent bells now use a dedicated =Agent Bells.app=, automatically built on first
+use (or by [agfi:notif-app-install]), with its own icon and notification settings.
+They respect Do Not Disturb by default; =notif_ignore_dnd_p=y= explicitly opts in
+to bypass. [agfi:notif-os-dismiss-agent] clears only agent desktop notifications.
+Headphones limit discrete bells to one ring, including explicit repeating modes
+and headphones connected while a loop is running.
+See [[NIGHTDIR:docs/notification-apps.md][notification app setup]].
 
 * CIS thesis applications
 

@@ -1,3 +1,33 @@
+function notif-app-install {
+    : "builds dedicated macOS notification apps: notif-app-install [agents|mail] [--check]"
+    local profile="${1:-agents}" night_dir="${NIGHTDIR:-${HOME}/scripts}"
+    (( $# )) && shift
+    ensure-cmd python3 @RET
+    command python3 "${night_dir}/macos/notification-apps/build.py" "$profile" "$@"
+}
+
+function h-notif-os-command {
+    #: Both posting and removal must use the same signed app identity.
+    local app="${notif_app:-}" app_file
+    case "$app" in
+        agents) app_file="${HOME}/Applications/Agent Bells.app/Contents/MacOS/terminal-notifier" ;;
+        mail) app_file="${HOME}/Applications/Night Mail.app/Contents/MacOS/terminal-notifier" ;;
+        '') ensure-cmd terminal-notifier @RET; REPLY="${commands[terminal-notifier]}"; return 0 ;;
+        *) ecerr "$0: unknown notif_app: $app"; return 1 ;;
+    esac
+    if [[ ! -x "$app_file" ]] ; then
+        [[ "$1" == --no-install ]] && return 1
+        #: No fallback to the generic app: that would break dismissal isolation.
+        notif-app-install "$app" || return $?
+    fi
+    REPLY="$app_file"
+}
+
+function notif-os-dismiss-agent {
+    : "dismisses desktop agent-bell notifications only; preserves mail and other apps"
+    notif_app=agents notif-os-remove ALL
+}
+
 function notif-os-dismiss-all {
     #: @duplicateCode/b88a767cde3e47cb1bad4b855a8989b8: hyper+d calls the
     #: same notifDismissAll, in hammerspoon/core/notif-dismiss.lua. It is far
@@ -30,10 +60,10 @@ function notif-os-remove {
     fi
 
     if isDarwin ; then
-        ensure-cmd terminal-notifier @RET
-        #: Exits 0 whether or not anything was showing, which is what a "make sure
-        #: it is gone" caller wants.
-        terminal-notifier -remove "$group" >/dev/null
+        local REPLY notifier
+        h-notif-os-command --no-install || return 0
+        notifier="$REPLY"
+        reval-timeout 12 "$notifier" -remove "$group" >/dev/null
     else
         @NA
     fi
@@ -61,7 +91,9 @@ function notif-os {
     if isDarwin ; then
         #: @alt `osascript -e 'display notification "msg" with title "hi"'`
         ##
-        if ((${+commands[terminal-notifier]})) ; then
+        local REPLY notifier
+        if h-notif-os-command ; then
+            notifier="$REPLY"
             local opts=()
             if bool "$ignore_dnd" ; then
                 opts+=(-ignoreDnD)
@@ -83,9 +115,11 @@ function notif-os {
                 fi
             fi
 
-            terminal-notifier -title "$title" -message "$msg" "$opts[@]"
+            #: NSUserDefaults parses option values as plists. A leading backslash
+            #: forces literal text and terminal-notifier strips that backslash.
+            reval-timeout 12 "$notifier" -title "\\${title}" -message "\\${msg}" "$opts[@]"
         else
-            ectrace "terminal-notifier not found"
+            ectrace "notification app is unavailable"
             return 1
         fi
         ##
