@@ -38,6 +38,45 @@ class BootstrapTest(unittest.TestCase):
         source.assert_not_called()
         self.assertEqual(run.call_count, 1)  # Signature verification only.
 
+    def test_aqua_command_reports_child_result_instead_of_open_status(self):
+        for status in (0, 3):
+            def launch(args, **kwargs):
+                self.assertEqual(args[:4], ["/usr/bin/open", "-g", "-n", "-W"])
+                self.assertIn("--authorize", args)
+                self.assertEqual(args[-2], "-status-file")
+                Path(args[-1]).write_text(json.dumps({"exit_status": status, "diagnostic": "fixture result"}))
+            with patch.object(builder, "run", side_effect=launch):
+                self.assertEqual(builder.app_command(builder.app_path("mail"), ["--authorize"]), status)
+
+    def test_missing_or_invalid_aqua_receipt_is_not_success(self):
+        for payload in (None, "invalid", "[]", '{"exit_status":false,"diagnostic":""}'):
+            def launch(args, **kwargs):
+                if payload is not None:
+                    Path(args[-1]).write_text(payload)
+            with patch.object(builder, "run", side_effect=launch):
+                with self.assertRaisesRegex(ValueError, "did not report"):
+                    builder.app_command(builder.app_path("mail"), ["--diagnose"])
+
+    def test_rebuild_refreshes_authorization_without_setup_spam(self):
+        for existing in (False, True):
+            with self.subTest(existing=existing):
+                dest = builder.app_path("mail")
+                if dest.exists():
+                    import shutil
+                    shutil.rmtree(dest)
+                if existing:
+                    self.fake_app(dest)
+                def build(profile, archive, work):
+                    candidate = work / "candidate.app"
+                    self.fake_app(candidate, builder.fingerprint("mail"))
+                    return candidate
+                with patch.object(builder, "run"), patch.object(builder, "source"), \
+                        patch.object(builder, "build", side_effect=build), \
+                        patch.object(builder, "app_command", return_value=0) as command:
+                    builder.install("mail")
+                    self.assertEqual(command.call_args_list[0].args[1], ["--authorize"])
+                    self.assertEqual(command.call_count, 1 if existing else 2)
+
     def test_failed_rebuild_preserves_existing_app(self):
         dest = builder.app_path("mail")
         self.fake_app(dest)

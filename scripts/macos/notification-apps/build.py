@@ -143,10 +143,35 @@ def build(profile, archive, work):
     shutil.copy2(work / "LICENSE.md", resources)
     (resources / "night-build.json").write_text(json.dumps({"fingerprint": fingerprint(profile),
                                                            "source_sha256": SOURCE_SHA256}))
-    run(["/usr/bin/codesign", "--force", "--sign", "-", app])
+    run(["/usr/bin/codesign", "--force", "--sign", "-", "--requirements",
+         f'=designated => identifier "{bundle_id}"', app])
     if not valid_app(app, profile):
         raise ValueError("built notification app failed verification")
     return app
+
+
+
+def app_command(app, args, timeout=12):
+    """Run in Aqua and read the app's result, not open(1)'s launch status."""
+    cache = Path.home() / ".cache/night-notification-apps"
+    cache.mkdir(parents=True, exist_ok=True)
+    with tempfile.TemporaryDirectory(prefix=".command-", dir=cache) as scratch:
+        receipt = Path(scratch) / "result.json"
+        run(["/usr/bin/open", "-g", "-n", "-W", "-a", app,
+             "--args", *args, "-status-file", receipt], timeout=timeout)
+        try:
+            result = json.loads(receipt.read_text())
+            if not isinstance(result, dict):
+                raise ValueError("invalid result")
+            status = result["exit_status"]
+            diagnostic = result["diagnostic"]
+            if type(status) is not int or not 0 <= status <= 255 or not isinstance(diagnostic, str):
+                raise ValueError("invalid result")
+        except (OSError, ValueError, KeyError) as error:
+            raise ValueError("notification app did not report its result in the graphical session") from error
+        if diagnostic:
+            print(diagnostic, file=sys.stderr if status else sys.stdout)
+        return status
 
 
 def install(profile):
@@ -179,12 +204,18 @@ def install(profile):
                     backup.rename(app)
                 raise
         print(f"installed {app}")
-    if first_install:
-        try:
-            run([binary(app), "--authorize"], timeout=50)
-            run([binary(app), "-title", PROFILES[profile][0], "-message", "Notifications are ready."], timeout=10)
-        except (OSError, subprocess.SubprocessError):
+    # Refresh the source identity after a rebuild as well as a first install.
+    # macOS remembers denial and will not prompt again; only the user can change
+    # that in System Settings. LaunchServices avoids detached security sessions.
+    try:
+        status = app_command(app, ["--authorize"], timeout=50)
+        if status == 0 and first_install:
+            status = app_command(app, ["-title", PROFILES[profile][0],
+                                       "-message", "Notifications are ready."])
+        if status:
             print(f"warning: allow notifications for {PROFILES[profile][0]} in System Settings", file=sys.stderr)
+    except (OSError, ValueError, subprocess.SubprocessError):
+        print(f"warning: check notification permission for {PROFILES[profile][0]} in System Settings", file=sys.stderr)
 
 
 def main():
@@ -201,7 +232,7 @@ def main():
                 print(f"{app}: missing, invalid, or needs rebuilding", file=sys.stderr)
                 return 1
             print(f"{app}: signature and build inputs verified")
-            return run([binary(app), "--diagnose"], timeout=10).returncode
+            return app_command(app, ["--diagnose"])
         install(args.profile)
         return 0
     except (OSError, ValueError, subprocess.SubprocessError) as error:

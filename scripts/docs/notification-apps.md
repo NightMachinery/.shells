@@ -14,13 +14,20 @@ The system/Homebrew terminal-notifier installation is untouched.
   operating systems retain their existing behavior.
 - `notif-app-install mail --check` and `notif-app-install agents --check` verify
   the signature and build inputs, and query macOS notification authorization.
+  Checks run through LaunchServices in the Aqua login session and use a result
+  receipt, so a successful `open` launch is not mistaken for permission success.
   Authorization codes: 0 not determined, 1 denied, 2 authorized, 3 provisional,
   4 ephemeral. A nonzero command exit means something needs attention.
 
 The first installation requests notification permission and posts a silent setup
 notification, respecting Do Not Disturb. Allow the relevant app in System
 Settings → Notifications. Agent Bells and Night Mail can use different banner or
-alert styles. Installation cannot approve the macOS permission prompt for you.
+alert styles. Installation cannot approve the macOS permission prompt for you. Apple records
+that decision and does not prompt again on subsequent authorization requests;
+a denied app must be enabled in System Settings. The bootstrapper requests
+permission after a first install or rebuild, refreshes the app's source identity,
+and reports failures without blocking mail sync. It does not change Focus or
+system banner/alert preferences.
 
 Requirements: Python 3.9+, macOS 10.14+, and Apple's Command Line Tools (`clang`,
 `xcrun`), plus the system `curl`, `sips`, `iconutil`, and `codesign` tools. The
@@ -32,7 +39,19 @@ verified against a checked-in SHA-256, and cached under
 records hashes of all build inputs and is reused when current; rerun installation
 after pulling changes to rebuild it. Builds are serialized. Rebuilds happen in a
 staging directory, and compilation/registration failure preserves the previous
-app. An unrelated app at the destination is never replaced.
+app. An unrelated app at the destination is never replaced. Ad-hoc signing uses
+a stable designated bundle identifier requirement, so an ordinary rebuild does
+not change identity to a new executable hash.
+
+Normal delivery, listing, and dismissal use Apple's `UserNotifications` API.
+Successful posting means macOS accepted the request, not that a banner appeared:
+Focus and the user's notification settings still decide presentation. The older
+`NSUserNotification` service can reject requests even when the current API
+reports authorization, producing delivery timeouts. Only explicit DND bypass
+retains that legacy upstream delivery path. Removal handles both APIs within the
+selected app identity. Modern notifications use the group as their request ID,
+so dismissal and replacement address the same alert. Unsupported optional image
+attachments are omitted rather than preventing a text alert.
 
 The nib-free launcher removes the stock Terminal sender override, so macOS uses
 the real bundle's icon and identity. It also removes upstream's logging of
@@ -47,7 +66,8 @@ through `bypass_dnd: true` in its JSON settings. Agent bells accept an explicit
 
 Optional bypass uses terminal-notifier 2's private `_ignoresDoNotDisturb` API.
 Newer terminal-notifier versions ignore the corresponding option, which is why
-this helper pins 2.0.0. This is best effort and depends on macOS compatibility.
+this helper pins 2.0.0. This is best effort and depends on macOS compatibility; a rejected legacy
+connection can also prevent bypass delivery. Such failures remain nonfatal.
 macOS Focus allowlists and notification settings can also affect what is shown.
 
 `notif_app=agents` and `notif_app=mail` select the dedicated identities for
