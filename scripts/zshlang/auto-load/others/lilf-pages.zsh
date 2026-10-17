@@ -12,17 +12,12 @@
 #: deployment repository, `~/code/sites/lilf-pages` (`site.toml`, `access.yaml`, `docs/`).
 ##
 typeset -g lilf_pages_bin="${HOME}/code/skills/html-reports/skills/html-reports/bin"
-typeset -g lilf_pages_deployment="${HOME}/code/sites/lilf-pages"
 ##
 function lilf-pages-build {
     : "usage: lilf-pages-build
 Rebuild the site from the registry. Does not touch the mirror."
 
     assert "${lilf_pages_bin}/build.py" "$@" @RET
-    #: The shared html-reports builder registers pages, not cross-page assets. The
-    #: linroute deployment packages its one shared/ directory after every build so the
-    #: mirror's rsync -L can ship it without duplicating it into each page.
-    assert python3 "${lilf_pages_deployment}/package_linroute.py" @RET
 }
 ##
 function lilf-pages-tunnel-start {
@@ -33,16 +28,10 @@ cloudflared-pages, restarting it whenever it fails."
     #: The tunnel once died with nothing to restart it and no trace of why. `retry' runs it
     #: again 5 s after any non-zero exit and prints the exit code, and the pane's scrollback
     #: keeps what it logged before dying. The one place that starts it: the boot launcher
-    #: and the deployment's deploy.sh both call this.
+    #: calls this, and so does the html-reports push when the tunnel's config changed
+    #: (the deployment names it as `tunnel_restart`).
     local cloudflared="${commands[cloudflared]:-${HOME}/bin/cloudflared}"
     tmuxnewsh2 cloudflared-pages retry_sleep=5 retry "${cloudflared}" tunnel run
-}
-##
-function lilf-pages-package-linroute {
-    : "usage: lilf-pages-package-linroute
-Add linroute's shared browser assets to the already-built tree."
-
-    assert python3 "${lilf_pages_deployment}/package_linroute.py" "$@" @RET
 }
 ##
 function lilf-pages-push {
@@ -64,15 +53,7 @@ Rebuild, then push the whole site, or only the named sections, to the mirror hos
     local opts=()
     bool "${yes_p}" && opts+=(--yes)
     bool "${dry_p}" && opts+=(--dry-run)
-    if bool "${build_p}" ; then
-        #: Build and package here, then tell push.py not to rebuild and remove the
-        #: deployment-local shared-assets symlink before rsync sees it.
-        assert "${lilf_pages_bin}/build.py" @RET
-        assert python3 "${lilf_pages_deployment}/package_linroute.py" @RET
-        opts+=(--no-build)
-    else
-        assert python3 "${lilf_pages_deployment}/package_linroute.py" @RET
-    fi
+    bool "${build_p}" || opts+=(--no-build)
 
     assert "${lilf_pages_bin}/push.py" "${opts[@]}" "$@" @RET
 }
