@@ -27,11 +27,11 @@ printf "%s\\n" "$0" "$@" >> "$TEST_NOTIFY_LOG"' > "$app_file"
         }
     }
     local notif_ignore_dnd_p=n notif_group=agent-session notif_image=''
-    notif_app=agents notif-os '[title]' '$(printf inert)' || exit 1
+    notif_app=agents notif_subtitle='[source]' notif-os '[title]' '$(printf inert)' || exit 1
     local log="$(<"$TEST_NOTIFY_LOG")"
     [[ "$log" == *'Agent Bells.app/Contents/MacOS/terminal-notifier'* ]] || exit 1
     [[ "$log" != *-ignoreDnD* ]] || exit 1
-    [[ "$log" == *'\[title]'* && "$log" == *'\$(printf inert)'* ]] || exit 1
+    [[ "$log" == *'\[title]'* && "$log" == *'\$(printf inert)'* && "$log" == *'\[source]'* ]] || exit 1
     command rm "$TEST_NOTIFY_LOG"
     notif_app=agents notif_ignore_dnd_p=y notif-os title message || exit 1
     [[ "$(<"$TEST_NOTIFY_LOG")" == *-ignoreDnD* ]] || exit 1
@@ -56,7 +56,10 @@ printf "%s\\n" "$0" "$@" >> "$TEST_NOTIFY_LOG"' > "$app_file"
     function h-bell-agent-role { ec main; }
     function oneinstance-setup { ec fixture; }
     function h-bell-claude { return 0; }
-    function notif { print -r -- "${notif_app}:${notif_ignore_dnd_p}" > "$TEST_NOTIFY_LOG"; }
+    function notif {
+        print -r -- "${notif_app}:${notif_ignore_dnd_p}" > "$TEST_NOTIFY_LOG"
+        print -rl -- "$notif_title" "$notif_subtitle" "$notif_body" > "${fixture}/card"
+    }
     local bell_auto_stop_mode=bell+notif bell_auto_tlg=n bell_auto_notif_alert=n
     local bell_auto_exit=() bell_skip_first='' bell_auto_sf=''
     unset notif_ignore_dnd_p
@@ -64,6 +67,10 @@ printf "%s\\n" "$0" "$@" >> "$TEST_NOTIFY_LOG"' > "$app_file"
     check hook-dnd-default "$(<"$TEST_NOTIFY_LOG")" agents:n
     notif_ignore_dnd_p=y bell-claude 'fixture' </dev/null >/dev/null || exit 1
     check hook-dnd-opt-in "$(<"$TEST_NOTIFY_LOG")" agents:y
+    function h-bell-agent-name { ec 'Useful task'; }
+    bell-claude '{"session_id":"card","cwd":"/tmp/project","message":"First line\nSecond line"}' </dev/null >/dev/null || exit 1
+    check hook-card "$(<"${fixture}/card")" $'Useful task\nproject · Claude\nFirst line\nSecond line'
+    function h-bell-agent-name { return 1; }
     function notif-os-remove { print -r -- "${notif_app}:$1" > "$TEST_NOTIFY_LOG"; }
     function h-bell-notif-remove { return 0; }
     function h-bell-tlg-retract { return 0; }

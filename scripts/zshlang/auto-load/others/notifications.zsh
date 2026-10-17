@@ -71,6 +71,7 @@ function notif-os-remove {
 
 function notif-os {
     local title="$1" msg="$2"
+    local subtitle="${notif_subtitle:-}"
     #: On by default: a notification raised by our own code is almost always worth
     #: seeing, whereas Do Not Disturb is aimed at calls and social apps. Override per
     #: call with `notif_ignore_dnd_p=n`.
@@ -95,6 +96,7 @@ function notif-os {
         if h-notif-os-command ; then
             notifier="$REPLY"
             local opts=()
+            test -n "$subtitle" && opts+=(-subtitle "\\${subtitle}")
             if bool "$ignore_dnd" ; then
                 opts+=(-ignoreDnD)
             fi
@@ -138,10 +140,11 @@ function notif-kitty {
 }
 ##
 function notif {
-    local msg="$@" tlg="${notif_tlg}"
+    local msg="$@" tlg="${notif_tlg}" title="${notif_title:-}"
+    local desktop_msg="${notif_body-$msg}"
 
     ec "NOTIF: $msg"
-    notif-os "" "$msg"
+    notif-os "$title" "$desktop_msg"
 
     # fsay "Notification. Notification."
     # fsay "$msg"

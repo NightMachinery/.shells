@@ -154,9 +154,20 @@ agent's default message. Names are collapsed to one line, stripped of control
 characters, and limited to 120 Unicode characters including a final `…` when cut.
 Spaces, punctuation, emoji, and shell metacharacters remain display text.
 
-The enriched message is built once before `bell-auto`, so desktop and Telegram
-use the same text (Telegram retains its existing batch/hostname wrapper). Names
-do not affect sounds, escalation timing, or grouping. Already queued messages
+Desktop cards use the task/session name as title (project name when no title is
+available), `project · agent` as subtitle, and the actual hook message as body.
+Without project/name context the title is `Needs attention`; without an event
+message the body is `Ready for your next instruction.` Body text keeps up to
+three lines and 300 characters, with an ellipsis when truncated. There is no
+constant app-name heading and no repeated tagged prefix in the body.
+
+The complete tagged message is still built once before `bell-auto` for Telegram
+and queue bookkeeping. Telegram retains its batch/hostname wrapper. Desktop
+fields travel separately through `bell_auto_notif_title`,
+`bell_auto_notif_subtitle`, and `bell_auto_notif_body`; the shared `notif` gateway
+accepts `notif_title`, `notif_subtitle`, and `notif_body` overrides. Generic calls
+retain their existing formatting. Names do not affect sounds, escalation timing,
+or grouping. Already queued messages
 retain the text captured when queued. Reload BrishGarden with `brishz-restart`
 after updating the hooks; subsequent events use the new format. No Antigravity
 notification hooks are added.

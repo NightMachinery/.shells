@@ -801,6 +801,8 @@ back, and stage 4 escalates to Telegram if they never do."
     #: A channel used for nothing else. Hosts without one keep the general channel.
     local tlg_dest="${bell_auto_tlg_dest:-${tlg_logger_notif:-${tlg_notifs}}}"
     local msg="${1}"
+    local desktop_title="${bell_auto_notif_title:-}" desktop_subtitle="${bell_auto_notif_subtitle:-}"
+    local desktop_body="${bell_auto_notif_body-$msg}"
 
     #: Notifications are opt-in per call site: without a message there is nothing
     #: worth saying, and this is what keeps `stop_mode=auto` safe for every existing
@@ -808,7 +810,8 @@ back, and stage 4 escalates to Telegram if they never do."
     test -z "$msg" && return 0
 
     #: Stage 2. Desktop only; Telegram is stage 4, deliberately later.
-    notif_tlg=n notif_ignore_dnd_p="${notif_ignore_dnd_p:-n}" notif "$msg"
+    notif_tlg=n notif_title="$desktop_title" notif_subtitle="$desktop_subtitle" notif_body="$desktop_body" \
+        notif_ignore_dnd_p="${notif_ignore_dnd_p:-n}" notif "$msg"
 
     if bool "${bell_auto_notif_alert:-n}" ; then
         #: Off by default: an [agfi:hs-alert] overlay is drawn outside the notification
@@ -1910,6 +1913,20 @@ not its Stop), hence the fallback. A subagent's bell follows [agfi:agent-bell-su
         name="$(h-bell-agent-name "$app" "$input" "$id" 2>/dev/null)" || name=''
     fi
 
+    #: Desktop fields prioritize the task, then its source, then the actual event.
+    #: Keep the complete tagged string below for Telegram and queue bookkeeping.
+    local desktop_title="${name:-${cwd:t}}" desktop_subtitle="$app"
+    test -n "$desktop_title" || desktop_title='Needs attention'
+    if test -n "$name" && test -n "$cwd" ; then
+        desktop_subtitle="${cwd:t} · ${app}"
+    fi
+    local desktop_body="${msg:-Ready for your next instruction.}"
+    local desktop_lines=("${(@f)desktop_body}")
+    desktop_body="${(F)desktop_lines[1,3]}"
+    if (( ${#desktop_body} > 300 || ${#desktop_lines} > 3 )) ; then
+        desktop_body="${desktop_body[1,299]}…"
+    fi
+
     #: The project name matters when several sessions are waiting at once, so it goes
     #: in the prefix rather than trailing the message: a batched Telegram is then
     #: scannable down its left edge.
@@ -1934,6 +1951,7 @@ not its Stop), hence the fallback. A subagent's bell follows [agfi:agent-bell-su
     group="$(h-bell-agent-group "$app" "$cwd" "$id")"
 
     bell_auto_sleep=10 bell_auto_notif_msg="$msg" bell_auto_notif_group="$group" \
+        bell_auto_notif_title="$desktop_title" bell_auto_notif_subtitle="$desktop_subtitle" bell_auto_notif_body="$desktop_body" \
         bell_auto_tlg="$tlg" \
         notif_app=agents notif_ignore_dnd_p="${notif_ignore_dnd_p:-n}" notif_image="$icon" notif_group="$group" \
         awaysh bell-auto "$engine"

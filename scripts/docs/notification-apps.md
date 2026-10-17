@@ -58,6 +58,15 @@ the real bundle's icon and identity. It also removes upstream's logging of
 notification contents on click. Original envelope and terminal artwork is drawn
 locally from vector source; no third-party app artwork is redistributed.
 
+## Notification content
+
+Mail alerts use the subject as title, sender as subtitle, and a bounded multiline
+body preview. Agent bells use the session/task as title, project/agent as subtitle,
+and the actual event text as body. Constant app names do not occupy the title.
+The common shell gateway accepts `notif_title`, `notif_subtitle`, and `notif_body`
+for callers that have structured context; generic calls keep their previous
+behavior. Content changes preserve per-app grouping and dismissal boundaries.
+
 ## DND and identity
 
 Mail and agent bells respect Do Not Disturb by default. Mail enables bypass only

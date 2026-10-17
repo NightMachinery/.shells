@@ -337,6 +337,8 @@ queued text stays as captured. See =./docs/bell-auto.md= for lookup, suppression
 and fallback details.
 Agent bells now use a dedicated =Agent Bells.app=, automatically built on first
 use (or by [agfi:notif-app-install]), with its own icon and notification settings.
+Desktop cards show the task/session title, project and agent, then the actual event
+text (up to three lines and 300 characters). Telegram keeps its tagged format.
 Normal posts and dismissal use Apple's current notification API; only explicit
 DND bypass retains the legacy path. Bootstrap permission checks run in Aqua and
 report the app's actual result. They respect Do Not Disturb by default; =notif_ignore_dnd_p=y= explicitly opts in
