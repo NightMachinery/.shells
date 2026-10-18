@@ -94,8 +94,29 @@ account for an explicit ID. `--continue` stays account/workspace-specific.
 
 ## Status and choosing an account
 
-`agy-status` (`agys`) reports every configured account, its auth state and known
-plan tier, then percent **used** and local reset time for every quota bucket.
+`agy-status` (`agys`) reports every configured account in a separate block. The
+header carries its name, sign-in state, known plan tier, cache age or live
+provenance, and email (dim in a terminal). `auth stored` means file credentials
+exist but this cached reading has not verified them. Each aligned row shows a
+short model family, window, usage bar, percent **used**, and relative reset:
+
+```text
+m  auth stored  Pro  cache 2m  masked@example.test
+  Gemini          5h      █░░░░░░░░░     6%  resets in 1h 25m
+  Gemini          weekly  █░░░░░░░░░     6%  resets in 4d 7h
+  Gemini 4 Argon  weekly  █████░░░░░    51%  resets in 2d 11h
+  Claude/GPT      weekly  ████████░░    75%  resets in 12m
+```
+
+Reset durations use at most two units. Columns align across accounts using
+display-cell widths, including wide and combining characters. At 80 columns
+only relative resets appear; at 100 or more, local absolute times appear dim
+when space permits. `agy_status_columns=80` overrides the terminal width;
+`agy_status_absolute_p=n` hides absolute times (`y` shows them when they fit).
+Long names, emails and error messages are clipped to the available width.
+Bars and percentages are green below 70%, yellow at 70 through 89%, and red at
+90% or above. Piped output and any set `NO_COLOR` disable ANSI styling, including
+with `agy_status_color=always`; `agy_status_color=never` disables it explicitly.
 Each failed account keeps its own error and never hides other accounts. Exit
 status is 1 when any account has an error; stdout is still a complete report.
 An account without a token is a normal `not signed in` status, with a login hint,
@@ -120,15 +141,31 @@ watcher consumes every account/bucket, preserves stale readings with a marker,
 and uses the existing alert thresholds. Run agy with its statusline configured
 to keep these cache readings fresh.
 
-`agy-best --model '<model name from agy models>' [other arguments]` chooses the
-account with the highest minimum remaining percentage across the known five-hour
-and weekly windows for that model's quota family. Gemini uses `gemini-*` buckets;
-Claude/GPT use `3p-*`. Unknown/missing quota and failed accounts are excluded;
-ties follow configured account order. Both windows are used when available;
-weekly-only data cannot reveal a missing five-hour restriction. Set
+`agy-best --model '<model ID or full name from agy models>' [other arguments]`
+first checks each account's model catalog. Accounts that do not offer the exact
+model variant are excluded, even when they have more quota. Wildcard/family
+names do not guess a variant. The selected canonical model ID is passed to agy.
+Among eligible accounts, it chooses the highest minimum remaining percentage
+across all known applicable five-hour and weekly windows: general `gemini-*`
+or `3p-*` pools and any matching model-specific pools, such as
+`gemini-4-argon-weekly` and `gemini-4-argon-5h`. Unrelated model pools do not
+constrain that choice. Unknown/missing applicable quota and failed accounts are
+excluded; ties follow configured account order. Weekly-only data cannot reveal
+a missing five-hour restriction. Set
 `agy_best_model` for a default model; that same model is passed to agy. Explicit
 `--model` avoids selecting Gemini quota while launching a saved Claude model.
 `agy-best --continue` requires an explicit account launcher instead.
+
+Model catalogs live at each account's `antigravity-cli/models-cache.json`, mode
+0600. They contain only account ID, capture time and model IDs/display names.
+The default TTL is one hour (`AGY_MODELS_CACHE_TTL`, positive seconds). A missing
+or expired catalog refreshes through the read-only, file-auth `agy models`
+command, with auto-update disabled and a 20-second timeout
+(`AGY_MODELS_TIMEOUT`). A failed refresh preserves the old file for inspection
+but excludes stale availability. Signed-out accounts never start that command.
+`agy-models-refresh cave` forces one refresh; `agy-models-refresh --all` (or no
+argument) refreshes every account. Explicit model selection on an owner-bound
+conversation is also checked against its owner's catalog before launch.
 
 ## Sandboxed unattended work
 
@@ -225,8 +262,8 @@ time.
 What there *is* is a statusline hook. `agy` renders a status line on every
 frame, and when `settings.json` names a command for it, agy pipes that
 command a JSON snapshot of the session on stdin and shows whatever it prints.
-The snapshot carries the whole quota table -- all four buckets, not just the
-two that `agy -p /usage` prints -- along with the model, the plan tier, the
+The snapshot carries the quota table, including five-hour buckets that
+`agy -p /usage` may omit -- along with the model, the plan tier, the
 context window and a good deal else.
 
 So the fast path is not a fetch at all. It is a cache that agy fills for us
@@ -274,21 +311,26 @@ had been sitting there, and wrong silently.
 Two writers share this file: the hook, and the slow path, which merges its own
 rows in after every successful run so that what `agy` itself said is not
 thrown away. Both merge **per bucket**, and that is the whole reason the merge
-exists. The hook knows all four buckets; `agy -p /usage` prints only the two
-weekly ones. A writer that replaced the file wholesale would therefore delete
-the two five-hour windows every time the slow path ran, and the report would
+exists. The hook sees five-hour and weekly buckets; `agy -p /usage` can print
+only weekly ones, including additional model-specific pools. A writer that
+replaced the file wholesale would therefore delete the five-hour windows every time the slow path ran, and the report would
 lose rows for reasons nobody could see from the outside. Each writer stamps
 its rows with a `source`, so a row's provenance is readable rather than
 guessed at.
 
-Bucket ids are agy's own -- `gemini-5h`, `gemini-weekly`, `3p-5h`,
-`3p-weekly` -- and the slow path's rows are mapped onto them rather than the
-other way round, by `h-agy-status-bucket-id`; `h-agy-status-bucket-names` is
-the inverse, and is what gives the cache-backed report the same group and
-label text the slow path prints. A row that maps to no id we know gets a
-stable id derived from its own group and label instead of being dropped: a
-group upstream invents should show up in the report looking odd, not vanish
-between two writers.
+General bucket IDs remain `gemini-5h`, `gemini-weekly`, `3p-5h` and
+`3p-weekly`. A separate model group gets its own normalized group slug plus
+window, for example `Gemini 4 Argon / Gemini 4 Argon Weekly Limit` becomes
+`gemini-4-argon-weekly`, and its five-hour bucket becomes
+`gemini-4-argon-5h`. The native statusline alias `gemini-argon-wtu-weekly`
+(and `gemini-argon-5h`) maps to those same canonical IDs. Existing alias entries
+are deduplicated by capture time when read or merged. Argon must never merge
+into `gemini-weekly`. Unknown windows
+retain a stable ID derived from both group and label. Slow-path cache entries
+also retain their original group and label; old entries reconstruct names from
+the ID. The statusline hook retains arbitrary native quota keys, including
+future model pools. The watcher uses `agy.<account>.<bucket_id>` as its gauge key,
+so separate pools remain separate across repeated reads and reset checks.
 
 ### Staleness, and what falls back
 
@@ -315,64 +357,17 @@ guessing.
 "force, bypass the memo" convention the rest of zshlang uses. Asking under
 `deus` is asking to distrust what is lying around.
 
-### The source note
+### Provenance in the account header
 
-Every read says, in one line above the rows, where the numbers came from --
-the worst age rather than the best, and the writers named, because a number
-that came out of the cache has to say so or the report reads as live:
+The human report puts `cache 2m`, `live`, or both in each account header. Cache
+age uses the oldest reported bucket, so a fresh row cannot conceal an older
+one. Missing capture timestamps show `cache age unknown` (or `some undated`
+when mixed with dated rows). Source diagnostics do not float above account
+blocks; each failed account has one error row while the others stay visible.
 
-```
-Cache 2m old (via `agy -p /usage')
-Cache 2m old (via agy's statusline hook)
-agy (cache older than 1h)
-agy (no cache; run `agy-statusline-install')
-agy (cache not valid JSON: /path/to/quota-cache.json)
-agy (deus)
-```
-
-The writer is described rather than named. `slow` and `statusline` are what
-the two implementations call each other; to a reader they say nothing, and
-`slow` in particular reads as a complaint about the numbers rather than as
-their provenance. `h-agy-status-writer-desc` maps each id to something you
-could go and run, spelled the way `h-agy-status-run`'s own error messages
-spell it. An id it does not know is printed as-is.
-
-It is **dim**, and deliberately not bold: it is provenance, not a finding, so
-it should be legible when looked for and invisible when the rows are what you
-came for. Dim is applied as the SGR attribute `\e[2m` rather than as a grey
-foreground, so it composes with the blue detail beside it and recedes against
-whatever palette the terminal actually has -- a fixed grey only recedes
-against the themes it was chosen for.
-
-It carries no function name. It used to be an `ecgray` line reading
-`h-agy-status-statusline: nothing in the cache is newer than 3600s; falling
-back to the slow path`, which read as a stray debug line above the answer
-rather than part of it -- and said in thirteen words what the second line
-above says in five.
-
-The age is printed at one unit of precision by `h-agy-status-age-fmt` rather
-than through `seconds-fmt-short`: three units (`0h:1m:37s`) is right for a
-reset the reader is waiting on and too much for a staleness note nobody acts
-on to the second.
-
-It goes to **stdout**, with the rows, and not to stderr where the gray line
-was. It is part of the report, and two streams cannot be ordered against each
-other. That is not theoretical here: `agent-status` runs this under
-`parallelm`, which collects each job's stderr separately from its stdout, so a
-note written there surfaces outside the agy section entirely -- and under
-`--keep-order`, possibly before any section at all. That function's own error
-line already carries this reasoning, for the same reason.
-
-The one exception is JSON mode, where stdout is a document somebody is about
-to parse; that caller redirects the note to stderr itself. Machine-readable
-output is `agy_status_json_p`, and it is asked for explicitly -- keeping the
-prose stream parseable for something that should have asked for JSON buys
-nothing and costs the ordering.
-
-A bucket carrying no `captured_at` at all is reported as such -- `some rows
-undated` in the detail -- rather than folded into the age: "unknown" and
-"captured at the epoch" are different claims, and treating them alike renders
-an age of half a million hours.
+The legacy flat-array engine and public `--json` keep source diagnostics on
+stderr and JSON on stdout. Their document shapes are unchanged. Human-only
+cache paths used to calculate header ages are never added to public JSON.
 
 ### Installing the hook
 
@@ -421,7 +416,7 @@ In practice, installing is one command and checking it is two more:
     agy                       # start agy; the line appears under agy's own
     agy-status                # now answered from the cache, not from agy
 
-`agy-status` printing a note about falling back means the hook has not run
+`agy-status` showing `live` instead of a cache age can mean the hook has not run
 yet: agy reads `settings.json` at start-up, so an agy that was already open
 when the installer ran has to be restarted before it will.
 

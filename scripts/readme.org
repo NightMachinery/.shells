@@ -195,8 +195,8 @@ and sleeps out the rate limit between runs, sharing that reading.
 
 * Antigravity
 
-=./docs/agy_status.md= covers =agy-status=, which reads the per-model-group
-quota that =agy -p /usage= prints without spending any of it, and the
+=./docs/agy_status.md= covers named account launchers, aligned =agy-status=
+blocks with relative resets, model-aware =agy-best= selection, and the
 =agy-status-notify= / =agy-status-continue-*= notifiers that wait for the
 earliest exhausted group to reset and type =Continue.= into the Antigravity
 windows or panes you picked.

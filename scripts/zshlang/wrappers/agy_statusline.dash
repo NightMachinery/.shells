@@ -50,6 +50,18 @@ out="$(jq -Rsr \
     --arg now "${now}" \
     --arg old "${old}" \
     '
+# The statusline and /usage use different names for the same Argon pool.
+def canonical_key:
+  if . == "gemini-argon-wtu-weekly" then "gemini-4-argon-weekly"
+  elif . == "gemini-argon-5h" then "gemini-4-argon-5h" else . end;
+def capture:
+  if type == "object" then (.captured_at | if type == "number" then . else -1 end) else -1 end;
+def canonical_buckets:
+  to_entries | reduce .[] as $entry ({};
+    ($entry.key | canonical_key) as $key
+    | if (. | has($key) | not) or (($entry.value | capture) >= (.[$key] | capture))
+      then .[$key] = $entry.value else . end);
+
 def durfmt:
   if . == null or . <= 0 then null
   else
@@ -73,9 +85,9 @@ def resetstr($t):
 | ( (fromjson?) // {} ) as $inraw
 | ( if ($inraw | type) == "object" then $inraw else {} end ) as $in
 | ( ($in.quota // {}) | if type == "object" then . else {} end ) as $q
-| ( ["gemini-5h", "gemini-weekly", "3p-5h", "3p-weekly"]
-    | map( . as $k
-           | ($q[$k] // null) as $b
+| ( $q | to_entries
+    | map( (.key | canonical_key) as $k
+           | .value as $b
            | if ($b | type) == "object"
                 and (($b.remaining_fraction | type) == "number")
              then { key: $k,
@@ -108,7 +120,7 @@ def resetstr($t):
     | with_entries(select(.value | type == "string")) ) as $metadata
 | $line,
   ( if ($fresh | length) > 0
-    then ( $prev + { buckets: (($prev.buckets // {}) + $fresh),
+    then ( $prev + { buckets: ((($prev.buckets // {}) | canonical_buckets) + $fresh),
                     account: (($prev.account // {}) + $metadata) } | tojson )
     else ""
     end )

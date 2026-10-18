@@ -71,11 +71,8 @@ typeset -g agy_status_credits_p="${agy_status_credits_p:-n}"
 #: Utilization at or above which a model group counts as blocking us. The only
 #: knob of the armed job that is Antigravity's own.
 typeset -g agy_status_arm_full_pct="${agy_status_arm_full_pct:-100}"
-#: Colour of the prose report: =auto= is "colour iff our stdout is a terminal",
-#: resolved by [agfi:h-color-mode-p]. An enum rather than a switch,
-#: because a caller that has already decided has to be able to say so:
-#: [agfi:agent-status] runs us inside the garden, where stdout is a pipe no
-#: matter what the user is looking at. The JSON never gets colour.
+#: Human account blocks use colour only on a terminal and without NO_COLOR.
+#: Legacy engine callers retain [agfi:h-color-mode-p]. JSON never gets colour.
 typeset -g agy_status_color="${agy_status_color:-auto}"
 ##
 function h-agy-status-run {
@@ -150,8 +147,7 @@ function h-agy-status-bucket-id {
     #:
     #: agy's own ids -- =gemini-5h=, =gemini-weekly=, =3p-5h=, =3p-weekly= --
     #: are what the statusline payload carries, so the slow path's rows are
-    #: mapped onto them rather than the other way round: the hook is the writer
-    #: that knows all four, and its naming wins.
+    #: mapped onto them. New per-model pools use their own group slug and window.
     ##
     local group="${1}" label="${2}"
     assert-args group label @RET
@@ -161,11 +157,17 @@ function h-agy-status-bucket-id {
     local group_l="${group:l}" label_l="${label:l}"
 
     local family='' window=''
-    if [[ "${group_l}" == *gemini* ]] ; then
-        family=gemini
-    elif [[ "${group_l}" == (*claude*|*gpt*|*openai*|*anthropic*) ]] ; then
-        family=3p
-    fi
+    case "${group_l}" in
+        'gemini models'|'gemini') family=gemini ;;
+        'claude and gpt models'|'claude and gpt'|'claude/gpt models') family=3p ;;
+        *)
+            #: A model-specific pool is not the family-wide pool. Use its
+            #: group slug, independent of the quota label/window wording.
+            family="${group_l//[^a-z0-9]/-}"
+            family="${family//-(#c2,)/-}"
+            family="${${family#-}%-}"
+            ;;
+    esac
 
     if [[ "${label_l}" == *weekly* ]] ; then
         window=weekly
@@ -200,8 +202,9 @@ function h-agy-status-bucket-names {
 
     local group label
     case "${bucket_id}" in
-        gemini-*) group='Gemini Models' ;;
-        3p-*) group='Claude and GPT models' ;;
+        gemini-5h|gemini-weekly) group='Gemini Models' ;;
+        3p-5h|3p-weekly) group='Claude and GPT models' ;;
+        *-5h|*-weekly) group="${(C)${${bucket_id%-*}//-/ }}" ;;
         #: An id we did not coin; showing it verbatim is more honest than
         #: inventing a display name for it.
         *) group="${bucket_id}" ;;
@@ -229,7 +232,7 @@ function h-agy-status-rows {
     local raw
     raw="$(h-agy-status-run /usage)" @TRET
 
-    local line pct iso epoch
+    local line pct iso epoch bucket_id
     local -a f
     for line in "${(@f)raw}" ; do
         test -n "${line}" || continue
@@ -259,7 +262,6 @@ function h-agy-status-rows {
         #: The bucket id is carried here rather than recomputed by each
         #: consumer, because both the cache merge and the JSON want it and they
         #: must not be able to disagree.
-        local bucket_id
         bucket_id="$(h-agy-status-bucket-id "${f[1]}" "${f[2]}")" @TRET
 
         printf '%s\t%s\t%s\t%s\t%s\t%s\n' \
@@ -389,7 +391,15 @@ function h-agy-status-cache-merge {
         --arg old "${old}" \
         --argjson now "${EPOCHSECONDS}" \
         '
-        ( ($old | fromjson?) // {} ) as $prevraw
+def capture:
+          if type == "object" then (.captured_at | if type == "number" then . else -1 end) else -1 end;
+        def canonical_buckets:
+          to_entries | reduce .[] as $entry ({};
+            ($entry.key | if . == "gemini-argon-wtu-weekly" then "gemini-4-argon-weekly"
+                          elif . == "gemini-argon-5h" then "gemini-4-argon-5h" else . end) as $key
+            | if (. | has($key) | not) or (($entry.value | capture) >= (.[$key] | capture))
+              then .[$key] = $entry.value else . end);
+                ( ($old | fromjson?) // {} ) as $prevraw
         | ( if ($prevraw | type) == "object" then $prevraw else {} end ) as $prev
         | ( $rows
             | split("\n")
@@ -398,10 +408,11 @@ function h-agy-status-cache-merge {
             | map({ key: .[5],
                     value: { remaining_percent: (.[2] | tonumber),
                              resets_at: (.[3] | tonumber),
+                             group: .[0], label: .[1],
                              captured_at: $now,
                              source: $src } })
             | from_entries ) as $fresh
-        | $prev + { buckets: (($prev.buckets // {}) + $fresh) }')" @TRET
+        | $prev + { buckets: ((($prev.buckets // {}) | canonical_buckets) + $fresh) }')" @TRET
 
     h-agy-status-write-atomic "${cache_file}" "${merged}" @RET
 }
@@ -551,8 +562,16 @@ function h-agy-status-statusline-raw {
         --argjson now "${EPOCHSECONDS}" \
         --argjson max_age "${max_age_s}" \
         '
+def capture:
+          if type == "object" then (.captured_at | if type == "number" then . else -1 end) else -1 end;
+        def canonical_buckets:
+          to_entries | reduce .[] as $entry ({};
+            ($entry.key | if . == "gemini-argon-wtu-weekly" then "gemini-4-argon-weekly"
+                          elif . == "gemini-argon-5h" then "gemini-4-argon-5h" else . end) as $key
+            | if (. | has($key) | not) or (($entry.value | capture) >= (.[$key] | capture))
+              then .[$key] = $entry.value else . end);
         ( .buckets // {} )
-        | to_entries
+        | canonical_buckets | to_entries
         | map(select((.value | type) == "object"))
         | map(select((.value.remaining_percent | type) == "number"))
         | map(select($max_age < 0
@@ -563,7 +582,8 @@ function h-agy-status-statusline-raw {
             (.value.remaining_percent | tostring),
             ((.value.resets_at // 0) | tostring),
             ((if (.value.captured_at | type) == "number" then .value.captured_at else -1 end) | tostring),
-            (.value.source // "unknown") ]
+            (.value.source // "unknown"),
+            (.value.group // ""), (.value.label // "") ]
         | @tsv' "${cache_file}" 2>/dev/null
 }
 
@@ -641,6 +661,7 @@ function h-agy-status-source-line {
     #:
     #: Usage: h-agy-status-source-line <label> [detail]
     ##
+    bool "${agy_status_source_quiet_p:-n}" && return 0
     local label="${1}" detail="${2:-}"
     assert-args label @RET
 
@@ -732,6 +753,9 @@ function h-agy-status-statusline {
         f=( "${(@ps:\t:)line}" )
 
         names="$(h-agy-status-bucket-names "${f[1]}")" @TRET
+        if test -n "${f[6]}" && test -n "${f[7]}" ; then
+            names="${f[6]}"$'\t'"${f[7]}"
+        fi
         iso="$(date-unix-to-3339 "${f[3]}")" @TRET
 
         #: The very row contract the slow path emits, bucket id included, so
@@ -1095,35 +1119,33 @@ function agy-status {
         ids=( "${(@f)configured}" )
     fi
     local id obj ret=0
+    local agy_status_source_quiet_p=n
+    bool "${json_p}" || agy_status_source_quiet_p=y
     for id in "${ids[@]}" ; do
-        obj="$(h-agy-status-account-json "${id}")" @RET
+        if bool "${json_p}" ; then
+            obj="$(h-agy-status-account-json "${id}")" @RET
+        else
+            #: The block carries provenance and its own error row. Engine
+            #: diagnostics/source notes must not float above other accounts.
+            obj="$(h-agy-status-account-json "${id}" 2>/dev/null)" @RET
+            h-agy-account-info "${id}" @RET
+            obj="$(ec "${obj}" | command jq --arg cache "${reply[5]}" \
+                '. + {_display_cache_file: $cache}')" @RET
+        fi
         objects+=( "${obj}" )
         ec "${obj}" | command jq --exit-status '.error == null' >/dev/null || ret=1
     done
-    local combined c_header='' c_off='' c_green='' c_red='' c_yellow=''
+    local combined
     combined="$(ec "${(F)objects}" | command jq --slurp '.')" @RET
     if bool "${json_p}" ; then
         ec "${combined}"
     else
-        if h-color-mode-p "${agy_status_color:-auto}" ; then
-            c_header=$'\e[1m'; c_off=$'\e[0m'
-            c_green=$'\e[32m'; c_yellow=$'\e[33m'; c_red=$'\e[31m'
-        fi
-        ec "${combined}" | command jq --raw-output \
-            --arg bold "${c_header}" --arg off "${c_off}" \
-            --arg green "${c_green}" --arg yellow "${c_yellow}" --arg red "${c_red}" '
-          .[] | $bold + "\(.label) [\(.account)]  " +
-            (if .auth_status == "missing" then "not signed in"
-             elif .signed_in == true then "signed in (verified)"
-             else "file credentials present (unverified)" end) +
-            "  tier: \(.tier // "unknown")" +
-            (if .email then "  \(.email)" else "" end) + $off,
-            (if .error then $red + "  ERROR: \(.error)" + $off else empty end),
-            (if .message then "  \(.message)" else empty end),
-            (.buckets[] | "  \(.group) / \(.label): " +
-              (if .used_percent >= 90 then $red elif .used_percent >= 67 then $yellow else $green end) +
-              "\(.used_percent | . * 10 | round / 10)% used" + $off +
-              ", resets \(.resets_at | strflocaltime("%Y-%m-%d %H:%M %Z")) [\(.source)]")'
+        ensure-cmd python3 @RET
+        local columns="${agy_status_columns:-${COLUMNS:-80}}"
+        [[ "${columns}" == <1-> ]] || columns=80
+        ec "${combined}" | command python3 "${NIGHTDIR:-${HOME}/scripts}/python/agy_status_render.py" \
+            --columns "${columns}" --color "${agy_status_color:-auto}" \
+            --absolute "${agy_status_absolute_p:-auto}" @RET
     fi
     return "${ret}"
 }

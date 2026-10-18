@@ -37,6 +37,8 @@ json.dump({"argv":sys.argv[1:], "root":os.environ.get("ANTIGRAVITY_GEMINI_DIR"),
            "ssh":os.environ.get("SSH_CONNECTION"), "home":os.environ["HOME"],
            "account":os.environ.get("AGY_ACCOUNT_ID"),
            "cache":os.environ.get("agy_status_cache_file")},open(os.environ["AGY_TEST_CALLS"],"w"))
+if sys.argv[-1] == "models":
+    print("gemini-fixture\tGemini fixture\nclaude-fixture\tClaude fixture")
 if "--print" in sys.argv:
     print("Gemini Models\tWeekly Limit Remaining\t93%\t2030-01-01T00:00:00Z")
 PY
@@ -77,11 +79,19 @@ json="$(agy-status --json)" || rc=$?
 (( rc == 0 )) || fail 'signed-out account is a status, not measurement failure'
 print -r -- "${json}" | command jq --exit-status '
  length == 3 and .[0].buckets[0].used_percent == 55
+ and all(.[]; keys == ["account","auth_status","buckets","email","error","label","message","signed_in","tier"])
+ and all(.[].buckets[]; keys == ["bucket_id","group","label","remaining_percent","resets_at","resets_at_iso","source","used_percent"])
  and .[1].label == "cave" and .[1].buckets[0].used_percent != 55
  and .[2].signed_in == false and .[2].error == null and .[2].message != null
 ' >/dev/null
 json="$(AGY_ACCOUNT_ID=acc1 agy_status_json_p=y agy-status)"
 print -r -- "${json}" | command jq --exit-status '.[0].remaining_percent == 45 and .[0].source == "cache"' >/dev/null
+
+# The human report consumes the same data without floating source diagnostics.
+agy_status_columns=80 agy-status > "${test_tmp}/human.txt" 2> "${test_tmp}/human.err"
+[[ ! -s "${test_tmp}/human.err" ]] || fail 'human diagnostics escaped account blocks'
+command rg --quiet 'resets in|reset .* ago' "${test_tmp}/human.txt" || fail 'relative resets missing'
+print -r -- "${json}" | command jq --exit-status 'all(.[]; has("_display_cache_file") | not)' >/dev/null
 
 # Best account considers the minimum known window; only Gemini prefers acc2.
 agy-best --model 'Gemini fixture' models

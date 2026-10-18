@@ -183,20 +183,82 @@ function agy {
     antigravity "$@"
 }
 
+function h-agy-model-catalog {
+    #: A stale or absent catalog is refreshed with the read-only models command.
+    #: Failed refreshes never turn stale model availability into launch consent.
+    local id="${1}" refresh="${2:-cached}" model="${3:-}"
+    local ttl="${AGY_MODELS_CACHE_TTL:-3600}" timeout="${AGY_MODELS_TIMEOUT:-20}"
+    ensure-cmd python3 @RET
+    local -a reply catalog_args
+    h-agy-account-info "${id}" @RET
+    id="${reply[1]}"
+    if ! test -s "${reply[4]}/antigravity-oauth-token" ; then
+        ecerr "$0: ${id}: not signed in; run agy-acc-login ${id}"
+        return 1
+    fi
+    catalog_args=( catalog --cache "${reply[4]}/models-cache.json" --account "${id}"
+        --ttl "${ttl}" --timeout "${timeout}" )
+    [[ "${refresh}" != refresh ]] || catalog_args+=( --refresh )
+    test -z "${model}" || catalog_args+=( --model "${model}" )
+    h-agy-account-argv "${id}" models @RET
+    command python3 "${NIGHTDIR:-${HOME}/scripts}/python/agy_model_catalog.py" \
+        "${catalog_args[@]}" -- "${reply[@]}"
+}
+
+function agy-models-refresh {
+    : "usage: agy-models-refresh [ACCOUNT|--all]; refreshes available model IDs without a model turn"
+    ensure-cmd jq @RET
+    local ids id catalog ret=0
+    if (( $# > 1 )) ; then
+        ecerr "$0: expected one account or --all"
+        return 2
+    elif [[ -z "${1}" || "${1}" == --all ]] ; then
+        ids="$(h-agy-accounts)" @RET
+    else
+        local -a reply
+        h-agy-account-info "${1}" @RET
+        ids="${reply[1]}"
+    fi
+    for id in "${(@f)ids}" ; do
+        if catalog="$(h-agy-model-catalog "${id}" refresh)" ; then
+            ec "${id}: cached $(ec "${catalog}" | command jq '.models | length') available models"
+        else
+            ecerr "$0: ${id}: catalog refresh failed; stale availability will not be used"
+            ret=1
+        fi
+    done
+    return "${ret}"
+}
+
 function agy-best {
     : "launches the account with most quota for --model (or agy_best_model)"
-    local model="${agy_best_model:-}" family=gemini conversation='' arg i=1 model_given=n
-    local -a args=( "$@" )
-    while (( i <= ${#args} )) ; do
-        arg="${args[$i]}"
+    local model="${agy_best_model:-}" conversation='' arg i=1
+    local ttl="${AGY_MODELS_CACHE_TTL:-3600}"
+    local -a input_args=( "$@" ) args=()
+    while (( i <= ${#input_args} )) ; do
+        arg="${input_args[$i]}"
         case "${arg}" in
-            --model) (( i++ )); model="${args[$i]}"; model_given=y ;;
-            --model=*) model="${arg#*=}"; model_given=y ;;
-            --conversation) (( i++ )); conversation="${args[$i]}" ;;
-            --conversation=*) conversation="${arg#*=}" ;;
+            --model|--conversation)
+                if (( i == ${#input_args} )) || [[ -z "${input_args[$((i+1))]}" || "${input_args[$((i+1))]}" == --* ]] ; then
+                    ecerr "$0: ${arg} requires a value"
+                    return 2
+                fi
+                (( i++ ))
+                if [[ "${arg}" == --model ]] ; then
+                    model="${input_args[$i]}"
+                else
+                    conversation="${input_args[$i]}"
+                    args+=( "${arg}" "${conversation}" )
+                fi ;;
+            --model=*)
+                model="${arg#*=}"
+                test -n "${model}" || { ecerr "$0: --model requires a value"; return 2; } ;;
+            --conversation=*) conversation="${arg#*=}"; args+=( "${arg}" ) ;;
             --continue|-c)
                 ecerr "$0: use an account launcher for --continue, so history ownership is explicit"
                 return 2 ;;
+            --) args+=( "${input_args[@][$i,-1]}" ); break ;;
+            *) args+=( "${arg}" ) ;;
         esac
         (( i++ ))
     done
@@ -204,33 +266,44 @@ function agy-best {
         ecerr "$0: --model (or agy_best_model) is required so selection matches the model launched"
         return 2
     fi
-    if test -n "${model}" && [[ "${model_given}" == n ]] ; then
-        args+=( --model "${model}" )
-    fi
-    case "${model:l}" in
-        *claude*|*gpt*|*openai*|*anthropic*) family=3p ;;
-        *gemini*) family=gemini ;;
-        '') ;;
-        *) ecerr "$0: cannot select a quota family for model: ${model}"; return 2 ;;
-    esac
-    local account json ret=0
+    ensure-cmd python3 jq @RET
+    local account json catalog selected ids id ret=0
+    local -a catalog_args reply
     if test -n "${conversation}" ; then
         local transcript
         transcript="$(h-agy-session-transcript-of "${conversation}")" @RET
         account="$(h-agy-account-of-transcript "${transcript}")" @RET
+        if test -n "${model}" ; then
+            catalog="$(h-agy-model-catalog "${account}" cached "${model}")" || {
+                ecerr "$0: owning account ${account} cannot verify the requested model"
+                return 1
+            }
+            model="$(ec "${catalog}" | command jq --exit-status --raw-output '.resolved_model.id')" @RET
+        fi
         ecerr "$0: resuming with owning account ${account}"
     else
+        ids="$(h-agy-accounts)" @RET
+        for id in "${(@f)ids}" ; do
+            if h-agy-model-catalog "${id}" >/dev/null ; then
+                h-agy-account-info "${id}" @RET
+                catalog_args+=( --catalog "${id}" "${reply[4]}/models-cache.json" )
+            else
+                ecerr "$0: skipping ${id}: current model catalog unavailable"
+            fi
+        done
+        (( ${#catalog_args} )) || { ecerr "$0: no current account model catalogs"; return 1; }
         json="$(agy-status --json)" || ret=$?
-        account="$(ec "${json}" | command jq --exit-status --raw-output --arg family "${family}" '
-            [.[] | select(.error == null)
-             | . + {available: ([.buckets[] | select(.bucket_id | startswith($family + "-")) | .remaining_percent] | min)}
-             | select(.available != null and .available > 0)]
-            | sort_by(-.available) | .[0].account // empty')" || {
-            ecerr "$0: no account has known remaining ${family} quota (status exit ${ret})"
+        selected="$(ec "${json}" | command python3 \
+            "${NIGHTDIR:-${HOME}/scripts}/python/agy_model_catalog.py" select \
+            --model "${model}" --ttl "${ttl}" "${catalog_args[@]}")" || {
+            ecerr "$0: no eligible account for ${model} (status exit ${ret})"
             return 1
         }
-        ecerr "$0: selected ${account} for ${family} (minimum of known 5h/weekly remaining quota)"
+        account="$(ec "${selected}" | command jq --exit-status --raw-output '.account')" @RET
+        model="$(ec "${selected}" | command jq --exit-status --raw-output '.model')" @RET
+        ecerr "$0: selected ${account} for ${model}, $(ec "${selected}" | command jq --raw-output '.remaining_percent')% remaining across applicable quota windows"
     fi
+    test -z "${model}" || args=( --model "${model}" "${args[@]}" )
     agy-account "${account}" "${args[@]}"
 }
 
