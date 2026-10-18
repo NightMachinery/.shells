@@ -102,9 +102,14 @@ def resetstr($t):
       | if . == null then empty else "wk \(.remaining_percent)%\(resetstr($t))" end ) ] as $cells
 | ( ($in.model.display_name // "") | tostring ) as $name
 | ( ($cells + (if $name == "" then [] else [$name] end)) | join(" · ") ) as $line
+| ( ($in.account // {}) | if type == "object" then . else {} end ) as $acct
+| ( { tier: ($acct.tier // $in.plan.tier? // $in.plan_tier? // null),
+      email: ($acct.email // $in.email // null) }
+    | with_entries(select(.value | type == "string")) ) as $metadata
 | $line,
   ( if ($fresh | length) > 0
-    then ( { buckets: (($prev.buckets // {}) + $fresh) } | tojson )
+    then ( $prev + { buckets: (($prev.buckets // {}) + $fresh),
+                    account: (($prev.account // {}) + $metadata) } | tojson )
     else ""
     end )
 ' 2>/dev/null)" || exit 0

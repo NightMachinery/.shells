@@ -89,16 +89,21 @@ function h-agy-status-run {
     local slash_cmd="${1}"
     assert-args slash_cmd @RET
 
+    if bool "${agy_status_cache_only_p:-n}" ; then
+        ecerr "$0: no usable cached quota; cache-only mode skips agy/network"
+        return 1
+    fi
+
     ensure-cmd agy @RET
 
-    #: Delegated because `agy' refreshes its own access token when it has
-    #: expired, and that goes through the login keychain -- so a detached
-    #: session would sit on Antigravity's interactive login prompt instead of
-    #: reporting. Delegating the whole command keeps the credential inside the
-    #: GUI-attached process.
-    if h-agy-status-garden-p && brishz-alive-p ; then
-        brishz_binary=y brishz agy-status-run-garden "${slash_cmd}"
-        return $?
+    local account="${AGY_ACCOUNT_ID:-m}"
+    local -a reply
+    h-agy-account-info "${account}" @RET
+    #: An unattended report must never start browser sign-in. Token contents
+    #: are deliberately not opened here, even to guess at identity/expiry.
+    if ! test -s "${reply[4]}/antigravity-oauth-token" ; then
+        ecerr "$0: ${account}: signed out; run agy-acc-login ${account}"
+        return 1
     fi
 
     #: GNU coreutils first, since that is what the rest of zshlang assumes;
@@ -106,9 +111,9 @@ function h-agy-status-run {
     #: one is still better than refusing to report at all.
     local -a runner=()
     if isdefined-cmd gtimeout ; then
-        runner=(command gtimeout "${timeout_s}")
+        runner=(gtimeout --kill-after=5 "${timeout_s}")
     elif isdefined-cmd timeout ; then
-        runner=(command timeout "${timeout_s}")
+        runner=(timeout --kill-after=5 "${timeout_s}")
     fi
 
     local tmp_dir
@@ -118,7 +123,11 @@ function h-agy-status-run {
     #: touched, and no wrapper of `cd' gets a say. There are no chpwd hooks in
     #: zshlang, so nothing prints into the output we are capturing.
     local out='' ret=0
-    out="$(builtin cd -- "${tmp_dir}" && "${runner[@]}" command agy -p "${slash_cmd}")" || ret=$?
+    local -a process_argv
+    h-agy-account-argv "${account}" --mode plan --print "${slash_cmd}" @RET
+    process_argv=( "${reply[@]}" )
+    out="$(builtin cd -- "${tmp_dir}" && \
+        command "${runner[@]}" "${process_argv[@]}" </dev/null)" || ret=$?
 
     silent command rm -rf -- "${tmp_dir}" || true
 
@@ -279,7 +288,8 @@ function h-agy-status-json {
             --argjson resets "${f[4]}" \
             --arg iso "${f[5]}" \
             --arg bucket_id "${f[6]:-}" \
-            '{group: $group, label: $label, remaining_percent: $remaining, resets_at: $resets, resets_at_iso: $iso}
+            --arg source "${agy_status_report_source:-unknown}" \
+            '{group: $group, label: $label, remaining_percent: $remaining, resets_at: $resets, resets_at_iso: $iso, source: $source}
              + (if $bucket_id == "" then {} else {bucket_id: $bucket_id} end)')" @TRET
         objects+=("${obj}")
     done
@@ -391,7 +401,7 @@ function h-agy-status-cache-merge {
                              captured_at: $now,
                              source: $src } })
             | from_entries ) as $fresh
-        | { buckets: (($prev.buckets // {}) + $fresh) }')" @TRET
+        | $prev + { buckets: (($prev.buckets // {}) + $fresh) }')" @TRET
 
     h-agy-status-write-atomic "${cache_file}" "${merged}" @RET
 }
@@ -469,6 +479,7 @@ function h-agy-status-slow {
     ##
     local json_p="${agy_status_json_p:-n}"
     local credits_p="${agy_status_credits_p:-n}"
+    local agy_status_report_source=live
 
     if (( $# > 0 )) ; then
         #: This path is driven entirely by knobs, so there is nothing an
@@ -650,7 +661,11 @@ function h-agy-status-source-line {
         c_off="${reset_color}"
     fi
 
-    ec "${c_dim}${label}${detail:+ ${c_detail}(${detail})}${c_off}"
+    if bool "${agy_status_json_p}" ; then
+        ec "${c_dim}${label}${detail:+ ${c_detail}(${detail})}${c_off}" >&2
+    else
+        ec "${c_dim}${label}${detail:+ ${c_detail}(${detail})}${c_off}"
+    fi
 }
 
 function h-agy-status-statusline {
@@ -662,6 +677,7 @@ function h-agy-status-statusline {
     local credits_p="${agy_status_credits_p:-n}"
     local cache_file="${agy_status_cache_file:-${HOME}/tmp/.agy-status/quota-cache.json}"
     local max_age_s="${agy_status_statusline_max_age_s:-3600}"
+    local agy_status_report_source=cache
 
     #: Before the `deus' branch, so that an argument aimed at the wrong
     #: implementation is visible whichever way we go from here.
@@ -961,52 +977,8 @@ function agy-statusline-uninstall {
 #: The brish garden guard
 ##
 function h-agy-status-garden-p {
-    #: Whether to run the report inside the brish garden rather than here.
-    #: What needs it is the slow path: `agy' refreshes its own access token
-    #: whenever the one it holds has expired, and that refresh rewrites the
-    #: login keychain item the token lives in. A GUI-detached session cannot
-    #: touch it -- its keychain search list collapses to the System keychain
-    #: alone -- and rather than failing, `agy' falls through to its interactive
-    #: browser login and sits there printing an OAuth URL until our timeout
-    #: kills it. See =docs/agy_status.md=.
-    #:
-    #: The garden's worker shells are attached to the GUI session, so the
-    #: refresh succeeds there.
-    #:
-    #: Proactive rather than a retry, because a detached run *cannot* succeed
-    #: -- attempting it first would only buy a minute of hanging on a login
-    #: prompt nobody is going to answer. The same shape as
-    #: [agfi:h-claude-code-usage-garden-p], for the same reason.
-    ##
-    local mode="${agy_status_garden_p:-auto}"
-
-    case "${mode}" in
-        y) return 0 ;;
-        n) return 1 ;;
-        auto)
-            #: `managername' answers `Aqua' only in a session attached to the
-            #: GUI login, and that attachment is exactly what the keychain
-            #: search list depends on -- so it names the real condition, where
-            #: [agfi:isSSH] only guesses at it. An agent-spawned shell on this
-            #: very machine is `Background' and cannot read the keychain
-            #: either. Kept as a fallback for a platform without `launchctl'.
-            ##
-            local manager=''
-            if isdefined-cmd launchctl ; then
-                manager="$(command launchctl managername 2>/dev/null)" || manager=''
-            fi
-
-            if test -n "${manager}" ; then
-                [[ "${manager}" != Aqua ]]
-            else
-                isSSH
-            fi
-            ;;
-        *)
-            ecerr "$0: unknown agy_status_garden_p: ${mode} (auto, y, n)"
-            return 1
-            ;;
-    esac
+    #: Compatibility predicate: file auth no longer needs a GUI/keychain garden.
+    return 1
 }
 
 function agy-status-run-garden {
@@ -1021,7 +993,7 @@ function agy-status-run-garden {
     agy_status_garden_p=n h-agy-status-run "${slash_cmd}"
 }
 ##
-function agy-status {
+function h-agy-status-one {
     #: What is left of Antigravity's quota, per bucket, and when it comes back.
     #: The gateway: [agfi:agy_status_method] picks the implementation.
     #: See =docs/agy_status.md=.
@@ -1040,6 +1012,118 @@ function agy-status {
             return 1
             ;;
     esac
+}
+
+function h-agy-status-account-json {
+    #: Isolate each cache, command and error. Never emit raw CLI login output.
+    local -a reply
+    h-agy-account-info "${1}" @RET
+    local id="${reply[1]}" label="${reply[2]}" root="${reply[3]}"
+    local -x AGY_ACCOUNT_ID="${id}"
+    local -x agy_status_cache_file="${reply[5]}"
+    local agy_status_json_p=y
+    local buckets='[]' error='' auth_status=missing signed_in=false ret=0
+    local metadata='{}'
+    if test -r "${agy_status_cache_file}" ; then
+        metadata="$(command jq --compact-output '.account | if type == "object" then . else {} end' "${agy_status_cache_file}" 2>/dev/null)" || metadata='{}'
+    fi
+    if test -s "${reply[4]}/antigravity-oauth-token" ; then
+        auth_status=file-present
+        signed_in=null
+        buckets="$(h-agy-status-one)" || ret=$?
+        if (( ret != 0 )) ; then
+            buckets='[]'
+            error="Quota check failed (exit ${ret}); file credentials exist, validity unverified"
+        elif ! ec "${buckets}" | command jq --exit-status 'type == "array" and length > 0' >/dev/null 2>&1 ; then
+            buckets='[]'
+            error='Quota check returned no buckets'
+        else
+            #: Cache success proves only that the file exists, not that its
+            #: current refresh token still works. Live rows do prove sign-in.
+            if ec "${buckets}" | command jq --exit-status 'any(.[]; .source == "live")' >/dev/null ; then
+                signed_in=true
+                auth_status=verified
+            fi
+        fi
+    else
+        error="Signed out; run agy-acc-login ${id}"
+    fi
+    command jq --null-input --arg account "${id}" --arg label "${label}" \
+        --arg auth_status "${auth_status}" --argjson signed_in "${signed_in}" \
+        --arg error "${error}" --argjson metadata "${metadata}" \
+        --argjson buckets "${buckets}" '
+        {account: $account, label: $label, signed_in: $signed_in,
+         auth_status: $auth_status, tier: ($metadata.tier // null),
+         email: ($metadata.email // null),
+         error: (if $error == "" then null else $error end),
+         buckets: ($buckets | map(. + {used_percent: (100 - .remaining_percent)}))}'
+}
+
+function agy-status {
+    : "all configured accounts; --json for account objects, --account N to select one"
+    ensure-cmd jq @RET
+    local json_p=n account='' arg
+    while (( $# )) ; do
+        arg="${1}"; shift
+        case "${arg}" in
+            --json) json_p=y ;;
+            --account)
+                (( $# )) || { ecerr "$0: --account requires N"; return 2; }
+                account="${1}"; shift ;;
+            --help)
+                ec 'agy-status [--json] [--account N]'
+                return 0 ;;
+            *) ecerr "$0: unknown option: ${arg}"; return 2 ;;
+        esac
+    done
+    local -a reply ids objects=()
+    #: Existing notifier/quota-watch callers explicitly request this old flat
+    #: bucket array. Keep it scoped to the current account, never mix quotas.
+    if bool "${agy_status_json_p}" && ! bool "${json_p}" ; then
+        h-agy-account-info "${account:-${AGY_ACCOUNT_ID:-m}}" @RET
+        local -x AGY_ACCOUNT_ID="${reply[1]}" agy_status_cache_file="${reply[5]}"
+        h-agy-status-one
+        return $?
+    fi
+    if test -n "${account}" ; then
+        h-agy-account-info "${account}" @RET
+        ids=( "${reply[1]}" )
+    else
+        local configured
+        configured="$(h-agy-accounts)" @RET
+        ids=( "${(@f)configured}" )
+    fi
+    local id obj ret=0
+    for id in "${ids[@]}" ; do
+        obj="$(h-agy-status-account-json "${id}")" @RET
+        objects+=( "${obj}" )
+        ec "${obj}" | command jq --exit-status '.error == null' >/dev/null || ret=1
+    done
+    local combined c_header='' c_off='' c_green='' c_red='' c_yellow=''
+    combined="$(ec "${(F)objects}" | command jq --slurp '.')" @RET
+    if bool "${json_p}" ; then
+        ec "${combined}"
+    else
+        if h-color-mode-p "${agy_status_color:-auto}" ; then
+            c_header=$'\e[1m'; c_off=$'\e[0m'
+            c_green=$'\e[32m'; c_yellow=$'\e[33m'; c_red=$'\e[31m'
+        fi
+        ec "${combined}" | command jq --raw-output \
+            --arg bold "${c_header}" --arg off "${c_off}" \
+            --arg green "${c_green}" --arg yellow "${c_yellow}" --arg red "${c_red}" '
+          .[] | $bold + "\(.label) [\(.account)]  " +
+            (if .auth_status == "missing" then "signed out"
+             elif .signed_in == true then "signed in (verified)"
+             else "file credentials present (unverified)" end) +
+            "  tier: \(.tier // "unknown")" +
+            (if .email then "  \(.email)" else "" end) + $off,
+            (if .error then $red + "  ERROR: \(.error)" + $off else empty end),
+            (.buckets[] | "  \(.group) / \(.label): " +
+              (if .used_percent >= 90 then $red elif .used_percent >= 67 then $yellow else $green end) +
+              "\(.used_percent | . * 10 | round / 10)% used" + $off +
+              ", resets \(.resets_at | strflocaltime("%Y-%m-%d %H:%M %Z")) [\(.source)]")'
+    fi
+    return "${ret}"
 }
 aliasfn agys agy-status
 

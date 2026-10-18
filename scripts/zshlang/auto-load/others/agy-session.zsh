@@ -11,17 +11,30 @@
 function h-agy-session-home {
     #: Antigravity's state directory.
     ##
-    ec "${agy_home:-${HOME}/.gemini/antigravity-cli}"
+    ec "${agy_home:-${ANTIGRAVITY_GEMINI_DIR:-${HOME}/.gemini}/antigravity-cli}"
 }
 
 function h-agy-session-roots {
     #: The conversations directory, when it exists; nothing otherwise, which is
     #: how a host without Antigravity contributes no rows.
     ##
-    local d
-    d="$(h-agy-session-home)/brain"
-    test -d "${d}" || return 1
-    ec "${d}"
+    local d ids id
+    local -a roots=()
+    if test -n "${agy_home}${ANTIGRAVITY_GEMINI_DIR}" ; then
+        d="$(h-agy-session-home)/brain"
+        test -d "${d}" || return 1
+        ec "${d}"
+    else
+        ids="$(h-agy-accounts)" @RET
+        local -a reply
+        for id in "${(@f)ids}" ; do
+            h-agy-account-info "${id}" @RET
+            d="${reply[4]}/brain"
+            test ! -d "${d}" || roots+=( "${d:A}" )
+        done
+        (( ${#roots} )) || return 1
+        print -rl -- "${(@u)roots}"
+    fi
 }
 
 function h-agy-session-owns-p {
@@ -127,6 +140,7 @@ function h-agy-session-name {
 
     local id name
     id="$(h-agy-session-id-of "${transcript}")" @RET
+    local agy_summaries_db="${transcript:h:h:h:h:h}/conversation_summaries.db"
 
     if isdefined-cmd sqlite3 ; then
         name="$(agy-conversation-name "${id}" 2>/dev/null)" || name=''
@@ -141,20 +155,12 @@ function h-agy-session-name {
 }
 
 function h-agy-session-account {
-    #: The signed-in Google account. Antigravity is a Gemini CLI derivative and
-    #: shares its account file, `~/.gemini/google_accounts.json', whose
-    #: `active' is the address in use; the old ones beside it are not.
-    ##
-    local f
-    f="$(h-agy-session-home)/../google_accounts.json"
-    test -e "${f}" || return 1
-    isdefined-cmd jq || return 1
-
-    local email
-    email="$(jq -r '.active // empty' "${f}" 2>/dev/null)" || return 1
-    test -n "${email}" || return 1
-
-    print -r -- "${email}"
+    #: The recorded account label, independent of shared transcript symlinks.
+    local id
+    id="$(h-agy-account-of-transcript "${1}")" @RET
+    local -a reply
+    h-agy-account-info "${id}" @RET
+    ec "${reply[2]}"
 }
 
 function h-agy-session-resume {
@@ -167,10 +173,12 @@ function h-agy-session-resume {
 
     local id
     id="$(h-agy-session-id-of "${transcript}")" @RET
+    local account
+    account="$(h-agy-account-of-transcript "${transcript}")" @RET
 
     #: In the session's own directory ([agfi:h-agent-session-resume-run]).
     local -a reply
-    h-agent-session-resume-argv agy "${id}" antigravity "$@" @RET
+    h-agent-session-resume-argv agy "${id}" agy-account "${account}" "$@" @RET
     h-agent-session-resume-run "${transcript}" "${reply[@]}"
 }
 

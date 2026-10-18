@@ -1,13 +1,139 @@
-# agy-status
+# Antigravity accounts and quota
 
-`zshlang/auto-load/others/agy-status.zsh` reports how much of each
-Antigravity quota is left and when it comes back, and can arm the shared
-reset notifier on that. It is the Antigravity counterpart of the Claude Code
-report in `docs/claude_code_usage.md` and of `codex-status` in
-`docs/codex_status.md`. It began a good deal smaller than either, because
-Antigravity gave us less to work with; it has since grown a second
-implementation, and a fair part of this document is about the two of them and
-why both are kept.
+The built-in accounts are `m`, `cave`, and `fm2`. `m` keeps the existing
+`~/.gemini` state; new accounts use `~/.agy-accounts/<name>`. The shell generates
+`agy-m`, `agy-cave`, `agy-fm2` and their `-t` tmux variants. `agy` and
+`antigravity` follow the current account inside an agy child shell, and select
+`m` otherwise. Every interactive launcher uses [agfi:h-agent-launch].
+
+## Account definitions and sign-in
+
+Define additional accounts in the private shell/environment, then start a new
+shell or run `agy-accounts-refresh`:
+
+```zsh
+export AGY_ACCOUNTS='m cave fm2 extra'
+export AGY_ACCOUNT_LABEL_EXTRA='Extra account'       # optional display label
+export AGY_ACCOUNT_DIR_EXTRA="$HOME/.agy-accounts/extra"  # optional Gemini root
+```
+
+Names use lowercase letters, digits and underscores, starting with a letter.
+Reserved command names and duplicate roots/aliases are rejected. An optional
+`AGY_ACCOUNT_NAME_<UPPERCASE_ID>` adds a friendly launcher alias. `HOME` is never
+changed. The owner has explicitly approved the three built-in account names
+for public code; email addresses and credentials remain outside the repository.
+
+`agy-account-prepare <name>` prepares new configuration/history links. New
+accounts are prepared on first launch; existing state is never rewritten by a
+normal launch. Setup links `GEMINI.md`, `AGENTS.md`, hooks, policies and skills
+when present, and synchronizes only the `statusLine` settings key. Other settings
+remain per account. Existing independent files are refused for manual
+reconciliation, never moved or overwritten. Override the shared root with
+`AGY_SHARED_GEMINI_DIR` if needed.
+
+```zsh
+agy-acc-login cave
+agy-acc-login fm2
+```
+
+The helper prints a `tmux attach-session` command. Complete Google sign-in
+there, exit agy, and the same pane runs `models` to verify the account. If a token
+already exists it verifies without signing out. Re-running the helper attaches
+to the existing login session rather than replacing it. No sign-in is performed
+by account setup or status reporting.
+
+## File authentication
+
+All shell launchers, login verification and print-mode quota calls inject
+`SSH_CONNECTION=agy-file-auth` only into the agy process (preserving a real SSH
+value when present). This is the native CLI's verified file-storage trigger.
+No global SSH environment is changed. A direct `command agy` deliberately
+bypasses shell wrappers and therefore bypasses this guarantee.
+
+Installed agy 1.4.2 also accepts hidden `--gemini_dir=<absolute root>` and
+`--app_data_dir=antigravity-cli` flags. The launchers supply both and reject
+user overrides that could select another account's auth. The corresponding
+`ANTIGRAVITY_GEMINI_DIR` environment variable serves plugin CLI children; it is
+not the normal CLI's state-directory selector. Binary disassembly and an
+unsigned scratch `models` run confirmed these behaviors, including the log
+message selecting file token storage. These controls are not documented in
+[Google's installation guide](https://www.antigravity.google/docs/cli/install/),
+so recheck them after a native CLI update.
+
+The token remains `<Gemini root>/antigravity-cli/antigravity-oauth-token`.
+Status tests file existence without opening token contents. Cached quota
+cannot establish whether a token is still valid: output distinguishes stored
+file credentials from a live verified sign-in.
+
+## Shared local history
+
+New profiles link the `conversations`, `brain`, and `annotations` directories
+to `m`'s existing copies when those directories exist. These contain local
+trajectories, transcripts/artifacts and annotations. Directory links preserve
+SQLite WAL/SHM siblings beside their databases. Each account keeps its own
+`conversation_summaries.db` derived index and `cache/`, including account-linked
+project selection and workspace last-conversation mappings.
+
+The native trajectory store uses WAL and a five-second busy timeout; different
+conversation IDs use different files. Concurrent turns on the **same** ID are
+unsafe because annotation locking is per process. Fork a conversation before
+running parallel workers against it. Existing independent history directories
+must be reconciled manually before linking; setup refuses to replace them.
+
+Local trajectory loading has no account ownership check in the installed
+binary. Cross-account authenticated continuation still needs verification with
+a second signed-in account; cloud-only history may be account-bound. Until that
+check succeeds, `agy-best --conversation <id>` resumes with the account that
+owns the local transcript. Explicit account launchers may select another
+account for an explicit ID. `--continue` stays account/workspace-specific.
+
+## Status and choosing an account
+
+`agy-status` (`agys`) reports every configured account, its auth state and known
+plan tier, then percent **used** and local reset time for every quota bucket.
+Each failed account keeps its own error and never hides other accounts. Exit
+status is 1 when any account has an error; stdout is still a complete report.
+
+`agy-status --json` emits an array of account objects with `account`, `label`,
+`signed_in` (true/false/null), `auth_status`, `tier`, `email`, `error`, and
+`buckets`. Buckets include `bucket_id`, `group`, `label`, `used_percent`,
+`remaining_percent`, epoch `resets_at`, `resets_at_iso`, and `source` (cache/live).
+`agy-status --account cave [--json]` selects one. Tier/email are shown only if
+known from the statusline cache; token contents are never mined for identity.
+
+The older `agy_status_json_p=y agy-status` interface retains the flat bucket
+array for the current account, so existing reset notifiers keep their contract.
+The notifier still arms only that account and its existing delivery pickers;
+all-account resume scheduling is a separate follow-up.
+
+For quota-watch, use `agy_status_method=statusline agy_status_cache_only_p=y
+agy-status --json`. Missing/stale caches then report errors without starting
+agy, requesting authentication, or contacting a backend. The quota-management
+watcher consumes every account/bucket, preserves stale readings with a marker,
+and uses the existing alert thresholds. Run agy with its statusline configured
+to keep these cache readings fresh.
+
+`agy-best --model '<model name from agy models>' [other arguments]` chooses the
+account with the highest minimum remaining percentage across the known five-hour
+and weekly windows for that model's quota family. Gemini uses `gemini-*` buckets;
+Claude/GPT use `3p-*`. Unknown/missing quota and failed accounts are excluded;
+ties follow configured account order. Both windows are used when available;
+weekly-only data cannot reveal a missing five-hour restriction. Set
+`agy_best_model` for a default model; that same model is passed to agy. Explicit
+`--model` avoids selecting Gemini quota while launching a saved Claude model.
+`agy-best --continue` requires an explicit account launcher instead.
+
+## Hook activation
+
+The hook transport guards function existence before invocation and always
+returns success. A stale garden or failed account lookup must not invoke the
+command-not-found handler. Account/root/label travel explicitly into Brish;
+`m` replaces the legacy `acc1` label. tmux names use `+Agy/<account> <title>`.
+
+Commit the helper functions first, ask the owner to run `brishz-restart`, verify
+all hook targets with `brishz whence -w`, then update the installed hooks. The
+installed hooks file may be a symlink into this repository, so editing its
+source is an immediate installed change. Never restart the garden automatically.
 
 ## Two implementations, one report
 
@@ -288,71 +414,21 @@ check that hangs is worse than one that fails and says so. The timeout is
 sized for a cold CLI start-up followed by five sequential round trips, which
 makes it far more generous than a status check would otherwise want.
 
-### The brish garden guard
+### No GUI dependency
 
-The slow path's `agy -p` run wants a process attached to the GUI login
-session, for a reason that is easy to miss. `agy` refreshes its own access
-token whenever the one it holds has expired, and that refresh goes through
-the login Keychain, where the token lives. A
-GUI-detached process cannot touch it: the keychain search list collapses to
-the System keychain alone. Rather than failing, `agy` then falls through to
-its interactive browser login and sits there printing an OAuth URL until our
-timeout kills it. A report that hangs for a minute and then asks you to log in
-is a worse answer than a slow one.
+The slow path uses the selected account's file credentials directly. It no
+longer delegates authentication or quota calls to BrishGarden, so tmux and
+background processes use the same auth path. `agy-status-run-garden` remains a
+compatibility entry point; the old GUI/keychain guard is disabled.
 
-So `h-agy-status-run`, the one place `agy -p` is invoked, delegates to the
-brish garden when `h-agy-status-garden-p` says so and the garden is alive. The
-client uses [agfi:brishz] (`brishzgo`) with `brishz_binary=y`, preserving
-Unicode output without the legacy file-output flag. The garden's worker
-shells are attached to the GUI session, so the refresh succeeds there.
-`agy-status-run-garden` is what the garden runs on our behalf,
-and it forces the guard off so a worker can never bounce the command on to
-another worker. The delegation is proactive rather than a retry, because a
-detached run *cannot* succeed; attempting it first would only buy a minute on
-a login prompt nobody is going to answer.
+## The bucket engine
 
-The knob is `agy_status_garden_p`, an enum `auto|y|n`. Under `auto` the
-question asked is whether `launchctl managername` answers `Aqua`, which it
-does only in a session attached to the GUI login -- the very attachment the
-Keychain search list depends on. That names the real condition where an
-ssh test only guesses at it: an agent-spawned shell on this machine is
-`Background` and cannot reach the Keychain either, despite no ssh being
-involved. Where there is no `launchctl`, the ssh test stands in.
-
-The *whole* command is delegated, not the credential handling alone: only the
-rows `agy` printed come back over the garden's transport, and the token never
-leaves the GUI-attached process. This is the same shape as the Claude Code
-usage report's garden guard, and `docs/claude_code_usage.md` has the longer
-version of the reasoning.
-
-## The report
-
-Both paths emit the same thing. The human-readable report prints one
-line per bucket: the group name, the remaining percentage, and the reset as
-local time with how far off it is, since "resets at 03:00 UTC" is not a number
-anyone wants to convert in their head at the moment they have just been cut
-off.
-Colour follows `agy_status_color`: `auto` colours only when stdout is a
-terminal, while `always` and `never` force it either way, which is what a
-wrapper that captures the output and prints it later needs.
-
-`agy_status_json_p=y` prints JSON instead: an array with one object per
-bucket, carrying `group`, `label`, `remaining_percent`, `resets_at` as epoch
-seconds and `resets_at_iso` as the string upstream sent. The epoch is what
-the notifier and anything else scripted on top of this want, so the
-conversion is done once here rather than by every consumer; the original
-string is kept beside it so a disagreement between the two is something you
-can see. Both paths also carry `bucket_id`, which older consumers ignore.
-That the two paths' JSON is interchangeable was checked the same way each
-time, by feeding the output through the jq in `h-agy-status-arm-deadline`.
-
-Credits are the one number with no endpoint of ours. `agy -p /credits` prints
-`Remaining credits` and a count on one row, then an upgrade URL. `agy-status`
-leaves credits out of the default report and out of the JSON, since they are
-a purchased pool with no reset to wait for; `agy_status_credits_p=y` appends
-them to the human report for when the question is whether to buy more. On
-the statusline path that addendum is still an `agy` start-up, so asking for
-it is asking for that cost.
+Both implementations feed the all-account report described above. Internally
+the engine retains remaining percentages, the source note, and the legacy flat
+bucket JSON. Cache notes go to stderr in JSON mode, including slow fallbacks,
+so a cache miss cannot corrupt a JSON document with prose. Credits remain an
+optional `agy_status_credits_p=y` per-account engine addendum; they have no reset
+and are not quota buckets.
 
 ## Reset notifications
 

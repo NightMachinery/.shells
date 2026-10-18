@@ -59,7 +59,7 @@ function h-agent-session-tmux-name {
     case "${agent}" in
         claude) h-claude-code-session-tmux-name "${transcript}" ;;
         codex) h-codex-session-tmux-name "${id}" ;;
-        agy) h-agy-session-tmux-name "${id}" ;;
+        agy) h-agy-session-tmux-name "${id}" "${transcript}" ;;
         *)
             ecerr "$0: unknown agent: ${agent}"
             return 1
@@ -261,9 +261,20 @@ function h-agy-session-tmux-name {
     local id="${1}"
     assert-args id @RET
 
-    local name
+    local name label="${AGY_ACCOUNT_LABEL:-m}"
+    local agy_summaries_db="${agy_summaries_db}"
+    if test -n "${2}" && test -z "${AGY_ACCOUNT_ID}" ; then
+        local account
+        account="$(h-agy-account-of-transcript "${2}" 2>/dev/null)" || account=''
+        if test -n "${account}" ; then
+            local -a reply
+            h-agy-account-info "${account}" @RET
+            label="${reply[2]}"
+            agy_summaries_db="${reply[4]}/conversation_summaries.db"
+        fi
+    fi
     name="$(agy-conversation-name "${id}")"
-    ec "${agent_tmux_name_marker}Agy ${name:-${id[1,8]}}"
+    ec "${agent_tmux_name_marker}Agy/${label} ${name:-${id[1,8]}}"
 }
 
 function h-agy-session-tmux-pane-p {
