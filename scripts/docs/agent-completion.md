@@ -34,7 +34,20 @@ fabricated from CLI layouts, with no real session text.
 
 In kitty, `alt+/` invokes dabbrev only when a Claude Code or Codex command
 line is in the foreground. The kitten checks the foreground process again,
-so an old agent title never steals zsh bindings. Reload kitty.conf with Cmd+F5.
+so an old agent title never steals zsh bindings. Reload kitty.conf with Cmd+F5
+after changing its bindings.
+
+Kitty capture and the detached Go worker recognize Claude/Codex behind the
+launcher's `decset-rewrite -map 1003=1002 -- <agent>` proxy. They remove the
+proxy prefix before checking the launched executable, including native and
+Node script launchers. Legacy proxy calls without `--` consume `-map` and
+`-trace` values before finding the command. Agent names in those option values,
+another application's arguments, shell snippets, or Node eval/require values
+do not establish an agent foreground. Node scripts can launch directly or
+after `--`, `--no-warnings`, `--trace-warnings` or `--no-deprecation`.
+The captured process ID remains the foreground proxy PID so recapture verifies
+the same terminal owner. Completion remains limited to Claude Code and Codex;
+Antigravity is not supported by the screen parser.
 
 The corpus order is current screen, other windows in the same kitty OS window,
 the agent's transcript, then tracked git paths in the foreground cwd. The
@@ -117,6 +130,30 @@ with a non-ASCII remainder stays disabled until the two CLIs' deletion behavior
 is established for the full set of combining and emoji sequences.
 
 ## Verification
+
+Foreground recognition has inert automated tests that contact no terminal:
+
+```sh
+python3 -B configFiles/kitty/kittens/test_agent_complete.py
+python3 -B golang/llm_complete/tests/test_live_terminal.py
+cd golang/llm_complete
+go test ./...
+go vet ./...
+```
+
+These cover direct and DECSET-wrapped launchers, Node scripts, missing proxy
+separators, agent-looking option values, non-agent commands and unsupported
+Antigravity. The kitten test also executes it the way kitty does, without a
+`__file__` global. The live harness shares the kitten's pure argv helper and
+uses fabricated screen/foreground snapshots in its automated test.
+
+Python-only kitten changes take effect on the next invocation: kitty rereads
+custom kitten source for each dispatch, and the shared argv helper is loaded
+fresh. No kitty reload is needed for these source changes. The hot
+`bin/agent-complete.zsh` launcher checks Go source modification times and
+rebuilds an outdated `llm_complete` through [agfi:go-local-dep] on the next
+completion. Users invoking the Go binary directly can run `go install` from
+the module directory. These changes do not require a BrishGarden restart.
 
 The maintained `golang/llm_complete/tests/live-terminal.py` is opt-in. Give it
 only dedicated scratch CLI targets. It never submits a prompt. It verifies

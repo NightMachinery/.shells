@@ -189,8 +189,17 @@ Checked, one by one:
   wrapper's command line, so `codexPids` picks up the wrapper's pid alongside
   the real one. Harmless -- the rows are built from thread-lock holders, and the
   wrapper holds none -- and left alone deliberately, with a comment there.
-- `#{pane_current_command}` would report the wrapper, but nothing in `~/scripts`
-  or `~/.tmux.conf` reads it. Noted so the next person does not go looking.
+- The Antigravity tmux hook reads `#{pane_current_command}` through
+  [agfi:h-agy-session-tmux-pane-p]. It accepts a live agy pane directly, or a
+  foreground DECSET proxy whose direct child executable is agy. The child has
+  its own pty, so the check follows parent PID across tty boundaries rather
+  than searching arbitrary descendants. A wrapped Claude/Codex tool shell
+  spawning print-mode agy does not qualify. See `docs/tmux-session-rename.md`.
+- Kitty completion capture, the Go worker's foreground verification, and its
+  live-test harness strip the DECSET argv prefix before recognizing their
+  supported Claude/Codex command. Option values and unrelated command arguments
+  cannot supply the agent name. This does not add Antigravity completion;
+  see `docs/agent-completion.md` for tests and activation.
 
 ## Dead ends and alternatives
 
