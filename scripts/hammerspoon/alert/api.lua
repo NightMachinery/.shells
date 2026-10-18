@@ -44,7 +44,8 @@ end
 ---   color        band colour, default dark slate. A table, or a name: the
 ---                originals default/warn/amber/crit/agent/free/notice, one of
 ---                the palette in colors.lua (ocean, violet, blood, gold, ...),
----                an animated one (rainbow-1, silver-pulse-1, wolf-eye-1), or
+---                an animated one (rainbow-1, silver-pulse-1, wolf-eye-1,
+---                red-pulse-1), or
 ---                any x11 colour name. Text goes black or white to suit it
 ---   position     "top" (default), "center", "bottom"
 ---   flashSeconds fullscreen flash before settling into the band; 0 skips it

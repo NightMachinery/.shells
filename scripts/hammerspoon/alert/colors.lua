@@ -144,6 +144,26 @@ AlertEngine.animatedColors = AlertEngine.animatedColors or {
         end,
     },
 
+    --- A red heartbeat, for "act now". The steady crimson already means "an
+    --- agent is driving this screen, hands off", which is the opposite
+    --- instruction, so an urgent red has to move to be told apart from it at
+    --- a glance. Swings from a dark blood red up to a red just short of where
+    --- white text stops reading well.
+    ---
+    --- The dark end is dark enough to swallow a flash, so the flash is pinned
+    --- to the bright end, for the reason given at wolf-eye-1 below.
+    ["red-pulse-1"] = {
+        animated = true, period = 2, textColor = { white = 1 },
+        animate_flood_color_p = false,
+        at = function(now)
+            local w = wave(now, 2)
+            return { red   = lerp(0.40, 0.85, w),
+                     green = lerp(0.02, 0.05, w),
+                     blue  = lerp(0.04, 0.08, w),
+                     alpha = alertV2BandAlpha }
+        end,
+    },
+
     --- Something watching from the dark: a near-black blue-grey that swells
     --- toward amber-gold and sinks back. The blend tops out at 30%, so it
     --- glows rather than lights up, and the band stays dark throughout.

@@ -911,8 +911,11 @@ usually looks darker than it measures.
 
 `rainbow-1` walks the hue circle in ten seconds, `silver-pulse-1` breathes a
 pale metal band, `wolf-eye-1` swells from near-black to amber-gold and sinks
-back. The `-1` is a version, not a count: a variant that spins faster becomes
-`rainbow-2` rather than replacing the original.
+back, and `red-pulse-1` beats between blood red and bright red every two
+seconds. That last one is for "act now" (the critical battery band): the steady
+crimson already means "an agent is driving, hands off", so an urgent red has to
+move to be told apart from it. The `-1` is a version, not a count: a variant
+that spins faster becomes `rainbow-2` rather than replacing the original.
 
 A colour may be a descriptor instead of a table:
 
@@ -939,14 +942,15 @@ The fullscreen flash follows the cycle too, unless a colour sets
 `floodColor` if the descriptor names one, otherwise the brightest point of the
 cycle, found by sampling once.
 
-That opt-out exists for a colour whose cycle goes dark, and `wolf-eye-1` is the
-only one here that does. A flash is a moment whose whole job is to be impossible
-to miss, and its phase comes from the wall clock rather than from when the alert
-fires — so a colour dipping near black flashes at whatever brightness the clock
-happens to be at. Measured, `wolf-eye-1` spans 0.079 to 0.244 in luminance, and
-the same command flashed anywhere across that threefold range from run to run,
-including a near-black that read as no flash at all; at `flashSeconds = 5` it
-sat near the dark end for seconds. Pinned, it flashes at 0.244 every time.
+That opt-out exists for a colour whose cycle goes dark: `wolf-eye-1`, and
+`red-pulse-1`, whose blood-red end would swallow a flash the same way. A flash
+is a moment whose whole job is to be impossible to miss, and its phase comes
+from the wall clock rather than from when the alert fires — so a colour dipping
+near black flashes at whatever brightness the clock happens to be at.
+Measured, `wolf-eye-1` spans 0.079 to 0.244 in luminance, and the same command
+flashed anywhere across that threefold range from run to run, including a
+near-black that read as no flash at all; at `flashSeconds = 5` it sat near the
+dark end for seconds. Pinned, it flashes at 0.244 every time.
 `silver-pulse-1` never drops below 0.577 and `rainbow-1`'s floor of 0.182 is
 about that of the static crimson band, so both animate their flash safely.
 
