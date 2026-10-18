@@ -74,11 +74,11 @@ command jq --null-input --argjson now "${now}" '{account:{tier:"fixture"}, bucke
 command jq --null-input --argjson now "${now}" '{buckets:{"gemini-weekly":{remaining_percent:88,resets_at:2000000000,captured_at:$now,source:"fixture"},"gemini-5h":{remaining_percent:72,resets_at:2000000000,captured_at:$now,source:"fixture"},"3p-weekly":{remaining_percent:6,resets_at:2000000000,captured_at:$now,source:"fixture"}}}' > "${AGY_ACCOUNTS_DIR}/acc2/antigravity-cli/quota-cache.json"
 typeset -g json='' rc=0
 json="$(agy-status --json)" || rc=$?
-(( rc == 1 )) || fail 'one signed-out account must return partial failure'
+(( rc == 0 )) || fail 'signed-out account is a status, not measurement failure'
 print -r -- "${json}" | command jq --exit-status '
  length == 3 and .[0].buckets[0].used_percent == 55
  and .[1].label == "cave" and .[1].buckets[0].used_percent != 55
- and .[2].signed_in == false and .[2].error != null
+ and .[2].signed_in == false and .[2].error == null and .[2].message != null
 ' >/dev/null
 json="$(AGY_ACCOUNT_ID=acc1 agy_status_json_p=y agy-status)"
 print -r -- "${json}" | command jq --exit-status '.[0].remaining_percent == 45 and .[0].source == "cache"' >/dev/null
@@ -98,5 +98,23 @@ command rm "${AGY_ACCOUNTS_DIR}/acc2/antigravity-cli/quota-cache.json" "${AGY_TE
 if agy_status_cache_only_p=y agy-status --account cave --json > "${test_tmp}/cache-only.json"; then fail 'missing cache must fail'; fi
 [[ ! -e "${AGY_TEST_CALLS}" ]] || fail 'cache-only invoked agy'
 command jq --exit-status '.[0].error != null' "${test_tmp}/cache-only.json" >/dev/null
+
+source "${test_root}/zshlang/plugins/agent-session/session.zsh"
+source "${test_root}/zshlang/auto-load/others/agy-session.zsh"
+source "${test_root}/zshlang/auto-load/others/agent-tmux.zsh"
+typeset -g conversation='12345678-1234-1234-1234-123456789abc'
+typeset -g transcript="${AGY_SHARED_GEMINI_DIR}/antigravity-cli/brain/${conversation}/.system_generated/logs/transcript_full.jsonl"
+command mkdir -p "${transcript:h}" "${AGY_ACCOUNTS_DIR}/history-owners"
+print -r -- '{}' > "${transcript}"
+command ln -s "${AGY_SHARED_GEMINI_DIR}/antigravity-cli/brain" "${AGY_ACCOUNTS_DIR}/acc2/antigravity-cli/brain"
+print -r -- acc2 > "${AGY_ACCOUNTS_DIR}/history-owners/${conversation}"
+[[ "$(h-agy-account-of-transcript "${transcript}")" == acc2 ]] || fail 'shared history lost owner'
+typeset -ga agy_test_resume=()
+function h-agent-session-resume-run { shift; agy_test_resume=( "$@" ) }
+h-agy-session-resume "${transcript}"
+[[ "${agy_test_resume[1]}" == agy-acc2 && "${agy_test_resume[2]}" == --conversation &&
+   "${agy_test_resume[3]}" == "${conversation}" ]] || fail 'owning account resume argv'
+function agy-conversation-name { print -r -- fixture }
+[[ "$(AGY_ACCOUNT_ID=acc2 AGY_ACCOUNT_LABEL=cave h-agy-session-tmux-name "${conversation}" "${transcript}")" == '+Agy/cave fixture' ]] || fail 'live account identity lost'
 
 print -r -- 'ok: launch isolation, named accounts, configuration, status JSON, best and cache-only'

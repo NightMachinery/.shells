@@ -1022,7 +1022,7 @@ function h-agy-status-account-json {
     local -x AGY_ACCOUNT_ID="${id}"
     local -x agy_status_cache_file="${reply[5]}"
     local agy_status_json_p=y
-    local buckets='[]' error='' auth_status=missing signed_in=false ret=0
+    local buckets='[]' error='' message='' auth_status=missing signed_in=false ret=0
     local metadata='{}'
     if test -r "${agy_status_cache_file}" ; then
         metadata="$(command jq --compact-output '.account | if type == "object" then . else {} end' "${agy_status_cache_file}" 2>/dev/null)" || metadata='{}'
@@ -1046,15 +1046,16 @@ function h-agy-status-account-json {
             fi
         fi
     else
-        error="Signed out; run agy-acc-login ${id}"
+        message="Not signed in; run agy-acc-login ${id}"
     fi
     command jq --null-input --arg account "${id}" --arg label "${label}" \
         --arg auth_status "${auth_status}" --argjson signed_in "${signed_in}" \
-        --arg error "${error}" --argjson metadata "${metadata}" \
+        --arg error "${error}" --arg message "${message}" --argjson metadata "${metadata}" \
         --argjson buckets "${buckets}" '
         {account: $account, label: $label, signed_in: $signed_in,
          auth_status: $auth_status, tier: ($metadata.tier // null),
          email: ($metadata.email // null),
+         message: (if $message == "" then null else $message end),
          error: (if $error == "" then null else $error end),
          buckets: ($buckets | map(. + {used_percent: (100 - .remaining_percent)}))}'
 }
@@ -1112,12 +1113,13 @@ function agy-status {
             --arg bold "${c_header}" --arg off "${c_off}" \
             --arg green "${c_green}" --arg yellow "${c_yellow}" --arg red "${c_red}" '
           .[] | $bold + "\(.label) [\(.account)]  " +
-            (if .auth_status == "missing" then "signed out"
+            (if .auth_status == "missing" then "not signed in"
              elif .signed_in == true then "signed in (verified)"
              else "file credentials present (unverified)" end) +
             "  tier: \(.tier // "unknown")" +
             (if .email then "  \(.email)" else "" end) + $off,
             (if .error then $red + "  ERROR: \(.error)" + $off else empty end),
+            (if .message then "  \(.message)" else empty end),
             (.buckets[] | "  \(.group) / \(.label): " +
               (if .used_percent >= 90 then $red elif .used_percent >= 67 then $yellow else $green end) +
               "\(.used_percent | . * 10 | round / 10)% used" + $off +

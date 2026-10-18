@@ -178,7 +178,7 @@ function h-agy-session-resume {
 
     #: In the session's own directory ([agfi:h-agent-session-resume-run]).
     local -a reply
-    h-agent-session-resume-argv agy "${id}" agy-account "${account}" "$@" @RET
+    h-agent-session-resume-argv agy "${id}" "agy-${account}" "$@" @RET
     h-agent-session-resume-run "${transcript}" "${reply[@]}"
 }
 

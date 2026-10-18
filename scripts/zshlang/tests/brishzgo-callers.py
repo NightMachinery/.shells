@@ -40,7 +40,7 @@ sys.exit(int(os.environ.get('CLIENT_STATUS','0')))
     (home / ".bashrc").write_text("")
     env = {"HOME": tmp, "PATH": tmp + ":" + os.environ["PATH"],
            "BRISHZGO_BIN": str(mock), "CALL_LOG": str(log),
-           "TMUX_PANE": "%9", "TMUX_SUBAGENT_NODE": "test"}
+           "TMUX_PANE": "%9", "TMUX_SUBAGENT_NODE": "test", "NIGHTDIR": str(ROOT)}
 
     def calls():
         rows = [json.loads(x) for x in log.read_text().splitlines()] if log.exists() else []
@@ -63,7 +63,7 @@ sys.exit(int(os.environ.get('CLIENT_STATUS','0')))
     for config in ("claude-code/settings.json", "codex/hooks.json", "antigravity/hooks.json"):
         count = 0
         for code in commands(json.loads((ROOT / "configFiles" / config).read_text())):
-            if "BRISHZGO_BIN" not in code: continue
+            if "BRISHZGO_BIN" not in code and "agy_hook.py" not in code: continue
             run(["/bin/sh", "-c", code], b'{"event":"synthetic"}\n')
             rows = calls()
             assert len(rows) == 1 and rows[0]["async"] == "y"
@@ -175,7 +175,6 @@ function brishz() { command "$BRISHZGO_BIN" -- "$@" }
 ''')
     for path, name, args, command in [
         ("zshlang/auto-load/others/claude.zsh", "h-claude-code-usage-run", [strange], "claude_code_usage.py"),
-        ("zshlang/auto-load/others/agy-status.zsh", "h-agy-status-run", ["/usage"], "agy-status-run-garden"),
         ("zshlang/auto-load/others/clipboard/images, pictures.zsh", "maccy-paste-images", ["2"], "python3"),
     ]:
         function_file = home / "report-function.zsh"

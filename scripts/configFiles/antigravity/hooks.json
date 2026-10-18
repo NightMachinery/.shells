@@ -3,14 +3,14 @@
     "SessionStart": [
       {
         "type": "command",
-        "command": "brishz_async=y brishz_in=MAGIC_READ_STDIN \"${BRISHZGO_BIN:-$HOME/go/bin/brishzgo}\" -- agy-session-tmux-autoname \"$TMUX_PANE\" >/dev/null 2>&1; echo '{}'",
+        "command": "python3 \"${NIGHTDIR:-$HOME/scripts}/python/agy_hook.py\" tmux \"$TMUX_PANE\" 2>/dev/null || printf '{}\\n'",
         "timeout": 5
       }
     ],
     "Stop": [
       {
         "type": "command",
-        "command": "brishz_async=y brishz_in=MAGIC_READ_STDIN \"${BRISHZGO_BIN:-$HOME/go/bin/brishzgo}\" -- agy-session-tmux-autoname \"$TMUX_PANE\" >/dev/null 2>&1; echo '{}'",
+        "command": "python3 \"${NIGHTDIR:-$HOME/scripts}/python/agy_hook.py\" tmux \"$TMUX_PANE\" 2>/dev/null || printf '{}\\n'",
         "timeout": 5
       }
     ]
@@ -19,14 +19,14 @@
     "PreInvocation": [
       {
         "type": "command",
-        "command": "brishz_async=y brishz_in=MAGIC_READ_STDIN \"${BRISHZGO_BIN:-$HOME/go/bin/brishzgo}\" -- agent-session-register agy >/dev/null 2>&1; echo '{}'",
+        "command": "python3 \"${NIGHTDIR:-$HOME/scripts}/python/agy_hook.py\" register 2>/dev/null || printf '{}\\n'",
         "timeout": 5
       }
     ],
     "Stop": [
       {
         "type": "command",
-        "command": "brishz_async=y brishz_in=MAGIC_READ_STDIN \"${BRISHZGO_BIN:-$HOME/go/bin/brishzgo}\" -- agent-session-register agy >/dev/null 2>&1; echo '{}'",
+        "command": "python3 \"${NIGHTDIR:-$HOME/scripts}/python/agy_hook.py\" register 2>/dev/null || printf '{}\\n'",
         "timeout": 5
       }
     ]
@@ -35,7 +35,7 @@
     "Stop": [
       {
         "type": "command",
-        "command": "brishz_async=y brishz_in=MAGIC_READ_STDIN \"${BRISHZGO_BIN:-$HOME/go/bin/brishzgo}\" -- agent-auto-continue-hook agy \"$TMUX_PANE\" >/dev/null 2>&1; echo '{}'",
+        "command": "python3 \"${NIGHTDIR:-$HOME/scripts}/python/agy_hook.py\" continue \"$TMUX_PANE\" 2>/dev/null || printf '{}\\n'",
         "timeout": 5
       }
     ]

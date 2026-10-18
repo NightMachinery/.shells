@@ -24,12 +24,19 @@ def record_owner(directory: Path, conversation: str, account: str) -> None:
     if not re.fullmatch(r"[a-zA-Z0-9_-]+", conversation):
         return
     directory.mkdir(parents=True, exist_ok=True, mode=0o700)
-    try:
-        fd = os.open(directory / conversation, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
-    except FileExistsError:
+    destination = directory / conversation
+    if destination.exists():
         return
-    with os.fdopen(fd, "w") as stream:
-        stream.write(account + "\n")
+    fd, temporary = tempfile.mkstemp(prefix=".owner-", dir=directory)
+    try:
+        with os.fdopen(fd, "w") as stream:
+            stream.write(account + "\n")
+        try:
+            os.link(temporary, destination)
+        except FileExistsError:
+            pass  # Another hook won. Never expose a partially written record.
+    finally:
+        os.unlink(temporary)
 
 
 def seed_owners(directory: Path, shared: Path, account="m") -> None:

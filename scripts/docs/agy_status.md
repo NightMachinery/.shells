@@ -75,7 +75,12 @@ SQLite WAL/SHM siblings beside their databases. Each account keeps its own
 project selection and workspace last-conversation mappings.
 
 The native trajectory store uses WAL and a five-second busy timeout; different
-conversation IDs use different files. Concurrent turns on the **same** ID are
+conversation IDs use different files. The first account recorded for each conversation is kept in an owner-only
+`history-owners/` directory outside the repository. Existing main-account IDs
+are seeded before the new profiles are prepared; hooks record new IDs with
+exclusive creation so another account cannot overwrite ownership.
+
+Concurrent turns on the **same** ID are
 unsafe because annotation locking is per process. Fork a conversation before
 running parallel workers against it. Existing independent history directories
 must be reconciled manually before linking; setup refuses to replace them.
@@ -93,9 +98,11 @@ account for an explicit ID. `--continue` stays account/workspace-specific.
 plan tier, then percent **used** and local reset time for every quota bucket.
 Each failed account keeps its own error and never hides other accounts. Exit
 status is 1 when any account has an error; stdout is still a complete report.
+An account without a token is a normal `not signed in` status, with a login hint,
+not a measurement error. It does not trigger quota-watcher error alerts.
 
 `agy-status --json` emits an array of account objects with `account`, `label`,
-`signed_in` (true/false/null), `auth_status`, `tier`, `email`, `error`, and
+`signed_in` (true/false/null), `auth_status`, `tier`, `email`, `error`, `message`, and
 `buckets`. Buckets include `bucket_id`, `group`, `label`, `used_percent`,
 `remaining_percent`, epoch `resets_at`, `resets_at_iso`, and `source` (cache/live).
 `agy-status --account cave [--json]` selects one. Tier/email are shown only if
@@ -122,6 +129,58 @@ weekly-only data cannot reveal a missing five-hour restriction. Set
 `agy_best_model` for a default model; that same model is passed to agy. Explicit
 `--model` avoids selecting Gemini quota while launching a saved Claude model.
 `agy-best --continue` requires an explicit account launcher instead.
+
+## Sandboxed unattended work
+
+The exact artifact review setting is `artifactReviewPolicy: "agent-decides"`.
+It is independent of the tool execution mode. The verified combination is:
+
+```json
+{
+  "enableTerminalSandbox": true,
+  "toolPermission": "proceed-in-sandbox",
+  "artifactReviewPolicy": "agent-decides",
+  "permissions": {
+    "allow": ["write_file(/absolute/workspace/)"]
+  }
+}
+```
+
+Merge those keys into the selected account's `antigravity-cli/settings.json`,
+preserving other settings and existing permission rules. Scope the write rule
+to the actual absolute workspace, with a trailing slash. In the installed
+1.4.2 build, relying on the implicit workspace grant denied even an in-workspace
+terminal write; the explicit rule above fixed it. Configure every candidate
+account for that workspace before using `agy-best`.
+
+```zsh
+cd /absolute/workspace
+agy-m --model gemini-3.8-flash-low --sandbox --print-timeout 5m \
+  --output-format json --print 'Create hello.txt containing hi.' \
+  > result.json 2> agy.stderr
+# Or use agy-cave / agy-fm2 after sign-in.
+# Or agy-best --model gemini-3.8-flash-low with the same remaining flags.
+```
+
+The account wrapper supplies file auth and state-root flags. `--sandbox` forces
+the terminal sandbox on; `--print-timeout` bounds the agent turn. Output goes
+to the two redirected files. Conversation state goes to the shared local
+history; each selected account keeps its own summary index/cache. Terminal
+commands can write the explicitly allowed workspace. Do not add an
+`unsandboxed(...)` rule for unattended workers. An action that still requires
+review may fail headlessly; `agent-decides` does not guarantee approval for
+every action. Verify requested artifacts as well as CLI exit status.
+
+The scratch verification used this settings combination and `--sandbox`,
+without a permission bypass. `printf hi > hello.txt` exited 0 and wrote exactly
+`hi`; a write to a sentinel outside the workspace exited 1 with `operation not
+permitted`, and the outside file did not exist. The overall JSON run exited 0,
+so command/artifact verification is necessary. The native `--mode auto` is not a
+portable substitute: it is gated by an account rollout and may warn and fall
+back to the default mode.
+
+See [Google's sandbox guide](https://antigravity.google/docs/sandbox/) and
+[settings reference](https://www.antigravity.google/docs/cli/reference/).
 
 ## Hook activation
 
