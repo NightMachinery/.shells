@@ -1069,6 +1069,41 @@ without re-flashing, so a long task can heartbeat without strobing. A changed
 message does flash again. The banner always expires on its own, so an agent
 that crashes or forgets cannot leave the screen branded.
 
+## Battery low banner
+
+`core/battery-low.lua` puts a pinned, rust-coloured band across the top of
+every screen once the Mac is on battery and macOS estimates five minutes or
+less of life left (`hs.battery.timeRemaining`). It reads like
+`Battery: about 3 min left (4%) - plug in now`, washes the screens for one
+second when it first appears, and refreshes its text without flashing again.
+
+It is **latched**: once up, only AC power takes it down, and a three-second
+green "On AC power" band confirms the cable took. The estimate is a running
+average that swings with load, so without the latch a machine hovering near
+the threshold would raise and drop the band every minute, and quitting a heavy
+app to buy time would hide a warning that is still true.
+
+Two gaps in the estimate are covered by a charge floor: macOS reports `-1`
+("calculating") for a minute or two after unplugging, and the estimate tends
+to be optimistic in the last few percent. At or below
+`batteryLowPercentFloor` (2%) the band goes up whatever the estimate says.
+
+An `hs.battery.watcher` catches the cable going in or out at once; a 30-second
+poll is the backstop for the estimate crossing the threshold between the
+moments macOS posts a change. The knobs are globals:
+`batteryLowMinutes` (5), `batteryLowPercentFloor` (2),
+`batteryLowFlashSeconds` (1).
+
+To test without unplugging, hand the check a fake reading. The next real check
+(30 seconds at most, or immediately with no argument) takes it down again on
+AC:
+
+```sh
+hs -c 'batteryLowCheck({source = "Battery Power", minutes = 3, percent = 4})'
+hs -c 'return batteryLowActive()'
+hs -c 'batteryLowCheck()'
+```
+
 ## Stepping a display level
 
 hyper+F1/F2 steps brightness and hyper+ctrl+F1/F2 steps contrast. Both are

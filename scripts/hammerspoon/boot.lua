@@ -77,6 +77,8 @@ local hammerspoonCoreFiles = {
     "core/audio-devices.lua",
     "core/audio-watcher.lua",
     "core/power-watcher.lua",
+    -- After alert/: it bands through alert_gateway.
+    "core/battery-low.lua",
     "core/hyper-mode.lua",
     -- After core/hyper-mode.lua and alert/: it reads hyper_modality.entered_p
     -- and alerts through alert_gateway. Before core/window-media-bindings.lua,
