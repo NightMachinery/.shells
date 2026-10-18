@@ -142,7 +142,8 @@ and regression checks. Codex identity hooks resolve missing transcript paths
 by session ID. Claude and Codex hooks keep the latest local outcome per pane
 and report identity-write failures there while returning success. Antigravity
 skips absent, dead and other-program tmux panes before writing identity, so a
-scripted call's inherited pane does not trigger a garden failure warning;
+scripted call's inherited pane does not trigger a garden failure warning.
+Direct agy and the launcher's DECSET proxy with an agy child are recognized;
 write failures on a verified agy pane still propagate. See
 [[NIGHTDIR:docs/tmux-session-rename.md][tmux identity diagnostics]].
 

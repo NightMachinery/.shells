@@ -266,19 +266,53 @@ function h-agy-session-tmux-name {
     ec "${agent_tmux_name_marker}Agy ${name:-${id[1,8]}}"
 }
 
+function h-agy-session-tmux-pane-p {
+    #: The foreground must be agy itself, or the launcher's DECSET proxy with
+    #: agy as its direct child. The child has a separate pty, so a pane-tty
+    #: process listing alone cannot see it. Do not follow arbitrary descendants:
+    #: a wrapped Claude/Codex can launch a print-mode agy in its tool shell.
+    local pane="${1:-}"
+    [[ "${pane}" == %<-> ]] || return 1
+
+    local foreground
+    foreground="$(command tmux display-message -p -t "${pane}" \
+        '#{pane_id} #{pane_current_command} #{pane_dead} #{pane_tty}' 2>/dev/null)" || return 1
+    local -a fields=( ${=foreground} )
+    (( ${#fields} == 4 )) || return 1
+    [[ "${fields[1]}" == "${pane}" && "${fields[3]}" == 0 ]] || return 1
+    [[ "${fields[2]}" == agy ]] && return 0
+    [[ "${fields[2]}" == decset-rewrite && "${fields[4]}" == /dev/* ]] || return 1
+
+    local tty="${fields[4]#/dev/}" rows row comm proxy=''
+    rows="$(command ps -t "${tty}" -o pid=,pgid=,tpgid=,comm= 2>/dev/null)" || return 1
+    for row in "${(@f)rows}" ; do
+        fields=( ${=row} )
+        (( ${#fields} >= 4 )) || continue
+        comm="${(j: :)fields[4,-1]}"
+        [[ "${fields[1]}" == <-> && "${fields[2]}" == <-> &&
+            "${fields[2]}" == "${fields[3]}" && "${comm:t}" == decset-rewrite ]] || continue
+        #: Ambiguous foreground proxies are not evidence of pane ownership.
+        test -z "${proxy}" || return 1
+        proxy="${fields[1]}"
+    done
+    test -n "${proxy}" || return 1
+
+    rows="$(command ps -axo ppid=,comm= 2>/dev/null)" || return 1
+    for row in "${(@f)rows}" ; do
+        fields=( ${=row} )
+        (( ${#fields} >= 2 )) || continue
+        comm="${(j: :)fields[2,-1]}"
+        [[ "${fields[1]}" == "${proxy}" && "${comm:t}" == agy ]] && return 0
+    done
+    return 1
+}
+
 function agy-session-tmux-autoname {
     : "hook body for Antigravity's hooks: <tmux-pane> [payload]"
     local pane="${1:-}"
-    [[ "${pane}" == %<-> ]] || return 0
-
     #: Print-mode children inherit the caller's pane, which may belong to
-    #: another program or server. Check what tmux actually shows before the
-    #: core writes either the session identity or its optional state file.
-    #: A stale @agent_session is not evidence that agy still owns the pane.
-    local foreground
-    foreground="$(command tmux display-message -p -t "${pane}" \
-        '#{pane_id} #{pane_current_command} #{pane_dead}' 2>/dev/null)" || return 0
-    [[ "${foreground}" == "${pane} agy 0" ]] || return 0
+    #: another program or server. Verify ownership before either identity write.
+    h-agy-session-tmux-pane-p "${pane}" || return 0
 
     local input
     input="$(h-agent-hook-payload "${2:-}")"

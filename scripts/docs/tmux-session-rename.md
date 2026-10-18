@@ -141,8 +141,9 @@ propagate to the caller for diagnostics. The Claude and Codex hook boundaries
 record those failures and return success, so a stale pane cannot produce a
 Brish command-failure warning; a broken rename must not cost a prompt.
 The Antigravity hook first verifies that the requested pane exists, is alive,
-and has `agy` as its foreground command. Empty, stale and other-program pane
-hints return success without writing identity or renaming. A real identity-write
+and shows `agy` directly or through the launcher's DECSET proxy. Empty, stale
+and other-program pane hints return success without writing identity or
+renaming. A real identity-write
 failure after that check still propagates and is recorded as `identity-failed`.
 This guard belongs in the agy parser because its print-mode children inherit
 the caller's pane; the shared core and Claude/Codex failure policy stay intact.
@@ -216,9 +217,15 @@ Run `zsh -f zshlang/tests/agent-tmux-claude.zsh`,
 `zsh -f zshlang/tests/agent-tmux-agy.zsh` from the scripts directory to check
 payload handling, identity-write failures and diagnostic outcomes without a
 real tmux server. The Codex tests also cover exact-ID fallback. Antigravity
-tests cover stale and inherited panes, a live agy foreground, preserved write
-errors, and its sibling registration and auto-continue hooks. Restart Brish
-after changing hook bodies so installed hook commands use the new definitions.
+tests cover stale and inherited panes, direct and DECSET-wrapped agy,
+preserved write errors, and its sibling registration and auto-continue hooks.
+Run `zsh -f zshlang/tests/agent-tmux-agy.zsh --integration` to exercise the
+installed `decset-rewrite` binary with inert agent fixtures on its own tmux
+`-L` socket, including a wrapped other agent that spawns a nested agy.
+This requires `tmux`, `decset-rewrite`, a C compiler and process-list access;
+it verifies socket isolation before hook writes and removes its own fixtures.
+Restart Brish after changing hook bodies so installed hook commands use the
+new definitions.
 
 ## Toggles
 
@@ -286,13 +293,21 @@ with `echo '{}'`.
 
 A print-mode `agy` launched by another agent can inherit `TMUX_PANE` from
 that agent's terminal even though the hook is not describing that pane.
-[agfi:agy-session-tmux-autoname] compares tmux's returned pane ID with the
-requested ID and requires `pane_current_command=agy` and `pane_dead=0` before
-calling the shared writer. It also rejects missing, empty or non-string
-conversation IDs before writing identity. The ID comparison matters because
-`display-message` can answer using its current context when a target does not
-resolve. This checks
-the foreground program, not agy's command-line mode.
+[agfi:agy-session-tmux-autoname] uses [agfi:h-agy-session-tmux-pane-p] to
+compare tmux's returned pane ID with the requested ID and require a live pane.
+A foreground `agy` passes directly. A foreground `decset-rewrite`, installed
+by [agfi:h-agent-launch], passes only when its direct child executable is agy.
+The proxy is identified by its foreground process group on the pane tty;
+its child is found by parent PID because the proxy gives the agent its own pty.
+A wrapped Claude or Codex with a nested print-mode agy therefore fails the
+guard. No arbitrary descendant search or command-line text match is used.
+Direct agy adds no process lookup; only the proxy path pays for the two `ps`
+queries. Executable paths containing spaces are supported.
+
+The handler also rejects missing, empty or non-string conversation IDs before
+writing identity. The ID comparison matters because `display-message` can
+answer using its current context when a target does not resolve. This checks
+pane ownership, not agy's command-line mode.
 
 The sibling [agfi:agent-session-register] already returns success when a
 transcript or eligible kitty window is absent. [agfi:agent-auto-continue-hook]
