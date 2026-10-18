@@ -65,6 +65,8 @@ def reset_text(epoch, now):
 
 
 def bucket_names(bucket):
+    if "_display_family" in bucket:
+        return clean(bucket["_display_family"]), clean(bucket["_display_window"])
     identity = clean(bucket.get("bucket_id"))
     group = clean(bucket.get("group") or identity)
     label = clean(bucket.get("label"))
@@ -89,6 +91,8 @@ def bucket_names(bucket):
 
 
 def provenance(account, now):
+    if "_display_source" in account:
+        return clean(account["_display_source"])
     buckets = account.get("buckets", [])
     if not buckets:
         return "quota unavailable" if account.get("error") else ""
@@ -165,31 +169,46 @@ def render(accounts, columns=80, color=False, absolute="auto", now=None):
     if absolute == "auto":
         show_absolute = show_absolute and columns >= 100
 
-    output = []
-    for account, entries in prepared:
-        if output:
-            output.append("")
+    headers = []
+    for account, _ in prepared:
         label = clean(account.get("label") or account.get("account"))
         name = label if label == account.get("account") else f"{label} [{clean(account.get('account'))}]"
         state = ("not signed in" if account.get("signed_in") is False else
                  "signed in" if account.get("signed_in") is True else "auth stored")
+        state = clean(account.get("_display_state") or state)
         tier = clean(account.get("tier"))
         source = provenance(account, now)
         email = clean(account.get("email"))
-        # Allocate header cells before ANSI styling. Provenance takes priority
-        # over a long label/email; all header information stays on one line.
-        tier_budget = max(0, columns - width(state) - width(source) - 16)
-        tier = clip(tier, tier_budget)
-        suffix = "  ".join(part for part in (state, tier, source) if part)
-        name = clip(name, max(8, columns - width(suffix) - 2))
-        header = f"{bold}{name}{off}  {suffix}"
-        plain_length = width(name) + 2 + width(suffix)
-        if email and columns - plain_length >= 6:
-            header += f"  {dim}{clip(email, columns - plain_length - 2)}{off}"
-        # Color only the source portion dimly, without dimming sign-in state.
-        if color and source:
-            header = header.replace(source, dim + source + off, 1)
-        output.append(header)
+        headers.append((name, state, tier, source, email))
+
+    # Header fields have their own shared columns. Allocate display cells
+    # before styling, reserving room for email on compact terminals.
+    header_widths = [max([0] + [width(row[i]) for row in headers]) for i in range(4)]
+    limits = (max(8, columns // 4), 13, 24, 32)
+    header_widths = [min(value, limit) for value, limit in zip(header_widths, limits)]
+    minima = [min(value, minimum) for value, minimum in zip(header_widths, (8, 13, 8, 12))]
+    email_reserve = 14 if any(row[4] for row in headers) else 0
+    while sum(header_widths) + 6 + email_reserve > columns:
+        candidates = [i for i in (0, 2, 3) if header_widths[i] > minima[i]]
+        if not candidates:
+            break
+        widest = max(candidates, key=lambda i: header_widths[i])
+        header_widths[widest] -= 1
+    email_width = max(0, columns - sum(header_widths) - 8)
+
+    output = []
+    for (account, entries), fields in zip(prepared, headers):
+        if output:
+            output.append("")
+        cells = []
+        for index, (value, cell_width) in enumerate(zip(fields, header_widths)):
+            value = clip(value, cell_width)
+            style = bold if index == 0 else dim if index == 3 else ""
+            cells.append(style + value + (off if style else "") + " " * (cell_width - width(value)))
+        header = "  ".join(cells)
+        if fields[4] and email_width:
+            header += "  " + dim + clip(fields[4], email_width) + off
+        output.append(header.rstrip())
         if account.get("error"):
             output.append(paint("  ! " + clip(account["error"], columns - 4), 31))
         if account.get("signed_in") is False:
@@ -205,6 +224,9 @@ def render(accounts, columns=80, color=False, absolute="auto", now=None):
             if show_absolute and stamp:
                 line += f"   {dim}{stamp}{off}"
             output.append(line.rstrip())
+        for severity, note in account.get("_display_notes", []):
+            code = 31 if severity == "alarm" else 33 if severity == "warning" else 2
+            output.append(paint("  " + clip(note, columns - 2), code))
     return "\n".join(output) + "\n"
 
 

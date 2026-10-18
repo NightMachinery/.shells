@@ -109,7 +109,9 @@ m  auth stored  Pro  cache 2m  masked@example.test
 ```
 
 Reset durations use at most two units. Columns align across accounts using
-display-cell widths, including wide and combining characters. At 80 columns
+display-cell widths, including wide and combining characters. Account header
+fields also share columns, so names of different lengths do not shift the
+sign-in state, tier, provenance or email. At 80 columns
 only relative resets appear; at 100 or more, local absolute times appear dim
 when space permits. `agy_status_columns=80` overrides the terminal width;
 `agy_status_absolute_p=n` hides absolute times (`y` shows them when they fit).

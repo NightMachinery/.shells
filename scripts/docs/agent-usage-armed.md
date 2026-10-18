@@ -313,23 +313,61 @@ presets over `agent_usage_continue_via`, with `acat`, `acak`, `acap` and
 
 ## All three reports at once
 
-`agent-status` (alias `agst`) prints the Claude Code, Codex and Antigravity
-reports one after another, each under a header carrying the agent's glyph
-and name. The three commands run concurrently through the repo's GNU
-parallel wrapper, `parallelm`, so the whole thing takes about as long as the
-slowest of them rather than the sum, and `--keep-order` keeps the sections
-in the configured order however the jobs happen to finish. The output goes
-through `pager-if-overflow`, so a report longer than the screen pages and a
-short one simply prints.
+`agent-status` (alias `agst`) displays each selected provider under a compact
+heading and rule. Account headers align name, status, plan, provenance and email;
+quota rows share the same short windows, usage bars and two-unit relative resets
+as `agy-status`. Long labels are clipped to fit the terminal. At 80 columns the
+rows use relative times; wider terminals add dim local reset timestamps.
+`agent_status_columns=80` fixes the width, and `agent_status_absolute_p=n`
+hides the optional timestamps.
 
-The jobs run inside BrishGarden shells and therefore see a pipe, not your
-terminal, so colour is decided once, up front, by `agent_status_color`
-(`auto`, `always` or `never`, where `auto` means "when stdout is a
-terminal") and passed to each command explicitly rather than left to their
-own tty checks. The list of agents is written one per line inside the
-function, so dropping one is a matter of commenting out a line; the array
-knob `agent_status_agents` overrides it without editing. A report that
-fails prints its error inside its own section, and the others still appear.
+The default providers remain Claude Code and Codex. To include Antigravity:
+
+```zsh
+agent_status_agents=(claude codex agy)
+agent-status
+```
+
+The array also sets section order. Collection runs concurrently through
+`parallelm --keep-order` in BrishGarden. Workers return compact JSON envelopes;
+the local renderer formats each section as it arrives and sends it through
+`pager-if-overflow-streaming`. Fetching and machine-readable provider commands
+retain their existing behavior and JSON contracts. Their credential-source
+paths and repeated report titles do not appear in the combined human view.
+
+Colour is resolved at the caller's terminal before the pipeline, so garden
+workers and the pager cannot accidentally disable it. `agent_status_color`
+accepts `auto`, `always` and `never`; a pipe or any set `NO_COLOR` disables
+styling. Green means below 70% used, yellow means 70 through 89%, and red means
+90% or more. Error rows remain inside the relevant account/provider, without
+hiding other sections. Missing usage is shown as unavailable, never as 0%.
+
+Claude cache age, stale warnings and extra-usage information remain visible.
+Codex reset credits, credit balances, reserve capacity, applicable model limits,
+blocked reasons and multi-account summaries remain visible too. Reserve rows
+include the model needed to use that allowance. For example (illustrative
+values, email masked):
+
+```text
+Claude Code  ───────────────────────────────────────────────────────────────────
+
+default  ready  max   cache 2m
+  Claude      5h      █████░░░░░    52%  resets in 1h 25m
+  Claude      weekly  ████████░░    83%  resets in 4d 7h
+
+work     ready  team  cache 2m
+  Claude      5h      ████░░░░░░    35%  resets in 2h
+
+Codex  ─────────────────────────────────────────────────────────────────────────
+
+auth  ready  pro  live  masked@example.test
+  Codex       weekly  ██████░░░░    61%  resets in 2d 11h
+  Reset credits: 1 available (Full reset, expires in 4d)
+```
+
+After editing shell collectors, ask the owner to run `brishz-restart` before
+using them through the garden. Python renderer-only changes load on the next
+report without restarting the garden.
 
 `agent-usage-armed-cancel-fz` is the middle ground between the two bulk
 commands, for when several agents have jobs armed and only one or two of

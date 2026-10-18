@@ -95,6 +95,25 @@ class RenderTest(unittest.TestCase):
             narrow = render(accounts, columns=80, color=True, now=NOW)
             self.assertNotRegex(narrow, r"\x1b\[2m\w{3} \d{2} \w{3}")
 
+    def test_header_columns_align_across_accounts(self):
+        accounts = fixture()[:3]
+        for account, label, tier, source in zip(accounts, ("m", "cave", "研究"),
+                                               ("Pro", "Google AI Pro", "Ultra"),
+                                               ("cache", "live", "cache")):
+            account.update(label=label, signed_in=None, tier=tier, email="masked@example.test")
+            for bucket in account["buckets"]:
+                bucket["source"] = source
+        for columns in (80, 120):
+            text = render(accounts, columns=columns, color=True, now=NOW)
+            headers = [ANSI.sub("", block.splitlines()[0]) for block in text.split("\n\n")]
+            for tokens in (("auth stored",) * 3,
+                           ("Pro", "Google AI Pro", "Ultra"),
+                           ("cache", "live", ""),
+                           ("masked",) * 3):
+                positions = [width(line[:line.index(token)]) for line, token in zip(headers, tokens) if token]
+                self.assertEqual(len(set(positions)), 1, (columns, tokens, headers))
+            self.assertTrue(all(width(line) <= columns for line in headers))
+
     def test_color_threshold_boundaries(self):
         for used, code in ((69.9, 32), (70, 33), (89.9, 33), (90, 31)):
             accounts = fixture()[:1]

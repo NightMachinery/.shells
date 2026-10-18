@@ -5,15 +5,16 @@
 #: There is no shared quota API to call -- each agent's status command is its
 #: own program with its own transport ([agfi:claude-code-usage-all] talks HTTP,
 #: [agfi:codex-status] starts `codex', [agfi:agy-status] starts `agy') -- so
-#: this is a fan-out, not an abstraction: run all three, label each block, and
-#: hand the lot to a pager.
+#: this fans out to each selected provider's JSON command, then renders
+#: compact aligned account blocks with a shared human-only renderer.
 #:
 #: The fan-out goes through the repository's GNU parallel wrapper
 #: ([agfi:parallelm]) rather than shell job control. Job control
 #: would mean either interleaved output or a temporary file per agent; `parallelm'
 #: with =--keep-order= already buffers each job and replays them in input
-#: order, which is exactly the "one section per agent, in the configured
-#: order" this wants. Its jobs run through =brishz_para.dash=, i.e. inside
+#: order, which keeps provider sections stable and lets the local renderer
+#: stream each completed section without waiting for later providers. Jobs
+#: run through =brishz_para.dash=, i.e. inside
 #: BrishGarden shells, so zshlang functions are callable there -- and so the
 #: garden must be restarted (=brishz-restart=) after any edit to the functions
 #: below, or it will keep running the versions it loaded at start-up.
@@ -61,121 +62,53 @@ function h-color-mode-p {
     esac
 }
 
-function h-agent-status-one {
-    #: One agent's section: a header naming it, a rule, then that agent's own
-    #: status report. Always succeeds: a failing report is said inside the
-    #: section and the section still appears, so that one agent being down
-    #: cannot cost you the other two.
-    #: Usage: h-agent-status-one <agent> [always|never]
-    ##
-    local agent="${1}" color="${2:-never}"
-    assert-args agent @RET
-
-    #: Raw SGR strings from zsh's own `colors', not [agfi:colorfg]: those gate
-    #: themselves on [agfi:isColor] and [agfi:true-color-p], which inspect the
-    #: environment -- and the environment here is a garden worker's, not the
-    #: terminal's. The decision has already been made by our caller.
-    local c_head='' c_rule='' c_err='' c_off=''
-    if [[ "${color}" == always ]] ; then
-        c_head="${fg_bold[blue]}"
-        c_rule="${fg[blue]}"
-        c_err="${fg_bold[red]}"
-        c_off="${reset_color}"
-    fi
-
-    #: A name that is not in [agfi:h-agents-table] still gets a section saying
-    #: so, rather than a job that dies before printing anything: every agent
-    #: that was asked for has to be accounted for in the report, and a typo in
-    #: =agent_status_agents= is exactly the case where that matters.
-    local glyph label
-    glyph="$(h-agent-field "${agent}" glyph 2>/dev/null)" || glyph='❔'
-    label="$(h-agent-field "${agent}" label 2>/dev/null)" || label="${agent}"
-
-    local header="${glyph} ${label}"
-    #: One column wider than the character count, because the glyph is a
-    #: double-width emoji and `${#...}' counts code points.
-    local rule="${(l:$(( ${#header} + 1 ))::─:)}"
-
-    ec "${c_head}${header}${c_off}"
-    ec "${c_rule}${rule}${c_off}"
-
-    local retcode=0
+function h-agent-status-collect {
+    #: One compact JSON envelope per provider, for the local human renderer.
+    #: Provider JSON contracts remain owned by their original commands.
+    local agent="${1}" report='' retcode=0 cache_files='{}' id
+    local -a reply
     case "${agent}" in
-        claude)
-            #: The wrapper puts its own flags before ours and argparse is
-            #: last-wins, so this decides the colour whatever
-            #: =claude_code_usage_strip_ansi_p= resolved to.
-            claude-code-usage-all --color "${color}" || retcode=$?
-            ;;
-        codex)
-            #: [agfi:codex-status] passes our arguments *before* its own, so
-            #: its =--color never= would win over ours; the knob is scoped off
-            #: here so that our own enum is the only thing deciding.
-            codex_status_strip_ansi_p=n codex-status --color "${color}" || retcode=$?
-            ;;
+        claude) report="$(claude-code-usage-all --json 2>/dev/null)" || retcode=$? ;;
+        codex) report="$(codex_status_strip_ansi_p=y codex-status --json 2>/dev/null)" || retcode=$? ;;
         agy)
-            agy_status_color="${color}" agy-status || retcode=$?
-            ;;
-        *)
-            ec "${c_err}$0: unknown agent: ${agent}${c_off}"
-            ec ''
-            return 0
-            ;;
+            report="$(agy-status --json 2>/dev/null)" || retcode=$?
+            for id in "${(@f)$(ec "${report}" | command jq --raw-output '.[]?.account' 2>/dev/null)}" ; do
+                if h-agy-account-info "${id}" 2>/dev/null ; then
+                    cache_files="$(ec "${cache_files}" | command jq --arg id "${id}" --arg file "${reply[5]}" '. + {($id): $file}')"
+                fi
+            done ;;
+        *) retcode=2 ;;
     esac
+    command jq --null-input --compact-output --arg agent "${agent}" \
+        --arg report "${report}" --argjson retcode "${retcode}" --argjson files "${cache_files}" \
+        '{agent:$agent, exit:$retcode, report:(try ($report | fromjson) catch null), cache_files:$files}'
+}
 
-    if (( retcode != 0 )) ; then
-        #: On stdout rather than through [agfi:ecerr]: `parallelm' collects each
-        #: job's stderr separately from its stdout, so a message written there
-        #: would surface outside the section it belongs to -- and, with
-        #: =--keep-order=, possibly before any section at all.
-        ec "${c_err}$0: ${agent}: status report failed (${retcode})${c_off}"
-    fi
-
-    #: The section separator. Trailing rather than leading so that the report
-    #: does not open with a blank line; [agfi:pager-if-overflow-streaming] drops
-    #: it again on a terminal.
-    ec ''
-
-    #: Deliberately zero: `parallelm' should report the *run* as successful even
-    #: when an agent could not be reached, since the combined report did come
-    #: out. The failure is visible in the section.
-    return 0
+function h-agent-status-one {
+    #: Compatibility entry point for one provider's formatted section.
+    local agent="${1}" color="${2:-never}" columns="${3:-80}"
+    h-agent-status-collect "${agent}" | command python3 \
+        "${NIGHTDIR:-${HOME}/scripts}/python/agent_status_render.py" \
+        --columns "${columns}" --color "${color}"
 }
 
 function agent-status {
-    #: Every agent's quota at once. See =docs/agent-usage-armed.md=.
-    ##
+    #: Collect concurrently in the garden; format beside the user's terminal.
     bella_zsh_disable1
-
-    local color_mode="${agent_status_color:-auto}"
-
-    #: Resolved before the pipeline below, so that =auto= tests *our* stdout
-    #: rather than the pipe into the pager. The children are then told the
-    #: answer outright: they run in the garden, whose stdout is a pipe, so an
-    #: =auto= of theirs could only ever say "no colour".
-    local color=never
-    h-color-mode-p "${color_mode}" && color=always
-
+    local color=never columns="${agent_status_columns:-${COLUMNS:-80}}"
+    [[ "${columns}" == <1-> ]] || columns=80
+    if [[ -t 1 && ! -v NO_COLOR ]] && h-color-mode-p "${agent_status_color:-auto}" ; then
+        color=always
+    fi
+    ensure-cmd python3 jq @RET
     ensure-array agent_status_agents
     local agents=("${agent_status_agents[@]}")
     if (( ${#agents} == 0 )) ; then
-        #: One per line so that an agent can be dropped from the report by
-        #: commenting its line out.
-        agents=(
-            claude
-            codex
-            # agy
-        )
+        agents=( claude codex )
     fi
-
-    #: =parallel_halt=never=: one agent's report failing must never stop the
-    #: others, which is the opposite of [agfi:parallelm]'s default. Belt and
-    #: braces with [agfi:h-agent-status-one]'s own `return 0', because a job
-    #: can also die in ways the function never sees.
-    #: The *streaming* pager: =--keep-order= hands us the sections in order but
-    #: only as each finishes, so the plain [agfi:pager-if-overflow] would hold
-    #: the whole report back until the slowest agent answered.
-    parallel_halt=never parallelm --keep-order h-agent-status-one '{}' "${color}" ::: "${agents[@]}" |
+    parallel_halt=never parallelm --keep-order h-agent-status-collect '{}' ::: "${agents[@]}" |
+        command python3 "${NIGHTDIR:-${HOME}/scripts}/python/agent_status_render.py" \
+            --columns "${columns}" --color "${color}" --absolute "${agent_status_absolute_p:-auto}" |
         pager-if-overflow-streaming
 }
 aliasfn agst agent-status
