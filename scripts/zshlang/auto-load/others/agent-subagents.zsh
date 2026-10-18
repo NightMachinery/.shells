@@ -198,7 +198,8 @@ function agent-subagents-list {
         to_entries[] | [ .key,
                          (.value.task_id|d), (.value.parent|d),
                          (.value.tmux_session_id|d), (.value.tmux_pane_id|d),
-                         (.value.workdir|d), (.value.created|d) ] | @tsv
+                         (.value.workdir|d), (.value.created|d),
+                         (.value.provider|d) ] | @tsv
     ' "${reg}")"} ) @TRET
     (( ${#entries} )) || return 0
 
@@ -338,6 +339,15 @@ function agent-subagents-list {
             if [[ "${agent}" == '-' && "${transcript}" != '-' ]] ; then
                 h-agent-session-agent-in-roots "${transcript}" "${root_agents[@]}"
                 agent="${REPLY}"
+            fi
+
+            #: Headless/new children may not have a transcript or hook identity.
+            #: The recorded provider still gives their goto row the right glyph;
+            #: it does not identify a conversation or imply a live agent process.
+            if [[ "${agent}" == '-' ]] ; then
+                case "${f[8]}" in
+                    claude|codex|agy) agent="${f[8]}" ;;
+                esac
             fi
 
             #: `-' is unknown, not idle: an adapter that does not report a
@@ -870,7 +880,8 @@ Plain-text summary of one subagent, for an fzf preview."
 
 function h-agent-session-subagent-rows {
     #: One row per registered tmux subagent, in the five column layout
-    #: [agfi:h-agent-session-annotate-rows] reads -- the same shape
+    #: [agfi:h-agent-session-annotate-rows] reads, plus fallback activity
+    #: epoch/stamp columns -- otherwise the same shape
     #: [agfi:h-agent-session-tmux-dead-rows] emits -- so that
     #: [agfi:h-agent-session-tmux-rows] can offer the skill's children beside
     #: your own sessions. [agfi:fftmux-agent-subagents] is the picker.
@@ -896,9 +907,9 @@ function h-agent-session-subagent-rows {
     #: holds: `remain-on-exit' left that child's last screen readable, and
     #: going there to read it is the whole of what a goto picker does.
     #:
-    #: A child with no transcript yet has nothing to preview and gets no row,
-    #: which is the rule [agfi:h-agent-session-tmux-rows] already applies to
-    #: its live half.
+    #: A registered child with no readable transcript still has a tmux session
+    #: to go to. Keep its row with a `-' transcript and an explicit label;
+    #: registry activity supplies its sort timestamp. No conversation is guessed.
     #:
     #: Prints nothing and fails when there are none, like the dead rows, so a
     #: caller can add this half without having to test for emptiness first.
@@ -907,7 +918,7 @@ function h-agent-session-subagent-rows {
     rows=( ${(f)"$(agent-subagents-list 2>/dev/null)"} )
     (( ${#rows} )) || return 1
 
-    local out='' row state sid transcript agent
+    local out='' row state sid transcript agent label
     local -a f
     for row in "${rows[@]}" ; do
         test -n "${row}" || continue
@@ -917,7 +928,12 @@ function h-agent-session-subagent-rows {
 
         [[ "${state}" == gone ]] && continue
         test -n "${sid}" && [[ "${sid}" != '-' ]] || continue
-        test -n "${transcript}" && [[ "${transcript}" != '-' ]] && test -e "${transcript}" || continue
+        if test -n "${transcript}" && [[ "${transcript}" != '-' ]] && test -f "${transcript}" && test -r "${transcript}" ; then
+            label="${f[1]}  -"
+        else
+            transcript='-'
+            label="${f[1]}  (no transcript)"
+        fi
 
         h-agent-subagents-state-rank "${state}"
 
@@ -927,7 +943,7 @@ function h-agent-session-subagent-rows {
         #: the conversation is read out of the transcript and put after it. The
         #: full task id is deliberately not here -- the node id already spells
         #: its slug, and [agfi:agent-subagents-preview] has the rest.
-        out+="${sid}"$'\t'"${transcript}"$'\t'"${agent}"$'\t'"${f[1]}  -"$'\t'"${REPLY#*$'\t'}"$'\n'
+        out+="${sid}"$'\t'"${transcript}"$'\t'"${agent}"$'\t'"${label}"$'\t'"${REPLY#*$'\t'}"$'\t'"${f[10]}"$'\t'"${f[9]}"$'\n'
     done
 
     test -n "${out}" || return 1

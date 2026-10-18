@@ -147,6 +147,11 @@ Direct agy and the launcher's DECSET proxy with an agy child are recognized;
 write failures on a verified agy pane still propagate. See
 [[NIGHTDIR:docs/tmux-session-rename.md][tmux identity diagnostics]].
 
+=fftas= keeps registered tmux children selectable even before a transcript
+exists. Such rows retain their state and recency, show =(no transcript)=, and
+still open the tmux session; transcript preview and Alt+Enter wait until a
+readable transcript is available.
+
 * Pandoc conversion
 
 [[agfi:pandoc-convert]] (=./zshlang/auto-load/others/pandoc.zsh=) is the single

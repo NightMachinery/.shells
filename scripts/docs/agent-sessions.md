@@ -463,15 +463,26 @@ That is the same division of labour as everywhere else rather than an
 inconsistency: `remain-on-exit` left the child's last screen readable, going
 there to read it is the whole of what a goto picker does, and clearing the pane
 afterwards is `tzkill`'s single pass. Only `gone` is dropped -- there is no
-session left to go to.
+session left to go to. A registered child whose transcript is absent or no
+longer readable remains selectable: its tmux session is still a valid goto
+target. The row says `(no transcript)`, keeps the registry's state badge, and
+uses its last activity for recency sorting. The provider recorded at launch
+supplies the glyph when no hook identity is available; it does not pretend to
+identify a conversation. This covers newly started children and headless agy
+runs that never publish transcript identity.
+
+For these rows the preview says that no transcript is available, Enter still
+goes to the session, and Alt+Enter does nothing. Rows with readable transcripts
+retain the normal transcript preview and Org-opening action. Neither path
+searches for a different conversation merely because it shares a workspace.
 
 Making that work needed one change in [agfi:agent-subagents-list]: an `exited`
 child now gets its identity and transcript filled in like any other. The
 `@agent_session` option sits on the tmux *session*, which outlives the pane, so
 it is readable exactly as long as there is somewhere to go.
 
-The preview is the fftmux family's -- the Go transcript previewer. The
-subagent-shaped preview, with the result front matter and the tail of the pane,
+When a transcript is available, the preview is the fftmux family's Go
+transcript previewer. The subagent-shaped preview, with the result front matter and the tail of the pane,
 belongs to the two pickers whose question is about the child rather than about
 the conversation in it: [agfi:agent-clean-fz], which asks whether to close the
 thing, and [agfi:subagents-of-fz] below, which asks which of one agent's
