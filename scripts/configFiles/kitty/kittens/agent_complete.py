@@ -1,10 +1,16 @@
 """No-UI screen capture only. All computation and IO run in a detached worker."""
 import json
 import os
-import re
+import runpy
 import subprocess
 import tempfile
 from kittens.tui.handler import result_handler
+
+# Custom kittens are executed without __file__. Use the same repository root
+# convention as the detached worker path below; run_path also avoids stale imports.
+_ROOT = os.environ.get('NIGHTDIR', os.path.expanduser('~/scripts'))
+agent_from_command = runpy.run_path(os.path.join(
+    _ROOT, 'configFiles/kitty/kittens/agent_complete_command.py'))['agent_from_command']
 
 
 def main(args):
@@ -14,11 +20,9 @@ def main(args):
 def agent_name(window):
     # Foreground matching selects mappings; foreground binaries decide whether insertion is safe.
     for process in window.child.foreground_processes:
-        names = [os.path.basename(x) for x in process.get('cmdline', [])[:3]]
-        if any(re.fullmatch(r'claude(?:\.exe|-.*)?', x) for x in names):
-            return 'claude', process['pid']
-        if any(x == 'codex' for x in names):
-            return 'codex', process['pid']
+        agent = agent_from_command(process.get('cmdline', []))
+        if agent:
+            return agent, process['pid']
     return '', 0
 
 
@@ -48,7 +52,7 @@ def handle_result(args, answer, target_window_id, boss):
         key = b'\x1b.' if len(args) > 1 and args[1] == 'fim' else b'\x1b/'
         w.write_to_child(key)
         return
-    root = os.environ.get('NIGHTDIR', os.path.expanduser('~/scripts'))
+    root = _ROOT
     request = {
         'screen': {'agent': agent, 'process_id': process_id, 'cursor_x': w.screen.cursor.x, 'cursor_y': w.screen.cursor.y, 'columns': w.screen.columns,
                    'lines': [{'text': str(w.screen.line(i)),
