@@ -223,6 +223,56 @@ func terminalDabbrev(r TerminalRequest) error {
 	return nil
 }
 
+// agentCommand recognizes the launched command, not agent-looking option or
+// prompt text. Keep this in sync with the kitty kitten's pure argv helper.
+func agentCommand(argv []string) string {
+	if len(argv) > 0 && filepath.Base(argv[0]) == "decset-rewrite" {
+		argv = argv[1:]
+		// Parse only the proxy prefix. A -- belonging to the child must
+		// never turn one of that child's later arguments into an agent.
+		for len(argv) > 0 && strings.HasPrefix(argv[0], "-") {
+			if argv[0] == "--" {
+				argv = argv[1:]
+				break
+			}
+			count := 1
+			if argv[0] == "-map" || argv[0] == "-trace" {
+				count = 2
+			}
+			if count > len(argv) {
+				return ""
+			}
+			argv = argv[count:]
+		}
+	}
+	if len(argv) == 0 {
+		return ""
+	}
+	name := filepath.Base(argv[0])
+	if name == "node" || name == "nodejs" || name == "node.exe" {
+		argv = argv[1:]
+		// Retain script launchers in the old first-three-argument window;
+		// eval/print/require values are not script names.
+		if len(argv) > 0 {
+			switch argv[0] {
+			case "--", "--no-warnings", "--trace-warnings", "--no-deprecation":
+				argv = argv[1:]
+			}
+		}
+		if len(argv) == 0 || strings.HasPrefix(argv[0], "-") {
+			return ""
+		}
+		name = filepath.Base(argv[0])
+	}
+	if name == "codex" {
+		return "codex"
+	}
+	if name == "claude" || name == "claude.exe" || strings.HasPrefix(name, "claude-") {
+		return "claude"
+	}
+	return ""
+}
+
 func kittyAgent(r TerminalRequest) (string, int, int, error) {
 	raw, err := kitty(r, "", "ls")
 	if err != nil {
@@ -250,17 +300,8 @@ func kittyAgent(r TerminalRequest) (string, int, int, error) {
 					continue
 				}
 				for _, p := range w.Foreground {
-					for i, arg := range p.Cmdline {
-						if i >= 3 {
-							break
-						}
-						name := filepath.Base(arg)
-						if name == "codex" {
-							return "codex", p.PID, w.Columns, nil
-						}
-						if name == "claude" || name == "claude.exe" || strings.HasPrefix(name, "claude-") {
-							return "claude", p.PID, w.Columns, nil
-						}
+					if agent := agentCommand(p.Cmdline); agent != "" {
+						return agent, p.PID, w.Columns, nil
 					}
 				}
 			}

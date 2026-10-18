@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 """Opt-in live checks. Targets must be dedicated scratch CLIs; never submit text."""
-import argparse, http.server, json, os, pathlib, re, subprocess, tempfile, threading, time, unicodedata
+import argparse, http.server, json, os, pathlib, re, runpy, subprocess, tempfile, threading, time, unicodedata
 BINARY=os.path.expanduser('~/go/bin/llm_complete')
 ROOT=pathlib.Path(__file__).resolve().parents[3]
 KITTEN=str(ROOT/'configFiles/kitty/kittens/agent_complete.py')
+agent_from_command=runpy.run_path(str(ROOT/'configFiles/kitty/kittens/agent_complete_command.py'))['agent_from_command']
 
 def run(args, text=None, env=None):
     p=subprocess.run(args,input=text,text=True,capture_output=True,env=env,timeout=35)
@@ -68,7 +69,7 @@ class Target:
             rows.append({'text':row,'wrapped':wrapped})
         listing=json.loads(self.rc('ls'))
         window=next(w for o in listing for t in o['tabs'] for w in t['windows'] if str(w['id'])==self.target)
-        process=next(p for p in window['foreground_processes'] if any(pathlib.Path(x).name in (self.agent,self.agent+'.exe') for x in p['cmdline'][:3]))
+        process=next(p for p in window['foreground_processes'] if agent_from_command(p.get('cmdline',[]))==self.agent)
         return {'source':'kitty','socket':self.socket,'target':self.target,'kitty_pid':int(re.search(r'kitty-(\d+)\.sock',self.socket)[1]),'cwd':window['cwd'],'kitten':KITTEN,'screen':{'agent':self.agent,'process_id':process['pid'],'cursor_y':int(match[1])-1,'cursor_x':int(match[2])-1,'columns':window['columns'],'lines':rows}}
     def operation(self,op,env=None,background=False):
         if self.source=='kitty' and env is None:
