@@ -268,14 +268,41 @@ function h-agy-session-tmux-name {
 
 function agy-session-tmux-autoname {
     : "hook body for Antigravity's hooks: <tmux-pane> [payload]"
-    local pane="${1}"
+    local pane="${1:-}"
+    [[ "${pane}" == %<-> ]] || return 0
+
+    #: Print-mode children inherit the caller's pane, which may belong to
+    #: another program or server. Check what tmux actually shows before the
+    #: core writes either the session identity or its optional state file.
+    #: A stale @agent_session is not evidence that agy still owns the pane.
+    local foreground
+    foreground="$(command tmux display-message -p -t "${pane}" \
+        '#{pane_id} #{pane_current_command} #{pane_dead}' 2>/dev/null)" || return 0
+    [[ "${foreground}" == "${pane} agy 0" ]] || return 0
+
     local input
-    input="$(h-agent-hook-payload "${2}")"
+    input="$(h-agent-hook-payload "${2:-}")"
     test -n "${input}" || return 0
 
     local id transcript
-    id="$(ec "${input}" | jq -r '.conversationId // empty' 2>/dev/null)"
-    transcript="$(ec "${input}" | jq -r '.transcriptPath // empty' 2>/dev/null)"
+    if ! id="$(ec "${input}" | command jq --exit-status --raw-output \
+        '.conversationId | select(type == "string" and length > 0)' 2>/dev/null)" ; then
+        h-agent-hook-status agy "${pane}" '' invalid-payload
+        return 0
+    fi
+    transcript="$(ec "${input}" | command jq --raw-output \
+        '.transcriptPath | if type == "string" then . else "" end' 2>/dev/null)"
+    h-agent-hook-status agy "${pane}" "${id}" received
 
-    h-agent-tmux-autoname agy "${pane}" "${id}" "${transcript}"
+    if h-agent-tmux-autoname agy "${pane}" "${id}" "${transcript}" ; then
+        local outcome=recorded-id
+        test -n "${transcript}" && outcome=recorded
+        h-agent-hook-status agy "${pane}" "${id}" "${outcome}"
+    else
+        #: Unlike an absent agy pane, a failed write on a verified one needs
+        #: attention. Keep both the bounded diagnostic and its original code.
+        local ret=$?
+        h-agent-hook-status agy "${pane}" "${id}" identity-failed
+        return "${ret}"
+    fi
 }
