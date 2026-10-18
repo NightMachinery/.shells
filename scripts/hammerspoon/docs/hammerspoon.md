@@ -1075,35 +1075,46 @@ that crashes or forgets cannot leave the screen branded.
 
 ## Battery low banner
 
-`core/battery-low.lua` puts a pinned, rust-coloured band across the top of
-every screen once the Mac is on battery and macOS estimates five minutes or
-less of life left (`hs.battery.timeRemaining`). It reads like
-`Battery: about 3 min left (4%) - plug in now`, washes the screens for one
-second when it first appears, and refreshes its text without flashing again.
+`core/battery-low.lua` puts a pinned band across the top of every screen once
+the Mac is on battery and macOS's estimate (`hs.battery.timeRemaining`) runs
+short, in two stages:
 
-It is **latched**: once up, only AC power takes it down, and a three-second
-green "On AC power" band confirms the cable took. The estimate is a running
-average that swings with load, so without the latch a machine hovering near
-the threshold would raise and drop the band every minute, and quitting a heavy
-app to buy time would hide a warning that is still true.
+- **Low**, at five minutes or less: amber,
+  `Battery low: about 4 min left (5%) - plug in now`.
+- **Critical**, at two minutes or less: pulsing red (`red-pulse-1`, see
+  Animated colours), `Battery critical: about 1 min left (2%) - plug in now`.
+  It pulses so it cannot be mistaken for the steady crimson agent banner. The
+  word in the text carries the stage too, for anyone who cannot tell amber
+  from red.
 
-Two gaps in the estimate are covered by a charge floor: macOS reports `-1`
+The band washes the screens for one second when it appears and again when it
+turns red, and otherwise refreshes its text without flashing.
+
+The stage is **latched**: it only escalates, and only AC power takes the band
+down, after which a three-second green "On AC power" band confirms the cable
+took. The estimate is a running average that swings with load, so without the
+latch a machine hovering near a threshold would raise and drop the band, or
+flip its colour, every minute; and quitting a heavy app to buy time would hide
+a warning that is still true.
+
+Two gaps in the estimate are covered by charge floors: macOS reports `-1`
 ("calculating") for a minute or two after unplugging, and the estimate tends
-to be optimistic in the last few percent. At or below
-`batteryLowPercentFloor` (2%) the band goes up whatever the estimate says.
+to be optimistic in the last few percent. At or below 2% the band is at least
+low, and at or below 1% it is critical, whatever the estimate says.
 
 An `hs.battery.watcher` catches the cable going in or out at once; a 30-second
-poll is the backstop for the estimate crossing the threshold between the
-moments macOS posts a change. The knobs are globals:
-`batteryLowMinutes` (5), `batteryLowPercentFloor` (2),
-`batteryLowFlashSeconds` (1).
+poll is the backstop for the estimate crossing a threshold between the moments
+macOS posts a change. The knobs are globals: `batteryLowMinutes` (5),
+`batteryCriticalMinutes` (2), `batteryLowPercentFloor` (2),
+`batteryCriticalPercentFloor` (1), `batteryLowFlashSeconds` (1).
 
 To test without unplugging, hand the check a fake reading. The next real check
 (30 seconds at most, or immediately with no argument) takes it down again on
 AC:
 
 ```sh
-hs -c 'batteryLowCheck({source = "Battery Power", minutes = 3, percent = 4})'
+hs -c 'batteryLowCheck({source = "Battery Power", minutes = 3, percent = 4})'   # low
+hs -c 'batteryLowCheck({source = "Battery Power", minutes = 1, percent = 2})'   # critical
 hs -c 'return batteryLowActive()'
 hs -c 'batteryLowCheck()'
 ```
