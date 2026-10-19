@@ -43,8 +43,10 @@ function TZ-set-from-system {
 function h_timer-bell {
     tts-glados1-cached "The time is now up, commander"
     #: `msg' is [agfi:timer]'s, in scope here. One id, so each repeat of the loop
-    #: re-flashes the same band instead of stacking another.
-    alert_id=timer-bell awaysh alert "${msg:-Time is up}"
+    #: re-flashes the same band instead of stacking another. Violet is used by
+    #: nothing else, so a finished timer is recognisable at a glance, and the
+    #: flash is held longer than the default 0.35s to be noticed.
+    alert_id=timer-bell alert_color=violet alert_flash=1.5 awaysh alert "${msg:-Time is up}"
     ##
     # awaysh tts-gateway-i2 "Deploy the delayed sequence." ;  tts-gateway-i1 "Deploy the delayed sequence."
     # awaysh tts-gateway-i2 "Deploy the delayed sequence." ;  awaysh tts-gateway-i1 "Deploy the delayed sequence." ; tts-gateway "Deploy the delayed sequence."
