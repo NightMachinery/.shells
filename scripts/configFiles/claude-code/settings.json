@@ -56,6 +56,16 @@
             "command": "brishz_async=y brishz_in=MAGIC_READ_STDIN \"${BRISHZGO_BIN:-$HOME/go/bin/brishzgo}\" -- bell-claude \"--pane=$TMUX_PANE\" \"--node=${TMUX_SUBAGENT_NODE:+1}\""
           }
         ]
+      },
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "if [ -n \"$PASEO_TERMINAL_ID\" ]; then \"${PASEO_HOOK_CLI:-paseo}\" hooks claude Notification; fi",
+            "timeout": 10
+          }
+        ]
       }
     ],
     "Stop": [
@@ -64,6 +74,16 @@
           {
             "type": "command",
             "command": "brishz_async=y brishz_in=MAGIC_READ_STDIN \"${BRISHZGO_BIN:-$HOME/go/bin/brishzgo}\" -- bell-claude \"--pane=$TMUX_PANE\" \"--node=${TMUX_SUBAGENT_NODE:+1}\""
+          }
+        ]
+      },
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "if [ -n \"$PASEO_TERMINAL_ID\" ]; then \"${PASEO_HOOK_CLI:-paseo}\" hooks claude Stop; fi",
+            "timeout": 10
           }
         ]
       }
@@ -75,6 +95,16 @@
           {
             "type": "command",
             "command": "brishz_async=y brishz_in=MAGIC_READ_STDIN \"${BRISHZGO_BIN:-$HOME/go/bin/brishzgo}\" -- agent-auto-continue-hook claude \"$TMUX_PANE\" >/dev/null 2>&1"
+          }
+        ]
+      },
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "if [ -n \"$PASEO_TERMINAL_ID\" ]; then \"${PASEO_HOOK_CLI:-paseo}\" hooks claude StopFailure; fi",
+            "timeout": 10
           }
         ]
       }
@@ -119,6 +149,28 @@
           {
             "type": "command",
             "command": "brishz_async=y brishz_in=MAGIC_READ_STDIN \"${BRISHZGO_BIN:-$HOME/go/bin/brishzgo}\" -- bell-claude-ack >/dev/null 2>&1"
+          }
+        ]
+      },
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "if [ -n \"$PASEO_TERMINAL_ID\" ]; then \"${PASEO_HOOK_CLI:-paseo}\" hooks claude UserPromptSubmit; fi",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "SessionEnd": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "if [ -n \"$PASEO_TERMINAL_ID\" ]; then \"${PASEO_HOOK_CLI:-paseo}\" hooks claude SessionEnd; fi",
+            "timeout": 10
           }
         ]
       }

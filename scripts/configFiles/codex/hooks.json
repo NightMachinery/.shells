@@ -41,6 +41,69 @@
             "timeout": 10
           }
         ]
+      },
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "if [ -n \"$PASEO_TERMINAL_ID\" ]; then \"${PASEO_HOOK_CLI:-paseo}\" hooks codex UserPromptSubmit; fi",
+            "commandWindows": "if defined PASEO_TERMINAL_ID (if defined PASEO_HOOK_CLI (\"%PASEO_HOOK_CLI%\" hooks codex UserPromptSubmit) else (paseo hooks codex UserPromptSubmit)) else (exit /b 0)",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "if [ -n \"$PASEO_TERMINAL_ID\" ]; then \"${PASEO_HOOK_CLI:-paseo}\" hooks codex PreToolUse; fi",
+            "commandWindows": "if defined PASEO_TERMINAL_ID (if defined PASEO_HOOK_CLI (\"%PASEO_HOOK_CLI%\" hooks codex PreToolUse) else (paseo hooks codex PreToolUse)) else (exit /b 0)",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "if [ -n \"$PASEO_TERMINAL_ID\" ]; then \"${PASEO_HOOK_CLI:-paseo}\" hooks codex PostToolUse; fi",
+            "commandWindows": "if defined PASEO_TERMINAL_ID (if defined PASEO_HOOK_CLI (\"%PASEO_HOOK_CLI%\" hooks codex PostToolUse) else (paseo hooks codex PostToolUse)) else (exit /b 0)",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "PermissionRequest": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "if [ -n \"$PASEO_TERMINAL_ID\" ]; then \"${PASEO_HOOK_CLI:-paseo}\" hooks codex PermissionRequest; fi",
+            "commandWindows": "if defined PASEO_TERMINAL_ID (if defined PASEO_HOOK_CLI (\"%PASEO_HOOK_CLI%\" hooks codex PermissionRequest) else (paseo hooks codex PermissionRequest)) else (exit /b 0)",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "if [ -n \"$PASEO_TERMINAL_ID\" ]; then \"${PASEO_HOOK_CLI:-paseo}\" hooks codex Stop; fi",
+            "commandWindows": "if defined PASEO_TERMINAL_ID (if defined PASEO_HOOK_CLI (\"%PASEO_HOOK_CLI%\" hooks codex Stop) else (paseo hooks codex Stop)) else (exit /b 0)",
+            "timeout": 10
+          }
+        ]
       }
     ]
   }
