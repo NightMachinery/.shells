@@ -553,5 +553,7 @@ Define, for each command, a function of the same name that runs it with shebang-
     done
 }
 #: The #! scripts zsh runs most often, counted with eslogger over minutes of normal use
-#: (2026-10): paste_files.swift about 2.5 times a second, from pbpaste-plus.
-shebang-bypass-def paste_files.swift brew sponge
+#: (2026-10): paste_files.swift about 2.5 times a second, from pbpaste-plus. kitty is
+#: Homebrew's #! wrapper around the app's binary, run once per interactive shell for its
+#: completions.
+shebang-bypass-def paste_files.swift brew sponge kitty
