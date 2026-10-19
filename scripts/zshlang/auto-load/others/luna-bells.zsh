@@ -890,7 +890,10 @@ back, and stage 4 escalates to Telegram if they never do."
 function bell-auto {
     : "rings <engine> until the user comes back, then escalates; see ./docs/bell-auto.md
 
-bell_auto_stop_mode: idle | idle+timeout | notif | bell+notif | auto (default)"
+bell_auto_stop_mode: idle | idle+timeout | notif | bell+notif | auto (default) | auto-once
+
+auto-once resolves like auto, except that it never loops: where auto would
+ring until the user comes back, it rings once and notifies."
     ##
     if ! isLocal ; then
         ecerr "$0: You're not on a local machine."
@@ -912,7 +915,7 @@ bell_auto_stop_mode: idle | idle+timeout | notif | bell+notif | auto (default)"
     local max_t="${bell_auto_max_t:-3600}"  #: Wall-clock cap on ringing. Named max_t because bell_auto_t is already the idle threshold.
     local notif_msg="${bell_auto_notif_msg}"
 
-    if [[ "$stop_mode" == auto ]] ; then
+    if [[ "$stop_mode" == (auto|auto-once) ]] ; then
         #: The ringing loop earns its keep in exactly one situation: open speakers
         #: in a private space, where repetition reaches a person the first ring
         #: missed. Everything else defeats it --
@@ -926,15 +929,18 @@ bell_auto_stop_mode: idle | idle+timeout | notif | bell+notif | auto (default)"
         #:   the job and the loop would just keep ducking your audio; if they are
         #:   on the desk, nobody hears any number of rings and looping would only
         #:   delay the notification ladder by up to max_t.
+        #: - auto-once opts out of the loop altogether, for callers whose user
+        #:   finds the bell anyway (the agent hooks, [agfi:h-bell-agent-hook]).
+        local requested="$stop_mode"
         if meeting-p ; then
             stop_mode='notif'
-        elif quiet-public-audio-p || headphones-p ; then
+        elif [[ "$requested" == auto-once ]] || quiet-public-audio-p || headphones-p ; then
             stop_mode='bell+notif'
         else
             stop_mode='idle+timeout'
         fi
 
-        ecgray "$0: stop_mode=auto resolved to ${stop_mode}."
+        ecgray "$0: stop_mode=${requested} resolved to ${stop_mode}."
     fi
 
     case "$stop_mode" in
@@ -1864,21 +1870,25 @@ function h-bell-agent-role {
 function h-bell-agent-hook {
     : "shared entry point for the coding-agent hooks
 
-Turns the agent's hook payload into a bell plus a notification. The payload is JSON,
-taken from the argument after <app> <engine> <fallback> [--pane=P] [--node=1] or from
-stdin, and carries a message only for some hook events (Claude Code's Notification but
-not its Stop), hence the fallback. A subagent's bell follows [agfi:agent-bell-subagents]."
+Turns the agent's hook payload into one bell plus a notification, or a notification
+alone in a meeting; set bell_auto_stop_mode=auto to ring until the user comes back. The
+payload is JSON, taken from the argument after
+<app> <engine> <fallback> [--pane=P] [--node=1] [--paseo=ID] or from stdin, and carries
+a message only for some hook events (Claude Code's Notification but not its Stop), hence
+the fallback. A subagent's bell follows [agfi:agent-bell-subagents]. A session Paseo
+runs goes to [agfi:bell-paseo] instead."
     ##
     local app="${1}" engine="${2}" fallback="${3}"
     shift 3
     #: What the agent's environment knows, forwarded by the hook command as
     #: single words through brishzgo: the client quotes argv, preserving
     #: empty values and spaces. The named flags also keep hook identity explicit.
-    local pane='' node_p=''
+    local pane='' node_p='' paseo=''
     while (( $# )) ; do
         case "$1" in
             --pane=*) pane="${1#--pane=}" ;;
             --node=*) node_p="${1#--node=}" ;;
+            --paseo=*) paseo="${1#--paseo=}" ;;
             *) break ;;
         esac
         shift
@@ -1897,6 +1907,16 @@ not its Stop), hence the fallback. A subagent's bell follows [agfi:agent-bell-su
         msg="$(ec "$input" | command jq --raw-output '.message | strings' 2>/dev/null)" || msg=''
         cwd="$(ec "$input" | command jq --raw-output '.cwd | strings' 2>/dev/null)" || cwd=''
         id="$(h-bell-agent-payload-id "$input")" || id=''
+    fi
+
+    #: Paseo shows its own agents' notifications. A forwarded PASEO_AGENT_ID is
+    #: not proof of being one, since everything a Paseo agent starts inherits it,
+    #: so the agent's record must name this session ([agfi:h-agent-done-paseo-id]).
+    #: That costs a Paseo CLI call, paid only when an id was forwarded.
+    if test -n "$paseo" && test -n "$id" &&
+            PASEO_AGENT_ID="$paseo" h-agent-done-paseo-id "$id" >/dev/null 2>&1 ; then
+        bell-paseo "$app" "$input"
+        return $?
     fi
 
     #: Before the name lookup, so a silenced subagent costs one tmux call.
@@ -1949,11 +1969,21 @@ not its Stop), hence the fallback. A subagent's bell follows [agfi:agent-bell-su
     local group
     group="$(h-bell-agent-group "$app" "$cwd" "$id")"
 
+    #: One ring by default: the notification stays until answered, and a ringing
+    #: loop per waiting session was mostly noise.
+    bell_auto_stop_mode="${bell_auto_stop_mode:-auto-once}" \
     bell_auto_sleep=10 bell_auto_notif_msg="$msg" bell_auto_notif_group="$group" \
         bell_auto_notif_title="$desktop_title" bell_auto_notif_subtitle="$desktop_subtitle" bell_auto_notif_body="$desktop_body" \
         bell_auto_tlg="$tlg" \
         notif_app=agents notif_ignore_dnd_p="${notif_ignore_dnd_p:-n}" notif_image="$icon" notif_group="$group" \
         awaysh bell-auto "$engine"
+}
+
+function bell-paseo {
+    : "the bell for an agent session that Paseo runs: bell-paseo <app> <payload>
+
+Does nothing for now, since Paseo shows its own notifications."
+    return 0
 }
 
 function h-bell-agent-payload-id {

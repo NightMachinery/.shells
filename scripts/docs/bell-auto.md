@@ -35,6 +35,9 @@ Set with `bell_auto_stop_mode`, or `@opts stop_mode <mode> @ bell-auto`.
   ladder at stage 2.
 - `notif` — no bell at all; straight to stage 2.
 - `bell+notif` — one bell, then stage 2.
+- `auto-once` — resolves like `auto`, but never loops: where `auto` would pick
+  `idle+timeout`, it picks `bell+notif`. A meeting still means `notif`. The agent
+  hooks default to it (see Agent hooks).
 
 `auto` resolves in order:
 
@@ -109,6 +112,12 @@ Inspect the queue with `bell-notif-pending`, which shows the raw tagged entries.
 
 `bell-claude` and `bell-codex` go through `h-bell-agent-hook`, which reads the agent's
 hook payload as JSON — from `$1`, or from stdin — and builds the message from it.
+
+The hook rings **once**: it runs `bell-auto` with `bell_auto_stop_mode=auto-once`
+unless the variable is already set, so a waiting session gets one bell and a
+notification, or the notification alone during a meeting. The notification stays until
+the session is answered, so a ringing loop per waiting session added noise rather than
+reach. Set `bell_auto_stop_mode=auto` in the caller to get the loop back.
 
 `h-codex-notify` completely suppresses notifications from realtime voice-chat
 tasks. It extracts the payload's thread ID and checks the current `CODEX_HOME` state
@@ -333,8 +342,8 @@ Outside tmux they warn and return 1. They work from any agent's shell tool, beca
 every agent shell inherits `TMUX_PANE`.
 
 **Forwarding.** The garden does not see the agent's environment, so the hooks pass
-what the gate needs as leading arguments: `--pane=$TMUX_PANE` and
-`--node=${TMUX_SUBAGENT_NODE:+1}`. Only a flag goes over for the node, never its
+what the gate needs as leading arguments: `--pane=$TMUX_PANE`,
+`--node=${TMUX_SUBAGENT_NODE:+1}` and `--paseo=$PASEO_AGENT_ID` (see Paseo). Only a flag goes over for the node, never its
 value. `brishzgo` quotes each argument, preserving spaces and empty values.
 The named flags keep the identity fields explicit; an empty node flag arrives
 as `--node=`.
@@ -343,9 +352,11 @@ Per agent:
 
 - **Claude Code**: the `Notification` and `Stop` hooks in
   `configFiles/claude-code/settings.json` forward both words. `~/.claude/settings.json`
-  and `~/.claude-work/settings.json` use that tracked source. If an app has
-  replaced a symlink with a plain file, update its hook commands in place too,
-  preserving its other settings. Running sessions pick it up too: the hooks reference says "Direct
+  and `~/.claude-work/settings.json` are symlinks to that tracked source. Paseo once
+  replaced `~/.claude/settings.json` and `~/.codex/hooks.json` with plain files
+  when it installed its own hooks (guarded by `PASEO_TERMINAL_ID`); those hooks are
+  now tracked, so Paseo finds them present. If `agents-md-doctor` reports a plain
+  file again, adopt its additions into the tracked file and re-link. Running sessions pick it up too: the hooks reference says "Direct
   edits to hooks in settings files are normally picked up automatically by the file
   watcher" (code.claude.com/docs/en/hooks), so no restart is needed. Hooks
   are not snapshotted for the life of the session.
@@ -353,7 +364,7 @@ Per agent:
   exec'd without a shell, so the untracked `~/.codex/config.toml` needs a small shim
   to expand the variables:
 
-      notify = ["zsh", "-fc", "exec \"${BRISHZGO_BIN:-$HOME/go/bin/brishzgo}\" -- h-codex-notify \"--pane=$TMUX_PANE\" \"--node=${TMUX_SUBAGENT_NODE:+1}\" \"$1\"", "codex-notify"]
+      notify = ["zsh", "-fc", "exec \"${BRISHZGO_BIN:-$HOME/go/bin/brishzgo}\" -- h-codex-notify \"--pane=$TMUX_PANE\" \"--node=${TMUX_SUBAGENT_NODE:+1}\" \"--paseo=$PASEO_AGENT_ID\" \"$1\"", "codex-notify"]
 
   `h-codex-notify` passes the leading words through to `bell-codex`. The old line
   (`["brishzq.zsh", "h-codex-notify"]`) still works, through the identity fallback.
@@ -367,6 +378,21 @@ so removing its group is a harmless no-op.
 
 Accepted misses: a child that fires its first hook before its tmux identity or name
 exists resolves as `main`, and so does a subagent outside tmux with no forwarded node.
+
+### Paseo
+
+Paseo shows its own agents' notifications, so a session Paseo runs gets
+`bell-paseo <app> <payload>` instead of the bell, the desktop notification and
+Telegram. `bell-paseo` does nothing yet; it is the place to add a Paseo-specific
+signal later.
+
+The hooks forward `--paseo=$PASEO_AGENT_ID`. That id alone does not make the session a
+Paseo agent: everything a Paseo agent starts inherits it, a `claude` it opens in a
+tmux pane included, and that session must still ring. So the hook reuses
+`h-agent-done-paseo-id`, which accepts the id only when that agent's Paseo record
+names the payload's session id as the native session it runs. This costs one Paseo
+CLI call, paid only when an id was forwarded; the hook is detached anyway. Any failure
+(no `paseo-ls`, no session id, a Paseo error) falls through to the normal bell.
 
 ### Making them persist until dismissed
 
@@ -424,7 +450,7 @@ missing helper or touch Telegram queues. `notif-os-dismiss-all` still clears all
 
 Bell behaviour, all `@opts`-settable with the `bell_auto_` prefix:
 
-- `bell_auto_stop_mode` — see Modes. Default `auto`.
+- `bell_auto_stop_mode` — see Modes. Default `auto`; `auto-once` from the agent hooks.
 - `bell_auto_t` — idle threshold in seconds; below this the user counts as present.
   Default 30.
 - `bell_auto_max_t` — wall-clock cap on ringing in `idle+timeout`. Default 3600.

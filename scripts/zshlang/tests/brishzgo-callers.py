@@ -40,7 +40,7 @@ sys.exit(int(os.environ.get('CLIENT_STATUS','0')))
     (home / ".bashrc").write_text("")
     env = {"HOME": tmp, "PATH": tmp + ":" + os.environ["PATH"],
            "BRISHZGO_BIN": str(mock), "CALL_LOG": str(log),
-           "TMUX_PANE": "%9", "TMUX_SUBAGENT_NODE": "test", "NIGHTDIR": str(ROOT)}
+           "TMUX_PANE": "%9", "TMUX_SUBAGENT_NODE": "test", "PASEO_AGENT_ID": "P1", "NIGHTDIR": str(ROOT)}
 
     def calls():
         rows = [json.loads(x) for x in log.read_text().splitlines()] if log.exists() else []
@@ -69,7 +69,7 @@ sys.exit(int(os.environ.get('CLIENT_STATUS','0')))
             assert len(rows) == 1 and rows[0]["async"] == "y"
             assert bytes.fromhex(rows[0]["stdin"]) == b'{"event":"synthetic"}\n'
             if rows[0]["args"][1] == "bell-claude":
-                assert rows[0]["args"][2:] == ["--pane=%9", "--node=1"]
+                assert rows[0]["args"][2:] == ["--pane=%9", "--node=1", "--paseo=P1"]
             if "tmux-autoname" in rows[0]["args"][1]:
                 assert rows[0]["args"][2:] == ["%9"]
             count += 1

@@ -39,6 +39,9 @@ esac' > "${fixture}/bin/tmux"
     function h-bell-agent-name { return 1; }
     function h-bell-claude { print -r -- Claude > "${fixture}/sound"; }
     function h-bell-codex { print -r -- Codex > "${fixture}/sound"; }
+    function bell-paseo { print -r -- "$1" > "${fixture}/paseo"; }
+    #: The Paseo record h-agent-done-paseo-id checks: agent P1 runs session $id.
+    function paseo-ls { print -r -- '[{"id":"P1","nativeSessionId":"'"${id}"'"}]'; }
     local bell_auto_stop_mode=bell+notif bell_auto_tlg=y bell_auto_tlg_t=0 bell_auto_tlg_dest=fixture-dest
     #: Sent batches are recorded in redis; keep them off the live keys.
     local bell_tlg_batch_key_prefix="bell_tlg_test_${$}_batch" bell_tlg_group_key_prefix="bell_tlg_test_${$}_group"
@@ -56,13 +59,13 @@ esac' > "${fixture}/bin/tmux"
     function sessions { print -r -- "$1" > "${fixture}/display"; print -r -- "$2" > "${fixture}/sessions"; }
     function outputs {
         local f out=()
-        for f in sound desktop telegram ; do
+        for f in sound desktop telegram paseo ; do
             test -e "${fixture}/$f" && out+=("$f")
         done
         ec "${out[*]:-silent}"
     }
     function fire {
-        command rm -f -- "${fixture}"/(sound|desktop|telegram|queue)(N)
+        command rm -f -- "${fixture}"/(sound|desktop|telegram|queue|paseo)(N)
         "$@" </dev/null >/dev/null 2>&1
         outputs
     }
@@ -114,6 +117,23 @@ ag--kid${T}${T}claude${T}${id}${T}/t"
     print -r -- os-only > "$agent_bell_subagents_file"
     check "codex sub, os-only" "$(fire h-codex-notify --node=1 "$codex_payload")" "sound desktop"
     command rm -f -- "$agent_bell_subagents_file"
+
+    #: Paseo: only a session its record names goes to bell-paseo, and only that.
+    sessions "plain${T}" ''
+    check "paseo agent" "$(fire bell-claude --pane=%1 --node= --paseo=P1 "$payload")" paseo
+    check "paseo codex agent" "$(fire h-codex-notify --pane=%1 --node= --paseo=P1 "$codex_payload")" paseo
+    check "inherited paseo id rings" "$(fire bell-claude --pane=%1 --node= --paseo=P2 "$payload")" "sound desktop telegram"
+    check "empty paseo id rings" "$(fire bell-claude --pane=%1 --node= --paseo= "$payload")" "sound desktop telegram"
+
+    #: The hooks default to one ring; a meeting still silences it. max_t=0 keeps a
+    #: regression to a looping mode from hanging the test.
+    function meeting-p { return 1; }
+    function quiet-public-audio-p { return 1; }
+    function headphones-p { return 1; }
+    function hook-mode { bell_auto_max_t=0 bell-claude --pane=%1 --node= "$payload" </dev/null 2>&1 | command grep -o 'started with stop_mode [^ ,]*'; }
+    check "hook default rings once" "$(unset bell_auto_stop_mode; hook-mode)" "started with stop_mode bell+notif"
+    check "hook default in a meeting" "$(unset bell_auto_stop_mode; function meeting-p { return 0; }; hook-mode)" "started with stop_mode notif"
+    check "caller's mode wins" "$(bell_auto_stop_mode=auto hook-mode)" "started with stop_mode idle+timeout"
 
     #: The ack still reads the payload, not a forwarded word.
     command rm -f -- "${fixture}/desktop-ack"

@@ -53,7 +53,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "brishz_async=y brishz_in=MAGIC_READ_STDIN \"${BRISHZGO_BIN:-$HOME/go/bin/brishzgo}\" -- bell-claude \"--pane=$TMUX_PANE\" \"--node=${TMUX_SUBAGENT_NODE:+1}\""
+            "command": "brishz_async=y brishz_in=MAGIC_READ_STDIN \"${BRISHZGO_BIN:-$HOME/go/bin/brishzgo}\" -- bell-claude \"--pane=$TMUX_PANE\" \"--node=${TMUX_SUBAGENT_NODE:+1}\" \"--paseo=$PASEO_AGENT_ID\""
           }
         ]
       },
@@ -73,7 +73,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "brishz_async=y brishz_in=MAGIC_READ_STDIN \"${BRISHZGO_BIN:-$HOME/go/bin/brishzgo}\" -- bell-claude \"--pane=$TMUX_PANE\" \"--node=${TMUX_SUBAGENT_NODE:+1}\""
+            "command": "brishz_async=y brishz_in=MAGIC_READ_STDIN \"${BRISHZGO_BIN:-$HOME/go/bin/brishzgo}\" -- bell-claude \"--pane=$TMUX_PANE\" \"--node=${TMUX_SUBAGENT_NODE:+1}\" \"--paseo=$PASEO_AGENT_ID\""
           }
         ]
       },
