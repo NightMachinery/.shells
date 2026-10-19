@@ -14,10 +14,27 @@ Query failures propagate through the output pipeline. A nonempty
 [agfi:frontapp-get-bundle-id-osa] remains identifier-only, and
 [agfi:frontapp-get-name-osa] remains name-only.
 
+## mpv and callers
+
+[agfi:mpv-frontmost-p] takes no arguments and writes nothing to stdout. It
+returns success when [agfi:frontapp-get] reports `io.mpv` (the app bundle),
+`mpv` (the process-name fallback), or the legacy `*/bin/mpv` path form. It
+returns nonzero for other apps and propagates query failures. It queries the
+front app once and respects `front_app_cached` through [agfi:frontapp-get].
+
+[agfi:luna-skip-p] uses this predicate in addition to its meeting and Do Not
+Disturb checks. Frontmost mpv qualifies whether playing or paused; an mpv
+running in the background does not. [agfi:nightshift-auto] uses the same
+predicate to turn Night Shift off for frontmost mpv and on otherwise, while
+retaining its enabled-state gate.
+
+## Verification
+
 Run the regression checks from the repository root:
 
 ```zsh
 python3 zshlang/tests/frontapp-get.py
+python3 zshlang/tests/mpv-frontmost.py
 ```
 
 The checks use synthetic app identities. On macOS they execute the actual

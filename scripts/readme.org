@@ -41,6 +41,9 @@ See [[NIGHTDIR:docs/rsp.md][selection and source-removal behavior]].
 falling back to its process name for apps without one, such as shell-launched
 mpv. See [[NIGHTDIR:docs/frontapp-get.md][front-app detection]].
 
+[agfi:mpv-frontmost-p] recognizes both command-line mpv and the app bundle.
+Luna skips while mpv is frontmost, and Night Shift shares the same predicate.
+
 * Hammerspoon
 
 Hammerspoon shortcut notes are tracked in =./hammerspoon/docs/hammerspoon.md=.

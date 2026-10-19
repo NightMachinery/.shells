@@ -73,13 +73,7 @@ function luna-skip-p {
         return 0
     fi
 
-    # local frontapp
-    # frontapp="$(frontapp-get)" @TRET
-    # if [[ "${frontapp}" =~ '^com.parallels.desktop' ]] ; then
-
-    # fi
-
-    return 1
+    mpv-frontmost-p
 }
 
 function lunas {

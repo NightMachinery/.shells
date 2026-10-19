@@ -5,6 +5,18 @@ typeset -g MPV_AUDIO_NORM=--af-add='dynaudnorm=g=5:f=250:r=0.9:p=0.5'     # audi
 export MPV_HOME="${MPV_HOME:-$HOME/.config/mpv}"
 
 ## Functions
+function mpv-frontmost-p {
+    : "True when the frontmost macOS app is mpv, launched as an app or from a shell."
+
+    local frontapp
+    frontapp="$(frontapp-get)" @RET
+
+    case "${frontapp}" in
+        io.mpv|mpv|*/bin/mpv) return 0 ;;
+        *) return 1 ;;
+    esac
+}
+
 function mpv-manga {
     bella_zsh_disable1
 

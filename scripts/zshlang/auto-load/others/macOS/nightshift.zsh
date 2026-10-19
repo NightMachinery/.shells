@@ -40,12 +40,10 @@ function nightshift-auto {
         return 0
     fi
 
-    local  app="$(frontapp-get)"
-    case "$app" in
-        io.mpv|mpv|*/bin/mpv)
-            nightshift-off
-            ;;
-        *) nightshift-on ;
-    esac
+    if mpv-frontmost-p ; then
+        nightshift-off
+    else
+        nightshift-on
+    fi
 }
 ##
