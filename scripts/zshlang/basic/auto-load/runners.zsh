@@ -507,3 +507,35 @@ alias zsh-restart='ZSH_PWD="$PWD" envless_engine=(exec env -i) envless_vars=(ZSH
 alias sbb='zsh-restart'
 alias sss='zsh-restart'
 ##
+##
+function shebang-bypass {
+    : "usage: shebang-bypass <command-or-path> [<arg> ...]
+Run a #! script through its interpreter, so the kernel never handles its #! line."
+    #: On macOS 14 to 26, every exec of a #! script leaks a 1K buffer of wired kernel
+    #: memory (zone data.kalloc.1024) that only a reboot frees; after 69 days that was
+    #: 11G of a 24G laptop. Starting the interpreter ourselves is an ordinary exec and
+    #: leaks nothing. Use this on hot paths, for scripts run many times a minute.
+    #:
+    #: The words after the interpreter are split on whitespace, as the macOS kernel does
+    #: (Linux would pass them as one argument). A file without a #! line runs as is.
+    local cmd="${1}"
+    assert-args cmd @RET
+    shift
+
+    local file="${cmd}"
+    if [[ "${cmd}" != */* ]] ; then
+        file="$(whence -p -- "${cmd}")" || {
+            ecerr "$0: command not found: ${cmd}"
+            return 127
+        }
+    fi
+
+    local line=''
+    read -r line < "${file}" || true
+    if [[ "${line}" == '#!'* ]] ; then
+        local interpreter=( ${=${line#'#!'}} )
+        "${interpreter[@]}" "${file}" "$@"
+    else
+        "${file}" "$@"
+    fi
+}
