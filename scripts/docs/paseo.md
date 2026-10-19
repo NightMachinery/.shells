@@ -65,6 +65,11 @@ At the handover:
    supervisor remains running. Keep the existing home to retain stored agents,
    workspaces, configuration, and daemon identity.
 
+`launchers/various-darwin.zsh` calls `paseo daemon start` when the CLI is
+installed, so the next launcher run starts it using the saved configuration.
+The launcher skips this step when Paseo is absent. An already running daemon
+is left in place; this startup hook does not transfer Desktop ownership.
+
 `start` launches a background supervisor that survives the invoking shell.
 It does not install a login service. `daemon restart` only replaces the worker
 inside the existing supervisor, retaining its launch and binary; use stop/start

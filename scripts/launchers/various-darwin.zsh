@@ -17,6 +17,11 @@ tmuxnew neru neru launch
 
 brishgarden-boot 64
 
+if isdefined-cmd paseo ; then
+    #: The CLI backgrounds its supervisor; disable Desktop's built-in daemon management.
+    command paseo daemon start
+fi
+
 if isMB2 ; then
     battery-charge-limit-restore-status
     # battery-charge-limit-enable

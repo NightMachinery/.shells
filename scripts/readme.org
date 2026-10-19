@@ -115,6 +115,7 @@ and attaches its output in tmux. See [[NIGHTDIR:docs/paseo.md][Paseo handoff]] f
 process checks, terminal-proxy handling, profiles, and manual-exit controls.
 That guide also covers running a CLI-managed daemon independently of Desktop;
 changing ownership requires a supervisor stop/start at a suitable stopping point.
+=launchers/various-darwin.zsh= starts it through the CLI when Paseo is installed.
 The official =paseo= and =paseo-help= skills are installed in the shared
 standalone skill-source layout and linked into the agents' skill directories.
 
