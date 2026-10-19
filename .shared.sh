@@ -82,10 +82,28 @@ if true ; then # ! command -v brew &> /dev/null ; then # it's faster to just not
     elif isDarwin ; then
         if isArm ; then
             if test -d /opt/homebrew/bin ; then
-                eval $(/opt/homebrew/bin/brew shellenv)
-
+                #: `brew shellenv` prints the same text for a shell until Homebrew changes
+                #: it, so it is kept in a file per shell rather than run by every shell.
+                #: brew is a #! script, and on macOS 14 to 26 each exec of one leaks 1K of
+                #: kernel memory until reboot (see [agfi:shebang-bypass]). Running bash
+                #: ourselves avoids that too. The file is remade when Homebrew's shellenv
+                #: code is newer. (zsh's `test -nt` is false for a missing file.)
                 #: see what this code does with:
                 #: `env -i zsh -f -c '/opt/homebrew/bin/brew shellenv'`
+                brew_shellenv_shell=zsh
+                isBash && brew_shellenv_shell=bash
+                brew_shellenv_cache="${HOME}/.cache/brew-shellenv.${brew_shellenv_shell}"
+                if ! test -e "${brew_shellenv_cache}" ||
+                        test /opt/homebrew/Library/Homebrew/cmd/shellenv.sh -nt "${brew_shellenv_cache}" ; then
+                    command mkdir -p "${HOME}/.cache"
+                    if /bin/bash -pu /opt/homebrew/bin/brew shellenv "${brew_shellenv_shell}" > "${brew_shellenv_cache}.$$" ; then
+                        command mv -f "${brew_shellenv_cache}.$$" "${brew_shellenv_cache}"
+                    else
+                        command rm -f "${brew_shellenv_cache}.$$"
+                    fi
+                fi
+                test -r "${brew_shellenv_cache}" && . "${brew_shellenv_cache}"
+                unset brew_shellenv_shell brew_shellenv_cache
             fi
 
             if isBash ; then
