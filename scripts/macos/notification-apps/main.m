@@ -45,7 +45,9 @@ static void post(UNUserNotificationCenter *center) {
             if (attachment) content.attachments = @[attachment];
         }
         NSString *identifier = option(@"group") ?: NSUUID.UUID.UUIDString;
-        content.userInfo = @{@"groupID": identifier};
+        NSString *onClick = option(@"onClick");
+        content.userInfo = onClick ? @{@"groupID": identifier, @"onClick": onClick}
+                                   : @{@"groupID": identifier};
         UNNotificationRequest *request = [UNNotificationRequest requestWithIdentifier:identifier
                                             content:content trigger:nil];
         [center addNotificationRequest:request withCompletionHandler:^(NSError *error) {
@@ -94,6 +96,66 @@ static void modernCommand(UNUserNotificationCenter *center) {
     } else post(center);
 }
 
+// Set only when macOS launched this process to deliver a click.
+static BOOL clickLaunch;
+
+// -onClick is a JSON array of strings: an absolute executable path and its
+// arguments. It is run directly, never through a shell, so alert text and
+// caller data cannot become shell syntax.
+static void clicked(NSDictionary *userInfo) {
+    // A launch can report the same click both as a launch option and to the
+    // delegate.
+    static BOOL handled;
+    if (handled) return;
+    handled = YES;
+    id value = userInfo[@"onClick"];
+    NSArray *argv = [value isKindOfClass:NSString.class]
+        ? [NSJSONSerialization JSONObjectWithData:[[value hasPrefix:@"\\"] ? [value substringFromIndex:1] : value
+                                                   dataUsingEncoding:NSUTF8StringEncoding] options:0 error:nil]
+        : nil;
+    BOOL valid = [argv isKindOfClass:NSArray.class] && argv.count && [argv[0] isKindOfClass:NSString.class] &&
+        [argv[0] isAbsolutePath];
+    for (id arg in valid ? argv : @[]) if (![arg isKindOfClass:NSString.class]) valid = NO;
+    if (!valid) {
+        if (clickLaunch) exit(0);
+        return;
+    }
+    NSTask *task = [NSTask new];
+    task.executableURL = [NSURL fileURLWithPath:argv[0]];
+    task.arguments = [argv subarrayWithRange:NSMakeRange(1, argv.count - 1)];
+    task.standardInput = task.standardOutput = task.standardError = NSFileHandle.fileHandleWithNullDevice;
+    // Stay alive until the action finishes; the launch timeout still bounds us.
+    if (clickLaunch) task.terminationHandler = ^(NSTask *done) { exit(done.terminationStatus ? 1 : 0); };
+    if (![task launchAndReturnError:nil] && clickLaunch) exit(1);
+}
+
+@interface ClickHandler : NSObject <NSApplicationDelegate, UNUserNotificationCenterDelegate>
+@end
+
+@implementation ClickHandler
+- (void)applicationDidFinishLaunching:(NSNotification *)notification {
+    // The launch option holds an NSUserNotification for legacy (DND bypass)
+    // alerts and a UNNotificationResponse for modern ones.
+    id launch = notification.userInfo[NSApplicationLaunchUserNotificationKey];
+    if ([launch isKindOfClass:NSUserNotification.class]) {
+        [NSUserNotificationCenter.defaultUserNotificationCenter removeDeliveredNotification:launch];
+        clicked([launch userInfo]);
+    } else if ([launch isKindOfClass:UNNotificationResponse.class] &&
+               [[launch actionIdentifier] isEqualToString:UNNotificationDefaultActionIdentifier]) {
+        clicked([launch notification].request.content.userInfo);
+    }
+}
+
+- (void)userNotificationCenter:(UNUserNotificationCenter *)center
+didReceiveNotificationResponse:(UNNotificationResponse *)response
+         withCompletionHandler:(void (^)(void))completionHandler {
+    if ([response.actionIdentifier isEqualToString:UNNotificationDefaultActionIdentifier])
+        clicked(response.notification.request.content.userInfo);
+    else if (clickLaunch) exit(0);
+    completionHandler();
+}
+@end
+
 // Normal commands use the public API. Only explicit DND bypass retains the
 // pinned upstream implementation and its best-effort private API.
 int main(int argc, const char *argv[]) {
@@ -126,7 +188,18 @@ int main(int argc, const char *argv[]) {
             [app run];
         } else if ((option(@"message") || option(@"remove") || option(@"list")) &&
                    (![args containsObject:@"-ignoreDnD"] || option(@"remove") || option(@"list"))) {
+            // A click can reach a short-lived command instance too.
+            __attribute__((objc_precise_lifetime)) ClickHandler *handler = [ClickHandler new];
+            UNUserNotificationCenter.currentNotificationCenter.delegate = handler;
             modernCommand(UNUserNotificationCenter.currentNotificationCenter);
+            [app run];
+        } else if (!option(@"message") && ![args containsObject:@"-help"] && ![args containsObject:@"-version"]) {
+            // Without a command, macOS launched us to deliver a click. The
+            // delegate must be installed before launch finishes.
+            clickLaunch = YES;
+            __attribute__((objc_precise_lifetime)) ClickHandler *handler = [ClickHandler new];
+            UNUserNotificationCenter.currentNotificationCenter.delegate = handler;
+            app.delegate = handler;
             [app run];
         } else {
             [AppDelegate initializeUserDefaults];

@@ -91,7 +91,14 @@ def patch_delegate(text):
     if text.count(needle) != 1:
         raise ValueError("pinned notifier sender patch no longer applies")
     text = text.replace(needle, "appDefaults = @{};")
-    # Clicking should simply dismiss; upstream logs all notification text.
+    # Bypass alerts carry the same argv click action as modern ones; main.m's
+    # ClickHandler runs it. Upstream's shell -execute is not supported.
+    needle = 'if (defaults[@"execute"])  options[@"command"]          = defaults[@"execute"];'
+    if text.count(needle) != 1:
+        raise ValueError("pinned notifier click-action patch no longer applies")
+    text = text.replace(needle, 'if (defaults[@"onClick"])  options[@"onClick"]          = defaults[@"onClick"];')
+    # A click delivered to the posting process itself only dismisses; upstream
+    # logs all notification text.
     start = text.index("- (void)userActivatedNotification:")
     end = text.index("- (BOOL)activateAppWithBundleID:", start)
     text = text[:start] + '''- (void)userActivatedNotification:(NSUserNotification *)notification;

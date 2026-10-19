@@ -121,6 +121,16 @@ class BootstrapTest(unittest.TestCase):
                 builder.source(self.home)
         self.assertFalse((self.home / "terminal-notifier-2.0.0.tar.gz").exists())
 
+    def test_legacy_alerts_carry_click_action_not_shell_command(self):
+        text = builder.patch_delegate(
+            'appDefaults = @{@"sender": @"com.apple.Terminal"};\n'
+            'if (defaults[@"execute"])  options[@"command"]          = defaults[@"execute"];\n'
+            '- (void)userActivatedNotification:(NSUserNotification *)n;\n{ NSLog(@"%@", n); }\n'
+            '- (BOOL)activateAppWithBundleID:')
+        self.assertIn('options[@"onClick"]', text)
+        self.assertNotIn('options[@"command"]', text)
+        self.assertNotIn("NSLog", text)
+
     def test_sender_patch_is_required(self):
         with self.assertRaisesRegex(ValueError, "patch no longer applies"):
             builder.patch_delegate("unexpected upstream source")

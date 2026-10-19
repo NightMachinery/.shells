@@ -55,7 +55,8 @@ attachments are omitted rather than preventing a text alert.
 
 The nib-free launcher removes the stock Terminal sender override, so macOS uses
 the real bundle's icon and identity. It also removes upstream's logging of
-notification contents on click. Original envelope and terminal artwork is drawn
+notification contents on click, and replaces its shell `-execute` click command
+with the argv `-onClick` described below. Original envelope and terminal artwork is drawn
 locally from vector source; no third-party app artwork is redistributed.
 
 ## Notification content
@@ -66,6 +67,25 @@ and the actual event text as body. Constant app names do not occupy the title.
 The common shell gateway accepts `notif_title`, `notif_subtitle`, and `notif_body`
 for callers that have structured context; generic calls keep their previous
 behavior. Content changes preserve per-app grouping and dismissal boundaries.
+
+## Click actions
+
+`-onClick '\["/absolute/program","arg",...]'` attaches an argv, as a JSON array
+of strings, that the app runs when the user clicks the alert. The leading
+backslash keeps `NSUserDefaults` from parsing the value, as with the other
+options. The argv runs directly, never through a shell, with standard streams on
+`/dev/null` and launchd's environment, so the program must not rely on the
+caller's `PATH` or shell functions. Upstream's shell-string `-execute`,
+`-activate`, and `-open` are not supported. A click on an alert without
+`-onClick` only dismisses it.
+
+macOS launches the app to deliver a click. An argument-free launch is therefore
+treated as a click: the app waits for the response, runs the action, and exits
+when the action does, within the usual eight-second bound. Modern alerts carry
+the action in their `userInfo`; legacy DND-bypass alerts get the same through a
+patch to upstream's posting code (untested where the legacy service rejects
+posting outright, as on the development host). Night Mail uses this to open the clicked mail
+in Emacs; Agent Bells does not set it.
 
 ## DND and identity
 
