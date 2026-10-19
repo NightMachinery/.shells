@@ -54,7 +54,17 @@ function h_timer-bell {
 function timer {
     doc aliased to timer with noglob
     local t=$1 cmd=("${@[2,-1]}") notify="${timer_notify:-y}" msg="${timer_msg}"
+
+    #: This is a heuristic to allow for a message to be passed as arguments.
+    local cmd_head="${cmd[1]}"
+    if ! isDefined "${cmd_head}" && test -z "${msg}" ; then
+        msg="${cmd[*]}"
+        cmd=()
+    fi
+
     test -z "$cmd[*]" && cmd=(reval-env lo_s=20 loop h_timer-bell)
+
+    ecgray "cmd:"$'\n  '"$(gquote "${cmd[@]}")"$'\n\n'msg:$'\n  '"$msg"$'\n'
 
     sleep-neon $(($t * 60)) && {
         if bool $notify ; then
