@@ -19,7 +19,11 @@ function wifi-internet-sharing-fix-ap1 {
     # listens only on bridge100). Nothing in the prefs can be edited to fix it.
     #
     # Normally the local.internetsharing.apbridge LaunchDaemon handles this; this is
-    # for the rare miss, or before installing the daemon.
+    # for the rare miss, or before installing the daemon. Its ProgramArguments must be
+    # ("/bin/sh", "/usr/local/libexec/internetsharing-apbridge.sh"), not the script
+    # alone: launchd runs it about 4 times a minute on network events, and on macOS 14
+    # to 26 each exec of a #! script leaks 1K of wired kernel memory until reboot (see
+    # [agfi:shebang-bypass]).
     #
     # This ADDS ap1 and deliberately does not remove en0, leaving both enrolled.
     # Do not "tidy that up" with `ifconfig bridge100 deletem en0': measured on
