@@ -137,7 +137,8 @@ The launchers --- [[agfi:claude]], [[agfi:codex-m]], [[agfi:antigravity-m]]
 --- call [[agfi:h-agents-md-sync-ask]], so the files are current whenever an
 agent starts. One sync rewrites every agent's file, not just the caller's, so
 any launcher keeps all of them current. It only writes when the content
-actually changed, and is cheap enough for a hot path.
+actually changed, and is cheap enough for a hot path. It reports each file it
+writes or removes; an up-to-date run prints nothing.
 
 When the assembly fails --- an unreadable source, a half-synced notes clone
 --- the wrapper prints the error and asks whether to launch anyway, defaulting
@@ -151,5 +152,5 @@ written file has drifted, =MISSING= if it was never written, and =OVERSIZED=
 past 200 lines, which is where Claude Code's docs say adherence starts to drop.
 
 Variables: =agents_md_dir=, =agents_md_private_dir=, =agents_md_host= override
-the locations, and =agents_md_sync_verbose_p=y= makes the sync say what it
-wrote.
+the locations. =agents_md_sync_verbose_p=n= suppresses change reports; errors
+still appear. See [[NIGHTDIR:docs/agents-md-sync.md][sync reporting and checks]].

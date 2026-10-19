@@ -121,9 +121,9 @@ function agents-md-sync {
     #: Rewrites every agent's instruction file from its sources. Idempotent,
     #: and only touches a file whose content actually changed, so mtimes stay
     #: meaningful. Called by the agent launchers, so it is on a hot path: keep
-    #: it to reading a handful of small files.
+    #: it to reading a handful of small files. Report changed targets only.
     ##
-    local verbose_p="${agents_md_sync_verbose_p:-n}"
+    local verbose_p="${agents_md_sync_verbose_p:-y}"
 
     local line agent target mode assembled
     local -a fields
