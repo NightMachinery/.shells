@@ -276,8 +276,10 @@ end
 --     A client killed by a signal reports 128 plus the signal number.
 --   * The "garden-down band": a warn band (id garden-down) naming the
 --     hotkey that did not run, or the call that failed. While the liveness
---     probe (gardenLivenessCheck, every 60 s) finds the garden down, it
---     keeps a band up saying so; it says again when the garden is back.
+--     probe (gardenLivenessCheck, every 60 s, every 5 s while down) finds the
+--     garden down, it keeps a band up saying so. The first sign of life, a
+--     probe or a successful call, replaces an outage band with "BrishGarden
+--     is back", which expires on its own.
 --
 -- Every client call is killed, with its whole process tree, if it is still
 -- running after `opts.timeout' seconds (default 30), so a wedged garden
@@ -348,6 +350,28 @@ gardenUp = nil
 
 local function gardenBand(msg, seconds)
     alert_gateway(msg, { id = "garden-down", color = "warn", seconds = seconds })
+end
+
+-- Whether an outage was announced and not yet taken back. One flag for both
+-- announcers, the probe and a call that was not sent, so whichever sees the
+-- garden alive first takes the band down; neither swallows the other's.
+local gardenDownAnnounced = false
+local gardenRecheckKey = nil
+
+-- Also schedules the next probe 5 s out, so a down garden is rechecked fast
+-- (see gardenLivenessCheck) from whichever announcer noticed. One pending
+-- recheck at a time, however the checks interleave with the minute timer.
+local function gardenDown(msg, seconds)
+    gardenDownAnnounced = true
+    gardenBand(msg, seconds)
+    hsCancel(gardenRecheckKey)
+    gardenRecheckKey = hsAfter(5, function() gardenLivenessCheck() end)
+end
+
+local function gardenBack()
+    if not gardenDownAnnounced then return end
+    gardenDownAnnounced = false
+    alert_gateway("BrishGarden is back", { id = "garden-down", color = "success" })
 end
 
 -- Terminates `rootPid' and everything below it. hs.task:terminate() alone
@@ -447,6 +471,7 @@ local function gardenCall(args, label, opts, onResult, noquote)
     gardenTask(bin, clientArgs, function(code, out, err)
         if code == 0 then
             gardenUp = true
+            gardenBack()
             return onResult(0, out, err)
         end
 
@@ -454,7 +479,7 @@ local function gardenCall(args, label, opts, onResult, noquote)
             if notSent then
                 gardenUp = false
                 print(label .. ": BrishGarden down; not run")
-                gardenBand("BrishGarden down: " .. label .. " did not run; run ivy", 30)
+                gardenDown("BrishGarden down: " .. label .. " did not run; run ivy", 30)
             else
                 if not opts.quiet then
                     print(label .. ": " .. bin .. " exited " .. tostring(code) .. ": " .. err)
@@ -532,27 +557,26 @@ end
 
 --- The liveness probe: one TCP connect every 60 s, so a dead garden is
 --- noticed within a minute rather than at the next failed hotkey (the
---- 2026-09-29 outage went unnoticed for 15 hours). While the garden is down
---- every probe re-issues the band with a lifetime longer than the interval,
---- so it stays on screen until the garden is back; an unchanged message on
---- the same id only extends the band. Its own state, not gardenUp, decides
---- when to say "back": a call that succeeded in between must not swallow it.
---- Global, so the timer is not collected.
-local gardenProbeUp = nil
+--- 2026-09-29 outage went unnoticed for 15 hours). A call that finds it down
+--- says so at once. Down, it probes every 5 s instead, so the band comes down
+--- within seconds of the garden returning; up, it stays at the minute tick.
+--- While the garden is down every probe re-issues the band with a lifetime
+--- longer than the interval, so it stays on screen until the garden is back;
+--- an unchanged message on the same id only extends the band. Global, so the
+--- timer is not collected.
 
 function gardenLivenessCheck()
     gardenProbe(function(up)
-        local was = gardenProbeUp
-        gardenProbeUp = up
         gardenUp = up
         if not up then
-            gardenBand("BrishGarden is down: hotkeys that need it do nothing; run ivy", 90)
-        elseif was == false then
-            alert_gateway("BrishGarden is back", { id = "garden-down" })
+            gardenDown("BrishGarden is down: hotkeys that need it do nothing; run ivy", 30)
+        else
+            gardenBack()
         end
     end)
 end
 
+if gardenLivenessTimer then gardenLivenessTimer:stop() end
 gardenLivenessTimer = hs.timer.doEvery(60, gardenLivenessCheck)
 hsAfter(5, gardenLivenessCheck)
 

@@ -72,13 +72,19 @@ from inside could not run that way.
     (exit N)". Ordinary remote failures get a console line and `onFail`,
     without a garden-down band.
 - A liveness probe, `gardenLivenessCheck`, connects to BrishGarden's port
-  every 60 s and 5 s after each config load. While BrishGarden is down, every
+  every 60 s, starting 5 s after each config load, and every 5 s while
+  BrishGarden is down, so a recovery shows within seconds without probing
+  constantly while it is up. A call that finds it down starts the fast
+  rechecks at once. While BrishGarden is down, every
   probe re-issues "BrishGarden is down: hotkeys that need it do nothing; run
-  ivy" with a 90 s lifetime, so the band stays up until BrishGarden is back
-  (an unchanged message on the same id only extends it). Then it says
-  "BrishGarden is back". The probe keeps its own state, so a call that
-  succeeded in between cannot swallow the "back" band. The global `gardenUp`
-  holds the latest answer from a call or a probe.
+  ivy" with a 30 s lifetime, so the band stays up until BrishGarden is back
+  (an unchanged message on the same id only extends it).
+- Recovery: the first sign of life, a probe that connects or any call that
+  succeeds, replaces an outage band (from the probe or from a call that was
+  not sent) with a green "BrishGarden is back", which expires on its own. Both
+  announcers share one flag, `gardenDownAnnounced`, so whichever sees the
+  garden alive first says it, once. The global `gardenUp` holds the latest
+  answer from a call or a probe.
 - Console lines per failure, prefixed with the caller's label, such as
   `hyper+d: BrishGarden down; not run`.
 
