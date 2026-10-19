@@ -529,10 +529,20 @@ Run a #! script through its interpreter, so the kernel never handles its #! line
         }
     fi
 
-    local line=''
-    read -r line < "${file}" || true
-    if [[ "${line}" == '#!'* ]] ; then
-        local interpreter=( ${=${line#'#!'}} )
+    #: The two bytes first, so a binary is not read up to its first newline (25K into
+    #: kitty's, a byte at a time). A file we cannot read (mode 111 still runs) has no
+    #: #! line we could use, and testing first keeps zsh's "permission denied" away.
+    local magic='' line=''
+    if [[ -r "${file}" ]] ; then
+        {
+            read -r -u 0 -k 2 magic && [[ "${magic}" == '#!' ]] && read -r -u 0 line
+        } < "${file}" || true
+    fi
+
+    #: Split on blanks, as the kernel does, whatever IFS the caller set.
+    local IFS=$' \t'
+    local interpreter=( ${=line} )
+    if [[ "${magic}" == '#!' ]] && (( ${#interpreter} )) ; then
         "${interpreter[@]}" "${file}" "$@"
     else
         "${file}" "$@"
@@ -556,4 +566,4 @@ Define, for each command, a function of the same name that runs it with shebang-
 #: (2026-10): paste_files.swift about 2.5 times a second, from pbpaste-plus. kitty is
 #: Homebrew's #! wrapper around the app's binary, run once per interactive shell for its
 #: completions.
-shebang-bypass-def paste_files.swift brew sponge kitty
+shebang-bypass-def paste_files.swift brew sponge kitty vcsh
