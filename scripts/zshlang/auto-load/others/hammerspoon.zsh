@@ -405,8 +405,9 @@ function hs-alert-v1 {
 #                 alert_flash rather than lengthening it
 #   alert_pos     top (default), center, bottom
 #   alert_id      reusing an id updates that alert in place instead of stacking
-#   alert_pinned  y claims space before every unpinned band, so a flood of
-#                 other alerts cannot push this one off the screen
+#   alert_pinned  y claims space before every unpinned band. Bands are never
+#                 dropped, but a full stack collapses older ones to one line
+#                 and hides the oldest; a pinned band stays whole and in view
 #   alert_markup  plain (default) or md
 #   alert_color   band colour by name. The originals are default, warn/amber,
 #                 crit, agent, free and notice; there is also a palette
