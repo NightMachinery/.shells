@@ -54,7 +54,8 @@ function h-grep-output-to-fz {
     elif [[ "$previewcode" == ntom ]] ; then
         local rtl_code=''
         if bool "$rtl" ; then
-            rtl_code='| rtl_reshaper.dash' # very bad perf for large files
+            #: Through dash rather than by name; see docs/macos-shebang-leak.md.
+            rtl_code='| /bin/dash "$NIGHTDIR/zshlang/wrappers/rtl_reshaper.dash"' # very bad perf for large files
             # adding ` | rtl_reshaper.dash` works fine if RTL text is not colored, it seems. @todo1 It's best if ntom does the reshaping itself ...
         fi
         previewcode="ntom {1} {2} {s3..} ${dir_main_quoted} ${ntom_mode} ${rtl_code} || printf -- \"\n\n%s \" {}"

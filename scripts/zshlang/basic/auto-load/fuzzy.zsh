@@ -7,7 +7,8 @@ if isRtl ; then
     FZF_RTL_PREVIEW="$FZF_SIMPLE_PREVIEW"
 else
     # FZF_RTL_PREVIEW='printf -- "%s " {} | rtl_reshaper.py'
-    FZF_RTL_PREVIEW='printf -- "%s " {} | rtl_reshaper.dash'
+    #: Through dash rather than by name; see docs/macos-shebang-leak.md.
+    FZF_RTL_PREVIEW='printf -- "%s " {} | /bin/dash "$NIGHTDIR/zshlang/wrappers/rtl_reshaper.dash"'
 fi
 ##
 FZF_SIMPLE_PREVIEW="$FZF_RTL_PREVIEW"
@@ -16,7 +17,7 @@ FZF_CAT_PREVIEW='cat {f}'
 if isRtl ; then
     FZF_CAT_RTL_PREVIEW="$FZF_CAT_PREVIEW"
 else
-    FZF_CAT_RTL_PREVIEW='cat {f} | rtl_reshaper.dash'
+    FZF_CAT_RTL_PREVIEW='cat {f} | /bin/dash "$NIGHTDIR/zshlang/wrappers/rtl_reshaper.dash"'
 fi
 ##
 # FZF_PREVIEW_NTAG="brishz_in={} brishzq.zsh ntag-color"

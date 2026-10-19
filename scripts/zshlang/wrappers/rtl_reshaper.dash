@@ -10,10 +10,12 @@ rtl_reshaper() {
     ##
 }
 
-if command -v ansifold 2>/dev/null >/dev/null ; then
+ansifold_bin="$(command -v ansifold 2>/dev/null)"
+if [ -n "$ansifold_bin" ] ; then
 # wrapping text with ANSI codes https://stackoverflow.com/questions/66986819/how-do-i-wrap-unicode-text-containing-ansi-color-codes-at-word-boundaries
 # ansifold still breaks some ANSI codes, but it is good enough
-    ansifold --boundary=word --width="$w" | rtl_reshaper
+    #: Through perl rather than by name; see docs/macos-shebang-leak.md.
+    perl "$ansifold_bin" --boundary=word --width="$w" | rtl_reshaper
 else
     rtl_reshaper
     # command ggrep -Eo ".{1,$w}" | rtl_reshaper
