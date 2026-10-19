@@ -83,11 +83,10 @@ if true ; then # ! command -v brew &> /dev/null ; then # it's faster to just not
         if isArm ; then
             if test -d /opt/homebrew/bin ; then
                 #: `brew shellenv` prints the same text for a shell until Homebrew changes
-                #: it, so it is kept in a file per shell rather than run by every shell.
-                #: brew is a #! script, and on macOS 14 to 26 each exec of one leaks 1K of
-                #: kernel memory until reboot (see [agfi:shebang-bypass]). Running bash
-                #: ourselves avoids that too. The file is remade when Homebrew's shellenv
-                #: code is newer. (zsh's `test -nt` is false for a missing file.)
+                #: it, so it is kept in a file per shell rather than run by every shell;
+                #: see $NIGHTDIR/docs/macos-shebang-leak.md. The file is remade when
+                #: Homebrew's shellenv code is newer. (zsh's `test -nt` is false for a
+                #: missing file.)
                 #: see what this code does with:
                 #: `env -i zsh -f -c '/opt/homebrew/bin/brew shellenv'`
                 brew_shellenv_shell=zsh

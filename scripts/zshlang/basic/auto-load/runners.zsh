@@ -511,9 +511,8 @@ alias sss='zsh-restart'
 function shebang-bypass {
     : "usage: shebang-bypass <command-or-path> [<arg> ...]
 Run a #! script through its interpreter, so the kernel never handles its #! line."
-    #: On macOS 14 to 26, every exec of a #! script leaks a 1K buffer of wired kernel
-    #: memory (zone data.kalloc.1024) that only a reboot frees. Starting the interpreter ourselves is an ordinary exec and
-    #: leaks nothing. Use this on hot paths, for scripts run many times a minute.
+    #: A stopgap for a kernel leak until macOS 27; see docs/macos-shebang-leak.md before
+    #: using it anywhere new.
     #:
     #: The words after the interpreter are split on whitespace, as the macOS kernel does
     #: (Linux would pass them as one argument). A file without a #! line runs as is.
@@ -552,8 +551,8 @@ Run a #! script through its interpreter, so the kernel never handles its #! line
 function shebang-bypass-def {
     : "usage: shebang-bypass-def <command> ...
 Define, for each command, a function of the same name that runs it with shebang-bypass."
-    #: So every zsh caller avoids the leak with no change at the call site. A name that is
-    #: already an alias or function is left alone.
+    #: So every zsh caller goes through it with no change at the call site; see
+    #: docs/macos-shebang-leak.md. A name that is already an alias or function is left alone.
     local cmd
     for cmd in "$@" ; do
         if (( ${+functions[$cmd]} || ${+aliases[$cmd]} )) ; then
@@ -562,8 +561,5 @@ Define, for each command, a function of the same name that runs it with shebang-
         functions[$cmd]="shebang-bypass ${(q)cmd} \"\$@\""
     done
 }
-#: The #! scripts zsh runs most often, counted with eslogger over minutes of normal use
-#: (2026-10): paste_files.swift about 2.5 times a second, from pbpaste-plus. kitty is
-#: Homebrew's #! wrapper around the app's binary, run once per interactive shell for its
-#: completions.
-shebang-bypass-def paste_files.swift brew sponge kitty vcsh
+#: Measured hot paths only; see docs/macos-shebang-leak.md.
+shebang-bypass-def paste_files.swift brew sponge kitty vcsh rtl_reshaper.dash
