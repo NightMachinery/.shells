@@ -31,7 +31,9 @@ function screen-gray-set-darwin () {
 function frontapp-get {
     #: [[id:5192ebaf-95c8-43df-be58-c153ab412564][macOS/front app]]
     ##
-    local frontapp="${front_app_cached}"
+    setopt localoptions pipefail
+
+    local frontapp="${front_app_cached:-}"
     if test -n "$frontapp" ; then
         ec "${frontapp}"
         return 0
@@ -40,7 +42,7 @@ function frontapp-get {
     {
         if isDarwin ; then
             if true ; then
-            frontapp-get-bundle-id-osa
+            frontapp-get-osa
             else
                 #: @upstreamBug? [[id:1163a291-fbc8-4f77-8b53-9b58be684e66][=lsappinfo info= doesn't return anything.]]
                 ##
@@ -63,6 +65,22 @@ function frontapp-get {
             return 1
         fi
     } | cat-copy-if-tty
+}
+
+function frontapp-get-osa {
+    : "Return the frontmost app's bundle ID, or its process name when it has none."
+    #: Shell-launched mpv can report no bundle ID. Read both properties from
+    #: one process so an app switch cannot mix two apps' identities.
+    ensure-cmd osascript @RET
+
+    command osascript <<'APPLESCRIPT'
+tell application "System Events"
+    set {appID, appName} to {bundle identifier, name} of (first process whose frontmost is true)
+end tell
+if appID is not missing value and appID is not "" then return appID
+if appName is missing value or appName is "" then error "Frontmost application has no identifier or name"
+return appName
+APPLESCRIPT
 }
 
 function frontapp-get-bundle-id-osa {
