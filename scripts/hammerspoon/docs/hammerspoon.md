@@ -827,7 +827,8 @@ and then a band at the anchor edge says how many are hidden. Nothing is
 silently dropped.
 
 `pinned` alerts claim their space before everyone else. The agent banner uses
-it, so a wall of text elsewhere cannot push it off.
+it, so a wall of text elsewhere cannot push it off. From zsh, `alert_pinned=y`
+passes it through `hs-alert-v2`; `bell-evacuate` uses it for its red banner.
 
 ### The fullscreen flash
 

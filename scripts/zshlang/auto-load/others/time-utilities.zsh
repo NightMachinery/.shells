@@ -42,7 +42,9 @@ function TZ-set-from-system {
 ##
 function h_timer-bell {
     tts-glados1-cached "The time is now up, commander"
-    awaysh @opts redo 2 @ bell-visual-flash1
+    #: `msg' is [agfi:timer]'s, in scope here. One id, so each repeat of the loop
+    #: re-flashes the same band instead of stacking another.
+    alert_id=timer-bell awaysh alert "${msg:-Time is up}"
     ##
     # awaysh tts-gateway-i2 "Deploy the delayed sequence." ;  tts-gateway-i1 "Deploy the delayed sequence."
     # awaysh tts-gateway-i2 "Deploy the delayed sequence." ;  awaysh tts-gateway-i1 "Deploy the delayed sequence." ; tts-gateway "Deploy the delayed sequence."
@@ -149,9 +151,9 @@ function h_timer-late {
     # i_dur=$(( i_dur + 5.3 )) # compensate for our time budget
     ##
     local bell_awaysh=no hear_loudidle=no
-    bell-visual-flash1
-    bell-lm-whattimeisit
     local m=$(( int(i * i_dur / 60) ))
+    alert_id=timer-late alert "${m} minutes late"
+    bell-lm-whattimeisit
     if (( m <= 200 )) ; then
         tts-glados1-cached "$m minutes late ... so so late"'!'
     else

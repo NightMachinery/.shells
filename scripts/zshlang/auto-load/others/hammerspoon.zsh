@@ -405,6 +405,8 @@ function hs-alert-v1 {
 #                 alert_flash rather than lengthening it
 #   alert_pos     top (default), center, bottom
 #   alert_id      reusing an id updates that alert in place instead of stacking
+#   alert_pinned  y claims space before every unpinned band, so a flood of
+#                 other alerts cannot push this one off the screen
 #   alert_markup  plain (default) or md
 #   alert_color   band colour by name. The originals are default, warn/amber,
 #                 crit, agent, free and notice; there is also a palette
@@ -438,7 +440,7 @@ function hs-alert-v2 {
     local msg="$*" dur="${alert_dur:-5}"
     local flash="${alert_flash:-0.35}" pos="${alert_pos:-top}"
     local fade="${alert_fade:-}"
-    local id="${alert_id:-}"
+    local id="${alert_id:-}" pinned="${alert_pinned:-n}"
     local markup="${alert_markup:-plain}" color="${alert_color:-}"
     #: A screen spec (hammerspoon/core/screens.lua): all, active, pointer,
     #: primary, external, role:<name>, ... Unset means every screen.
@@ -458,6 +460,9 @@ function hs-alert-v2 {
     fi
     if test -n "$color" ; then
         opts+=", color = \"${color}\""
+    fi
+    if bool "$pinned" ; then
+        opts+=", pinned = true"
     fi
     if test -n "$screens" ; then
         #: Interpolated into Lua source, so only the characters a spec can

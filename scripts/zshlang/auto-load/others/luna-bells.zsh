@@ -133,7 +133,7 @@ function h_luna-advanced-bell {
                 if (( skipped >= 1 )) ; then
                     tts-gateway "CRITICAL: You are at your ${skipped}th skip"
                 fi
-                @opts redo 1 @ bell-visual-flash1
+                alert_dur=10 alert_id="$luna_skip_alert_id" alert "LUNA/skip: ${skipped}"
                 sleep 10 #: keeps screen gray
             fi
         elif true ; then
@@ -153,7 +153,7 @@ function h_luna-advanced-bell {
             if (( skipped >= 1 )) ; then
                 brishz awaysh lunaquit-monitor '' ''
                 for i in {1..3} ; do
-                    @opts redo 1 @ bell-visual-flash1
+                    alert_color=red-pulse-1 alert_id="$luna_skip_alert_id" alert "LUNA/skip: ${skipped}"
                     tts-gateway "CRITICAL: You are at your ${skipped}th skip"
                     bell-hp3-be-careful-harry
                     bell-helicopter 20
@@ -161,7 +161,7 @@ function h_luna-advanced-bell {
                 done
             else
                 if [[ "$signal1" == flash ]] ; then
-                    @opts redo 10 @ bell-visual-flash1
+                    alert_dur=10 alert 'LUNA: take a break'
                 else
                     local count=25
                     # I did not find out how BTT knows whether there is sth playing. Anyhow, mpv-get works as long as you don't play multiple videos simultaneously, and is cross-platform.
@@ -362,24 +362,32 @@ function kill-marker-luna-timer-late {
 function bell-evacuate {
     kill-marker-luna-timer-late
 
-    # `x (4*46)/0.78` = 235
-    awaysh-bnamed LUNA_BELL_EVACUATE_MARKER @opts redo 235 @ bell-visual-flash1 # each iter takes ~0.78 (outdated?)
+    #: Up for the whole sequence below (4 iterations of ~46s), pinned so other
+    #: bands cannot push it off. Bands take no clicks, so it comes down with the
+    #: sequence; its lifetime only bounds a run that was killed.
+    local evacuate_alert_id='luna-evacuate'
+    alert_dur=300 alert_pinned=y alert_color=red-pulse-1 alert_id="$evacuate_alert_id" \
+        alert 'EVACUATE: you did not rest. Step away from the machine.'
 
-    local bell_awaysh=no hear_loudidle=no i
-    for i in {1..4} ; do # each iter takes ~46s
-        bell-sc2-personnel-must-evacuate
-        bell-sc2-zerg-detected
-        bell-sc2-will-face-justice
-        bell-sc2-personnel-must-evacuate
-        bell-helicopter
-        bell-sc2-my-sins
-        bell-sc2-extreme-zerg-infestation
-        bell-sc2-personnel-must-evacuate
-        bell-sc2-containment-breach
-        bell-sc2-personnel-must-evacuate
-        bell-sc2-my-sins
-        bell-sc2-containment-breach
-    done
+    {
+        local bell_awaysh=no hear_loudidle=no i
+        for i in {1..4} ; do # each iter takes ~46s
+            bell-sc2-personnel-must-evacuate
+            bell-sc2-zerg-detected
+            bell-sc2-will-face-justice
+            bell-sc2-personnel-must-evacuate
+            bell-helicopter
+            bell-sc2-my-sins
+            bell-sc2-extreme-zerg-infestation
+            bell-sc2-personnel-must-evacuate
+            bell-sc2-containment-breach
+            bell-sc2-personnel-must-evacuate
+            bell-sc2-my-sins
+            bell-sc2-containment-breach
+        done
+    } always {
+        silence hs-alert-dismiss "$evacuate_alert_id" || true
+    }
     display-gray-off # if you're still here, I doubt keeping the display gray will be able to help you any. :(
 }
 
@@ -1560,6 +1568,11 @@ aliasfnq bell-gibberish1-long tts-gateway-g1 'An apple is an edible fruit produc
 ##
 redis-defvar bell_visual_flash1_lock
 function bell-visual-flash1 {
+    #: @deprecated Flashes the built-in display's brightness, which says nothing
+    #: about why. Use [agfi:hs-alert-v2] (`alert'), whose fullscreen flash
+    #: settles into a band carrying the message. Kept for one-off use; nothing
+    #: in the repo calls it any more.
+    ##
     if [[ "$(bell_visual_flash1_lock_get)" == y ]] ; then
         tts-gateway "Flash disabled because of lock"
         return 0
