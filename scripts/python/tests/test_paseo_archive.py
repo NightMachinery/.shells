@@ -75,6 +75,10 @@ source "$1/zshlang/basic/basic.plugin.zsh"
 source "$1/zshlang/auto-load/others/paseo.zsh"
 function ecerr { print -ru2 -- "$@" }
 function fzf-gateway { command fzf "$@" }
+function h-agent-session-live-list { return 0 }
+function h-agent-session-call { return 1 }
+function h-agent-session-preview-cmd { print -r -- "printf 'RICH:%s:%s\\n' {13}" }
+
 '''
         return subprocess.run(['zsh', '-f', '-c', script + command, '_', str(ROOT)], cwd=self.tmp, env=self.env, text=True, capture_output=True)
 
@@ -170,6 +174,55 @@ function fzf-gateway { command fzf "$@" }
         r = self.shell('paseo-archive-fz --filter "old test"')
         self.assertEqual(r.returncode, 0, r.stderr)
         self.assertEqual(self.calls(), [['archive', IDLE]])
+
+    def test_rich_preview_keeps_cascade_and_full_uuid_selection(self):
+        native = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'
+        transcript = self.tmp / 'native' / 'projects' / "fixture with 'quote" / (native + '.jsonl')
+        transcript.parent.mkdir(parents=True)
+        transcript.write_text('{}\n')
+        self.record(IDLE, labels={'paseo.parent-agent-id': OTHER},
+                    title="old test ' $(printf inert)",
+                    persistence={'nativeHandle': native, 'metadata': {'provider': 'claude'}})
+        inspector = self.tmp / 'inspect-fzf.py'
+        inspector.write_text(r'''import json,os,re,shlex,subprocess,sys
+from pathlib import Path
+root=Path(os.environ['TEST_ARCHIVE_DIR'])
+args=sys.argv[1:]
+assert '--ansi' in args
+assert args[args.index('--preview-window')+1]=='down,60%,wrap' if '--preview-window' in args else '--preview-window=down,60%,wrap' in args
+preview=args[args.index('--preview')+1]
+rows=[line.split('\t') for line in sys.stdin.read().splitlines()]
+by_id={row[0]:row for row in rows}
+child=by_id['33333333-3333-3333-3333-333333333333']
+parent=by_id['55555555-5555-5555-5555-555555555555']
+assert len(child)==13 and child[12]=='claude' and Path(child[11]).is_file()
+assert parent[11:]==['-','-']
+results={}
+for row in [child,parent]:
+ command=re.sub(r'\{(\d+)\}',lambda match:shlex.quote(row[int(match[1])-1]),preview)
+ result=subprocess.run(['dash','-c',command],capture_output=True,text=True)
+ assert result.returncode==0,result.stderr
+ results[row[0]]=result.stdout
+(root/'previews.json').write_text(json.dumps(results))
+print('\t'.join(parent))
+''')
+        command = '''
+function h-agent-session-call {
+    [[ "$1" == claude && "$2" == roots ]] || return 1
+    print -r -- "${TEST_ARCHIVE_DIR}/native/projects"
+}
+function fzf-gateway { command python3 "${TEST_ARCHIVE_DIR}/inspect-fzf.py" "$@" }
+paseo-archive-fz
+'''
+        result = self.shell(command)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        previews = json.loads((self.tmp / 'previews.json').read_text())
+        self.assertIn('RICH:claude:' + str(transcript), previews[IDLE])
+        self.assertIn('archives 1 subagents with it:', previews[OTHER])
+        self.assertIn('$(printf inert)', previews[OTHER])
+        # Missing paths are delegated too; Go preview tests cover their fallback.
+        self.assertIn('RICH:-:-', previews[OTHER])
+        self.assertEqual(self.calls(), [['archive', OTHER]])
 
     def test_caller_and_parent_cannot_be_forced(self):
         self.env.pop('PASEO_PARENT_AGENT_ID')

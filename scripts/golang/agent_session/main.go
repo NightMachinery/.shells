@@ -64,7 +64,9 @@ func main() {
 	}
 
 	ad, ok := adapters[args[0]]
-	if !ok {
+	// Picker rows without native identity use '-' for both provider and path.
+	// Preview can explain that absence without treating it as a usage error.
+	if !ok && !(args[0] == "-" && len(args) >= 2 && args[1] == "preview") {
 		fmt.Fprintf(os.Stderr, "agent_session: unknown agent: %s\n", args[0])
 		usage()
 	}
@@ -352,7 +354,19 @@ func cmdPreview(ad session.Adapter, argv []string) error {
 	// Its presence is what counts, whatever the value.
 	_, noColor := os.LookupEnv("NO_COLOR")
 
-	out, err := ad.Preview(fs.Arg(0), session.PreviewOpts{
+	path := fs.Arg(0)
+	// Every picker shares this fallback, including a transcript removed between
+	// listing and preview. Reject non-files before Open, which could block on a FIFO.
+	if !readablePreviewFile(path) {
+		fmt.Println("No transcript available.")
+		return nil
+	}
+	if ad == nil {
+		fmt.Println("No session preview available for this provider.")
+		return nil
+	}
+
+	out, err := ad.Preview(path, session.PreviewOpts{
 		Bytes:   *window,
 		Color:   *colorP && !noColor,
 		Compact: compact,
@@ -362,6 +376,23 @@ func cmdPreview(ad session.Adapter, argv []string) error {
 	}
 	os.Stdout.WriteString(turns.ScrubText(out))
 	return nil
+}
+
+// Test file availability once for every provider before rendering it.
+func readablePreviewFile(path string) bool {
+	if path == "-" {
+		return false
+	}
+	info, err := os.Stat(path)
+	if err != nil || !info.Mode().IsRegular() {
+		return false
+	}
+	file, err := os.Open(path)
+	if err != nil {
+		return false
+	}
+	file.Close()
+	return true
 }
 
 // Below these the ordinary layout does not fit: the rows wrap, and a wrapped

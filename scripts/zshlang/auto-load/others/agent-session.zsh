@@ -2657,6 +2657,7 @@ function h-agent-session-preview-cmd {
     #: global cannot reach a process fzf spawns on its own.
     #: Usage: h-agent-session-preview-cmd [agent or {3}]
     ##
+    setopt localoptions extendedglob
     local agent="${1:-{3\}}"
     if [[ "${agent}" != [[:alnum:]{}]## ]] ; then
         ecerr "$0: refusing to splice into a shell command: ${agent}"

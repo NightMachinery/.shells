@@ -221,6 +221,11 @@ Every call names the agent first: =agent_session <agent> <subcommand> [flags]
 args=. =agent_session agents= lists the known agents, one per line: =claude=,
 =codex=, =agy=. Exit status 2 is a usage error --- no agent, an unknown agent or
 subcommand --- 1 a failure, and 3 an agent that does not support the subcommand.
+For =preview= only, a =-= agent is accepted for a row without native identity.
+Missing, unreadable or non-file transcripts (including the =-= placeholder)
+produce =No transcript available.= with exit status 0. This shared fallback is
+used by session and archive pickers; other commands retain their normal errors.
+
 Nothing returns 3 today: all three adapters answer all six subcommands. It is
 =session.ErrUnsupported=, and it exists so that the fourth agent can decline one
 without the zsh side having to special-case it --- [agfi:h-agent-session-call]

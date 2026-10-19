@@ -78,6 +78,8 @@ function bella_zsh_disable1 { return 0 }
 function h-agent-session-preview-cmd { print -r -- "printf 'preview:%s\\n'" }
 function h-agent-session-open-cmd { print -r -- "printf 'open:%s\\n'" }
 function h-agent-session-fz {
+    # The shared picker supplies this default preview when none is overridden.
+    print -r -- "$(h-agent-session-preview-cmd '{3}') {2}" > "${test_tmp}/preview"
     local arg
     while (( $# )) ; do
         arg="$1"; shift
@@ -104,7 +106,7 @@ for transcript in ['-',sys.argv[2]]:
         assert result.returncode==0,result.stderr
         return result.stdout
     if transcript=='-':
-        assert run(preview)=='No transcript available; Enter opens this tmux session.\n'
+        assert run(preview)=='preview:-\n'  # Fallback text is owned by the shared Go previewer.
         assert run(opening)==''
     else:
         assert run(preview)=='preview:'+transcript+'\n'

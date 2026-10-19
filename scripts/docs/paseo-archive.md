@@ -28,9 +28,15 @@ before offering a parent. If any descendant is ineligible, the parent is hidden.
 `--force` can override a descendant's age guard in the picker, but never a
 running descendant, pin, caller protection or directory restriction.
 
-The picker shows `archives N subagents with it: ...` and has a wrapped preview
-below the selection. Printed selections and confirmations list that cascade
-under the parent. Counts include all descendants, not just immediate children.
+The picker shows `archives N subagents with it: ...`. Its wrapped preview
+occupies the lower 60% of the picker: cascade context comes first, followed by
+the shared rich native-session preview (conversation metadata, recent prompt
+and reply). Native identity is joined by full Paseo UUID, including subagents;
+preview fields do not change the archive target or eligibility checks.
+The shared `agent_session` previewer handles missing or unreadable transcripts
+with `No transcript available.`; pickers do not duplicate that fallback.
+Printed selections and confirmations list that cascade under the parent.
+Counts include all descendants, not just immediate children.
 If parent and child are both selected, only the parent's archive request is
 sent; Paseo handles the cascade. Eligibility is refreshed before each request;
 a changed cascade requires a fresh listing instead of silently expanding the

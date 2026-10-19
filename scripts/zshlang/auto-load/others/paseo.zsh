@@ -373,6 +373,28 @@ function h-paseo-archive-rows {
         --caller "${caller}" --parent "${parent}" --min-idle "${minimum}" "${opts[@]}"
 }
 
+function h-paseo-archive-preview-rows {
+    #: Append native transcript/provider as hidden columns 12/13. Preserve the
+    #: planner's UUID, eligibility, cascade and ordering columns verbatim.
+    local pairs row id transcript agent
+    local -a fields
+    local -A transcript_of agent_of
+    pairs="$(agent_session_fz_subagents_p=y h-paseo-agent-pairs '' 2>/dev/null)" || pairs=''
+    for row in "${(@f)pairs}" ; do
+        fields=( "${(@ps:\t:)row}" )
+        id="${fields[1]}"; transcript="${fields[2]}"; agent="${fields[3]}"
+        transcript_of[${id}]="${transcript:--}"
+        case "${agent}" in
+            claude|codex|agy) agent_of[${id}]="${agent}" ;;
+        esac
+    done
+    while IFS= read -r row ; do
+        test -n "${row}" || continue
+        id="${row%%$'\t'*}"
+        printf '%s\t%s\t%s\n' "${row}" "${transcript_of[$id]:--}" "${agent_of[$id]:--}"
+    done
+}
+
 function h-paseo-archive {
     emulate -L zsh
     setopt pipefail
@@ -455,10 +477,14 @@ clears the pin by setting keep=false (the CLI has no label-delete option).'
     done
     if [[ "${kind}" == fz ]] ; then
         ensure-cmd fzf @RET
-        local -a fz_args=(--multi --delimiter=$'\t' --with-nth=2..7,9 \
+        rows="$(print -r -- "${rows}" | h-paseo-archive-preview-rows)" @RET
+        local rich_preview preview
+        rich_preview="$(h-agent-session-preview-cmd '{13}')" @RET
+        preview="printf '%s\\n\\n' {9}; ${rich_preview} {12}"
+        local -a fz_args=(--multi --ansi --delimiter=$'\t' --with-nth=2..7,9 \
             --header="ID | STATUS | LAST ACTIVE | PROVIDER | TITLE | CWD | CASCADE; default inactive >=72h
 ${summary}" \
-            --preview 'printf "%s\n" {9}' --preview-window=down:4:wrap)
+            --preview "${preview}" --preview-window=down,60%,wrap)
         [[ "${filter_p}" == y ]] && fz_args+=(--filter "${filter}")
         selected="$(print -r -- "${rows}" | fzf-gateway "${fz_args[@]}")" || {
             local pick_rc=$?

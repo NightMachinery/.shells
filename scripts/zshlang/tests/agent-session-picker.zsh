@@ -27,6 +27,10 @@ done
 expect-eq "$(FZF_QUERY="${uuid}" FZF_WITH_NTH=1,4.. command dash -c "${id_cmd}")" '' 'no redundant refresh'
 
 function h-agent-session-dep { :; }
+typeset -g preview_from_emulated="$(emulate -L zsh; h-agent-session-preview-cmd '{13}')"
+[[ "${preview_from_emulated}" == *'{13}'*'preview'* ]] || {
+    print -ru2 -- 'FAIL: preview builder under archive emulate scope'; exit 1
+}
 function h-agents { print -r -- claude; }
 function h-agent-field { print -r -- C; }
 function h-agent-session-call {

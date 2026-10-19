@@ -505,7 +505,9 @@ active at least 72 hours ago, oldest activity first. =--min-idle 3d= changes
 the age gate; =--all-ages= disables it. Closed and other terminal agents follow
 the same rules as idle ones, including when they are cascade members.
 Parents with running descendants are never archived, even with =--force=.
-Other ineligible descendants also hide the parent, and eligible cascades are listed under it. [agfi:paseo-keep] pins
+Other ineligible descendants also hide the parent, and eligible cascades are listed under it.
+The picker shows cascade context above the shared rich native-session preview;
+the previewer itself handles missing transcripts. [agfi:paseo-keep] pins
 an agent with =keep=true=; [agfi:paseo-unkeep] clears the pin. Pins and
 caller/ancestor protection survive =--force=. =--show-hidden= lists excluded
 agents with reasons without making them selectable. Both cover every directory

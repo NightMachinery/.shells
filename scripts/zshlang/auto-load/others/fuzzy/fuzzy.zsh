@@ -276,15 +276,13 @@ function fftmux-agent {
     #: binding with it, and hides everything but the display columns; the tmux
     #: session id is field 1, which is what comes back to us.
     local picks
-    local preview_cmd open_cmd
-    preview_cmd="$(h-agent-session-preview-cmd '{3}')" @RET
+    local open_cmd
     open_cmd="$(h-agent-session-open-cmd)" @RET
-    #: Registered children can be attachable before they have a transcript.
-    #: Keep the normal preview/open behavior for readable transcript rows only.
-    local preview="p={2}; if test \"\$p\" = -; then printf '%s\\n' 'No transcript available; Enter opens this tmux session.'; else ${preview_cmd} \"\$p\"; fi"
+    #: Preview fallback belongs to the shared renderer. No transcript means
+    #: there is nothing for the optional Org-opening action to convert.
     local open="p={2}; if test \"\$p\" != -; then ${open_cmd} \"\$p\"; fi"
     picks="$(ec "${rows}" | h-agent-session-fz multi --query "${query}" \
-        --preview "${preview}" --bind "alt-enter:execute-silent(${open})")" || return $?
+        --bind "alt-enter:execute-silent(${open})")" || return $?
 
     h-fftmux-act "${picks}"
 }

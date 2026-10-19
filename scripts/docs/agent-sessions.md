@@ -471,8 +471,11 @@ supplies the glyph when no hook identity is available; it does not pretend to
 identify a conversation. This covers newly started children and headless agy
 runs that never publish transcript identity.
 
-For these rows the preview says that no transcript is available, Enter still
-goes to the session, and Alt+Enter does nothing. Rows with readable transcripts
+The shared `agent_session` previewer handles absent, unreadable or removed
+transcript files with `No transcript available.`, including rows whose native
+provider is unknown (`-`). Picker commands do not supply their own fallback.
+For these rows Enter still goes to the session, and Alt+Enter does nothing.
+Rows with readable transcripts
 retain the normal transcript preview and Org-opening action. Neither path
 searches for a different conversation merely because it shares a workspace.
 
