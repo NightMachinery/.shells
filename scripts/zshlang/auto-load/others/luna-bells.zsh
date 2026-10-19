@@ -1896,12 +1896,12 @@ runs goes to [agfi:bell-paseo] instead."
     #: What the agent's environment knows, forwarded by the hook command as
     #: single words through brishzgo: the client quotes argv, preserving
     #: empty values and spaces. The named flags also keep hook identity explicit.
-    local pane='' node_p='' paseo=''
+    local pane='' node_p='' paseo='' paseo_given=''
     while (( $# )) ; do
         case "$1" in
             --pane=*) pane="${1#--pane=}" ;;
             --node=*) node_p="${1#--node=}" ;;
-            --paseo=*) paseo="${1#--paseo=}" ;;
+            --paseo=*) paseo="${1#--paseo=}" ; paseo_given=y ;;
             *) break ;;
         esac
         shift
@@ -1922,12 +1922,15 @@ runs goes to [agfi:bell-paseo] instead."
         id="$(h-bell-agent-payload-id "$input")" || id=''
     fi
 
-    #: Paseo shows its own agents' notifications. A forwarded PASEO_AGENT_ID is
-    #: not proof of being one, since everything a Paseo agent starts inherits it,
-    #: so the agent's record must name this session ([agfi:h-agent-done-paseo-id]).
-    #: That costs a Paseo CLI call, paid only when an id was forwarded.
-    if test -n "$paseo" && test -n "$id" &&
-            PASEO_AGENT_ID="$paseo" h-agent-done-paseo-id "$id" >/dev/null 2>&1 ; then
+    #: Paseo shows its own agents' notifications. A session is a Paseo agent
+    #: when an active Paseo record names it as the native session it runs
+    #: ([agfi:h-bell-agent-paseo-p]). The forwarded PASEO_AGENT_ID only
+    #: decides whether to look: an empty one, from an up-to-date hook outside
+    #: Paseo, skips the lookup. A missing one does not, since a Codex process
+    #: keeps the notify line it started with, and Paseo's app-servers outlive
+    #: config edits.
+    if test -n "$id" && { test -z "$paseo_given" || test -n "$paseo" } &&
+            h-bell-agent-paseo-p "$id" ; then
         bell-paseo "$app" "$input"
         return $?
     fi
@@ -1990,6 +1993,24 @@ runs goes to [agfi:bell-paseo] instead."
         bell_auto_tlg="$tlg" \
         notif_app=agents notif_ignore_dnd_p="${notif_ignore_dnd_p:-n}" notif_image="$icon" notif_group="$group" \
         awaysh bell-auto "$engine"
+}
+
+function h-bell-agent-paseo-p {
+    : "whether an active Paseo agent runs this native session: h-bell-agent-paseo-p <session-id>"
+    #: By session id alone, never by an inherited PASEO_AGENT_ID: everything a
+    #: Paseo agent starts inherits that, a claude opened in a tmux pane
+    #: included, and such a child has its own session id, so it still rings.
+    #: [agfi:paseo-ls] reads the stored records without asking the daemon and
+    #: leaves archived agents out, so a Paseo thread resumed by hand rings too.
+    ##
+    local id="${1}"
+    test -n "$id" || return 1
+    (( ${+functions[paseo-ls]} )) || return 1
+
+    local rows
+    rows="$(paseo-ls --json 2>/dev/null)" || return 1
+    print -r -- "$rows" | command jq --exit-status --arg id "$id" \
+        'any(.[]; .nativeSessionId == $id)' >/dev/null 2>&1
 }
 
 function bell-paseo {

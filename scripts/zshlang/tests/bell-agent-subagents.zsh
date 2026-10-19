@@ -40,8 +40,8 @@ esac' > "${fixture}/bin/tmux"
     function h-bell-claude { print -r -- Claude > "${fixture}/sound"; }
     function h-bell-codex { print -r -- Codex > "${fixture}/sound"; }
     function bell-paseo { print -r -- "$1" > "${fixture}/paseo"; }
-    #: The Paseo record h-agent-done-paseo-id checks: agent P1 runs session $id.
-    function paseo-ls { print -r -- '[{"id":"P1","nativeSessionId":"'"${id}"'"}]'; }
+    #: Paseo's active agent records, from a fixture file; none by default.
+    function paseo-ls { command cat "${fixture}/paseo-records" 2>/dev/null || print -r -- '[]'; }
     local bell_auto_stop_mode=bell+notif bell_auto_tlg=y bell_auto_tlg_t=0 bell_auto_tlg_dest=fixture-dest
     #: Sent batches are recorded in redis; keep them off the live keys.
     local bell_tlg_batch_key_prefix="bell_tlg_test_${$}_batch" bell_tlg_group_key_prefix="bell_tlg_test_${$}_group"
@@ -118,12 +118,16 @@ ag--kid${T}${T}claude${T}${id}${T}/t"
     check "codex sub, os-only" "$(fire h-codex-notify --node=1 "$codex_payload")" "sound desktop"
     command rm -f -- "$agent_bell_subagents_file"
 
-    #: Paseo: only a session its record names goes to bell-paseo, and only that.
+    #: Paseo: only a session an active record names goes to bell-paseo, and only that.
     sessions "plain${T}" ''
+    print -r -- '[{"id":"P1","nativeSessionId":"'"${id}"'"}]' > "${fixture}/paseo-records"
     check "paseo agent" "$(fire bell-claude --pane=%1 --node= --paseo=P1 "$payload")" paseo
     check "paseo codex agent" "$(fire h-codex-notify --pane=%1 --node= --paseo=P1 "$codex_payload")" paseo
-    check "inherited paseo id rings" "$(fire bell-claude --pane=%1 --node= --paseo=P2 "$payload")" "sound desktop telegram"
-    check "empty paseo id rings" "$(fire bell-claude --pane=%1 --node= --paseo= "$payload")" "sound desktop telegram"
+    check "paseo codex, notify line from before --paseo" "$(fire h-codex-notify --pane=%1 --node= "$codex_payload")" paseo
+    check "empty paseo id skips the lookup" "$(fire bell-claude --pane=%1 --node= --paseo= "$payload")" "sound desktop telegram"
+    print -r -- '[{"id":"P1","nativeSessionId":"99999999-2222-3333-4444-555555555555"}]' > "${fixture}/paseo-records"
+    check "inherited paseo id, own session rings" "$(fire bell-claude --pane=%1 --node= --paseo=P1 "$payload")" "sound desktop telegram"
+    command rm -f -- "${fixture}/paseo-records"
 
     #: The hooks default to one ring; a meeting still silences it. max_t=0 keeps a
     #: regression to a looping mode from hanging the test.

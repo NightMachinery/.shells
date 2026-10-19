@@ -386,13 +386,20 @@ Paseo shows its own agents' notifications, so a session Paseo runs gets
 Telegram. `bell-paseo` does nothing yet; it is the place to add a Paseo-specific
 signal later.
 
-The hooks forward `--paseo=$PASEO_AGENT_ID`. That id alone does not make the session a
-Paseo agent: everything a Paseo agent starts inherits it, a `claude` it opens in a
-tmux pane included, and that session must still ring. So the hook reuses
-`h-agent-done-paseo-id`, which accepts the id only when that agent's Paseo record
-names the payload's session id as the native session it runs. This costs one Paseo
-CLI call, paid only when an id was forwarded; the hook is detached anyway. Any failure
-(no `paseo-ls`, no session id, a Paseo error) falls through to the normal bell.
+A session is a Paseo agent when an active (unarchived) Paseo record names the
+payload's session id as the native session it runs (`h-bell-agent-paseo-p`, reading
+the records through `paseo-ls`, under a second). The test is the session id, never an
+inherited `PASEO_AGENT_ID`: everything a Paseo agent starts inherits that, a `claude`
+it opens in a tmux pane included, and such a child has its own session id, so it still
+rings. An archived agent's thread resumed by hand rings too.
+
+The hooks forward `--paseo=$PASEO_AGENT_ID` only to decide whether to look. An empty
+value, from an up-to-date hook outside Paseo, skips the lookup, so ordinary sessions
+pay nothing. A missing one does not skip it: Codex keeps the `notify` line it started
+with, and Paseo's `codex app-server` processes outlive edits to `config.toml`. On
+2026-10-19 a Paseo Codex agent started before the `--paseo=` edit rang the full bell
+for exactly that reason. Any failure (no `paseo-ls`, no session id, unreadable
+records) falls through to the normal bell.
 
 ### Making them persist until dismissed
 
