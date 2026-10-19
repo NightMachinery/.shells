@@ -31,6 +31,53 @@ existing binary. `--no-binaries` installs `/Applications/Paseo.app` without
 replacing that link. The desktop's bundled CLI remains available at
 `/Applications/Paseo.app/Contents/Resources/bin/paseo`.
 
+## Run the daemon independently of Desktop
+
+Use a standalone package-manager CLI when the daemon should outlive the Desktop
+app. Installing the CLI does not transfer ownership of an already running daemon.
+Desktop's built-in daemon management must also be disabled, or opening the app
+can start its bundled daemon again.
+
+Before switching, compare `paseo --version` with
+`paseo daemon status --home "$HOME/.paseo" --json`. Install a matching CLI
+version first. Plan the handover when active agents can be interrupted: stopping
+the supervisor ends its worker and can interrupt provider processes and terminals.
+
+At the handover:
+
+1. Disable built-in daemon management in Desktop's settings, then quit Desktop.
+   Verify the old supervisor has exited with the CLI's `daemon status` command.
+   If it remains running, stop that home explicitly:
+
+   ```zsh
+   paseo daemon stop --home "$HOME/.paseo"
+   ```
+
+2. Start the standalone daemon from the same home:
+
+   ```zsh
+   paseo daemon start --home "$HOME/.paseo"
+   paseo daemon status --home "$HOME/.paseo" --json
+   ```
+
+3. Confirm `desktopManaged` is false and the supervisor comes from the
+   standalone installation. Reopen Desktop as a client and verify the same
+   supervisor remains running. Keep the existing home to retain stored agents,
+   workspaces, configuration, and daemon identity.
+
+`start` launches a background supervisor that survives the invoking shell.
+It does not install a login service. `daemon restart` only replaces the worker
+inside the existing supervisor, retaining its launch and binary; use stop/start
+to change ownership or the supervisor installation.
+
+On macOS, Desktop persists the setting as
+`settings.daemon.manageBuiltInDaemon` in
+`~/Library/Application Support/Paseo/desktop-settings.json`. Prefer the app's
+settings control: Desktop caches the file, and its legacy-settings migration
+can otherwise overwrite a manual edit.
+
+See the official [daemon lifecycle reference](https://paseo.sh/docs/cli.md#daemon-management).
+
 ## Official agent skills
 
 The upstream [`paseo` skill](https://github.com/getpaseo/paseo/tree/main/skills/paseo)
