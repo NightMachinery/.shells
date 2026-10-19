@@ -15,6 +15,13 @@ fzf() {
     fi
 }
 
+h_fzf_mru_deduplicate() {
+    # fzf returns plain selections for --ansi input. Compare without SGR
+    # colors so a cached plain row and its current colored row are one item;
+    # keep the first row's original display bytes and the MRU ordering.
+    command perl -MTerm::ANSIColor=colorstrip -ne 'print unless $seen{colorstrip($_)}++'
+}
+
 mru_count="${fzf_mru_count:-90}"
 mru_iteration_count="${fzf_mru_iteration_count:-5}"
 mru_minquery="${fzf_mru_minquery}"
@@ -55,13 +62,13 @@ touch "$conf_cache" || (
 )
 conf_tmp="${conf_cache}.tmp"
 
-# Removing duplicate lines: seen is an associative-array that Awk will pass every line of the file to. If a line isn't in the array then seen[$0] will evaluate to false. (The name 'seen' does not matter.)
-result="$(echo "$input" | cat "$conf_cache" - | gawk '!seen[$0]++' | fzf --tiebreak=index "$@" | sponge)" || return $?
+# Cached entries lead, with duplicates compared by their plain text.
+result="$(echo "$input" | cat "$conf_cache" - | h_fzf_mru_deduplicate | fzf --tiebreak=index "$@" | sponge)" || return $?
 
 if test -n "$result" ; then
     echo "$result"
     ##
-    echo "$result" | ghead -n "$mru_iteration_count" | cat - "$conf_cache" | gawk '!seen[$0]++' | ghead -n "$mru_count" > "$conf_tmp" || return $?
+    echo "$result" | ghead -n "$mru_iteration_count" | cat - "$conf_cache" | h_fzf_mru_deduplicate | ghead -n "$mru_count" > "$conf_tmp" || return $?
     ##
     mv "$conf_tmp" "$conf_cache"
 else

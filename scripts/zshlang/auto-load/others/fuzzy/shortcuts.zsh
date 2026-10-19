@@ -1,11 +1,18 @@
 ###
 function play-tag {
-    local f="$1"
+    local f="${1}"
+    if [[ -z "${f}" || ! -f "${f}" ]] ; then
+        ecerr "$0: select an existing video file"
+        return 1
+    fi
 
-    #: disabled
-    # ntag-add "$f" green
+    ensure-cmd grealpath @RET
+    local selected
+    selected="$(command grealpath -- "${f}")" @RET
 
-    rgeval awaysh mpv "$(grealpath -- "$ntag_add_dest")" # realpath to unbreak rgeval's usefulness because we use this via `indir`.
+    #: Use the selection itself; tagging is disabled, so ntag_add_dest is unset
+    #: or stale. Resolve before launching so [agfi:indir] can restore its cwd.
+    rgeval awaysh mpv "${selected}"
 }
 function ntag-lv-nocolor() {
     local fd_args=("$@") noprioMode="${ntag_lv_nopriority}"
@@ -18,7 +25,12 @@ function ntag-lv-nocolor() {
     # `hyp 'fd --color always -uuu --type file --regex \\.\(ape\|avi\|flv\|mp4\|mkv\|mov\|mpeg\|mpg\|rm\|webm\)\$  ~/base/cache ~/base/Lectures ~/base/series ~/base/anime ~/"base/_Local TMP" ~/base/docu ~/base/movies ~/base/V ~/base/dls ~/Downloads  ' 'fd --color always -uuu --type file --regex \\.\(ape\|avi\|flv\|mp4\|mkv\|mov\|mpeg\|mpg\|rm\|webm\)\$  ~/base/cache ~/base/Lectures ~/base/series ~/base/anime ~/"base/_Local TMP" ~/base/docu ~/base/movies ~/base/V ~/base/dls ~/Downloads | gsort'`
     # `time2 fnswap fzf-gateway true zv`
     ##
-    vids="$(fd --color always -uuu --type file --regex "\.(${(j.|.)video_formats})\$" "$fd_args[@]")"
+    ensure-cmd fd @RET
+    vids="$(fd --color always --absolute-path --unrestricted --type file --regex "\.(${(j.|.)video_formats})\$" "$fd_args[@]")" @RET
+    [[ -n "${vids}" ]] || return 0
+    #: Overlapping search roots can produce the same file more than once.
+    local -aU video_paths=("${(@f)vids}")
+    vids="${(F)video_paths}"
     if test -z "$noprioMode" ; then
         # @perf1 rewrite this part using a sort function
         local prio=''
@@ -44,9 +56,31 @@ function ntag-lv {
 @opts-setprefix ntag-lv-nocolor ntag-lv
 ##
 function openv {
-    local dirs=(${openv_dirs[@]}) query="$(fz-createquery "$@")"
-    test -z "$dirs[*]" && dirs=(.)
-    @opts nopriority '' @ ntag-lv "$dirs[@]" | fzf_mru_context="$0_${(@F)dirs}" fzf_mru_count=10 fz-ntag --tiebreak=end,length --delimiter / --with-nth  -3..-1 --query "$query" --preview-window down:4:wrap | inargsf play-tag
+    setopt localoptions pipefail
+
+    local dirs=("${openv_dirs[@]}") query
+    [[ -n "${dirs[*]}" ]] || dirs=(.)
+    local -aU existing_dirs=()
+    local dir
+    for dir in "${dirs[@]}" ; do
+        [[ -d "${dir}" ]] && existing_dirs+=("${dir:A}")
+    done
+    if (( ${#existing_dirs} == 0 )) ; then
+        ecerr "$0: no existing video search directories"
+        return 1
+    fi
+    dirs=("${existing_dirs[@]}")
+    query="$(fz-createquery "$@")" @RET
+
+    local selected
+    selected="$(
+        @opts nopriority '' @ ntag-lv "${dirs[@]}" |
+            fzf_mru_context="$0_${(@F)dirs}" fzf_mru_count=10 fz-ntag \
+                --no-multi --tiebreak=end,length --delimiter / --with-nth -3..-1 \
+                --query "${query}" --preview-window down:4:wrap
+    )" @RET
+    [[ -n "${selected}" ]] || return 1
+    play-tag "${selected}"
 }
 function delenda() {
     ntag-filterori red green aqua teal gray grey | inargsf trs
@@ -68,6 +102,7 @@ function zv {
             ~/base/docu
             ~/base/movies
             ~/base/dls
+            ~/base/video
             ~/Downloads
             ~vol/hyper-diva/video
             # ~/base/Lectures

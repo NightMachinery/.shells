@@ -35,6 +35,12 @@ source and destination of each selection and use [agfi:ask] before transferring,
 with No as the default.
 See [[NIGHTDIR:docs/rsp.md][selection and source-removal behavior]].
 
+* Video picker
+
+[agfi:zv] skips missing library roots and shows each video once, including
+recent selections. It launches the selected file and does nothing on an empty
+selection or cancellation. See [[NIGHTDIR:docs/video-picker.md][video selection]].
+
 * Frontmost application
 
 [agfi:frontapp-get] returns the frontmost macOS app's bundle identifier,
