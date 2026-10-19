@@ -1553,7 +1553,7 @@ function bell-entropy-gained {
 aliasfnq bell-gibberish1-long tts-gateway-g1 'An apple is an edible fruit produced by an apple tree (Malus domestica). Apple trees are cultivated worldwide and are the most widely grown species in the genus Malus. The tree originated in Central Asia, where its wild ancestor, Malus sieversii, is still found today. Apples have been grown for thousands of years in Asia and Europe and were brought to North America by European colonists. Apples have religious and mythological significance in many cultures, including Norse, Greek, and European Christian tradition.'
 ##
 redis-defvar bell_visual_flash1_lock
-function bell-visual-flash1() {
+function bell-visual-flash1 {
     if [[ "$(bell_visual_flash1_lock_get)" == y ]] ; then
         tts-gateway "Flash disabled because of lock"
         return 0
@@ -1562,7 +1562,6 @@ function bell-visual-flash1() {
     trapexits
 
     bell_visual_flash1_lock_set y # @todo2 use better locking primitives? This is still open to race conditions
-
 
     {
         local b off="${1:-0.1}" s="${2:-0.2}" redo="${bell_visual_flash1_redo:-1}" s_after="${bell_visual_flash1_sa:-0.3}"
