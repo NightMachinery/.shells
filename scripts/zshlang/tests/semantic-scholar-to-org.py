@@ -22,6 +22,9 @@ if os.environ['TEST_PAPER_FAIL']:
 print(json.dumps({'args':sys.argv[1:],'key_present':bool(os.getenv('SemanticScholar_API_key')),'scraper':os.getenv('semantic_scholar_scraper')}))
 """)
             binary.chmod(0o755)
+            updater = Path(directory) / "org-paper-metadata-updater"
+            updater.write_bytes(binary.read_bytes())
+            updater.chmod(0o755)
             env = dict(os.environ, TEST_PAPER_BIN=directory, TEST_PAPER_FAIL="y" if fail else "")
             script = r'''
 path=("${TEST_PAPER_BIN}" "${path[@]}")
@@ -59,6 +62,13 @@ semantic_scholar_scraper=page-data
         self.assertEqual(result.returncode,22,result.stderr)
         self.assertEqual(result.stdout,'')
         self.assertIn('GRAY:api failed:',result.stderr)
+
+    def test_updater_delegates_to_go_and_preserves_root_argument(self):
+        result=self.run_shell("org-paper-metadata-updater",input_url="/tmp/synthetic root")
+        self.assertEqual(result.returncode,0,result.stderr)
+        data=json.loads(result.stdout)
+        self.assertEqual(data['args'],['/tmp/synthetic root'])
+        self.assertTrue(data['key_present'])
 
     def test_explicit_api_remains_available(self):
         result=self.run_shell("semantic-scholar-to-json-api")

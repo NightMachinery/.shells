@@ -86,6 +86,13 @@ inside the same folded `@abstract` heading. Comment-marked summary and abstract 
 identify generated content for later refreshes. Zero counts are preserved;
 missing values are omitted.
 
+## Refreshing existing notes
+
+Use [org-paper-metadata-updater](org-paper-metadata-updater.md) to refresh paper
+headings under a directory root. It shares this Go package, skips entries fetched
+within seven days, and preserves personal notes. Preview with `--diff`; writing
+requires `--write`.
+
 ## Verification
 
 ```zsh

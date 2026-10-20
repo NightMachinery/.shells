@@ -26,6 +26,11 @@ API and extraction fallbacks. Notes include authors, a full abstract, and a
 supplied TLDR block before the abstract. See
 [[NIGHTDIR:docs/semantic-scholar-to-org.md][retrieval options and output]].
 
+[agfi:org-paper-metadata-updater] refreshes existing paper headings under a
+root directory, skipping entries fetched within seven days. Preview changes
+first; add =--write= to apply them. Loose links and personal notes stay in place.
+See [[NIGHTDIR:docs/org-paper-metadata-updater.md][weekly refresh usage]].
+
 * arXiv metadata
 
 [agfi:arxiv-to-org] falls back to the abstract page's citation metadata when

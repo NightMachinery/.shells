@@ -26,6 +26,20 @@ org-paper-metadata --from-json '<paper-url>' < metadata.json
 See [[NIGHTDIR:docs/semantic-scholar-to-org.md][source selection and Org fields]].
 The old Lisp and Python entry points are deprecated compatibility shims.
 
+* Weekly refresh
+
+The updater uses this module directly, with a dry run as its default:
+
+#+begin_src zsh :eval never
+go install . ./cmd/org-paper-metadata-updater
+org-paper-metadata-updater --diff '<directory-root>'
+org-paper-metadata-updater --write '<directory-root>'
+#+end_src
+
+Entries fetched within seven days are skipped. Only existing paper headings
+are refreshed; loose links are ignored and personal notes are preserved.
+See [[NIGHTDIR:docs/org-paper-metadata-updater.md][selection and safe editing]].
+
 * Tests
 
 =go test -race ./...= runs offline normalization, routing, formatting, and file
