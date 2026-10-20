@@ -2,6 +2,7 @@
 """Exercise the zsh Fetch wrapper without contacting a network service."""
 
 import os
+import json
 from pathlib import Path
 import subprocess
 import tempfile
@@ -11,7 +12,7 @@ ROOT = Path(__file__).resolve().parents[2]
 
 
 class FetchTests(unittest.TestCase):
-    def run_fetch(self, *urls, key="synthetic-test-key", mode="ok"):
+    def run_fetch(self, *urls, key="synthetic-test-key", mode="ok", command="deepseek-fetch"):
         with tempfile.TemporaryDirectory() as directory:
             curl = Path(directory) / "curl"
             curl.write_text('''#!/usr/bin/env python3
@@ -26,24 +27,38 @@ assert args[-1]=='https://api.deepseek.com/v1/tools/fetch'
 url=json.loads(args[args.index('--data')+1])['url']
 if os.environ['TEST_FETCH_MODE']=='fail': sys.exit(22)
 if os.environ['TEST_FETCH_MODE']=='invalid': print('{}')
-else: print(json.dumps({'title':'Example','content':'Page: '+url+'\\n\\n'}))
+else: print(json.dumps({'title':('' if os.environ['TEST_FETCH_MODE']=='untitled' else 'Example'), 'content':'Page: '+url+'\\n\\n'}))
 ''')
             curl.chmod(0o755)
             env = dict(os.environ, TEST_FETCH_BIN=directory, TEST_FETCH_KEY=key,
                        TEST_FETCH_MODE=mode)
-            return subprocess.run(["zsh", "-c", 'path=("${TEST_FETCH_BIN}" "${path[@]}"); deepseek_api_key="${TEST_FETCH_KEY}"; deepseek-fetch "$@"',
-                                   "_", *urls], env=env, text=True, capture_output=True, timeout=20)
+            return subprocess.run(["zsh", "-c", 'path=("${TEST_FETCH_BIN}" "${path[@]}"); deepseek_api_key="${TEST_FETCH_KEY}"; \"$1\" "${@:2}"',
+                                   "_", command, *urls], env=env, text=True, capture_output=True, timeout=20)
 
     def test_single_url_returns_content(self):
         result = self.run_fetch("https://example.org/one")
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertEqual(result.stdout, "Page: https://example.org/one\n")
+        self.assertEqual(result.stdout, "# Example\n\nURL: <https://example.org/one>\n\nPage: https://example.org/one\n")
 
     def test_multiple_urls_have_exact_separators(self):
         result = self.run_fetch("https://example.org/one", "https://example.org/two")
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertEqual(result.stdout, "URL: https://example.org/one\n\nPage: https://example.org/one"
-                         "\n\n---\n\nURL: https://example.org/two\n\nPage: https://example.org/two\n")
+        self.assertEqual(result.stdout, "# Example\n\nURL: <https://example.org/one>\n\nPage: https://example.org/one"
+                         "\n\n---\n\n# Example\n\nURL: <https://example.org/two>\n\nPage: https://example.org/two\n")
+
+    def test_jsonl_preserves_fields_and_content(self):
+        result = self.run_fetch("https://example.org/one", "https://example.org/two", command="deepseek-fetch-json")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        rows = [json.loads(line) for line in result.stdout.splitlines()]
+        self.assertEqual([row["url"] for row in rows], ["https://example.org/one", "https://example.org/two"])
+        self.assertEqual(rows[0]["title"], "Example")
+        self.assertEqual(rows[0]["content"], "Page: https://example.org/one\n\n")
+
+    def test_missing_title_uses_numbered_source_heading(self):
+        result = self.run_fetch("https://example.org/one", "https://example.org/two", mode="untitled")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("# Source 1\n\nURL:", result.stdout)
+        self.assertIn("\n\n---\n\n# Source 2\n\nURL:", result.stdout)
 
     def test_missing_key_and_missing_urls(self):
         for urls, key in ((("https://example.org",), ""), ((), "synthetic-test-key")):
