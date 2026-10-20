@@ -19,9 +19,9 @@ function semantic-scholar-to-json-api {
 
     else
         ecdbg "$0: proxy not wanted or already active"
-        var-show HTTP_PROXY
     fi
 
+    local tmp
     local paper_id="${1}" #: e.g., arXiv:1705.10311
     local corpus_id="${semantic_scholar_corpus_id}"
 
@@ -52,7 +52,7 @@ function semantic-scholar-to-json-api {
     fi
 
     json="$(revaldbg gurl "${curl_opts_[@]}" "$url")" || {
-        ecerr "$0: curl-ing the API failed with $?"$'\n'"URL: ${url}"
+        ecgray "$0: curl-ing the API failed with $?"$'\n'"URL: ${url}"
         return 1
     }
     #: =tldr= sometimes isn't available for the newer papers, and we aren't currently using it, so I have omitted it from the request above. (It will trow an error if tldr is not available.)
@@ -61,79 +61,94 @@ function semantic-scholar-to-json-api {
         jq .
 }
 
+function h-semantic-scholar-page-url {
+    #: Resolve external IDs through Semantic Scholar's own redirect, without search.
+    local input="${1}" url resolved
+    local page_pattern='^https://(?:www\.)?semanticscholar\.org/paper/(?:[^/?#]+/)?[a-fA-F0-9]{40}(?:[?#].*)?$'
+    url="$(semantic-scholar-url-get "${input}")" @RET
+    if [[ "${url}" =~ "${page_pattern}" ]] ; then
+        ec "${url%%\#*}"
+        return 0
+    fi
+    if [[ "${url}" != https://api.semanticscholar.org/* ]] ; then
+        ecerr "$0: cannot resolve a Semantic Scholar paper from ${input}"
+        return 1
+    fi
+    #: Do not require the destination HTML to be readable: its redirect URL is
+    #: useful even when the final page presents a browser-verification screen.
+    resolved="$(command curl --head --silent --show-error --location --retry 2 --retry-delay 1 --max-time 30 \
+        --output /dev/null --write-out '%{url_effective}' "${url}")" @RET
+    if [[ "${resolved}" =~ "${page_pattern}" ]] ; then
+        ec "${resolved%%\#*}"
+    else
+        ecerr "$0: Semantic Scholar did not resolve ${input} to a public paper page"
+        return 1
+    fi
+}
+
 function semantic-scholar-to-json {
-    # @alt https://www.semanticscholar.org/product/api
-    ##
     local api_p="${semantic_scholar_api_p:-${SemanticScholar_API_key:+y}}"
-    local url="${1:-$(pbpaste)}"
-    assert-args url @RET
-    url="$(semantic-scholar-url-get "$url")" @TRET
-
-    local json_scraped
-    json_scraped="$(semantic-scholar-to-json-scraping "$url")" @TRET
-
-    #: Scraping is sufficient without a key, or when explicitly requested.
-    if ! bool "${api_p}" ; then
-        ec "${json_scraped}"
-        return 0
+    local scraper="${semantic_scholar_scraper:-auto}"
+    local input="${1:-$(pbpaste)}" url json_api
+    assert-args input @RET
+    case "${scraper}" in
+        auto|deepseek|full-html2) ;;
+        *) ecerr "$0: semantic_scholar_scraper must be auto, deepseek, or full-html2"; return 1 ;;
+    esac
+    if bool "${api_p}" ; then
+        url="$(semantic-scholar-url-get "${input}")" @RET
+        if json_api="$(semantic-scholar-to-json-api "${url}")" &&
+                ec "${json_api}" | command jq --exit-status \
+                    'type == "object" and (.title | type == "string" and length > 0)' > /dev/null ; then
+            ec "${json_api}" |
+                command jq 'with_entries(select(.value != null and .value != "" and .value != []))' |
+                json-listify-first-level | json-stringify-atoms
+            return $?
+        fi
+        ecgray "$0: API failed; using ${scraper} scraper"
     fi
+    semantic-scholar-to-json-scraping "${input}"
+}
 
-    local corpus_id
-    corpus_id="$(ec "$json_scraped" |
-                    jqm '.corpusID' |
-                    rget '(?:Corpus\s*ID:\s*)?(\d+)')" || true
-
-    local json_api
-    if ! { json_api="$(semantic_scholar_corpus_id="$corpus_id" semantic-scholar-to-json-api "$url")" &&
-            ec "${json_api}" | jq --exit-status 'type == "object" and (.title | type == "string" and length > 0)' > /dev/null } ; then
-        ecerr "$0: API failed, falling back to scraped data"
-        ec "${json_scraped}"
-        return 0
+function h-semantic-scholar-scrape-deepseek {
+    local url="${1}" page json
+    page="$(deepseek-fetch-json "${url}")" @RET
+    json="$(ec "${page}" | command python3 "${NIGHTDIR}/python/orgmode/semantic_scholar_html_to_json.py" --fetch-json "${url}")" @RET
+    if ec "${json}" | command jq --exit-status '.metadataStatus == ["partial"]' > /dev/null ; then
+        ecgray "$0: Semantic Scholar exposed partial metadata; unavailable fields are omitted"
     fi
+    ec "${json}"
+}
 
-    if false ; then
-        {
-            ec "$json_scraped" | jq .
-            ec '----------'
-            ec "$json_api" | jq .
-            ec '----------'
-        } >&2
-    fi
-
-    jq -s '.[0] * .[1]' <(ec "$json_scraped") <(ec "$json_api" |
-                                                    jq 'with_entries(select(.value != null and .value != "" and .value != []))' |
-                                                    json-listify-first-level |
-                                                    json-stringify-atoms)
+function h-semantic-scholar-scrape-html {
+    local url="${1}" html
+    html="$(fhMode="${fhMode:-curlfull_s5}" full-html2 "${url}")" @RET
+    ec "${html}" | command python3 "${NIGHTDIR}/python/orgmode/semantic_scholar_html_to_json.py" "${url}"
 }
 
 function semantic-scholar-to-json-scraping {
-    # @alt =semantic-scholar-to-json-api=
-    ##
-    local url="${1:-$(pbpaste)}"
-    assert-args url @RET
-    url="$(semantic-scholar-url-get "$url")" @TRET
-
-    #: External-ID links should use the public site's redirect, not the API.
-    if [[ "$url" =~ '^https?://api\.semanticscholar\.org/((?:arXiv|CorpusID|ACL):[^/?#]+)$' ]] ; then
-        url="https://www.semanticscholar.org/paper/${match[1]}"
-    fi
-
+    local scraper="${semantic_scholar_scraper:-auto}"
+    local input="${1:-$(pbpaste)}" url json
+    case "${scraper}" in
+        auto|deepseek|full-html2) ;;
+        *) ecerr "$0: semantic_scholar_scraper must be auto, deepseek, or full-html2"; return 1 ;;
+    esac
     ensure-cmd python3 @RET
-    local html json
-    #: fhMode=curl,wgetm did not work with genrouter for some reason
-
-    if html="$(fhMode="${fhMode:-curlfull_s5}" full-html2 "$url")" &&
-            json="$(ec "$html" | command python3 "${NIGHTDIR}/python/orgmode/semantic_scholar_html_to_json.py" "${url}")" ; then
-        ec "${json}"
-    elif test -n "${deepseek_api_key}" ; then
-        ecerr "$0: HTML unavailable; trying DeepSeek Fetch"
-        local markdown
-        markdown="$(deepseek-fetch "${url}")" @RET
-        ec "${markdown}" | command python3 "${NIGHTDIR}/python/orgmode/semantic_scholar_html_to_json.py" --markdown "${url}"
-    else
-        ecerr "$0: could not scrape paper metadata; DeepSeek fallback needs deepseek_api_key"
-        return 1
-    fi
+    url="$(h-semantic-scholar-page-url "${input}")" @RET
+    case "${scraper}" in
+        deepseek) h-semantic-scholar-scrape-deepseek "${url}" ;;
+        full-html2) h-semantic-scholar-scrape-html "${url}" ;;
+        auto)
+            if test -n "${deepseek_api_key}" ; then
+                if json="$(h-semantic-scholar-scrape-deepseek "${url}")" ; then
+                    ec "${json}"
+                    return 0
+                fi
+                ecgray "$0: DeepSeek Fetch failed; trying full-html2"
+            fi
+            h-semantic-scholar-scrape-html "${url}"
+            ;;
+    esac
 }
 
 function semantic-scholar-to-org {
@@ -144,13 +159,16 @@ function semantic-scholar-to-org {
 
     local url
     for url in ${inargs[@]} ; do
-        url="$(semantic-scholar-url-get "$url")" @TRET
-
         local json
         json="$(revaldbg semantic-scholar-to-json "$url")" @TRET
 
+        local paper_url
+        paper_url="$(ec "${json}" | command jq --raw-output '.url[0] // empty')" @RET
+        if test -z "${paper_url}" ; then
+            paper_url="$(h-semantic-scholar-page-url "${url}")" @RET
+        fi
         ec "$json" |
-            revaldbg semantic_scholar_json_to_org.lisp "$url"
+            revaldbg semantic_scholar_json_to_org.lisp "$paper_url"
     done | cat-copy-if-tty
 }
 aliasfn ssorg semantic-scholar-to-org

@@ -7,6 +7,7 @@ import os
 from pathlib import Path
 import subprocess
 import sys
+import tempfile
 import unittest
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -124,71 +125,118 @@ class ParserTests(unittest.TestCase):
 
 class PipelineTests(unittest.TestCase):
     def run_shell(self, *, key="", api="unused", html=HTML, command="semantic-scholar-to-json",
-                  api_p="", url=URL, deepseek=""):
-        env = dict(os.environ, TEST_SS_KEY=key, semantic_scholar_api_p=api_p,
-                   TEST_SS_API=api, TEST_SS_HTML=html, TEST_SS_URL=url, NIGHTDIR=str(ROOT),
-                   TEST_SS_DEEPSEEK_KEY=deepseek, TEST_SS_MARKDOWN=MARKDOWN)
-        script = r'''
+                  api_p="", url=URL, deepseek="", scraper="auto", fetch_fail=False, partial=False):
+        with tempfile.TemporaryDirectory() as directory:
+            log = Path(directory) / "calls"
+            env = dict(os.environ, TEST_SS_KEY=key, TEST_SS_API_P=api_p, TEST_SS_SCRAPER=scraper,
+                       TEST_SS_API=api, TEST_SS_HTML=html, TEST_SS_URL=url, NIGHTDIR=str(ROOT),
+                       TEST_SS_DEEPSEEK_KEY=deepseek, TEST_SS_MARKDOWN=MARKDOWN,
+                       TEST_SS_CANONICAL=URL, TEST_SS_LOG=str(log),
+                       TEST_SS_FETCH_FAIL="yes" if fetch_fail else "", TEST_SS_PARTIAL="yes" if partial else "")
+            script = r'''
 SemanticScholar_API_key="${TEST_SS_KEY}"
+semantic_scholar_api_p="${TEST_SS_API_P}"
+semantic_scholar_scraper="${TEST_SS_SCRAPER}"
 deepseek_api_key="${TEST_SS_DEEPSEEK_KEY}"
+function h-semantic-scholar-page-url {
+    print -r -- "resolve:$1" >> "${TEST_SS_LOG}"
+    print -r -- "${TEST_SS_CANONICAL}"
+}
 function full-html2 {
-    [[ "$1" == https://www.semanticscholar.org/paper/* ]] || return 97
+    print -r -- html >> "${TEST_SS_LOG}"
+    [[ "$1" == "${TEST_SS_CANONICAL}" ]] || return 97
     print -r -- "${TEST_SS_HTML}"
 }
 function semantic-scholar-to-json-api {
+    print -r -- api >> "${TEST_SS_LOG}"
     case "${TEST_SS_API}" in
         unused) print -ru2 -- 'Unexpected API call'; return 98 ;;
         fail) return 22 ;;
         invalid) print -r -- '{"error":"rate limited"}' ;;
-        ok) print -r -- '{"title":"API title","citationCount":0,"abstract":null}' ;;
+        ok) command jq --null-input --arg url "${TEST_SS_CANONICAL}" '{title:"API title",url:$url,citationCount:0,abstract:"API abstract"}' ;;
     esac
 }
+function ecgray { print -r -- gray >> "${TEST_SS_LOG}"; print -ru2 -- "$@" }
 function pbcopy { print -ru2 -- 'Unexpected clipboard write'; return 99 }
-function deepseek-fetch { print -r -- "${TEST_SS_MARKDOWN}" }
+function deepseek-fetch-json {
+    print -r -- "deepseek:$1" >> "${TEST_SS_LOG}"
+    [[ "$1" == "${TEST_SS_CANONICAL}" ]] || return 96
+    [[ -z "${TEST_SS_FETCH_FAIL}" ]] || return 22
+    if [[ -n "${TEST_SS_PARTIAL}" ]] ; then
+        command jq --null-input --arg url "$1" '{url:$url,title:"Partial paper | Semantic Scholar",content:"## 48 References\n\n### Unrelated paper\nUnrelated abstract"}'
+    else
+        command jq --null-input --arg url "$1" --arg content "${TEST_SS_MARKDOWN}" '{url:$url,title:"Synthetic paper | Semantic Scholar",content:$content}'
+    fi
+}
 "$1" "${TEST_SS_URL}"
 '''
-        return subprocess.run(["zsh", "-c", script, "_", command], env=env,
-                              text=True, capture_output=True, timeout=45)
+            result = subprocess.run(["zsh", "-c", script, "_", command], env=env,
+                                    text=True, capture_output=True, timeout=45)
+            result.calls = log.read_text().splitlines() if log.exists() else []
+            return result
 
-    def test_no_key_skips_api(self):
+    def test_no_keys_uses_html_without_api(self):
         result = self.run_shell()
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(json.loads(result.stdout)["abstract"], ["Full abstract & $x$."])
-        self.assertNotIn("Unexpected API call", result.stderr)
+        self.assertEqual(result.calls, ["resolve:" + URL, "html"])
 
-    def test_deepseek_fallback_uses_real_org_formatter_and_labels_tldr(self):
-        result = self.run_shell(html="<title>Human Verification</title>",
-                                deepseek="synthetic-test-key", command="semantic-scholar-to-org")
+    def test_api_success_does_not_scrape(self):
+        result = self.run_shell(key="test-key", api="ok")
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertIn("@citations/1234 @2025 @TestVenue", result.stdout)
-        self.assertIn("* @summary", result.stdout)
-        self.assertIn("A short TLDR.", result.stdout)
-        self.assertNotIn("* @abstract", result.stdout)
+        self.assertEqual(json.loads(result.stdout)["citationCount"], ["0"])
+        self.assertEqual(result.calls, ["api"])
 
-    def test_explicit_scraping_with_key_skips_api(self):
-        result = self.run_shell(key="synthetic-test-key", api_p="n")
-        self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertNotIn("Unexpected API call", result.stderr)
-
-    def test_api_failures_preserve_scraped_data(self):
+    def test_api_failures_go_directly_to_deepseek_with_gray_notice(self):
         for api in ("fail", "invalid"):
             with self.subTest(api=api):
-                result = self.run_shell(key="synthetic-test-key", api=api)
+                result = self.run_shell(key="test-key", api=api, deepseek="test-key")
                 self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertEqual(result.calls, ["api", "gray", "resolve:" + URL, "deepseek:" + URL])
+                self.assertIn("API failed", result.stderr)
                 self.assertEqual(json.loads(result.stdout)["citationCount"], ["1234"])
-                self.assertIn("falling back to scraped data", result.stderr)
 
-    def test_api_enrichment_preserves_scraped_abstract(self):
-        result = self.run_shell(key="synthetic-test-key", api="ok")
+    def test_arxiv_input_resolves_before_fetching_semantic_scholar(self):
+        source = "https://arxiv.org/abs/2610.22300"
+        result = self.run_shell(url=source, deepseek="test-key", command="semantic-scholar-to-org")
         self.assertEqual(result.returncode, 0, result.stderr)
-        data = json.loads(result.stdout)
-        self.assertEqual(data["title"], ["API title"])
-        self.assertEqual(data["citationCount"], ["0"])
-        self.assertEqual(data["abstract"], ["Full abstract & $x$."])
+        self.assertEqual(result.calls, ["resolve:" + source, "deepseek:" + URL])
+        self.assertIn("[[" + URL + "][", result.stdout)
+        self.assertNotIn("/paper/arXiv:", result.stdout)
+        self.assertIn("* @summary", result.stdout)
 
-    def test_external_id_uses_public_site(self):
-        result = self.run_shell(url="https://api.semanticscholar.org/arXiv:2505.00661")
+    def test_explicit_html_scraper_ignores_deepseek_key(self):
+        result = self.run_shell(deepseek="test-key", scraper="full-html2")
         self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.calls, ["resolve:" + URL, "html"])
+
+    def test_explicit_deepseek_does_not_fall_back_to_html(self):
+        result = self.run_shell(deepseek="test-key", scraper="deepseek", fetch_fail=True)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertNotIn("html", result.calls)
+
+    def test_auto_tries_html_only_after_deepseek_failure(self):
+        result = self.run_shell(deepseek="test-key", fetch_fail=True)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.calls, ["resolve:" + URL, "deepseek:" + URL, "gray", "html"])
+
+    def test_invalid_scraper_fails_before_network(self):
+        result = self.run_shell(key="test-key", scraper="typo")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertEqual(result.calls, [])
+
+    def test_explicit_api_disable(self):
+        result = self.run_shell(key="test-key", api_p="n", deepseek="test-key")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertNotIn("api", result.calls)
+
+    def test_partial_fetch_never_uses_related_paper_description(self):
+        result = self.run_shell(deepseek="test-key", partial=True, command="semantic-scholar-to-org")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("Partial paper", result.stdout)
+        self.assertIn(":referenceCount: 48", result.stdout)
+        self.assertNotIn("Unrelated abstract", result.stdout)
+        self.assertIn("partial metadata", result.stderr)
 
     def test_keyless_org_output_uses_real_formatter(self):
         result = self.run_shell(command="semantic-scholar-to-org")
@@ -197,19 +245,44 @@ function deepseek-fetch { print -r -- "${TEST_SS_MARKDOWN}" }
                      ":pdf_urls: https://example.org/paper.pdf", "* @abstract"):
             self.assertIn(text, result.stdout)
 
-    def test_missing_optional_fields_do_not_create_nil_tags(self):
-        html = '<meta name="citation_title" content="Minimal paper">'
-        result = self.run_shell(command="semantic-scholar-to-org", html=html)
-        self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertIn("Minimal paper", result.stdout)
-        self.assertNotIn("@citations/NIL", result.stdout)
-        self.assertNotIn(" NIL ", result.stdout)
-
     def test_challenge_fails_without_org(self):
         result = self.run_shell(command="semantic-scholar-to-org", html="<title>Human Verification</title>")
         self.assertNotEqual(result.returncode, 0)
         self.assertEqual(result.stdout, "")
         self.assertIn("human verification", result.stderr)
+
+
+class ResolverTests(unittest.TestCase):
+    def resolve(self, source, destination=URL):
+        with tempfile.TemporaryDirectory() as directory:
+            curl = Path(directory) / "curl"
+            curl.write_text('''#!/usr/bin/env python3
+import os,sys
+assert sys.argv[-1] == "https://api.semanticscholar.org/arXiv:2610.22300"
+assert "--location" in sys.argv
+assert "--head" in sys.argv
+print(os.environ["TEST_DESTINATION"],end="")
+''')
+            curl.chmod(0o755)
+            env = dict(os.environ, TEST_RESOLVER_BIN=directory, TEST_DESTINATION=destination)
+            return subprocess.run(["zsh", "-c", 'path=("${TEST_RESOLVER_BIN}" "${path[@]}"); h-semantic-scholar-page-url "$1"',
+                                   "_", source], env=env, text=True, capture_output=True, timeout=20)
+
+    def test_arxiv_uses_the_real_external_id_redirect(self):
+        result = self.resolve("https://arxiv.org/abs/2610.22300")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.stdout.strip(), URL)
+
+    def test_existing_full_paper_url_needs_no_redirect(self):
+        result = self.resolve(URL)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.stdout.strip(), URL)
+
+    def test_unresolved_or_unrelated_destination_is_rejected(self):
+        for destination in ("https://api.semanticscholar.org/arXiv:2610.22300", "https://example.org/paper/" + "a" * 40):
+            result = self.resolve("https://arxiv.org/abs/2610.22300", destination)
+            self.assertNotEqual(result.returncode, 0)
+            self.assertEqual(result.stdout, "")
 
 
 if __name__ == "__main__":

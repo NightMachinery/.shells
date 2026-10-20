@@ -206,16 +206,48 @@ def parse_markdown(markdown, *, url):
     return data
 
 
+def parse_fetch_page(page, *, url):
+    """Use the Fetch title when Semantic Scholar omits its main paper section."""
+    content = page.get("content")
+    title = page.get("title")
+    if not isinstance(content, str) or not isinstance(title, str):
+        raise ValueError("Fetch response must contain string title and content")
+    match = re.fullmatch(r"(?:\[PDF\]\s*)?(.+?)\s*\|\s*Semantic Scholar", title.strip(), re.I)
+    if not match:
+        raise ValueError("Fetch did not return a Semantic Scholar paper title; human verification may be required")
+    title = match.group(1).strip()
+    text = re.sub(r"\\([^\w\s])", r"\1", content)
+    primary = re.split(r"(?m)^###\s", text, maxsplit=1)[0]
+    if re.search(r"@\w+\s*\{", primary):
+        data = parse_markdown(content, url=url)
+        normalize = lambda value: re.sub(r"\W+", "", value).casefold()
+        if normalize(data["title"][0]) != normalize(title):
+            raise ValueError("paper BibTeX does not match the fetched page title")
+        return data
+    data = {"title": [title], "url": [url], "metadataStatus": ["partial"]}
+    paper_id = re.search(r"/([a-fA-F0-9]{40})(?:[/?#]|$)", url)
+    if paper_id:
+        data["paperId"] = [paper_id.group(1)]
+    for key, label in (("citationCount", "Citations"), ("referenceCount", "References")):
+        count = re.search(r"(?im)^(?:#{1,2}\s+)?([\d,]+)\s+" + label + r"\s*$", primary)
+        if count:
+            data[key] = [count.group(1).replace(",", "")]
+    return data
+
+
 def main():
     args = sys.argv[1:]
-    markdown_p = args[:1] == ["--markdown"]
-    if markdown_p:
+    mode = args[0] if args[:1] in (["--markdown"], ["--fetch-json"]) else ""
+    if mode:
         args = args[1:]
     if len(args) != 1:
-        sys.exit("usage: semantic_scholar_html_to_json.py [--markdown] <paper-url> < page")
+        sys.exit("usage: semantic_scholar_html_to_json.py [--markdown|--fetch-json] <paper-url> < page")
     try:
-        parse = parse_markdown if markdown_p else parse_paper
-        data = parse(sys.stdin.read(), url=args[0])
+        if mode == "--fetch-json":
+            data = parse_fetch_page(json.load(sys.stdin), url=args[0])
+        else:
+            parse = parse_markdown if mode == "--markdown" else parse_paper
+            data = parse(sys.stdin.read(), url=args[0])
     except ValueError as error:
         sys.exit(f"semantic-scholar scraper: {error}")
     print(json.dumps(data, ensure_ascii=False))

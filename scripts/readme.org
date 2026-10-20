@@ -13,16 +13,16 @@ There are some non-FOSS resources in this repo that I have included only for my 
 
 * Fetch web pages as Markdown
 
-[agfi:deepseek-fetch] fetches one or more URLs using the existing
-=deepseek_api_key=. Try =deepseek-fetch 'https://example.org'=; multiple URLs
-are separated and labeled. See
+[agfi:deepseek-fetch] fetches URLs as Markdown with page-title headings and
+source links; [agfi:deepseek-fetch-json] returns JSONL. Both use the existing
+=deepseek_api_key=. Try =deepseek-fetch 'https://example.org'=. See
 [[NIGHTDIR:docs/deepseek-fetch.md][usage and output format]].
 
 * Semantic Scholar research notes
 
-[agfi:semantic-scholar-to-org] creates Org paper entries without a Semantic
-Scholar API key. It scrapes the page and can fall back to [agfi:deepseek-fetch].
-Pass the full public paper URL, including its title slug and ID. See
+[agfi:semantic-scholar-to-org] creates Org paper entries from Semantic Scholar
+or arXiv links, resolving the real Semantic Scholar page automatically. It tries
+the API when configured, then selectable DeepSeek or HTML scraping. See
 [[NIGHTDIR:docs/semantic-scholar-to-org.md][retrieval options and summary labeling]].
 
 * arXiv metadata

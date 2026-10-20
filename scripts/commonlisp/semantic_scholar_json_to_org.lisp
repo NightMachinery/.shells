@@ -278,13 +278,15 @@
 
     (let ((desc (or (v0 "abstract") (v0 "tldr")))
           (bibtex (v0 "bibtex")))
-      (format out_stream "* @~a~%"
-              (if (and (not (v0 "abstract")) (v0 "tldr")) "summary" "abstract"))
-      (org-properties-write
-       :keys nil
-       :accessor nil
-       :out_stream out_stream
-       :folded_p t)
-      (org-quote-write :content desc)
-      (ec)
-      (org-example-write :headers "bibtex" :content bibtex))))
+      (when desc
+        (format out_stream "* @~a~%"
+                (if (and (not (v0 "abstract")) (v0 "tldr")) "summary" "abstract"))
+        (org-properties-write
+         :keys nil
+         :accessor nil
+         :out_stream out_stream
+         :folded_p t)
+        (org-quote-write :content desc)
+        (ec))
+      (when bibtex
+        (org-example-write :headers "bibtex" :content bibtex)))))
