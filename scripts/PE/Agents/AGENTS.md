@@ -2,6 +2,8 @@
 
 - Root commands must be run as `sudo -kA <command>`. Never run bare `sudo`: there is no TTY, so it will hang until the tool times out.
 
+- Your running shell is Zsh. Use proper Zsh. Quote everything conservatively, to avoid Zsh glob patterns etc. on literal strings.
+
 - Keep `./docs/` updated as you investigate or make changes.
   - If a `readme.org` (or `readme.md`) file exists, keep it updated too.
   - Avoid using tables in docs. They can be difficult to read in plain-text on a laptop screen.
@@ -27,6 +29,7 @@
 - We are usually pushing to public git remotes. Be deliberate about what personal information we put into commits. Ask the user if in doubt. See **Private Information** below.
 
 - Keep a checklist in `TASKS.org` (this file should be gitignored in each repo locally). Tick each item when it’s done, and add anything new you find.
+  - Shorthand names for items, milestones, etc., should be clear, easy to understand, and follow consistent, systematic naming conventions.
 
 ## `~/scripts`
 - If you ever need to edit anything here, read `~/scripts/AGENTS.md` first.
@@ -204,7 +207,7 @@ Another agent or a human may be staging and committing in the same repository
 while you work. The index is shared state, so a plain `git commit` picks up
 whatever *they* staged, even when you only ever `git add`ed your own paths.
 
-- Commit with an explicit pathspec — `git commit -- <paths>` — so the commit
+- Commit with an explicit pathspec — `git commit -- <paths>`, so the commit
   contains only what you name, regardless of what else is sitting in the index.
 - Re-check `status` immediately before committing. A check from earlier in the
   session proves nothing; the index may have changed since.
@@ -216,6 +219,7 @@ whatever *they* staged, even when you only ever `git add`ed your own paths.
 - If a commit does end up mixing their work with yours, do not rewrite or
   force-push to fix it. They may already be working from that history. Report
   it and let me decide.
+- Use your own judgement on when you can preemptively commit concurrent edits as their own commits. E.g., small finished changes made by the user should be committed by you.
 
 ## Holds: Claiming a Resource Exclusively
 
@@ -424,3 +428,18 @@ Inside Paseo (`PASEO_AGENT_ID` is set), pick the Paseo skill by job:
   compacts with `paseo-compact` first.
 
 `delegate` still decides worker model, account and backend.
+
+# Token Efficiency
+
+- See `paseo-compact`.
+- Avoid busy waiting for conditions when possible. Use a script that wakes up the waiting agent when the conditions are fulfilled.
+- Have cache warming in sight: Claude cache goes cold after about 1h, and GPT after about 30m. We should have regular cache-warming low-token pings that keep the caches warm when we know the session is likely to continue soon, e.g., when it is waiting for a condition that is likely to be fulfilled under 24 hours. See `paseo-cache-warmer`.
+- If we can engineer tools or improve our workflow to increase token efficiency, offer them to the user proactively.
+
+# Paseo Harness Bugs
+
+```
+The user doesn't want to proceed with this tool use. The tool use was rejected (eg. If it was a file edit, the new_string was NOT written to the file). STOP what you are doing and wait for the user to tell you how to proceed.
+```
+
+This is a Paseo bug, any steers mid-task causes this message.
