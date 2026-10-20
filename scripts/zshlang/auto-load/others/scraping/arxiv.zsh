@@ -152,14 +152,18 @@ function arxiv-json {
         for id in ${ids[@]} ; do
             # re var-show id
 
-            xml="$(h-arxiv-api-query "${id}")" @TRET
-            #  | ggrep -oPm1 "(?<=<title>)[^<]+"
-            if test -z "${xml}" ; then
-                ecerr "$0: empty response from the arXiv API for id: ${id}"
-                return 1
+            if xml="$(h-arxiv-api-query "${id}")" && test -n "${xml}" ; then
+                ec "${xml}" | xml2json @RET
+            else
+                #: The Atom API can rate-limit while the abstract page works.
+                #: Keep the feed.entry shape expected by existing callers.
+                ecerr "$0: arXiv API unavailable for ${id}; using abstract-page metadata"
+                ensure-cmd python3 @RET
+                local html
+                html="$(gurl "https://arxiv.org/abs/${id}")" @TRET
+                ec "${html}" |
+                    command python3 "${NIGHTDIR}/python/orgmode/arxiv_html_to_json.py" "${id}" @RET
             fi
-
-            ec "${xml}" | xml2json @RET
         done
     done
 }

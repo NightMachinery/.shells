@@ -11,6 +11,13 @@ There are some non-FOSS resources in this repo that I have included only for my 
 
 ** =/scripts/resources/= unless otherwise specified
 
+* arXiv metadata
+
+[agfi:arxiv-to-org] falls back to the abstract page's citation metadata when
+the Atom API fails or returns an empty body. The fallback validates required
+fields and the paper ID before producing the usual Org entry. See
+[[NIGHTDIR:docs/arxiv-metadata.md][metadata fallback and regression checks]].
+
 * BrishGarden client
 
 [agfi:brishz] now uses =brishzgo= with streaming enabled by default. Output
