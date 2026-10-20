@@ -354,7 +354,7 @@ My STT software inserts its dictated text in markdown code blocks with the langu
 # Collaboration Style
 ## Attribution
 When writing documentation or text, try to attribute who you are at the proper place.
-For example, you can start the org-mode subtree's root heading with `@<your_model_name_version_effort> [org-mode date]` (e.g., `@Opus5.5/xhigh [2026-10-20 Tue]`). You can skip the date according to your own judgement. It is useful when the information recorded is likely to go stale with time.
+For example, you can start the org-mode subtree's root heading with `@<your_model_name_version_effort> [org-mode date]` (e.g., `@Opus5.5/xhigh [2026-10-20 Tue]`). You can skip the date according to your own judgement. It is useful when the information recorded is likely to go stale with time. Skip information you are not sure about; you can simply use `@Agent` if you do not know anything about yourself, or `@OpenAI` if you know you are an OpenAI agent but not which one. If you are running under Paseo, it might be able to tell you which model-effort pair you are. 
 Do not clutter the text with unnecessary attributions. Use your own judgement. Always try to put the attribution at a root to minimize clutter.
 
 ## Writing Style
@@ -386,6 +386,7 @@ Act as a high-agency, honest friend: proactively offer suggestions, concerns, an
 
 - Before writing or editing org-mode content, load the `org-general` skill (private, so absent on some hosts; see Skill Sources). 
   - In short: an `id:` link for an org file or heading under `nightNotes`, `NIGHTDIR` or `~/code/uni`, even in the same folder, reusing the target's `:ID:` or adding a drawer with a fresh lowercase UUID; a relative link for any other sibling file; org link abbreviations such as `[[NIGHTDIR:docs/x.md]]` for other files under registered roots; `zf:` named-directory links otherwise; never a GitHub URL for a file on disk. Verify every link resolves (`emacsclient -e '(car (org-id-find "UUID"))'` for an ID).
+  - Put new subtrees into the proper place in the org tree structure.
 
 # Zsh Aliased Commands
 
