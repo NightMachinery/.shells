@@ -344,7 +344,7 @@ instead.
 
 # Unexpected File Changes
 
-If you notice files changed since you last read/wrote them, it's possible the user updated them manually. Leave these changes be; if they conflict with your instructions, ask the user explicitly for instructions.
+If you notice files changed since you last read/wrote them, it's possible the user updated them manually. Leave these changes be or commit them separately if they look complete; if they conflict with your instructions, ask the user explicitly for instructions.
 
 # Speech to Text
 
@@ -352,6 +352,11 @@ I sometimes use STT software to type, so be on the lookout for typos and intelli
 My STT software inserts its dictated text in markdown code blocks with the language set to `speech-to-text`.
 
 # Collaboration Style
+## Attribution
+When writing documentation or text, try to attribute who you are at the proper place.
+For example, you can start the org-mode subtree's root heading with `@<your_model_name_version_effort> [org-mode date]` (e.g., `@Opus5.5/xhigh [2026-10-20 Tue]`). You can skip the date according to your own judgement. It is useful when the information recorded is likely to go stale with time.
+Do not clutter the text with unnecessary attributions. Use your own judgement. Always try to put the attribution at a root to minimize clutter.
+
 ## Writing Style
 Write like a sharp, natural human writer, not like generated text. Specifically:
 - No em dashes (—) or en dashes (–) as sentence connectors. Use commas, colons, parentheses, or split into two sentences. (This is a punctuation rule for prose; it does not affect direct quotes etc.)
@@ -379,7 +384,8 @@ Act as a high-agency, honest friend: proactively offer suggestions, concerns, an
 
 ## Org Files
 
-- Before writing or editing org-mode content that links to a local file (notes, docs, skills), load the `org-general` skill (private, so absent on some hosts; see Skill Sources). In short: an `id:` link for an org file or heading under `nightNotes`, `NIGHTDIR` or `~/code/uni`, even in the same folder, reusing the target's `:ID:` or adding a drawer with a fresh lowercase UUID; a relative link for any other sibling file; org link abbreviations such as `[[NIGHTDIR:docs/x.md]]` for other files under registered roots; `zf:` named-directory links otherwise; never a GitHub URL for a file on disk. Verify every link resolves (`emacsclient -e '(car (org-id-find "UUID"))'` for an ID).
+- Before writing or editing org-mode content, load the `org-general` skill (private, so absent on some hosts; see Skill Sources). 
+  - In short: an `id:` link for an org file or heading under `nightNotes`, `NIGHTDIR` or `~/code/uni`, even in the same folder, reusing the target's `:ID:` or adding a drawer with a fresh lowercase UUID; a relative link for any other sibling file; org link abbreviations such as `[[NIGHTDIR:docs/x.md]]` for other files under registered roots; `zf:` named-directory links otherwise; never a GitHub URL for a file on disk. Verify every link resolves (`emacsclient -e '(car (org-id-find "UUID"))'` for an ID).
 
 # Zsh Aliased Commands
 
