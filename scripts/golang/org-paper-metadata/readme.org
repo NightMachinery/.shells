@@ -1,0 +1,32 @@
+#+TITLE: Org paper metadata
+
+Native Semantic Scholar fetching, normalization, and Org rendering, shared by
+the shell converter and paper-note tooling. Default retrieval starts with public
+page data, without an API key. Successful results require authors and a full
+abstract; a supplied TLDR appears before the abstract in the same heading.
+
+* Try it
+
+The shell wrappers build the helper automatically on first use:
+
+#+begin_src zsh :eval never
+semantic-scholar-to-org '<paper-url>'
+semantic-scholar-to-json '<paper-url>'
+#+end_src
+
+To build the binary manually (Go 1.26+):
+
+#+begin_src zsh :eval never
+cd "${NIGHTDIR}/golang/org-paper-metadata"
+go install .
+org-paper-metadata --format json '<paper-url>'
+org-paper-metadata --from-json '<paper-url>' < metadata.json
+#+end_src
+
+See [[NIGHTDIR:docs/semantic-scholar-to-org.md][source selection and Org fields]].
+The old Lisp and Python entry points are deprecated compatibility shims.
+
+* Tests
+
+=go test -race ./...= runs offline normalization, routing, formatting, and file
+editing checks against synthetic metadata.

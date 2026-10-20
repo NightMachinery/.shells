@@ -21,10 +21,10 @@ source links; [agfi:deepseek-fetch-json] returns JSONL. Both use the existing
 * Semantic Scholar research notes
 
 [agfi:semantic-scholar-to-org] creates Org paper entries from Semantic Scholar
-or arXiv links, resolving the real Semantic Scholar page automatically. It tries
-the API when configured, then selectable DeepSeek, public page data, or HTML
-retrieval. Successful notes include authors and a full abstract; page data needs
-no key. See [[NIGHTDIR:docs/semantic-scholar-to-org.md][retrieval options]].
+or arXiv links. The native Go helper tries public page data first, then configured
+API and extraction fallbacks. Notes include authors, a full abstract, and a
+supplied TLDR block before the abstract. See
+[[NIGHTDIR:docs/semantic-scholar-to-org.md][retrieval options and output]].
 
 * arXiv metadata
 
