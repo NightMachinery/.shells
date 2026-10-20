@@ -5,7 +5,7 @@
 - Your running shell is Zsh. Use proper Zsh. Quote everything conservatively, to avoid Zsh glob patterns etc. on literal strings.
 
 - Keep `./docs/` updated as you investigate or make changes.
-  - If a `readme.org` (or `readme.md`) file exists, keep it updated too.
+  - If a `readme.org` (or `readme.md`) file exists, keep it updated AND streamlined: README files are meant for humans. These files should be concise and let humans know why this project might provide value for them and teach how to try it out quickly, with links to other docs for more details.
   - Avoid using tables in docs. They can be difficult to read in plain-text on a laptop screen.
   
 - Before asking the user a multiple-choice question, first explain the choices in detail then ask the question. This way the user can scroll back and see the technical details of each answer if needed.
