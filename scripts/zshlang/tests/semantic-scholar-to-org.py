@@ -50,9 +50,55 @@ A short TLDR\.
 Unrelated text.
 \#\# 41 References
 '''
+PAGE_DATA = {"paper": {
+    "id": "a" * 40, "title": {"text": "Synthetic paper"},
+    "paperAbstract": {"text": "The complete main paper abstract."},
+    "paperAbstractTruncated": "The complete main...",
+    "authors": [[{"name": "Example Author"}, {"text": "Example Author"}],
+                [{"name": "Other Author"}, {"text": "Other Author"}]],
+    "year": {"text": "2025"}, "pubDate": "2025-05-01", "corpusId": 12345,
+    "citationStats": {"numCitations": 0, "numReferences": 48, "numKeyCitations": 0},
+    "fieldsOfStudy": ["Computer Science"],
+    "links": [{"url": "https://example.org/paper.pdf", "linkType": "arxiv"}],
+    "primaryPaperLink": {"url": "https://example.org/paper.pdf", "linkType": "arxiv"},
+}}
 
 
 class ParserTests(unittest.TestCase):
+    def test_page_data_uses_full_abstract_and_nested_authors(self):
+        data = module.parse_page_data(PAGE_DATA, url=URL)
+        self.assertEqual(data["authors_names"], ["Example Author", "Other Author"])
+        self.assertEqual(data["abstract"], ["The complete main paper abstract."])
+        self.assertEqual(data["publicationDate"], ["2025-05-01"])
+        self.assertEqual(data["year"], ["2025"])
+        self.assertEqual(data["citationCount"], ["0"])
+        self.assertEqual(data["referenceCount"], ["48"])
+        self.assertEqual(data["links"], ["https://example.org/paper.pdf"])
+        self.assertEqual(data["pdf_urls"], data["links"])
+
+    def test_page_data_must_match_requested_paper(self):
+        with self.assertRaisesRegex(ValueError, "does not match"):
+            module.parse_page_data(PAGE_DATA, url=URL.replace("a" * 40, "b" * 40))
+
+    def test_preview_or_tldr_cannot_replace_full_abstract(self):
+        for field in ("authors", "paperAbstract"):
+            payload = json.loads(json.dumps(PAGE_DATA))
+            payload["paper"].pop(field)
+            with self.subTest(field=field), self.assertRaisesRegex(ValueError, "missing"):
+                module.parse_page_data(payload, url=URL)
+        result = subprocess.run([sys.executable, str(PARSER), "--fetch-json", URL],
+                                input=json.dumps({"title": "Synthetic paper | Semantic Scholar", "content": MARKDOWN}),
+                                text=True, capture_output=True)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertEqual(result.stdout, "")
+        self.assertIn("missing abstract", result.stderr)
+
+    def test_title_and_related_paper_text_are_not_metadata(self):
+        page = {"title": "Synthetic paper | Semantic Scholar",
+                "content": "## 48 References\n### Related paper\nUnrelated abstract"}
+        with self.assertRaisesRegex(ValueError, "main paper metadata"):
+            module.parse_fetch_page(page, url=URL)
+
     def test_deepseek_markdown_has_summary_and_main_paper_metadata(self):
         data = module.parse_markdown(MARKDOWN, url=URL)
         self.assertEqual(data["title"], ["Synthetic paper"])
@@ -84,7 +130,7 @@ class ParserTests(unittest.TestCase):
     def test_jsonld_graph(self):
         article = {"@graph": [{"@type": "Organization", "name": "Ignore"},
                    {"@type": "ScholarlyArticle", "headline": "LD paper",
-                    "description": "LD abstract", "author": {"name": "Example Author"},
+                    "abstract": "LD abstract", "author": {"name": "Example Author"},
                     "datePublished": "2025-05-01T12:00:00Z", "isPartOf": {"name": "LD Venue"}}]}
         html = '<script type="application/ld+json">' + json.dumps(article) + '</script>'
         data = module.parse_paper(html, url=URL)
@@ -106,6 +152,15 @@ class ParserTests(unittest.TestCase):
         data = module.parse_paper(HTML + '<meta name="citation_abstract" content="Entire abstract">', url=URL)
         self.assertEqual(data["abstract"], ["Entire abstract"])
 
+    def test_social_description_is_not_a_full_abstract(self):
+        html = '<meta name="citation_title" content="Synthetic paper">'
+        html += '<meta name="citation_author" content="Example Author">'
+        html += '<meta name="description" content="A truncated abstract...">'
+        data = module.parse_paper(html, url=URL)
+        self.assertNotIn("abstract", data)
+        with self.assertRaisesRegex(ValueError, "missing abstract"):
+            module.validate_metadata(data)
+
     def test_abbreviated_count_is_not_invented(self):
         data = module.parse_paper(HTML.replace("1,234 Citations", "1.2K Citations"), url=URL)
         self.assertNotIn("citationCount", data)
@@ -125,12 +180,15 @@ class ParserTests(unittest.TestCase):
 
 class PipelineTests(unittest.TestCase):
     def run_shell(self, *, key="", api="unused", html=HTML, command="semantic-scholar-to-json",
-                  api_p="", url=URL, deepseek="", scraper="auto", fetch_fail=False, partial=False):
+                  api_p="", url=URL, deepseek="", scraper="auto", fetch_fail=False, partial=False,
+                  page_data_fail=False, markdown=MARKDOWN):
         with tempfile.TemporaryDirectory() as directory:
             log = Path(directory) / "calls"
             env = dict(os.environ, TEST_SS_KEY=key, TEST_SS_API_P=api_p, TEST_SS_SCRAPER=scraper,
                        TEST_SS_API=api, TEST_SS_HTML=html, TEST_SS_URL=url, NIGHTDIR=str(ROOT),
-                       TEST_SS_DEEPSEEK_KEY=deepseek, TEST_SS_MARKDOWN=MARKDOWN,
+                       TEST_SS_DEEPSEEK_KEY=deepseek, TEST_SS_MARKDOWN=markdown,
+                       TEST_SS_PAGE_DATA=json.dumps(PAGE_DATA),
+                       TEST_SS_PAGE_DATA_FAIL="yes" if page_data_fail else "",
                        TEST_SS_CANONICAL=URL, TEST_SS_LOG=str(log),
                        TEST_SS_FETCH_FAIL="yes" if fetch_fail else "", TEST_SS_PARTIAL="yes" if partial else "")
             script = r'''
@@ -153,11 +211,18 @@ function semantic-scholar-to-json-api {
         unused) print -ru2 -- 'Unexpected API call'; return 98 ;;
         fail) return 22 ;;
         invalid) print -r -- '{"error":"rate limited"}' ;;
-        ok) command jq --null-input --arg url "${TEST_SS_CANONICAL}" '{title:"API title",url:$url,citationCount:0,abstract:"API abstract"}' ;;
+        partial) print -r -- '{"title":"Partial API title"}' ;;
+        ok) command jq --null-input --arg url "${TEST_SS_CANONICAL}" '{title:"API title",url:$url,citationCount:0,abstract:"API abstract",authors:[{name:"Example Author"}]}' ;;
     esac
 }
 function ecgray { print -r -- gray >> "${TEST_SS_LOG}"; print -ru2 -- "$@" }
 function pbcopy { print -ru2 -- 'Unexpected clipboard write'; return 99 }
+function h-semantic-scholar-scrape-page-data {
+    print -r -- page-data >> "${TEST_SS_LOG}"
+    [[ "$1" == "${TEST_SS_CANONICAL}" ]] || return 95
+    [[ -z "${TEST_SS_PAGE_DATA_FAIL}" ]] || return 22
+    print -r -- "${TEST_SS_PAGE_DATA}" | command python3 "${NIGHTDIR}/python/orgmode/semantic_scholar_html_to_json.py" --page-data "$1"
+}
 function deepseek-fetch-json {
     print -r -- "deepseek:$1" >> "${TEST_SS_LOG}"
     [[ "$1" == "${TEST_SS_CANONICAL}" ]] || return 96
@@ -175,11 +240,11 @@ function deepseek-fetch-json {
             result.calls = log.read_text().splitlines() if log.exists() else []
             return result
 
-    def test_no_keys_uses_html_without_api(self):
+    def test_no_keys_uses_public_page_data_without_api(self):
         result = self.run_shell()
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertEqual(json.loads(result.stdout)["abstract"], ["Full abstract & $x$."])
-        self.assertEqual(result.calls, ["resolve:" + URL, "html"])
+        self.assertEqual(json.loads(result.stdout)["abstract"], ["The complete main paper abstract."])
+        self.assertEqual(result.calls, ["resolve:" + URL, "page-data"])
 
     def test_api_success_does_not_scrape(self):
         result = self.run_shell(key="test-key", api="ok")
@@ -188,37 +253,53 @@ function deepseek-fetch-json {
         self.assertEqual(result.calls, ["api"])
 
     def test_api_failures_go_directly_to_deepseek_with_gray_notice(self):
-        for api in ("fail", "invalid"):
+        for api in ("fail", "invalid", "partial"):
             with self.subTest(api=api):
                 result = self.run_shell(key="test-key", api=api, deepseek="test-key")
                 self.assertEqual(result.returncode, 0, result.stderr)
-                self.assertEqual(result.calls, ["api", "gray", "resolve:" + URL, "deepseek:" + URL])
+                self.assertEqual(result.calls, ["api", "gray", "resolve:" + URL, "deepseek:" + URL, "gray", "page-data"])
                 self.assertIn("API failed", result.stderr)
-                self.assertEqual(json.loads(result.stdout)["citationCount"], ["1234"])
+                self.assertEqual(json.loads(result.stdout)["authors_names"], ["Example Author", "Other Author"])
 
     def test_arxiv_input_resolves_before_fetching_semantic_scholar(self):
         source = "https://arxiv.org/abs/2610.22300"
         result = self.run_shell(url=source, deepseek="test-key", command="semantic-scholar-to-org")
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertEqual(result.calls, ["resolve:" + source, "deepseek:" + URL])
+        self.assertEqual(result.calls, ["resolve:" + source, "deepseek:" + URL, "gray", "page-data"])
         self.assertIn("[[" + URL + "][", result.stdout)
         self.assertNotIn("/paper/arXiv:", result.stdout)
-        self.assertIn("* @summary", result.stdout)
+        self.assertIn("* @abstract", result.stdout)
+        self.assertIn("The complete main paper abstract.", result.stdout)
+        self.assertIn("Example Author", result.stdout)
 
     def test_explicit_html_scraper_ignores_deepseek_key(self):
         result = self.run_shell(deepseek="test-key", scraper="full-html2")
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(result.calls, ["resolve:" + URL, "html"])
 
-    def test_explicit_deepseek_does_not_fall_back_to_html(self):
+    def test_explicit_deepseek_recovers_page_data_without_html(self):
         result = self.run_shell(deepseek="test-key", scraper="deepseek", fetch_fail=True)
-        self.assertNotEqual(result.returncode, 0)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("page-data", result.calls)
         self.assertNotIn("html", result.calls)
 
-    def test_auto_tries_html_only_after_deepseek_failure(self):
-        result = self.run_shell(deepseek="test-key", fetch_fail=True)
+    def test_complete_deepseek_metadata_does_not_need_recovery(self):
+        markdown = MARKDOWN.replace(r" year\=\{2025\}\,",
+                                    r" abstract\=\{Full abstract from BibTeX\}\," + "\n" + r" year\=\{2025\}\,")
+        result = self.run_shell(deepseek="test-key", markdown=markdown)
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertEqual(result.calls, ["resolve:" + URL, "deepseek:" + URL, "gray", "html"])
+        self.assertEqual(result.calls, ["resolve:" + URL, "deepseek:" + URL])
+        self.assertEqual(json.loads(result.stdout)["abstract"], ["Full abstract from BibTeX"])
+
+    def test_auto_tries_html_after_deepseek_and_page_data_failures(self):
+        result = self.run_shell(deepseek="test-key", fetch_fail=True, page_data_fail=True)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.calls, ["resolve:" + URL, "deepseek:" + URL, "gray", "page-data", "gray", "html"])
+
+    def test_explicit_page_data_ignores_deepseek_key(self):
+        result = self.run_shell(deepseek="test-key", scraper="page-data")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.calls, ["resolve:" + URL, "page-data"])
 
     def test_invalid_scraper_fails_before_network(self):
         result = self.run_shell(key="test-key", scraper="typo")
@@ -233,20 +314,30 @@ function deepseek-fetch-json {
     def test_partial_fetch_never_uses_related_paper_description(self):
         result = self.run_shell(deepseek="test-key", partial=True, command="semantic-scholar-to-org")
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertIn("Partial paper", result.stdout)
+        self.assertIn("Synthetic paper", result.stdout)
         self.assertIn(":referenceCount: 48", result.stdout)
+        self.assertIn("Example Author", result.stdout)
+        self.assertIn("The complete main paper abstract.", result.stdout)
         self.assertNotIn("Unrelated abstract", result.stdout)
-        self.assertIn("partial metadata", result.stderr)
+        self.assertIn("main paper metadata", result.stderr)
+
+    def test_partial_fetch_and_incomplete_html_fail_without_org(self):
+        result = self.run_shell(deepseek="test-key", partial=True, page_data_fail=True,
+                                html='<meta name="citation_title" content="Only title">',
+                                command="semantic-scholar-to-org")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertEqual(result.stdout, "")
+        self.assertIn("missing authors, abstract", result.stderr)
 
     def test_keyless_org_output_uses_real_formatter(self):
-        result = self.run_shell(command="semantic-scholar-to-org")
+        result = self.run_shell(command="semantic-scholar-to-org", scraper="full-html2")
         self.assertEqual(result.returncode, 0, result.stderr)
         for text in ("@citations/1234", "@2025/May", "Full abstract & $x$.", "Example, Jörg",
                      ":pdf_urls: https://example.org/paper.pdf", "* @abstract"):
             self.assertIn(text, result.stdout)
 
     def test_challenge_fails_without_org(self):
-        result = self.run_shell(command="semantic-scholar-to-org", html="<title>Human Verification</title>")
+        result = self.run_shell(command="semantic-scholar-to-org", html="<title>Human Verification</title>", page_data_fail=True)
         self.assertNotEqual(result.returncode, 0)
         self.assertEqual(result.stdout, "")
         self.assertIn("human verification", result.stderr)

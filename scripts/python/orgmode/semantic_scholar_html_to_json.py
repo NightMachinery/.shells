@@ -72,9 +72,9 @@ def parse_paper(html, *, url):
         if values:
             data[key] = values
 
-    put("abstract", first(*meta("citation_abstract"), article.get("description"),
-                          *texts('[data-selenium-selector="abstract-text"]'),
-                          *meta("description", "og:description")))
+    # Search/social descriptions can be truncated previews or TLDRs.
+    put("abstract", first(*meta("citation_abstract"), article.get("abstract"),
+                          *texts('[data-selenium-selector="abstract-text"]')))
 
     authors = meta("citation_author")
     if not authors:
@@ -180,7 +180,8 @@ def parse_markdown(markdown, *, url):
     if not title:
         raise ValueError("paper BibTeX has no title")
     data = {"title": [title], "url": [url], "bibtex": [bibtex]}
-    for key, field in (("venue", "booktitle"), ("year", "year"), ("doi", "doi")):
+    for key, field in (("venue", "booktitle"), ("year", "year"), ("doi", "doi"),
+                       ("abstract", "abstract")):
         if fields.get(field):
             data[key] = [fields[field]]
     if "venue" not in data and fields.get("journal"):
@@ -207,7 +208,7 @@ def parse_markdown(markdown, *, url):
 
 
 def parse_fetch_page(page, *, url):
-    """Use the Fetch title when Semantic Scholar omits its main paper section."""
+    """Read the main paper, rejecting pages that only expose related papers."""
     content = page.get("content")
     title = page.get("title")
     if not isinstance(content, str) or not isinstance(title, str):
@@ -224,32 +225,108 @@ def parse_fetch_page(page, *, url):
         if normalize(data["title"][0]) != normalize(title):
             raise ValueError("paper BibTeX does not match the fetched page title")
         return data
-    data = {"title": [title], "url": [url], "metadataStatus": ["partial"]}
-    paper_id = re.search(r"/([a-fA-F0-9]{40})(?:[/?#]|$)", url)
-    if paper_id:
-        data["paperId"] = [paper_id.group(1)]
-    for key, label in (("citationCount", "Citations"), ("referenceCount", "References")):
-        count = re.search(r"(?im)^(?:#{1,2}\s+)?([\d,]+)\s+" + label + r"\s*$", primary)
-        if count:
-            data[key] = [count.group(1).replace(",", "")]
+    raise ValueError("fetched page is missing the main paper metadata; title and counts are insufficient")
+
+
+def validate_metadata(data):
+    """Require the fields that make a research note useful."""
+    if not isinstance(data, dict):
+        raise ValueError("paper metadata must be an object")
+    def has_text(values):
+        if isinstance(values, str):
+            values = [values]
+        return isinstance(values, list) and any(isinstance(x, str) and x.strip() for x in values)
+
+    authors = data.get("authors_names")
+    if not has_text(authors):
+        authors = [author.get("name") for author in data.get("authors", [])
+                   if isinstance(author, dict)]
+    missing = [key for key, values in (("title", data.get("title")), ("authors", authors),
+                                      ("abstract", data.get("abstract")))
+               if not has_text(values)]
+    if missing:
+        raise ValueError("incomplete paper metadata: missing " + ", ".join(missing))
     return data
+
+
+def parse_page_data(payload, *, url):
+    """Read the same public JSON used by Semantic Scholar's paper page."""
+    paper = payload.get("paper")
+    if not isinstance(paper, dict):
+        raise ValueError("page-data response has no paper")
+    expected = re.search(r"/([a-fA-F0-9]{40})(?:[/?#]|$)", url)
+    if not expected or paper.get("id", "").lower() != expected.group(1).lower():
+        raise ValueError("page-data paper ID does not match the requested paper")
+
+    def text(value):
+        if isinstance(value, dict):
+            value = value.get("text", "")
+        return value.strip() if isinstance(value, str) else ""
+
+    data = {"paperId": [paper["id"]], "url": [url]}
+
+    def put(key, values):
+        if not isinstance(values, list):
+            values = [values]
+        values = list(dict.fromkeys(str(value).strip() for value in values
+                                    if isinstance(value, (str, int)) and str(value).strip()))
+        if values:
+            data[key] = values
+
+    put("title", text(paper.get("title")))
+    # paperAbstractTruncated is a separate preview string, not a boolean flag.
+    # Read the full abstract only, even when the preview is present.
+    put("abstract", text(paper.get("paperAbstract")))
+    put("year", text(paper.get("year")) or paper.get("year"))
+    put("publicationDate", paper.get("pubDate"))
+    put("venue", text(paper.get("venue")))
+    put("corpusID", paper.get("corpusId"))
+    put("fieldsOfStudy", paper.get("fieldsOfStudy", []))
+    names = []
+    for author in paper.get("authors", []):
+        if isinstance(author, list):
+            author = author[0] if author else {}
+        if isinstance(author, dict):
+            names.append(text(author.get("name")) or text(author))
+    put("authors_names", names)
+    stats = paper.get("citationStats") or {}
+    for key, source in (("citationCount", "numCitations"), ("referenceCount", "numReferences"),
+                        ("influentialCitationCount", "numKeyCitations")):
+        put(key, stats.get(source))
+    links = list(paper.get("links") or []) + list(paper.get("alternatePaperLinks") or [])
+    if paper.get("primaryPaperLink"):
+        links.append(paper["primaryPaperLink"])
+    links = [link for link in links if isinstance(link, dict)
+             and urlsplit(link.get("url", "")).scheme in ("http", "https")]
+    put("links", [link["url"] for link in links])
+    put("pdf_urls", [link["url"] for link in links
+                     if urlsplit(link["url"]).path.lower().endswith(".pdf")
+                     or link.get("linkType") == "pdf"])
+    return validate_metadata(data)
 
 
 def main():
     args = sys.argv[1:]
-    mode = args[0] if args[:1] in (["--markdown"], ["--fetch-json"]) else ""
+    mode = args[0] if args[:1] in (["--markdown"], ["--fetch-json"], ["--page-data"], ["--validate"]) else ""
     if mode:
         args = args[1:]
     if len(args) != 1:
-        sys.exit("usage: semantic_scholar_html_to_json.py [--markdown|--fetch-json] <paper-url> < page")
+        sys.exit("usage: semantic_scholar_html_to_json.py [--markdown|--fetch-json|--page-data|--validate] <paper-url> < page")
     try:
         if mode == "--fetch-json":
             data = parse_fetch_page(json.load(sys.stdin), url=args[0])
+        elif mode == "--page-data":
+            data = parse_page_data(json.load(sys.stdin), url=args[0])
+        elif mode == "--validate":
+            data = json.load(sys.stdin)
         else:
             parse = parse_markdown if mode == "--markdown" else parse_paper
             data = parse(sys.stdin.read(), url=args[0])
+        validate_metadata(data)
     except ValueError as error:
         sys.exit(f"semantic-scholar scraper: {error}")
+    except (AttributeError, TypeError) as error:
+        sys.exit(f"semantic-scholar scraper: malformed paper metadata: {error}")
     print(json.dumps(data, ensure_ascii=False))
 
 

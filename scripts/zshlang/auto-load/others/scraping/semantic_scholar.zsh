@@ -89,21 +89,21 @@ function h-semantic-scholar-page-url {
 function semantic-scholar-to-json {
     local api_p="${semantic_scholar_api_p:-${SemanticScholar_API_key:+y}}"
     local scraper="${semantic_scholar_scraper:-auto}"
-    local input="${1:-$(pbpaste)}" url json_api
+    local input="${1:-$(pbpaste)}" url json_api json
     assert-args input @RET
     case "${scraper}" in
-        auto|deepseek|full-html2) ;;
-        *) ecerr "$0: semantic_scholar_scraper must be auto, deepseek, or full-html2"; return 1 ;;
+        auto|deepseek|page-data|full-html2) ;;
+        *) ecerr "$0: semantic_scholar_scraper must be auto, deepseek, page-data, or full-html2"; return 1 ;;
     esac
     if bool "${api_p}" ; then
         url="$(semantic-scholar-url-get "${input}")" @RET
         if json_api="$(semantic-scholar-to-json-api "${url}")" &&
-                ec "${json_api}" | command jq --exit-status \
-                    'type == "object" and (.title | type == "string" and length > 0)' > /dev/null ; then
-            ec "${json_api}" |
-                command jq 'with_entries(select(.value != null and .value != "" and .value != []))' |
-                json-listify-first-level | json-stringify-atoms
-            return $?
+                json="$(ec "${json_api}" |
+                    command jq --exit-status 'select(type == "object" and (.title | type == "string" and length > 0)) | with_entries(select(.value != null and .value != "" and .value != []))' |
+                    json-listify-first-level | json-stringify-atoms |
+                    command python3 "${NIGHTDIR}/python/orgmode/semantic_scholar_html_to_json.py" --validate "${url}")" ; then
+            ec "${json}"
+            return 0
         fi
         ecgray "$0: API failed; using ${scraper} scraper"
     fi
@@ -111,13 +111,19 @@ function semantic-scholar-to-json {
 }
 
 function h-semantic-scholar-scrape-deepseek {
-    local url="${1}" page json
+    local url="${1}" page
     page="$(deepseek-fetch-json "${url}")" @RET
-    json="$(ec "${page}" | command python3 "${NIGHTDIR}/python/orgmode/semantic_scholar_html_to_json.py" --fetch-json "${url}")" @RET
-    if ec "${json}" | command jq --exit-status '.metadataStatus == ["partial"]' > /dev/null ; then
-        ecgray "$0: Semantic Scholar exposed partial metadata; unavailable fields are omitted"
-    fi
-    ec "${json}"
+    ec "${page}" | command python3 "${NIGHTDIR}/python/orgmode/semantic_scholar_html_to_json.py" --fetch-json "${url}"
+}
+
+function h-semantic-scholar-scrape-page-data {
+    #: This public endpoint supplies the main paper data to the website.
+    local url="${1}" paper_id page
+    paper_id="$(semantic-scholar-id-get "${url}")" @RET
+    [[ "${paper_id}" =~ '^[a-fA-F0-9]{40}$' ]] || return 1
+    page="$(command curl --fail --silent --show-error --retry 2 --retry-delay 1 --max-time 30 \
+        "https://www.semanticscholar.org/api/1/paper/${paper_id}")" @RET
+    ec "${page}" | command python3 "${NIGHTDIR}/python/orgmode/semantic_scholar_html_to_json.py" --page-data "${url}"
 }
 
 function h-semantic-scholar-scrape-html {
@@ -128,27 +134,34 @@ function h-semantic-scholar-scrape-html {
 
 function semantic-scholar-to-json-scraping {
     local scraper="${semantic_scholar_scraper:-auto}"
-    local input="${1:-$(pbpaste)}" url json
+    local input="${1:-$(pbpaste)}" url json backend
+    local backends=()
     case "${scraper}" in
-        auto|deepseek|full-html2) ;;
-        *) ecerr "$0: semantic_scholar_scraper must be auto, deepseek, or full-html2"; return 1 ;;
+        auto|deepseek|page-data|full-html2) ;;
+        *) ecerr "$0: semantic_scholar_scraper must be auto, deepseek, page-data, or full-html2"; return 1 ;;
     esac
     ensure-cmd python3 @RET
     url="$(h-semantic-scholar-page-url "${input}")" @RET
     case "${scraper}" in
-        deepseek) h-semantic-scholar-scrape-deepseek "${url}" ;;
-        full-html2) h-semantic-scholar-scrape-html "${url}" ;;
+        deepseek) backends=(deepseek page-data) ;;
+        full-html2) backends=(html page-data) ;;
+        page-data) backends=(page-data) ;;
         auto)
             if test -n "${deepseek_api_key}" ; then
-                if json="$(h-semantic-scholar-scrape-deepseek "${url}")" ; then
-                    ec "${json}"
-                    return 0
-                fi
-                ecgray "$0: DeepSeek Fetch failed; trying full-html2"
+                backends+=(deepseek)
             fi
-            h-semantic-scholar-scrape-html "${url}"
+            backends+=(page-data html)
             ;;
     esac
+    for backend in "${backends[@]}" ; do
+        if json="$("h-semantic-scholar-scrape-${backend}" "${url}")" ; then
+            ec "${json}"
+            return 0
+        fi
+        ecgray "$0: ${backend} did not provide complete paper metadata"
+    done
+    ecerr "$0: could not recover the paper's title, authors, and full abstract from Semantic Scholar"
+    return 1
 }
 
 function semantic-scholar-to-org {
