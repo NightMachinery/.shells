@@ -241,7 +241,8 @@ func (d Document) Plan(t Target, m paper.Metadata) []Edit {
 		props = append(props, ":END:")
 		edits = append(edits, Edit{Start: pos, End: pos, Lines: props, Priority: 0})
 	} else {
-		updatedKeys := map[string]bool{}
+		// Drop the retired Org-only property even if the source does not supply it.
+		updatedKeys := map[string]bool{"metadatasource": true}
 		for key := range m {
 			if len(m[key]) > 0 {
 				updatedKeys[strings.ToLower(key)] = true

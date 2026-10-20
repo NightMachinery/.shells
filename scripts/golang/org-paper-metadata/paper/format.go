@@ -6,7 +6,7 @@ import (
 	"strings"
 )
 
-var PropertyKeys = []string{"paperId", "arxiv", "publicationDate", "publicationUpdateDate", "citationCount", "influentialCitationCount", "referenceCount", "keyReferenceCount", "venue", "journal_name", "authors_names", "links", "openAccessPdf", "pdf_urls", "doi", "fieldsOfStudy", "isOpenAccess", "corpusID", "year", "metadataSource", "metadataFetchedAt"}
+var PropertyKeys = []string{"paperId", "arxiv", "publicationDate", "publicationUpdateDate", "citationCount", "influentialCitationCount", "referenceCount", "keyReferenceCount", "venue", "journal_name", "authors_names", "links", "openAccessPdf", "pdf_urls", "doi", "fieldsOfStudy", "isOpenAccess", "corpusID", "year", "metadataFetchedAt"}
 
 func OneLine(s string) string { return strings.Join(strings.Fields(s), " ") }
 func Description(s string) string {

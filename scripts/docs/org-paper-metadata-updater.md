@@ -60,7 +60,8 @@ The tool refreshes the paper link's title, generated citation/date/venue
 at-tags, and supplied metadata properties. It preserves the original heading
 level and URL, TODO state, priority, personal tags, other heading text, custom
 properties such as `ID`, prose, and unrelated subheadings. Missing optional
-source fields do not erase previously recorded values. Open access remains a
+source fields do not erase previously recorded values. The retired
+`metadataSource` property is removed when an entry is refreshed. Open access remains a
 drawer property, without adding an at-tag.
 
 Generated TLDR and abstract quote blocks use plain Org comment markers so

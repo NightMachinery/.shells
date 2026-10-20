@@ -124,12 +124,12 @@ func TestOrgFormatting(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, want := range []string{"@citations/0 @2025/May", ":keyReferenceCount: 4", ":metadataSource: semantic-scholar-page-data", ":metadataFetchedAt: 2026-10-20T12:00:00Z", ":isOpenAccess: true", "* @abstract", "*Semantic Scholar TLDR:* A supplied summary.", "The complete abstract."} {
+	for _, want := range []string{"@citations/0 @2025/May", ":keyReferenceCount: 4", ":metadataFetchedAt: 2026-10-20T12:00:00Z", ":isOpenAccess: true", "* @abstract", "*Semantic Scholar TLDR:* A supplied summary.", "The complete abstract."} {
 		if !strings.Contains(out, want) {
 			t.Errorf("missing %s", want)
 		}
 	}
-	if strings.Contains(out, "@openAccess") || strings.Contains(out, "* @summary") {
+	if strings.Contains(out, "@openAccess") || strings.Contains(out, "* @summary") || strings.Contains(out, ":metadataSource:") {
 		t.Fatal(out)
 	}
 	if strings.Index(out, "org-paper-metadata: summary") > strings.Index(out, "org-paper-metadata: abstract") {

@@ -79,7 +79,7 @@ counts, publication information, and links, and adds these when available:
 - `isOpenAccess`: explicitly reported status; an absent badge is not read as false.
 - `keyReferenceCount`: the source's key-reference count.
 - `publicationUpdateDate`: supplied update date when different from publication date.
-- `metadataSource` and `metadataFetchedAt`: successful retrieval backend and UTC time.
+- `metadataFetchedAt`: UTC time of successful retrieval, used for weekly refreshes.
 
 A supplied TLDR appears in a labeled quote block before the full abstract,
 inside the same folded `@abstract` heading. Comment-marked summary and abstract blocks

@@ -19,7 +19,7 @@ const page = "https://www.semanticscholar.org/paper/" + id
 var now = time.Date(2026, 10, 20, 12, 0, 0, 0, time.UTC)
 
 func fresh() paper.Metadata {
-	return paper.Metadata{"title": {"New title"}, "url": {page}, "paperId": {id}, "authors_names": {"Example Author", "Other Author"}, "abstract": {"The new complete abstract."}, "tldr": {"The new summary."}, "citationCount": {"12"}, "year": {"2026"}, "publicationDate": {"2026-10-15"}, "venue": {"International Conference on Learning Representations"}, "metadataSource": {"semantic-scholar-page-data"}, "metadataFetchedAt": {now.Format(time.RFC3339)}}
+	return paper.Metadata{"title": {"New title"}, "url": {page}, "paperId": {id}, "authors_names": {"Example Author", "Other Author"}, "abstract": {"The new complete abstract."}, "tldr": {"The new summary."}, "citationCount": {"12"}, "year": {"2026"}, "publicationDate": {"2026-10-15"}, "venue": {"International Conference on Learning Representations"}, "metadataFetchedAt": {now.Format(time.RFC3339)}}
 }
 func transform(t *testing.T, text string) string {
 	t.Helper()
@@ -43,14 +43,14 @@ func transform(t *testing.T, text string) string {
 }
 
 func TestPreserveNotesTagsAndProperties(t *testing.T) {
-	text := "* TODO [#A] @great @citations/3 @2025/May @ICLR [[" + page + "][Old title]] :research:\nSCHEDULED: <2026-10-22 Thu>\n:PROPERTIES:\n:ID: synthetic-id\n:custom: Keep this\n:venue: International Conference on Learning Representations\n:year: 2025\n:publicationDate: 2025-05-01\n:citationCount: 3\n:END:\nMy notes must stay.\n** @abstract\n:PROPERTIES:\n:visibility: folded\n:ID: abstract-id\n:END:\n#+BEGIN_QUOTE\nOld abstract.\n#+END_QUOTE\n\n** My analysis\nKeep this child.\n* Next heading\nUntouched.\n"
+	text := "* TODO [#A] @great @citations/3 @2025/May @ICLR [[" + page + "][Old title]] :research:\nSCHEDULED: <2026-10-22 Thu>\n:PROPERTIES:\n:ID: synthetic-id\n:custom: Keep this\n:metadataSource: semantic-scholar-page-data\n:venue: International Conference on Learning Representations\n:year: 2025\n:publicationDate: 2025-05-01\n:citationCount: 3\n:END:\nMy notes must stay.\n** @abstract\n:PROPERTIES:\n:visibility: folded\n:ID: abstract-id\n:END:\n#+BEGIN_QUOTE\nOld abstract.\n#+END_QUOTE\n\n** My analysis\nKeep this child.\n* Next heading\nUntouched.\n"
 	out := transform(t, text)
 	for _, want := range []string{"* TODO [#A] @great @citations/12 @2026/October @ICLR [[" + page + "][New title]] :research:", "SCHEDULED: <2026-10-22 Thu>", ":ID: synthetic-id", ":custom: Keep this", ":ID: abstract-id", "My notes must stay.", "** My analysis\nKeep this child.\n* Next heading\nUntouched.", "*Semantic Scholar TLDR:* The new summary.", "The new complete abstract."} {
 		if !strings.Contains(out, want) {
 			t.Errorf("missing %q\n%s", want, out)
 		}
 	}
-	if strings.Contains(out, "Old abstract") || strings.Contains(out, ":citationCount: 3") {
+	if strings.Contains(out, "Old abstract") || strings.Contains(out, ":citationCount: 3") || strings.Contains(out, ":metadataSource:") {
 		t.Fatal(out)
 	}
 	if again := transform(t, out); again != out {
