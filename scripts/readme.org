@@ -11,6 +11,13 @@ There are some non-FOSS resources in this repo that I have included only for my 
 
 ** =/scripts/resources/= unless otherwise specified
 
+* Fetch web pages as Markdown
+
+[agfi:deepseek-fetch] fetches one or more URLs using the existing
+=deepseek_api_key=. Try =deepseek-fetch 'https://example.org'=; multiple URLs
+are separated and labeled. See
+[[NIGHTDIR:docs/deepseek-fetch.md][usage and output format]].
+
 * arXiv metadata
 
 [agfi:arxiv-to-org] falls back to the abstract page's citation metadata when
