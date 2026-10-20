@@ -18,6 +18,13 @@ There are some non-FOSS resources in this repo that I have included only for my 
 are separated and labeled. See
 [[NIGHTDIR:docs/deepseek-fetch.md][usage and output format]].
 
+* Semantic Scholar research notes
+
+[agfi:semantic-scholar-to-org] creates Org paper entries without a Semantic
+Scholar API key. It scrapes the page and can fall back to [agfi:deepseek-fetch].
+Pass the full public paper URL, including its title slug and ID. See
+[[NIGHTDIR:docs/semantic-scholar-to-org.md][retrieval options and summary labeling]].
+
 * arXiv metadata
 
 [agfi:arxiv-to-org] falls back to the abstract page's citation metadata when

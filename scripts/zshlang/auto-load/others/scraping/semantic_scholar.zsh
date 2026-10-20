@@ -53,7 +53,6 @@ function semantic-scholar-to-json-api {
 
     json="$(revaldbg gurl "${curl_opts_[@]}" "$url")" || {
         ecerr "$0: curl-ing the API failed with $?"$'\n'"URL: ${url}"
-        pbcopy "$url"
         return 1
     }
     #: =tldr= sometimes isn't available for the newer papers, and we aren't currently using it, so I have omitted it from the request above. (It will trow an error if tldr is not available.)
@@ -65,6 +64,7 @@ function semantic-scholar-to-json-api {
 function semantic-scholar-to-json {
     # @alt https://www.semanticscholar.org/product/api
     ##
+    local api_p="${semantic_scholar_api_p:-${SemanticScholar_API_key:+y}}"
     local url="${1:-$(pbpaste)}"
     assert-args url @RET
     url="$(semantic-scholar-url-get "$url")" @TRET
@@ -72,19 +72,23 @@ function semantic-scholar-to-json {
     local json_scraped
     json_scraped="$(semantic-scholar-to-json-scraping "$url")" @TRET
 
+    #: Scraping is sufficient without a key, or when explicitly requested.
+    if ! bool "${api_p}" ; then
+        ec "${json_scraped}"
+        return 0
+    fi
+
+    local corpus_id
     corpus_id="$(ec "$json_scraped" |
                     jqm '.corpusID' |
                     rget '(?:Corpus\s*ID:\s*)?(\d+)')" || true
 
     local json_api
-    if ! json_api="$(semantic_scholar_corpus_id="$corpus_id" semantic-scholar-to-json-api "$url")" ; then
+    if ! { json_api="$(semantic_scholar_corpus_id="$corpus_id" semantic-scholar-to-json-api "$url")" &&
+            ec "${json_api}" | jq --exit-status 'type == "object" and (.title | type == "string" and length > 0)' > /dev/null } ; then
         ecerr "$0: API failed, falling back to scraped data"
-        if true ; then
-            return 1
-        else
-            ec "${json_scraped}"
-            return 0
-        fi
+        ec "${json_scraped}"
+        return 0
     fi
 
     if false ; then
@@ -97,6 +101,7 @@ function semantic-scholar-to-json {
     fi
 
     jq -s '.[0] * .[1]' <(ec "$json_scraped") <(ec "$json_api" |
+                                                    jq 'with_entries(select(.value != null and .value != "" and .value != []))' |
                                                     json-listify-first-level |
                                                     json-stringify-atoms)
 }
@@ -108,35 +113,27 @@ function semantic-scholar-to-json-scraping {
     assert-args url @RET
     url="$(semantic-scholar-url-get "$url")" @TRET
 
-    local html
-    html="$(fhMode="${fhMode:-curlfull_s5}" full-html2 "$url")" @TRET
+    #: External-ID links should use the public site's redirect, not the API.
+    if [[ "$url" =~ '^https?://api\.semanticscholar\.org/((?:arXiv|CorpusID|ACL):[^/?#]+)$' ]] ; then
+        url="https://www.semanticscholar.org/paper/${match[1]}"
+    fi
+
+    ensure-cmd python3 @RET
+    local html json
     #: fhMode=curl,wgetm did not work with genrouter for some reason
 
-    ec "$html" |
-        selectors2json.py \
-            title '[data-selenium-selector="paper-detail-title"]' '' \
-            bibtex '.bibtex-citation' '' \
-            doi '[data-selenium-selector="paper-doi"] .doi__link' 'attr:href' \
-            corpusID '[data-selenium-selector="corpus-id"]' '' \
-            date '[data-selenium-selector="paper-year"]' '' \
-            authors_names 'meta[name="citation_author"], meta[property="citation_author"]' 'attr:content' \
-            journal_name '[data-heap-id="paper-meta-journal"]' '' \
-            abstract_scraped 'meta[name="description"], meta[property="description"]' 'attr:content' \
-            links '[data-selenium-selector="paper-link"]' 'attr:href' \
-            pdf_urls 'meta[name="citation_pdf_url"], meta[property="citation_pdf_url"]' 'attr:content' \
-            topics '[data-selenium-selector="entity-name"]' '' \
-            referenceCount '[data-heap-nav="references"]' '' \
-            | jq '.'
-
-    #: * [jalali:1402/01/09/03:46]
-    #: ** pdf_urls which is extracted using the meta tags might be the best that is scrapable without using a headless browser.
-    #: ** The only PDF url the API might offer is 'openAccessPdf'.
-    ##
-    # abstract '[data-selenium-selector="abstract-text"]' '->org' \
-        # authors '.author-list' '->org' \
-        # '+1 author' appears in the authors list.
-    # citationCount '[data-heap-nav="citing-papers"]' '' \
-        ##
+    if html="$(fhMode="${fhMode:-curlfull_s5}" full-html2 "$url")" &&
+            json="$(ec "$html" | command python3 "${NIGHTDIR}/python/orgmode/semantic_scholar_html_to_json.py" "${url}")" ; then
+        ec "${json}"
+    elif test -n "${deepseek_api_key}" ; then
+        ecerr "$0: HTML unavailable; trying DeepSeek Fetch"
+        local markdown
+        markdown="$(deepseek-fetch "${url}")" @RET
+        ec "${markdown}" | command python3 "${NIGHTDIR}/python/orgmode/semantic_scholar_html_to_json.py" --markdown "${url}"
+    else
+        ecerr "$0: could not scrape paper metadata; DeepSeek fallback needs deepseek_api_key"
+        return 1
+    fi
 }
 
 function semantic-scholar-to-org {

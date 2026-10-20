@@ -91,7 +91,13 @@
                (v0 "year")))
             (month
               (or (rget "([a-zA-Z]+)" date)
-                  (month-number-to-name (rget "\\d{4}-(\\d{2})" date)))))
+                  (let ((number (rget "\\d{4}-(\\d{2})" date)))
+                    (when number
+                      (let ((index (parse-integer number :junk-allowed t)))
+                        (when (and index (<= 1 index 12))
+                          (nth (1- index)
+                               '("January" "February" "March" "April" "May" "June"
+                                 "July" "August" "September" "October" "November" "December")))))))))
        (listify-if-not
         (when year
           (let ((tag (concat "@" year)))
@@ -230,9 +236,10 @@
   (let ((title (v0 "title"))
         (url (car (argv-get)))
         (venue-or-journal (venue-or-journal-name-get)))
-    (format t "@citations/~a ~a "
-            (v0 citations_count_key)
-            (v0 "date_tag"))
+    (when-let ((citations (v0 citations_count_key)))
+      (format t "@citations/~a " citations))
+    (when-let ((date-tag (v0 "date_tag")))
+      (format t "~a " date-tag))
     (when
         (and venue-or-journal
              (not (emptyp venue-or-journal)))
@@ -269,9 +276,10 @@
        :out_stream out_stream
        :folded_p nil))
 
-    (let ((desc (v0 "abstract"))
+    (let ((desc (or (v0 "abstract") (v0 "tldr")))
           (bibtex (v0 "bibtex")))
-      (format out_stream "* @abstract~%")
+      (format out_stream "* @~a~%"
+              (if (and (not (v0 "abstract")) (v0 "tldr")) "summary" "abstract"))
       (org-properties-write
        :keys nil
        :accessor nil
