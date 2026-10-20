@@ -96,6 +96,9 @@ func ParsePageData(raw []byte, url string) (Metadata, error) {
 		return nil, err
 	}
 	p := object(d["paper"])
+	if p == nil {
+		return nil, fmt.Errorf("page-data response has no paper (responseType=%q)", str(d["responseType"]))
+	}
 	id := str(p["id"])
 	if id == "" || !strings.EqualFold(id, PaperID(url)) {
 		return nil, errors.New("page-data paper ID does not match the requested paper")

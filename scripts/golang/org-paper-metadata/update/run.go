@@ -14,6 +14,10 @@ import (
 	"time"
 
 	"org-paper-metadata/paper"
+
+	"github.com/hexops/gotextdiff"
+	"github.com/hexops/gotextdiff/myers"
+	"github.com/hexops/gotextdiff/span"
 )
 
 type Options struct {
@@ -143,6 +147,11 @@ func Run(ctx context.Context, root string, o Options, fetch FetchFunc, now time.
 			fmt.Fprintln(log, err)
 			return nil
 		}
+		// Unrelated .org files may contain arbitrary data, including non-UTF-8.
+		lower := bytes.ToLower(before)
+		if !bytes.Contains(lower, []byte("semanticscholar.org/")) && !bytes.Contains(lower, []byte("arxiv.org/")) {
+			return nil
+		}
 		doc, err := Parse(string(before))
 		if err != nil {
 			stats.Failed++
@@ -161,6 +170,9 @@ func Run(ctx context.Context, root string, o Options, fetch FetchFunc, now time.
 		var edits []Edit
 		updated := 0
 		for _, target := range targets {
+			if ctx.Err() != nil {
+				return ctx.Err()
+			}
 			if !o.Force && Recent(target.Properties, now, o.MaxAge) {
 				stats.Recent++
 				continue
@@ -176,9 +188,13 @@ func Run(ctx context.Context, root string, o Options, fetch FetchFunc, now time.
 					}
 				}
 				last = time.Now()
+				fmt.Fprintf(log, "fetch %s:%d %s\n", path, target.Heading.Start+1, target.URL)
 				fetchCtx, cancel := context.WithTimeout(ctx, o.Timeout)
 				r.metadata, r.err = fetch(fetchCtx, target.URL)
 				cancel()
+				if ctx.Err() != nil {
+					return ctx.Err()
+				}
 				if r.err == nil {
 					r.err = r.metadata.Validate()
 				}
@@ -192,6 +208,7 @@ func Run(ctx context.Context, root string, o Options, fetch FetchFunc, now time.
 							cache[aliasKey] = r
 						}
 					}
+					fmt.Fprintf(log, "fetched in %s: %s\n", time.Since(last).Round(time.Millisecond), target.URL)
 				}
 			}
 			if r.err != nil {
@@ -244,49 +261,18 @@ func Run(ctx context.Context, root string, o Options, fetch FetchFunc, now time.
 		stats.Updated += updated
 		return nil
 	})
-	if err != nil {
-		failures = append(failures, err)
-	}
 	fmt.Fprintf(log, "files=%d paper-headings=%d recent=%d %s=%d failed=%d editor-locked=%d\n", stats.Files, stats.Headings, stats.Recent, map[bool]string{true: "updated", false: "would-update"}[o.Write], stats.Updated, stats.Failed, stats.Locked)
-	return stats, errors.Join(failures...)
+	if err != nil {
+		return stats, err
+	}
+	if len(failures) > 0 {
+		return stats, fmt.Errorf("%d metadata or file operations failed; see diagnostics above", len(failures))
+	}
+	return stats, nil
 }
 
-// Diff uses one contextual hunk; it never invokes a shell or external diff tool.
+// Diff renders minimal contextual hunks without a shell or external diff tool.
 func Diff(path, before, after string) string {
-	a := strings.SplitAfter(before, "\n")
-	b := strings.SplitAfter(after, "\n")
-	if a[len(a)-1] == "" {
-		a = a[:len(a)-1]
-	}
-	if b[len(b)-1] == "" {
-		b = b[:len(b)-1]
-	}
-	start := 0
-	for start < len(a) && start < len(b) && a[start] == b[start] {
-		start++
-	}
-	aEnd, bEnd := len(a), len(b)
-	for aEnd > start && bEnd > start && a[aEnd-1] == b[bEnd-1] {
-		aEnd--
-		bEnd--
-	}
-	start = max(0, start-3)
-	suffix := min(3, min(len(a)-aEnd, len(b)-bEnd))
-	aEnd += suffix
-	bEnd += suffix
-	var out strings.Builder
-	fmt.Fprintf(&out, "--- %s\n+++ %s\n@@ -%d,%d +%d,%d @@\n", path, path, start+1, aEnd-start, start+1, bEnd-start)
-	line := func(prefix, text string) {
-		out.WriteString(prefix + text)
-		if !strings.HasSuffix(text, "\n") {
-			out.WriteString("\n\\ No newline at end of file\n")
-		}
-	}
-	for i := start; i < aEnd; i++ {
-		line("-", a[i])
-	}
-	for i := start; i < bEnd; i++ {
-		line("+", b[i])
-	}
-	return out.String()
+	edits := myers.ComputeEdits(span.URIFromPath(path), before, after)
+	return fmt.Sprint(gotextdiff.ToUnified(path, path, before, edits))
 }

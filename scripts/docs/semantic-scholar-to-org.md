@@ -36,7 +36,9 @@ org-paper-metadata --from-json '<paper-url>' < metadata.json
 2. Graph API when `SemanticScholar_API_key` is configured, or when
    `semantic_scholar_api_p=y` explicitly enables it.
 3. DeepSeek Fetch when `deepseek_api_key` is configured.
-4. `full-html2` as the final fallback.
+
+HTML retrieval is disabled in automatic mode. Use `full-html2` explicitly to
+opt in to the browser/shell backend.
 
 Use `semantic_scholar_api_p=n` to omit the Graph API fallback. Explicit scraper
 values select `page-data` only, `api` only, `deepseek` followed by page-data
@@ -62,8 +64,10 @@ LLM, title guessing, or search, and never invents `/paper/arXiv:...` URLs.
 
 Public page data comes from
 `https://www.semanticscholar.org/api/1/paper/<paper-id>`. Its paper ID must match
-the requested paper. This undocumented website endpoint can change, which is
-why the other backends remain available.
+the requested paper. Explicit `CANONICAL` responses are followed to the new
+paper ID, with validation, cycle detection, and a bounded chain. Arbitrary
+mismatched payloads are rejected. This undocumented website endpoint can change,
+which is why the other backends remain available.
 
 ## Org output
 

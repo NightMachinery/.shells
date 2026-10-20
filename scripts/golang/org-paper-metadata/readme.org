@@ -4,6 +4,8 @@ Native Semantic Scholar fetching, normalization, and Org rendering, shared by
 the shell converter and paper-note tooling. Default retrieval starts with public
 page data, without an API key. Successful results require authors and a full
 abstract; a supplied TLDR appears before the abstract in the same heading.
+HTML retrieval is opt-in through =--scraper full-html2=; automatic retrieval
+uses page data and configured API/DeepSeek backends.
 
 * Try it
 
@@ -38,6 +40,8 @@ org-paper-metadata-updater --write '<directory-root>'
 
 Entries fetched within seven days are skipped. Only existing paper headings
 are refreshed; loose links are ignored and personal notes are preserved.
+The updater logs progress, limits each paper to one minute by default, and
+prints contextual diffs for review.
 See [[NIGHTDIR:docs/org-paper-metadata-updater.md][selection and safe editing]].
 
 * Tests

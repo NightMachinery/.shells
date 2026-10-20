@@ -24,7 +24,7 @@ func updaterCode(args []string) int {
 	flags.BoolVar(&u.Force, "force", false, "refresh entries even when fetched within max-age")
 	flags.DurationVar(&u.MaxAge, "max-age", 7*24*time.Hour, "skip entries fetched more recently than this")
 	flags.DurationVar(&u.Interval, "interval", time.Second, "minimum delay between uncached paper requests")
-	flags.DurationVar(&u.Timeout, "timeout", 3*time.Minute, "timeout per paper, including fallbacks")
+	flags.DurationVar(&u.Timeout, "timeout", time.Minute, "timeout per paper, including fallbacks")
 	flags.StringVar(&o.Scraper, "scraper", o.Scraper, "auto, page-data, api, deepseek, or full-html2")
 	flags.Usage = func() {
 		fmt.Fprintln(flags.Output(), "usage: org-paper-metadata-updater [options] <directory-root>")

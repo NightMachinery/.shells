@@ -155,11 +155,31 @@ func (c *Client) Resolve(ctx context.Context, input string) (string, error) {
 	return "https://www.semanticscholar.org/paper/" + id, nil
 }
 func (c *Client) pageData(ctx context.Context, url string) (Metadata, error) {
-	data, _, err := c.request(ctx, http.MethodGet, "https://www.semanticscholar.org/api/1/paper/"+PaperID(url), nil, nil)
-	if err != nil {
-		return nil, err
+	seen := map[string]bool{}
+	for step := 0; step < 8; step++ {
+		id := PaperID(url)
+		if seen[id] {
+			return nil, errors.New("cycle in Semantic Scholar canonical IDs")
+		}
+		seen[id] = true
+		data, _, err := c.request(ctx, http.MethodGet, "https://www.semanticscholar.org/api/1/paper/"+id, nil, nil)
+		if err != nil {
+			return nil, err
+		}
+		payload, err := decode(data)
+		if err != nil {
+			return nil, err
+		}
+		if str(payload["responseType"]) != "CANONICAL" {
+			return ParsePageData(data, url)
+		}
+		canonical := str(payload["canonicalId"])
+		if !idPattern.MatchString(canonical) {
+			return nil, errors.New("invalid Semantic Scholar canonical ID")
+		}
+		url = "https://www.semanticscholar.org/paper/" + strings.ToLower(canonical)
 	}
-	return ParsePageData(data, url)
+	return nil, errors.New("too many Semantic Scholar canonical-ID redirects")
 }
 func (c *Client) api(ctx context.Context, page string) (Metadata, error) {
 	fields := "title,url,abstract,authors.name,year,publicationDate,venue,journal,citationCount,referenceCount,influentialCitationCount,fieldsOfStudy,isOpenAccess,externalIds,openAccessPdf"
@@ -207,7 +227,6 @@ func (c *Client) Fetch(ctx context.Context, input string) (Metadata, error) {
 		if c.Options.DeepSeekKey != "" {
 			backends = append(backends, "deepseek")
 		}
-		backends = append(backends, "full-html2")
 	case "deepseek":
 		backends = []string{"deepseek", "page-data"}
 	case "full-html2":
@@ -237,6 +256,9 @@ func (c *Client) Fetch(ctx context.Context, input string) (Metadata, error) {
 				m, err = ParseHTML(raw, page)
 			}
 			source = "semantic-scholar-html"
+		}
+		if ctx.Err() != nil {
+			return nil, ctx.Err()
 		}
 		if err == nil {
 			err = m.Validate()

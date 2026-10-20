@@ -217,15 +217,28 @@ func (d Document) Plan(t Target, m paper.Metadata) []Edit {
 	}
 	// Only generated citation/date tags and the old metadata's venue tag are owned.
 	var keep strings.Builder
+	keptWords := map[string]bool{}
 	for _, segment := range regexp.MustCompile(`\S+\s*`).FindAllString(prefix, -1) {
 		word := strings.TrimSpace(segment)
 		if !oldTags[word] && !citationTagRE.MatchString(word) && !dateTagRE.MatchString(word) {
 			keep.WriteString(segment)
+			keptWords[word] = true
 		}
 	}
 	newPrefix := strings.TrimRight(keep.String(), " \t")
-	if tags := paper.HeadingTags(m); len(tags) > 0 {
-		newPrefix += " " + strings.Join(tags, " ")
+	tagMetadata := paper.Metadata{}
+	for key, values := range t.Properties {
+		tagMetadata[key] = values
+	}
+	for key, values := range m {
+		if len(values) > 0 {
+			tagMetadata[key] = values
+		}
+	}
+	for _, tag := range paper.HeadingTags(tagMetadata) {
+		if !keptWords[tag] {
+			newPrefix += " " + tag
+		}
 	}
 	newLine := newPrefix + " [[" + t.URL + "][" + paper.Description(m.First("title")) + "]]" + line[t.LinkEnd:]
 	if newLine != line {
@@ -243,7 +256,7 @@ func (d Document) Plan(t Target, m paper.Metadata) []Edit {
 	} else {
 		// Drop the retired Org-only property even if the source does not supply it.
 		updatedKeys := map[string]bool{"metadatasource": true}
-		for key := range m {
+		for _, key := range paper.PropertyKeys {
 			if len(m[key]) > 0 {
 				updatedKeys[strings.ToLower(key)] = true
 			}
@@ -265,19 +278,28 @@ func (d Document) Plan(t Target, m paper.Metadata) []Edit {
 }
 
 func (d Document) bodyEdits(t Target, m paper.Metadata) []Edit {
-	var child *Heading
+	var abstracts, summaries []Heading
 	for _, h := range d.Headings {
 		if h.Start <= t.Heading.Start || h.Start >= t.Heading.End || h.Level != t.Heading.Level+1 {
 			continue
 		}
-		text := strings.TrimSpace(d.Lines[h.Start][h.Level:])
-		if text == "@abstract" || text == "@summary" {
-			if child != nil {
-				return nil
-			}
-			copy := h
-			child = &copy
+		switch strings.TrimSpace(d.Lines[h.Start][h.Level:]) {
+		case "@abstract":
+			abstracts = append(abstracts, h)
+		case "@summary":
+			summaries = append(summaries, h)
 		}
+	}
+	var child *Heading
+	if len(abstracts) > 1 {
+		return nil
+	}
+	if len(abstracts) == 1 {
+		child = &abstracts[0]
+	} else if len(summaries) == 1 {
+		child = &summaries[0]
+	} else if len(summaries) > 1 {
+		return nil
 	}
 	if child == nil {
 		body := strings.Split(strings.TrimSuffix(paper.AbstractSection(m, t.Heading.Level+1), "\n"), "\n")
@@ -338,19 +360,53 @@ func (d Document) bodyEdits(t Target, m paper.Metadata) []Edit {
 		}
 		return edits
 	}
-	// Upgrade a legacy generated abstract only when it contains a single quote
-	// block and whitespace. Mixed prose, extra blocks, and subheadings are kept.
-	legacy := strings.TrimSpace(strings.Join(d.Lines[bodyStart:child.End], "\n"))
-	upper := strings.ToUpper(legacy)
-	if strings.HasPrefix(upper, "#+BEGIN_QUOTE\n") && strings.HasSuffix(upper, "\n#+END_QUOTE") && strings.Count(upper, "#+BEGIN_QUOTE") == 1 && strings.Count(upper, "#+END_QUOTE") == 1 {
+	// Legacy output may carry a BibTeX example after its single abstract quote.
+	// Replace only that quote; preserve the citation and all surrounding bytes.
+	quoteStart := bodyStart
+	for quoteStart < child.End && strings.TrimSpace(d.Lines[quoteStart]) == "" {
+		quoteStart++
+	}
+	if legacyCitationTail(d.Lines[quoteStart:child.End]) {
 		body := strings.Split(strings.TrimSuffix(paper.ContentBlocks(m), "\n"), "\n")
-		result := []Edit{{Start: bodyStart, End: child.End, Lines: append(body, "")}}
+		result := []Edit{{Start: quoteStart, End: quoteStart, Lines: append(body, "")}}
 		if strings.HasSuffix(d.Lines[child.Start], "@summary") {
 			result = append(result, Edit{Start: child.Start, End: child.Start + 1, Lines: []string{strings.Repeat("*", child.Level) + " @abstract"}})
 		}
 		return result
 	}
-	return nil
+	if quoteStart >= child.End || !strings.EqualFold(strings.TrimSpace(d.Lines[quoteStart]), "#+BEGIN_QUOTE") {
+		return nil
+	}
+	quoteEnd := quoteStart + 1
+	for quoteEnd < child.End && !strings.EqualFold(strings.TrimSpace(d.Lines[quoteEnd]), "#+END_QUOTE") {
+		if strings.EqualFold(strings.TrimSpace(d.Lines[quoteEnd]), "#+BEGIN_QUOTE") {
+			return nil
+		}
+		quoteEnd++
+	}
+	if quoteEnd == child.End || !legacyCitationTail(d.Lines[quoteEnd+1:child.End]) {
+		return nil
+	}
+	body := strings.Split(strings.TrimSuffix(paper.ContentBlocks(m), "\n"), "\n")
+	result := []Edit{{Start: quoteStart, End: quoteEnd + 1, Lines: body}}
+	if strings.HasSuffix(d.Lines[child.Start], "@summary") {
+		result = append(result, Edit{Start: child.Start, End: child.Start + 1, Lines: []string{strings.Repeat("*", child.Level) + " @abstract"}})
+	}
+	return result
+}
+
+// Accept whitespace or one legacy BibTeX example, never arbitrary prose/code.
+func legacyCitationTail(lines []string) bool {
+	tail := strings.TrimSpace(strings.Join(lines, "\n"))
+	if tail == "" {
+		return true
+	}
+	parts := strings.Split(tail, "\n")
+	if len(parts) < 3 || !regexp.MustCompile(`(?i)^#\+BEGIN_EXAMPLE(?:\s+.+)?$`).MatchString(strings.TrimSpace(parts[0])) || !strings.EqualFold(strings.TrimSpace(parts[len(parts)-1]), "#+END_EXAMPLE") {
+		return false
+	}
+	content := strings.TrimSpace(strings.Join(parts[1:len(parts)-1], "\n"))
+	return regexp.MustCompile(`^@[A-Za-z]+\s*[{(]`).MatchString(content) && !strings.Contains(strings.ToUpper(content), "#+END_EXAMPLE")
 }
 
 func (d Document) Apply(edits []Edit) (string, error) {

@@ -50,16 +50,21 @@ org-paper-metadata-updater --scraper page-data --timeout 2m '<directory-root>'
 ```
 
 `--force` bypasses freshness checks. `--max-age` defaults to `168h`; `--timeout`
-defaults to three minutes per paper, including all fallbacks. `--interval`
+defaults to one minute per paper, including all fallbacks. `--interval`
 controls spacing. Source selection and credentials follow the
-[paper converter](semantic-scholar-to-org.md).
+[paper converter](semantic-scholar-to-org.md). Automatic mode never launches
+`full-html2`; select it explicitly to enable HTML retrieval. Each network fetch
+is logged before it starts, followed by its elapsed time on success. Ctrl-C
+stops the run without starting another fallback or writing the current file.
+Diffs use contextual hunks so unchanged notes remain visibly unchanged.
 
 ## What changes
 
 The tool refreshes the paper link's title, generated citation/date/venue
 at-tags, and supplied metadata properties. It preserves the original heading
 level and URL, TODO state, priority, personal tags, other heading text, custom
-properties such as `ID`, prose, and unrelated subheadings. Missing optional
+properties such as `ID`, `url`, or personal `title`/`abstract` annotations, prose,
+and unrelated subheadings. Missing optional
 source fields do not erase previously recorded values. The retired
 `metadataSource` property is removed when an entry is refreshed. Open access remains a
 drawer property, without adding an at-tag.
@@ -67,7 +72,11 @@ drawer property, without adding an at-tag.
 Generated TLDR and abstract quote blocks use plain Org comment markers so
 they can be updated without creating duplicate named-block anchors. Those
 blocks are refreshed inside the same folded `@abstract` child. A legacy child
-containing only a single generated quote block is upgraded to the new format.
+containing only a single generated quote block, optionally followed by its
+legacy BibTeX example block, is upgraded to the new format. Saved BibTeX is
+preserved byte for byte. Empty legacy abstract sections are filled, including
+those containing only a saved BibTeX citation. A separate handwritten
+`@summary` sibling is preserved.
 If there is no abstract child, one is added. Mixed or handwritten abstract
 sections without generated markers are preserved. Other text around marked
 blocks is left in place.
@@ -88,7 +97,10 @@ editor locks, or files changed during retrieval. Dry run is the default;
 Run `go test -race ./...` in `golang/org-paper-metadata`. Offline fixtures cover
 freshness boundaries, duplicate fetching, partial failure, dry runs, metadata
 and body edits, personal-content preservation, CRLF, nested paper headings,
-editor locks, concurrent changes, and atomic writes. A live smoke test uses
-temporary Org files rather than the notes tree.
+editor locks, concurrent changes, cancellation, contextual diffs, canonical-ID
+redirects, disabled automatic HTML retrieval, and atomic writes. Live smoke tests
+use temporary Org files. A read-only audit across a research tree also checked
+custom properties, handwritten content, saved citations, source blocks, heading
+hierarchy, and every generated field against its fetched source.
 
 Verified by @OpenAI on 2026-10-20.

@@ -257,3 +257,79 @@ func TestExplicitSymlinkRootAndForce(t *testing.T) {
 		t.Fatal(stats, calls, err)
 	}
 }
+
+func TestUnrenderedMetadataKeysDoNotEraseCustomProperties(t *testing.T) {
+	custom := ":url: https://example.invalid/reading-copy\n:title: My working title\n:abstract: My own abstract notes\n:tldr: My takeaway\n:authors: Personal author annotation\n:date: [2025-01-01 Wed]\n"
+	text := "* [[" + page + "][Old title]]\n:PROPERTIES:\n" + custom + ":END:\n"
+	out := transform(t, text)
+	if !strings.Contains(out, custom) {
+		t.Fatal("erased unrendered custom properties", out)
+	}
+}
+
+func TestLegacyAbstractWithBibTeXPreserved(t *testing.T) {
+	citation := "\n\n#+BEGIN_EXAMPLE bibtex\n@article{synthetic,\n  title={Saved citation},\n  year={2025}\n}\n#+END_EXAMPLE\n\n"
+	text := "* [[" + page + "][Old]]\n** @abstract\n:PROPERTIES:\n:ID: saved-abstract\n:END:\n\n#+BEGIN_QUOTE\nOld abstract.\n#+END_QUOTE" + citation + "** My notes\nKeep these notes.\n"
+	out := transform(t, text)
+	for _, want := range []string{citation, ":ID: saved-abstract", "The new complete abstract.", "*Semantic Scholar TLDR:* The new summary.", "** My notes\nKeep these notes.\n"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("lost %q\n%s", want, out)
+		}
+	}
+	if strings.Contains(out, "Old abstract.") {
+		t.Fatal(out)
+	}
+	if again := transform(t, out); again != out {
+		t.Fatal("not idempotent", again)
+	}
+}
+
+func TestLegacyQuoteWithPersonalTailIsPreserved(t *testing.T) {
+	for _, tail := range []string{"Personal commentary.\n", "#+BEGIN_EXAMPLE\nPersonal example.\n#+END_EXAMPLE\n", "#+BEGIN_EXAMPLE\n@article{saved}\n#+END_EXAMPLE\nPersonal commentary.\n"} {
+		body := "** @abstract\n#+BEGIN_QUOTE\nMy quotation.\n#+END_QUOTE\n" + tail
+		out := transform(t, "* [["+page+"][Old]]\n"+body)
+		if !strings.Contains(out, body) || strings.Contains(out, "The new complete abstract.") {
+			t.Fatal("overwrote ambiguous section", out)
+		}
+	}
+}
+
+func TestEmptyLegacyAbstractAndCitationOnlyGetContent(t *testing.T) {
+	for _, citation := range []string{"", "#+BEGIN_EXAMPLE tex\n@article{synthetic, title={Saved citation}}\n#+END_EXAMPLE\n"} {
+		text := "* [[" + page + "][Old]]\n** @abstract\n:PROPERTIES:\n:ID: empty-abstract\n:END:\n\n" + citation
+		out := transform(t, text)
+		for _, want := range []string{citation, ":ID: empty-abstract", "The new complete abstract.", "*Semantic Scholar TLDR:* The new summary."} {
+			if !strings.Contains(out, want) {
+				t.Errorf("lost %q\n%s", want, out)
+			}
+		}
+		if again := transform(t, out); again != out {
+			t.Fatal("not idempotent", again)
+		}
+	}
+}
+
+func TestVenueTagsUseRetainedFieldsWithoutDuplicates(t *testing.T) {
+	text := "* @ICLR @arXiv [[" + page + "][Old]]\n:PROPERTIES:\n:venue: arXiv.org\n:END:\n"
+	out := transform(t, text)
+	if strings.Count(strings.Split(out, "\n")[0], "@ICLR") != 1 || strings.Contains(strings.Split(out, "\n")[0], "@arXiv") {
+		t.Fatal(out)
+	}
+	d, _ := Parse(text)
+	targets, _ := d.Targets()
+	m := fresh()
+	delete(m, "venue")
+	out, err := d.Apply(d.Plan(targets[0], m))
+	if err != nil || !strings.Contains(strings.Split(out, "\n")[0], "@arXiv") || !strings.Contains(out, ":venue: arXiv.org") {
+		t.Fatal(out, err)
+	}
+}
+
+func TestPersonalSummarySiblingDoesNotBlockAbstractRefresh(t *testing.T) {
+	personal := "** @summary\nMy own takeaway stays here.\n"
+	text := "* [[" + page + "][Old]]\n** @abstract\n#+BEGIN_QUOTE\nOld abstract.\n#+END_QUOTE\n" + personal
+	out := transform(t, text)
+	if !strings.Contains(out, personal) || !strings.Contains(out, "The new complete abstract.") || strings.Contains(out, "Old abstract.") {
+		t.Fatal(out)
+	}
+}

@@ -167,7 +167,7 @@ func fakeClient(o Options, serve func(*http.Request) (int, string, map[string]st
 	return c
 }
 func TestDefaultAndFallbackOrder(t *testing.T) {
-	for _, success := range []string{"page-data", "api", "deepseek", "full-html2"} {
+	for _, success := range []string{"page-data", "api", "deepseek"} {
 		t.Run(success, func(t *testing.T) {
 			var calls []string
 			c := fakeClient(Options{Scraper: "auto", APIEnabled: true, APIKey: "synthetic-key", DeepSeekKey: "synthetic-key"}, func(r *http.Request) (int, string, map[string]string) {
@@ -202,7 +202,7 @@ func TestDefaultAndFallbackOrder(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			order := []string{"page-data", "api", "deepseek", "full-html2"}
+			order := []string{"page-data", "api", "deepseek"}
 			for i, call := range calls {
 				if call != order[i] {
 					t.Fatal(calls)
