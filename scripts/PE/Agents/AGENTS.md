@@ -50,6 +50,14 @@ only where they have been cloned. So a skill these instructions name may be
 missing. When it is, follow the short rule given alongside the instruction,
 and say that the skill was unavailable rather than silently improvising.
 
+## Skill Evolution
+
+At the natural end of a task in which you used a skill, run
+`meta-skill-true-evolution` on it. If it is unavailable, propose only changes
+that this run's evidence supports and that would change what a future agent
+does, written into the skill rather than appended as notes, and ask before
+applying them.
+
 ## Research Work Profile
 
 My work profile is for research. Sharing relevant research drafts, code, data,
