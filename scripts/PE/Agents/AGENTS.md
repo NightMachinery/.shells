@@ -427,7 +427,12 @@ Inside Paseo (`PASEO_AGENT_ID` is set), pick the Paseo skill by job:
   keepalive heartbeats while work runs, and decide when that pays; it
   compacts with `paseo-compact` first.
 
-`delegate` still decides worker model, account and backend.
+Inside Paseo, Paseo is the backend for every agent you launch that is not an
+in-process subagent: another provider such as Codex, another Claude account, or
+any agent the user should be able to watch. Launch it with the `paseo` skill,
+from a profile `list_profiles` returns. Use `tmux-subagents` only when the user
+asks for tmux or Paseo lacks the provider. `delegate` still decides the worker's
+model and account.
 
 # Token Efficiency
 
