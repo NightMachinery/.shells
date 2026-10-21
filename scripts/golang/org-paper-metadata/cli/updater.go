@@ -46,6 +46,7 @@ func updaterCode(args []string) int {
 		return 2
 	}
 	u.NoBibTeX = !*bibtex
+	o.FetchBibTeX = *bibtex
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 	_, err := update.Run(ctx, flags.Arg(0), u, client(o).Fetch, time.Now(), os.Stdout, os.Stderr)

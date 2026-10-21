@@ -158,6 +158,7 @@ func ParseJSON(raw []byte, fallbackURL string) (Metadata, error) {
 			m.Put(key, str(v))
 		}
 	}
+	m.Put("bibtex", str(firstObject(d["citationStyles"])["bibtex"]))
 	for _, a := range array(d["authors"]) {
 		m.Put("authors_names", str(object(a)["name"]))
 	}

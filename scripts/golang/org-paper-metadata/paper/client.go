@@ -20,6 +20,7 @@ import (
 type Options struct {
 	Scraper                       string
 	APIEnabled                    bool
+	FetchBibTeX                   bool
 	APIKey, DeepSeekKey, HTMLMode string
 }
 
@@ -183,6 +184,9 @@ func (c *Client) pageData(ctx context.Context, url string) (Metadata, error) {
 }
 func (c *Client) api(ctx context.Context, page string) (Metadata, error) {
 	fields := "title,url,abstract,authors.name,year,publicationDate,venue,journal,citationCount,referenceCount,influentialCitationCount,fieldsOfStudy,isOpenAccess,externalIds,openAccessPdf"
+	if c.Options.FetchBibTeX {
+		fields += ",citationStyles"
+	}
 	endpoint := "https://api.semanticscholar.org/graph/v1/paper/" + PaperID(page) + "?fields=" + url.QueryEscape(fields)
 	headers := map[string]string{}
 	if c.Options.APIKey != "" {
@@ -264,6 +268,17 @@ func (c *Client) Fetch(ctx context.Context, input string) (Metadata, error) {
 			err = m.Validate()
 		}
 		if err == nil {
+			if c.Options.FetchBibTeX && BibTeX(m) == "" {
+				citationCtx, cancel := context.WithTimeout(ctx, 15*time.Second)
+				citationErr := c.fetchBibTeX(citationCtx, m)
+				cancel()
+				if citationErr != nil && c.Warnf != nil {
+					c.Warnf("Semantic Scholar BibTeX export failed: %v", citationErr)
+				}
+			}
+			if ctx.Err() != nil {
+				return nil, ctx.Err()
+			}
 			m.Stamp(source, c.Now())
 			return m, nil
 		}

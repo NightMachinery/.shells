@@ -6,8 +6,11 @@ page data, without an API key. Successful results require authors and a full
 abstract; a supplied TLDR appears before the abstract in the same heading.
 HTML retrieval is opt-in through =--scraper full-html2=; automatic retrieval
 uses page data and configured API/DeepSeek backends.
-A folded =@bibtex= sibling follows the abstract by default; =--no-bibtex=
-omits it. Generated sections carry an ownership property for safe updates.
+A folded =@bibtex= sibling follows the abstract when a citation is available.
+BibTeX comes from Semantic Scholar’s anonymous export, never local synthesis;
+=--no-bibtex= skips export and output. Managed sections carry an ownership
+property. The updater removes old marked, locally synthesized =@misc= records,
+including on recent entries, while preserving personal additions.
 
 * Try it
 

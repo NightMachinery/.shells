@@ -171,9 +171,7 @@ func Run(ctx context.Context, root string, o Options, fetch FetchFunc, now time.
 		updated := 0
 		applyLocal := func(target Target) {
 			local := doc.DrawerLinkEdits(target)
-			if o.NoBibTeX {
-				local = append(local, doc.BibTeXEdits(target, nil, true)...)
-			}
+			local = append(local, doc.BibTeXEdits(target, nil, o.NoBibTeX)...)
 			if len(local) == 0 {
 				return
 			}

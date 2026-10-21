@@ -88,7 +88,8 @@ The updater reads and edits notes locally. Retrieval sends only paper
 identifiers/public URLs, never note text, drawer contents or local file paths.
 Automatic retrieval can send the public paper URL to configured DeepSeek Fetch.
 Use `--scraper page-data` to restrict retrieval to Semantic Scholar's keyless
-endpoint. Source/API credentials go only to their respective services.
+endpoints (page data and anonymous BibTeX export). Source/API credentials go only
+to their respective services.
 
 ## Org output
 
@@ -106,7 +107,7 @@ counts, publication information, and links, and adds these when available:
 - `publicationUpdateDate`: supplied update date when different from publication date.
 - `metadataFetchedAt`: UTC time of successful retrieval, used for weekly refreshes.
 
-A supplied TLDR appears in a labeled quote block before the full abstract,
+A supplied TLDR appears in a plain quote block before the full abstract,
 inside the same folded `@abstract` heading. Comment-marked summary and abstract blocks
 identify generated content for later refreshes. Zero counts are preserved;
 missing values are omitted.
@@ -130,7 +131,8 @@ Verified conference names: [ECAI](https://eurai.org/ecai),
 
 ## BibTeX
 
-Org output includes a folded `@bibtex` sibling immediately after `@abstract`:
+When a source citation is available, Org output includes a folded `@bibtex`
+sibling immediately after `@abstract`:
 
 ```org
 * @bibtex
@@ -139,19 +141,43 @@ Org output includes a folded `@bibtex` sibling immediately after `@abstract`:
 :orgPaperMetadataGenerated: bibtex
 :END:
 #+BEGIN_SRC bibtex
-@misc{…}
+@inproceedings{source_key, …}
 #+END_SRC
 ```
 
 `--bibtex` enables it (the default); `--no-bibtex` omits it. Both flags are
 available on `semantic-scholar-to-org`, `org-paper-metadata`, and the updater.
 Put flags before URLs or the directory argument. The last BibTeX switch wins.
-These flags change Org output, not JSON metadata.
+`--no-bibtex` also skips the extra citation export request. Stdin parsing
+(`--from-json` or `--parse`) stays offline and uses only supplied BibTeX.
 
-Source-supplied BibTeX is used when available. Otherwise the helper creates a
-`@misc` citation with a stable key from known title, authors, year, URL, DOI, arXiv ID,
-and venue. It does not infer a publication type or make an extra API request.
-The source block escapes Org control lines.
+The helper never synthesizes BibTeX. When the metadata does not already contain
+one, it requests Semantic Scholar's own export with an anonymous
+`POST https://api.semanticscholar.org/graph/v1/paper/batch?fields=citationStyles`,
+sending only `{"ids":["<paper-id>"]}`. No API key is needed or sent, even if one
+is configured. The response must identify the requested paper. Export has a
+15-second cap within the paper deadline. A missing or failed export emits a
+warning and leaves new output without a BibTeX section; metadata can still
+refresh. Existing retrieved or manually saved citations survive export failure.
+The source block escapes Org control lines; citation fields and keys are kept.
+
+The ownership property marks sections maintained by the tool, not locally
+fabricated records. Old marked `@misc{ss<40-hex-id>,...}` or
+`@misc{paper<20-hex>,...}` records from the retired serializer are replaced with
+retrieved citations during refresh, or removed when no retrieved citation is
+available. Cleanup also runs on recent entries and failed metadata fetches,
+without an extra request. Unmarked saved citations are never removed. Personal
+notes, IDs, custom properties, and child headings in a marked section survive
+cleanup, retaining their heading.
+
+Semantic Scholar exports may lack proceedings details. Other keyless options
+are [DOI content negotiation](https://citation.doi.org/docs.html)
+(`GET https://doi.org/<doi>` with `Accept: application/x-bibtex`) and
+[DBLP publication exports](https://blog.dblp.org/2020/08/18/new-dblp-url-scheme-and-api-changes/)
+(`https://dblp.org/rec/<publication-key>.bib`). DOI exports reflect registered
+publisher metadata; DBLP is useful for computer-science proceedings. These are
+alternatives, not automatic requests made by this helper. It does not search
+for publication matches or invent missing conference fields.
 
 ## Refreshing existing notes
 

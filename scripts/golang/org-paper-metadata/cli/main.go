@@ -60,6 +60,7 @@ func mainCode(args []string) int {
 	}
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
+	o.FetchBibTeX = *bibtex
 	c := client(o)
 	var output bytes.Buffer
 	for _, input := range flags.Args() {

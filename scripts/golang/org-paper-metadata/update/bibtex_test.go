@@ -25,7 +25,7 @@ func withBibOptions(t *testing.T, text string, no bool) string {
 	}
 	var edits []Edit
 	for _, target := range targets {
-		edits = append(edits, d.PlanWithOptions(target, fresh(), paper.OrgOptions{NoBibTeX: no})...)
+		edits = append(edits, d.PlanWithOptions(target, freshCitation(), paper.OrgOptions{NoBibTeX: no})...)
 	}
 	out, err := d.Apply(edits)
 	if err != nil {
@@ -42,7 +42,7 @@ func TestGeneratedBibTeXRefreshPlacementAndRemoval(t *testing.T) {
 	if again := withBibOptions(t, out, false); again != out {
 		t.Fatal("not idempotent", again)
 	}
-	out = strings.Replace(out, "@misc{ss"+id, "@misc{obsolete_key", 1)
+	out = strings.Replace(out, "@inproceedings{native_key", "@inproceedings{obsolete_key", 1)
 	out = withBibOptions(t, out, false)
 	if strings.Contains(out, "obsolete_key") {
 		t.Fatal("citation was not refreshed", out)
@@ -132,6 +132,73 @@ func TestHandwrittenSummaryOnlyGetsSeparateAbstract(t *testing.T) {
 	personal := "** @summary\nMy own takeaway.\n"
 	out := withBibOptions(t, "* [["+page+"][Old]]\n"+personal, false)
 	if !strings.Contains(out, personal) || !strings.Contains(out, "** @abstract") || !strings.Contains(out, "The new complete abstract.") || strings.Index(out, "** @bibtex") < strings.Index(out, "** @abstract") {
+		t.Fatal(out)
+	}
+}
+
+func freshCitation() paper.Metadata {
+	m := fresh()
+	m.Put("bibtex", "@inproceedings{native_key, title={New title}, booktitle={Example Conference}}")
+	return m
+}
+func TestLegacyGeneratedMiscCleanup(t *testing.T) {
+	for _, personal := range []bool{false, true} {
+		for _, failed := range []bool{false, true} {
+			root := t.TempDir()
+			path := filepath.Join(root, "papers.org")
+			text := withBibOptions(t, "* [["+page+"][Old]]\nMy paper notes.\n", false)
+			text = strings.Replace(text, "@inproceedings{native_key, title={New title}, booktitle={Example Conference}}", "@misc{ss"+id+", title={{Old title}}}", 1)
+			if personal {
+				text += "Personal citation note.\n*** Follow-up\nKeep this child.\n"
+				text = strings.Replace(text, ":orgPaperMetadataGenerated: bibtex", ":orgPaperMetadataGenerated: bibtex\n:ID: saved-id", 1)
+			}
+			os.WriteFile(path, []byte(text), 0600)
+			var log bytes.Buffer
+			stats, err := Run(context.Background(), root, Options{Write: true, Force: failed, MaxAge: 7 * 24 * time.Hour, Timeout: time.Minute}, func(context.Context, string) (paper.Metadata, error) {
+				if !failed {
+					t.Fatal("recent cleanup fetched")
+				}
+				return nil, errors.New("unavailable")
+			}, now, &log, &log)
+			data, _ := os.ReadFile(path)
+			out := string(data)
+			if (err != nil) != failed || stats.Updated != 1 || strings.Contains(out, "@misc{") || strings.Contains(out, paper.GeneratedProperty) || !strings.Contains(out, "My paper notes.") {
+				t.Fatal(stats, err, out)
+			}
+			if !personal && strings.Contains(out, "@bibtex") {
+				t.Fatal(out)
+			}
+			if personal {
+				for _, want := range []string{":ID: saved-id", "Personal citation note.", "*** Follow-up\nKeep this child."} {
+					if !strings.Contains(out, want) {
+						t.Fatal(out)
+					}
+				}
+			}
+		}
+	}
+}
+func TestCitationUnavailablePreservesNativeAndManualCitations(t *testing.T) {
+	for _, bib := range []string{"@inproceedings{native_key, title={Conference paper}}", "@misc{ss" + id + ", title={Saved manual record}}"} {
+		marked := !strings.HasPrefix(bib, "@misc")
+		text := "* [[" + page + "][Old]]\n** @bibtex\n:PROPERTIES:\n:visibility: folded\n"
+		if marked {
+			text += ":orgPaperMetadataGenerated: bibtex\n"
+		}
+		text += ":END:\n#+BEGIN_SRC bibtex\n" + bib + "\n#+END_SRC\n"
+		d, _ := Parse(text)
+		ts, _ := d.Targets()
+		out, err := d.Apply(d.PlanWithOptions(ts[0], fresh(), paper.OrgOptions{}))
+		if err != nil || !strings.Contains(out, bib) {
+			t.Fatal(out, err)
+		}
+	}
+}
+func TestLegacyMiscReplacedWithRetrievedCitation(t *testing.T) {
+	text := withBibOptions(t, "* [["+page+"][Old]]\n", false)
+	text = strings.Replace(text, "@inproceedings{native_key, title={New title}, booktitle={Example Conference}}", "@misc{ss"+id+", title={Old}}", 1)
+	out := withBibOptions(t, text, false)
+	if strings.Contains(out, "@misc{") || !strings.Contains(out, "@inproceedings{native_key") {
 		t.Fatal(out)
 	}
 }

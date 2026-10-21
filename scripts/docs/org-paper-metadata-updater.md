@@ -33,8 +33,9 @@ go install . ./cmd/org-paper-metadata-updater
 - Source/example/quote blocks, drawers, COMMENT subtrees, and archived subtrees
   do not contribute candidate headings.
 - `metadataFetchedAt`, an RFC3339 UTC property on each paper heading, controls
-  freshness of remote metadata. Local arXiv drawer-URL normalization still runs
-  on recent entries without fetching metadata or changing the timestamp.
+  freshness of remote metadata. Local arXiv drawer-URL normalization and removal
+  of old fabricated BibTeX still run on recent entries without fetching metadata
+  or changing the timestamp.
   File modification times are irrelevant. Missing or invalid
   timestamps trigger retrieval; an entry exactly seven days old is eligible.
 - Duplicate paper URLs share one fetch during a run. Requests are sequential,
@@ -85,11 +86,11 @@ blocks is left in place.
 
 ## BibTeX sections
 
-BibTeX is enabled by default, or explicitly with `--bibtex`. A generated
+Retrieved BibTeX is enabled by default, or explicitly with `--bibtex`. A managed
 `@bibtex` child is folded and placed immediately after the `@abstract` subtree,
 at the same heading level. Its drawer carries
-`:orgPaperMetadataGenerated: bibtex`. Source citations are preferred; otherwise
-a citation is built from known metadata, as described in the
+`:orgPaperMetadataGenerated: bibtex`. Only source-supplied citations are used,
+including Semantic Scholar’s anonymous batch export, as described in the
 [converter documentation](semantic-scholar-to-org.md#bibtex).
 
 ```zsh
@@ -111,15 +112,22 @@ sections are preserved and do not receive a duplicate generated citation.
 `--no-bibtex` never removes an unmarked citation. Ambiguous multiple citation
 blocks are left intact.
 
-Generated citations are refreshed on later updates. If a generated heading
+Managed citations are refreshed on later updates. No citations are synthesized.
+Old marked `@misc` records with the retired serializer’s `ss<40-hex-id>` or
+`paper<20-hex>` key pattern are replaced with retrieved citations on refresh.
+Without a retrieved citation they are removed, including during recent-entry
+skips or failed fetches. Unmarked citations and other citation keys are preserved.
+An export failure warns without failing an otherwise successful metadata refresh.
+If a managed heading
 has acquired personal prose, IDs, custom properties, or child headings,
 `--no-bibtex` removes the citation block and ownership marker while keeping
 that personal content and its heading. A section containing only generated
 content is removed completely.
 
 Every successful fetch requires authors and a full abstract. A failed paper's
-metadata is left unchanged and does not receive a new timestamp. Local arXiv URL normalization or explicitly
-requested removal of generated BibTeX can still change that entry. Successful
+metadata is left unchanged and does not receive a new timestamp. Local arXiv
+URL normalization, cleanup of old fabricated citations, or explicitly requested
+removal of managed BibTeX can still change that entry. Successful
 papers can still be refreshed; the command exits nonzero when any retrieval or file edit
 fails, and prints a summary of updates, recent entries, failures, and locks.
 

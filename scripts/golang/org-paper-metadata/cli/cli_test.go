@@ -65,7 +65,7 @@ func TestInvalidOptionsBeforeNetwork(t *testing.T) {
 }
 
 func TestBibTeXFlagsAndLastSwitchWins(t *testing.T) {
-	input := `{"title":["Synthetic paper"],"abstract":["Full abstract."],"authors_names":["Example Author"],"url":["https://www.semanticscholar.org/paper/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"]}`
+	input := `{"bibtex":["@inproceedings{source_key, title={Synthetic paper}}"],"title":["Synthetic paper"],"abstract":["Full abstract."],"authors_names":["Example Author"],"url":["https://www.semanticscholar.org/paper/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"]}`
 	for _, tc := range []struct {
 		args    []string
 		enabled bool
@@ -85,6 +85,7 @@ func TestUpdaterNoBibTeXCleansRecentEntry(t *testing.T) {
 	root := t.TempDir()
 	path := filepath.Join(root, "papers.org")
 	m := paper.Metadata{"title": {"Synthetic paper"}, "authors_names": {"Example Author"}, "abstract": {"Full abstract."}, "url": {"https://www.semanticscholar.org/paper/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}}
+	m.Put("bibtex", "@inproceedings{source_key, title={Synthetic paper}}")
 	m.Stamp("synthetic", time.Now())
 	org, _ := paper.RenderOrg(m)
 	text := "* " + strings.ReplaceAll(org, "\n* @", "\n** @")

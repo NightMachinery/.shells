@@ -140,12 +140,23 @@ func (d Document) BibTeXEdits(t Target, m paper.Metadata, noBibTeX bool) []Edit 
 			manual = true
 		}
 	}
-	if noBibTeX {
+	// Clean old fabricated citations even when the paper is recent or retrieval
+	// failed. The ownership marker AND the old serializer's key must match.
+	if noBibTeX || paper.BibTeX(m) == "" {
 		var edits []Edit
 		for _, h := range generated {
-			edits = append(edits, d.generatedBibTeX(h, nil, true)...)
+			remove := noBibTeX
+			blocks := d.citationBlocks(h)
+			if len(blocks) == 1 && paper.IsLegacyGeneratedBibTeX(strings.Join(d.Lines[blocks[0].start+1:blocks[0].end-1], "\n")) {
+				remove = true
+			}
+			if remove {
+				edits = append(edits, d.generatedBibTeX(h, nil, true)...)
+			}
 		}
-		return edits
+		if noBibTeX || m == nil || len(generated) > 0 {
+			return edits
+		}
 	}
 	abstract, ambiguous := d.metadataChild(t)
 	if m == nil || ambiguous {
@@ -198,6 +209,9 @@ func (d Document) BibTeXEdits(t Target, m paper.Metadata, noBibTeX bool) []Edit 
 			lines = append(lines, "")
 			return []Edit{{Start: b.start, End: b.end}, {Start: pos, End: pos, Lines: lines, Priority: 10001 - 2*t.Heading.Level}}
 		}
+	}
+	if paper.BibTeX(m) == "" {
+		return nil
 	}
 	section := strings.Split(strings.TrimSuffix(paper.BibTeXSection(m, t.Heading.Level+1), "\n"), "\n")
 	return []Edit{{Start: pos, End: pos, Lines: section, Priority: 10001 - 2*t.Heading.Level}}
