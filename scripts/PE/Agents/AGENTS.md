@@ -449,10 +449,26 @@ from a profile `list_profiles` returns. Use `tmux-subagents` only when the user
 asks for tmux or Paseo lacks the provider. `delegate` still decides the worker's
 model and account.
 
+# Long Runs and Asynchronous Work
+
+- Before launching asynchronous workers or jobs, use `event-driven-agents` and
+  arrange completion notifications in the same turn. Read its fleet reference
+  only when supervising many workers or jobs for hours. If unavailable, use
+  verified native completion notifications or a harness-tracked waiter.
+- Before substantial work likely to cross compaction or coordinator replacement,
+  use `long-run-handoff`; also use it when recovering an existing run. Keep
+  durable state outside repositories under `~/.agents/runs/<project>/<run>/`.
+  If unavailable, preserve the owner's instructions, decisions, live work,
+  result paths and next actions there, then verify live state before resuming.
+- Before sustained agent work or a burst of worker launches, use
+  `quota-management` to check headroom and arrange monitoring. Stop monitoring
+  when the run becomes idle. If unavailable, use verified usage readers when
+  available; treat missing data as unknown and checkpoint before exhaustion.
+
 # Token Efficiency
 
 - See `paseo-compact`.
-- Avoid busy waiting for conditions when possible. Use a script that wakes up the waiting agent when the conditions are fulfilled.
+- Avoid busy waiting for conditions when possible. Use a script that wakes up the waiting agent when the conditions are fulfilled. Follow `event-driven-agents`: arm the completion notification at launch and never poll with model turns.
 - Have cache warming in sight: Claude cache goes cold after about 1h, and GPT after about 30m. We should have regular cache-warming low-token pings that keep the caches warm when we know the session is likely to continue soon, e.g., when it is waiting for a condition that is likely to be fulfilled under 24 hours. See `paseo-cache-warmer`.
 - If we can engineer tools or improve our workflow to increase token efficiency, offer them to the user proactively.
 
