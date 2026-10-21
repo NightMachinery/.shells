@@ -4,7 +4,8 @@
 (`com.brave.Browser`) is frontmost:
 
 - **Cmd+.** opens a new tab through File > New Tab.
-- **Cmd+/** opens Brave's native Tab Search.
+- **Cmd+/** opens Omni Prompt, combining open tabs and bookmarks.
+- **Cmd+Shift+/** opens Brave's native Tab Search.
 - **Cmd+N / Cmd+M** move older/newer through tab recency in the current window.
 - **Cmd+Up / Cmd+Down** select the previous/next tab in tab-strip order.
 - **Cmd+Left / Cmd+Right** navigate page history through History > Back/Forward.
@@ -12,9 +13,9 @@
 - **Cmd+B** presses Bitwarden’s native extension action.
 
 The existing auto-load scan loads the module after the core configuration.
-Other apps retain their normal shortcuts. Shift/Option/Ctrl variants are not bound, and
+Other apps retain their normal shortcuts. Other Shift/Option/Ctrl variants are not bound, and
 holding a key does not repeat the action.
-Pressing Cmd+/ while its native search input is already focused leaves it open.
+Pressing Cmd+Shift+/ while its native search input is already focused leaves it open.
 
 These hotkeys consume the original chord and activate native browser controls,
 without forwarding Cmd+Shift+A or Cmd+T. Webpage keyboard handlers therefore
@@ -154,3 +155,30 @@ rejection, Pin/Unpin rejection, and already-open extension URL detection.
 
 Version 1.3.2 swaps the two browser actions: Cmd+. creates a tab and Cmd+/
 opens native Tab Search. The action implementations stay the same.
+
+## Omni Prompt and local matching
+
+Omni Prompt snapshots tabs across all Brave windows when opened, then appends
+bookmarks from the same private file as Cmd+,. Each row identifies its source.
+Selecting a tab uses its stable ID, even if it moved to another window. A closed
+tab reports an error instead of opening a replacement. Selecting a bookmark
+uses the existing switch-or-open behavior. Reopen the chooser to refresh tabs.
+An unavailable source reports a warning while the other source remains usable.
+
+Both choosers use case-insensitive literal substring matching: split the query
+on whitespace and require every term, in any order, across the title and URL.
+For example, `inbox example.org` requires both terms. Punctuation such as `.`,
+`+`, `[` and `%` is literal. There is no fuzzy matching, regex syntax, quoting,
+negation, or OR syntax.
+
+`core/chooser-search.lua` supplies the default constructor for local lists:
+`ChooserSearch.new(completion)` and `ChooserSearch.setChoices(chooser, rows)`.
+It also handles emoji and Wi-Fi selection. History, tag lookup, and autocomplete
+retain their query-provider callbacks. New local choosers should use this
+constructor; the native Hammerspoon API is left intact for custom providers.
+
+Version 1.5.0 passed matching and native bridge regression tests, Lua/JavaScript
+syntax checks, and live hotkey checks. Typed queries matched terms across
+fields, absent terms cleared rows, choosing a tab selected its stable ID without
+creating a tab, and Cmd+Shift+/ focused native Tab Search. The tab bridge test
+also covers a tab moved between windows and a tab closed after listing.

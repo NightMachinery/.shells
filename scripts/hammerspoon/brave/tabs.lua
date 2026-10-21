@@ -47,6 +47,14 @@ return function(config)
         return true
     end
 
+    function E.listTabs(callback)
+        E.request({action="list"}, callback)
+    end
+
+    function E.selectTab(tabId)
+        E.request({action="selectTab",tabId=tabId}, report)
+    end
+
     function E.openBookmark(url)
         E.request({action="bookmark",url=url}, report)
         return true

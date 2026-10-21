@@ -1,9 +1,9 @@
 -- Brave-only browser actions, ahead of webpage keyboard handlers.
 -- Loaded by core/reload.lua's auto-load directory scan.
--- Cmd+. opens a new tab; Cmd+/ opens native Tab Search.
+-- Cmd+. opens a new tab; Cmd+/ opens Omni Prompt; Cmd+Shift+/ native Tab Search.
 if BraveShortcuts then BraveShortcuts.stop() end
 
-BraveShortcuts = { version = "1.4.0", hotkeys = {} }
+BraveShortcuts = { version = "1.5.0", hotkeys = {} }
 local M = BraveShortcuts
 local bundleID = "com.brave.Browser"
 local log = hs.logger.new("brave-shortcuts", "warning")
@@ -197,6 +197,7 @@ function M.stop()
     M.finishRecency()
     if M.flags then M.flags:stop() end
     if M.bitwarden then M.bitwarden.stop() end
+    if M.omniPrompt then M.omniPrompt.stop() end
     if M.bookmarks then M.bookmarks.stop() end
     if M.tabs then M.tabs.stop() end
     if M.pending then M.pending:stop(); M.pending = nil end
@@ -215,6 +216,9 @@ M.bookmarks = dofile(nightdir .. "/hammerspoon/brave/bookmarks.lua")({
     engine = M.tabs, unavailable = unavailable,
 })
 
+M.omniPrompt = dofile(nightdir .. "/hammerspoon/brave/omni-prompt.lua")({
+    engine=M.tabs, bookmarks=M.bookmarks, braveInFront=braveInFront, unavailable=unavailable,
+})
 M.bitwarden = dofile(nightdir .. "/hammerspoon/brave/bitwarden.lua")({
     braveInFront = braveInFront, nativeWindow = nativeWindow,
     unavailable = unavailable, clearError = function() M.lastError=nil end,
@@ -230,7 +234,8 @@ M.hotkeys = {
     hs.hotkey.new({"cmd", "fn"}, "up", function() schedule(function() M.finishRecency(); M.tabs.step(-1) end) end),
     hs.hotkey.new({"cmd", "fn"}, "down", function() schedule(function() M.finishRecency(); M.tabs.step(1) end) end),
     hs.hotkey.new({"cmd"}, ".", function() schedule(M.newTab) end),
-    hs.hotkey.new({"cmd"}, "/", function() schedule(M.tabSearch) end),
+    hs.hotkey.new({"cmd"}, "/", function() schedule(function() M.finishRecency(); M.omniPrompt.show() end) end),
+    hs.hotkey.new({"cmd", "shift"}, "/", function() schedule(M.tabSearch) end),
 }
 M.flags = hs.eventtap.new({hs.eventtap.event.types.flagsChanged}, function(event)
     if not event:getFlags().cmd then M.finishRecency() end

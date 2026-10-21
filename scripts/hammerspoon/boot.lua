@@ -91,6 +91,7 @@ local hammerspoonCoreFiles = {
     "core/input-language.lua",
     "core/popclick.lua",
     "core/system-keys.lua",
+    "core/chooser-search.lua",
     "core/choosers.lua",
     -- After alert/ and core/helpers.lua: it alerts through alert_gateway and
     -- times passes with hsAfter. Before core/app-hotkeys/main.lua, whose

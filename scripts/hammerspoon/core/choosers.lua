@@ -111,48 +111,6 @@ function ntagFinder()
 end
 hyper_bind_v2{mods={"cmd"}, key='n', pressedfn=ntagFinder}
 --- * Emoji Chooser
--- Reusable function to filter choices based on space-separated regexp patterns
-local function filterChoicesByPatterns(params)
-    local query = params.query
-    local choices = params.choices
-    local filterKey = params.on or "text" -- Default to "text" if no key is provided
-
-    -- Determine if the query contains any uppercase characters
-    local case_sensitive_p = query:match("%u")
-
-    local patterns = {}
-    for pattern in query:gmatch("%S+") do -- Split query into space-separated patterns
-
-        -- If case_sensitive_p is true, use the pattern as is; otherwise, convert to lowercase
-        if not case_sensitive_p then
-            pattern = pattern:lower()
-        end
-
-        table.insert(patterns, pattern)
-    end
-
-    local filteredChoices = {}
-    for _, choice in ipairs(choices) do
-        local match = true
-        for _, pattern in ipairs(patterns) do
-            local choiceText = choice[filterKey]
-
-            -- If case_sensitive_p is true, use the choiceText as is; otherwise, convert to lowercase
-            if not case_sensitive_p then
-                choiceText = choiceText:lower()
-            end
-
-            if not string.match(choiceText, pattern) then
-                match = false
-                break
-            end
-        end
-        if match then
-            table.insert(filteredChoices, choice)
-        end
-    end
-    return filteredChoices
-end
 
 
 local emojiData = {}
@@ -200,7 +158,7 @@ function emojiChooser()
         alert_gateway_dismiss(kEmojiAlertId)
     end
 
-    local chooser = hs.chooser.new(function(choice)
+    local chooser = ChooserSearch.new(function(choice)
             if not choice then
                 -- canceled
                 return
@@ -240,13 +198,7 @@ function emojiChooser()
 
     table.sort(choices, function(a, b) return a.subText < b.subText end)
 
-    chooser:choices(choices)
-
-    -- Update the chooser choices based on the query
-    chooser:queryChangedCallback(function(query)
-            local filteredChoices = filterChoicesByPatterns{query=query, choices=choices, on="subText"}
-            chooser:choices(filteredChoices)
-    end)
+    ChooserSearch.setChoices(chooser, choices)
 
     local function addCurrent()
         local choice = chooser:selectedRowContents()
@@ -347,7 +299,7 @@ function wifiChooser()
     local active = true
     local retryTimer = nil
 
-    local chooser = hs.chooser.new(function(choice)
+    local chooser = ChooserSearch.new(function(choice)
             if not choice or not choice.ssid or choice.ssid == "" then
                 return
             end
@@ -375,13 +327,9 @@ function wifiChooser()
     end)
 
     chooser:placeholderText("Choose Wi-Fi network...")
-    chooser:choices({{text="Scanning Wi-Fi networks...", subText=currentNetwork and ("Current: " .. currentNetwork) or "Not connected"}})
+    ChooserSearch.setChoices(chooser, {{text="Scanning Wi-Fi networks...", subText=currentNetwork and ("Current: " .. currentNetwork) or "Not connected"}})
     chooser:rows(12)
 
-    chooser:queryChangedCallback(function(query)
-            local filteredChoices = filterChoicesByPatterns{query=query, choices=allChoices, on="ssid"}
-            chooser:choices(filteredChoices)
-    end)
 
     local function updateChoices(networks)
         currentNetwork = wifi.currentNetwork(interface)
@@ -440,7 +388,7 @@ function wifiChooser()
             allChoices = {{text="No Wi-Fi networks found", subText="", ssid=""}}
         end
 
-        chooser:choices(filterChoicesByPatterns{query=chooser:query(), choices=allChoices, on="ssid"})
+        ChooserSearch.setChoices(chooser, allChoices)
     end
 
     chooser:hideCallback(function()
@@ -472,7 +420,7 @@ function wifiChooser()
                 -- (kCWNotSupportedErr, -3903), so retrying cannot help.
                 local okd, details = pcall(wifi.interfaceDetails, interface)
                 if okd and details and details.interfaceMode == "Host AP" then
-                    chooser:choices({{text="Wi-Fi is hosting Internet Sharing",
+                    ChooserSearch.setChoices(chooser, {{text="Wi-Fi is hosting Internet Sharing",
                                       subText="It cannot scan as an access point; turn sharing off to choose a network", ssid=""}})
                     return
                 end
@@ -480,7 +428,7 @@ function wifiChooser()
                     updateChoices(wifiChooserNetworkCache)
                     chooser:placeholderText("Choose Wi-Fi network... " .. wifiChooserCacheAgeText() .. "; scan retrying")
                 else
-                    chooser:choices({{text="Scanning Wi-Fi networks...", subText="Retrying after scan error: " .. networks, ssid=""}})
+                    ChooserSearch.setChoices(chooser, {{text="Scanning Wi-Fi networks...", subText="Retrying after scan error: " .. networks, ssid=""}})
                 end
 
                 retryTimer = hs.timer.doAfter(3, startScan)

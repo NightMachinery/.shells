@@ -25,7 +25,7 @@ The explicit core load order is:
 - `input-language.lua`
 - `popclick.lua`
 - `system-keys.lua`
-- `choosers.lua`
+- `chooser-search.lua`, `choosers.lua`
 - `app-hotkeys/config.lua`, `app-hotkeys/main.lua`, `app-hotkeys/bindings.lua`
 - `window-media-bindings.lua`
 - `stt.lua`
@@ -38,8 +38,9 @@ alphabetical order after the core modules are ready.
 Put core features in `core/` and add them to the explicit list in `boot.lua`.
 Put app-specific add-ons that can run after all core modules in `auto-load/`.
 
-`auto-load/brave-shortcuts.lua` binds Cmd+. to native Tab Search and Cmd+/ to
-New Tab while Brave is frontmost, bypassing page keyboard handlers. See
+`auto-load/brave-shortcuts.lua` binds Cmd+. to New Tab, Cmd+/ to Omni Prompt
+(tabs and bookmarks), and Cmd+Shift+/ to native Tab Search while Brave is
+frontmost. See
 [Brave shortcuts](brave-shortcuts.md) for behavior and console helpers.
 
 ## App hotkeys
@@ -2228,3 +2229,22 @@ heading "Trying to Use Kitty Panel". kitty's own quick-access kitten was
 rejected for a different reason: it runs as a second app bundle,
 `net.kovidgoyal.kitty-quick-access`, and every per-app rule in this config
 assumes only `net.kovidgoyal.kitty` exists.
+
+## Local chooser matching
+
+Use `ChooserSearch.new(completion)` for local lists and
+`ChooserSearch.setChoices(chooser, rows)` whenever the source changes. The
+shared default splits a query on whitespace and requires all terms as literal,
+case-insensitive substrings across `text` and `subText`, in any order. An
+optional second constructor argument selects different searchable fields.
+Punctuation has no pattern meaning and matching preserves source order.
+This policy covers bookmarks, Omni Prompt, emoji, and Wi-Fi choosers.
+History, tag lookup, and autocomplete retain custom query-provider behavior.
+
+Hammerspoon's `chooser:query(value)` changes the input without firing its query
+callback. When changing a query programmatically, call `setChoices` again to
+refresh rows; typing and showing a chooser invoke filtering automatically.
+The native `hs.chooser` API remains available for custom providers.
+
+Run focused checks from `hammerspoon/` with `lua tests/chooser-search.lua` and
+`node tests/brave-tabs.js`.

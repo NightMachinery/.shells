@@ -20,19 +20,26 @@ return function(config)
         return choices
     end
 
-    B.chooser = hs.chooser.new(function(choice)
+    B.chooser = ChooserSearch.new(function(choice)
         if choice then config.engine.openBookmark(choice.url) end
     end)
     B.chooser:searchSubText(true)
     B.chooser:placeholderText("Bookmarks: switch to an open tab or open a new one")
 
-    function B.show()
+    function B.read()
         local file = io.open(B.path,"r")
-        if not file then return config.unavailable("Bookmark file is missing: " .. B.path) end
+        if not file then return nil, "Bookmark file is missing: " .. B.path end
         local content = file:read("*a"); file:close()
         local choices = B.parse(content)
+        return choices
+    end
+
+    function B.show()
+        local choices, err = B.read()
+        if not choices then return config.unavailable(err) end
         if #choices == 0 then return config.unavailable("No uncommented titled bookmarks found") end
-        B.chooser:choices(choices):query(""):show()
+        B.chooser:query("")
+        ChooserSearch.setChoices(B.chooser, choices):show()
         return true
     end
 

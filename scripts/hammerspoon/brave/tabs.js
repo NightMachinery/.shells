@@ -41,6 +41,27 @@ function handle(request, b) {
         return snapshot(w);
     }
     if (request.action === 'snapshot' || request.action === 'active') return snapshot(windows()[0]);
+    if (request.action === 'list') {
+        var list = windows(), tabs = [];
+        for (var i=0;i<list.length;i++) {
+            var ids = list[i].tabs.id(), titles = list[i].tabs.title(), urls = list[i].tabs.url();
+            for (var j=0;j<ids.length;j++) {
+                tabs.push({tabId:String(ids[j]), windowId:String(list[i].id()),
+                    windowNumber:i+1, index:j+1, title:titles[j] || '', url:urls[j] || ''});
+            }
+        }
+        return {ok:true,tabs:tabs};
+    }
+    if (request.action === 'selectTab') {
+        // Find the stable ID again: the tab may have moved since the chooser opened.
+        var list = windows();
+        for (var i=0;i<list.length;i++) {
+            var ids = list[i].tabs.id().map(String);
+            var index = ids.indexOf(String(request.tabId));
+            if (index >= 0) return select(list[i], index+1);
+        }
+        return {ok:false,error:'That tab has closed; reopen Omni Prompt to refresh'};
+    }
     if (request.action === 'step') {
         if (!b.frontmost()) return {ok:false, error:'Browser focus changed'};
         var w = windows()[0], state = snapshot(w);
