@@ -38,6 +38,10 @@ alphabetical order after the core modules are ready.
 Put core features in `core/` and add them to the explicit list in `boot.lua`.
 Put app-specific add-ons that can run after all core modules in `auto-load/`.
 
+`auto-load/brave-shortcuts.lua` binds Cmd+. to native Tab Search and Cmd+/ to
+New Tab while Brave is frontmost, bypassing page keyboard handlers. See
+[Brave shortcuts](brave-shortcuts.md) for behavior and console helpers.
+
 ## App hotkeys
 
 The app hotkeys live in `core/app-hotkeys/`, as three files loaded in this
