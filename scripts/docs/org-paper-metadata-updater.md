@@ -121,6 +121,12 @@ bounded `full-html2` recovery from DBLP’s official Trier mirror as a last
 resort after direct exports, exact SPARQL DOI lookup, DOI/SS citations and
 optional DeepSeek have failed; it is off by default. Only public identifiers/URLs are sent.
 
+A confirmed DBLP website bot challenge disables only its direct BibTeX export
+for the remainder of that run, with one notice instead of repeated attempts and
+fallback warnings. SPARQL publication metadata and other citation providers
+continue normally. A new run retries DBLP; an individual missing record does
+not disable the service. Genuine overall citation failures still warn.
+
 Normal freshness rules apply to additions and refreshes. Use `--force` to add
 BibTeX to entries whose metadata is still recent. `--no-bibtex` also removes
 marked sections from recent entries without fetching metadata. If a stale

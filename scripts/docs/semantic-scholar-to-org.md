@@ -195,8 +195,13 @@ match before either identifiers or its fallback citation are trusted. No title
 search, fuzzy matching, or LLM identification is used. Missing identifiers skip
 a provider. Incorrect upstream associations can still give incorrect citations.
 
-DBLP exports use `https://dblp.org/rec/<publication-key>.bib`. Direct requests
-that fail or return bot-check HTML can recover through configured DeepSeek
+DBLP exports use `https://dblp.org/rec/<publication-key>.bib`. After a confirmed
+bot challenge, the direct export is skipped for the remaining papers in that
+invocation, with one informational notice. SPARQL metadata enrichment, DOI/SS
+citations, and explicitly enabled recovery remain active. A new invocation
+tries the export again. Missing records and ordinary export errors do not
+switch off the provider. Failed overall citation retrieval is still reported.
+Direct requests that fail or return bot-check HTML can recover through configured DeepSeek
 Fetch, using the same export URL. DeepSeek may also be denied.
 `--bibtex-browser` explicitly enables `full-html2` recovery from the official
 Trier mirror’s record page with `?view=bibtex`, which passed a live challenge

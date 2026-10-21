@@ -13,6 +13,7 @@ import (
 	"os/exec"
 	"strconv"
 	"strings"
+	"sync"
 	"syscall"
 	"time"
 )
@@ -63,11 +64,15 @@ func (o Options) Validate() error {
 }
 
 type Client struct {
-	HTTP     *http.Client
-	Options  Options
-	Warnf    func(string, ...any)
-	Now      func() time.Time
-	LoadHTML func(context.Context, string) ([]byte, error)
+	// Only the website's BibTeX export is disabled after a confirmed bot gate.
+	// SPARQL and other providers retain their own independent availability.
+	dblpExportMu      sync.Mutex
+	dblpExportBlocked bool
+	HTTP              *http.Client
+	Options           Options
+	Warnf             func(string, ...any)
+	Now               func() time.Time
+	LoadHTML          func(context.Context, string) ([]byte, error)
 }
 
 func NewClient(o Options) *Client {

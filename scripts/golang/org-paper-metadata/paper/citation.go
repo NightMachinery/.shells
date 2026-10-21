@@ -130,7 +130,7 @@ func (c *Client) fetchBibTeX(ctx context.Context, m Metadata) error {
 		}
 		if err != nil {
 			failures = append(failures, fmt.Errorf("%s: %w", provider, err))
-			if c.Warnf != nil && provider != "semantic-scholar" {
+			if c.Warnf != nil && provider != "semantic-scholar" && !errors.Is(err, errDBLPExportBlocked) {
 				c.Warnf("%s BibTeX export failed: %v; trying fallback if available", provider, err)
 			}
 		}
@@ -176,11 +176,32 @@ func (c *Client) semanticScholarIdentifiers(ctx context.Context, m Metadata, wit
 	m.addExternalIDs(rows[0].ExternalIDs)
 	return strings.TrimSpace(rows[0].CitationStyles.BibTeX), nil
 }
+
+var errCitationBotChallenge = errors.New("export returned a bot-check page")
+var errDBLPExportBlocked = errors.New("DBLP BibTeX export is bot-blocked for this run")
+
 func (c *Client) dblpCitation(ctx context.Context, key string) (string, error) {
-	ctx, cancel := context.WithTimeout(ctx, 4*time.Second)
-	defer cancel()
+	c.dblpExportMu.Lock()
+	if c.dblpExportBlocked {
+		c.dblpExportMu.Unlock()
+		return "", errDBLPExportBlocked
+	}
+	requestCtx, cancel := context.WithTimeout(ctx, 4*time.Second)
 	endpoint := (&url.URL{Scheme: "https", Host: "dblp.org", Path: "/rec/" + key + ".bib"}).String()
-	return c.citationExport(ctx, endpoint)
+	bib, err := c.citationExport(requestCtx, endpoint)
+	cancel()
+	blocked := errors.Is(err, errCitationBotChallenge)
+	if blocked {
+		c.dblpExportBlocked = true
+	}
+	c.dblpExportMu.Unlock()
+	if blocked {
+		if c.Warnf != nil {
+			c.Warnf("DBLP BibTeX export is bot-blocked; skipping direct exports for the rest of this run (SPARQL metadata is unaffected)")
+		}
+		return "", errDBLPExportBlocked
+	}
+	return bib, err
 }
 func (c *Client) browserDBLPCitation(ctx context.Context, key string) (string, error) {
 	if c.Warnf != nil {
@@ -217,7 +238,13 @@ func (c *Client) citationExport(ctx context.Context, endpoint string) (string, e
 	}
 	bib := strings.TrimSpace(string(raw))
 	if !IsBibTeX(bib) {
-		return "", errors.New("export returned no BibTeX (possibly a bot-check page)")
+		lower := strings.ToLower(bib)
+		for _, marker := range []string{"/.within.website/x/", "protected by anubis", "making sure you're not a bot", "making sure you&#39;re not a bot", "human verification", "verify you are human"} {
+			if strings.Contains(lower, marker) {
+				return "", errCitationBotChallenge
+			}
+		}
+		return "", errors.New("export returned no BibTeX")
 	}
 	return bib, nil
 }
