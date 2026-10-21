@@ -174,8 +174,9 @@ Trier mirror’s record page with `?view=bibtex`, which passed a live challenge
 and returned source BibTeX. Its environment default is
 `semantic_scholar_bibtex_browser` (disabled). `fhMode` selects the existing
 browser mode, defaulting to `curlfull_s5`; `curlfull_s10` allows more rendering
-time. Browser recovery precedes DeepSeek when enabled. It is independent of
-the metadata scraper and remains off by default. Recovery accepts only a
+time. DeepSeek and browser recovery run only after all selected programmatic
+providers fail, with the browser last. They are independent of
+the metadata scraper, and browser use remains off by default. Recovery accepts only a
 complete source BibTeX entry whose `DBLP:` key matches the requested publication. It does not
 generate or repair citations. DOI exports use `https://doi.org/<doi>` with
 `Accept: application/x-bibtex` and follow registration-agency redirects.
@@ -189,12 +190,16 @@ and the Org shell wrapper forwards it. `--no-bibtex` skips citation enrichment.
 `bibtexSource` records the selected provider in JSON, without adding an Org
 property. Stdin parsing remains offline.
 
+If the DOI is missing but a DBLP key is known, the official SPARQL API resolves
+that exact key to its DOI before publisher export is attempted. Ambiguous or
+invalid DOI results are rejected. SPARQL supplies identifiers only, never a
+locally serialized citation.
+
 Citation enrichment has a 30-second cap within the paper deadline. Individual
-SS/DOI attempts have eight seconds; DBLP has twelve, with up to four for direct
-export before optional DeepSeek recovery. With `--bibtex-browser`, the total
-citation cap is 50 seconds, DBLP gets 36 seconds including up to 24 for the
-browser, and the whole paper’s timeout still takes precedence. Unavailable
-providers fall through.
+SS, SPARQL, DOI and DeepSeek attempts have eight seconds; direct DBLP export
+has four. With `--bibtex-browser`, the total citation cap is 50 seconds,
+including up to 24 for browser recovery. The whole paper’s timeout still takes
+precedence. Unavailable providers fall through.
 If none succeeds, a warning is emitted and new output has no BibTeX section;
 metadata can still refresh and existing saved source citations survive.
 The source block escapes Org control lines.

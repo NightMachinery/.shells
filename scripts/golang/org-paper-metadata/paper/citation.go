@@ -51,10 +51,18 @@ func (c *Client) fetchBibTeX(ctx context.Context, m Metadata) error {
 	providers := []string{source}
 	if source == "auto" {
 		providers = []string{"dblp", "doi", "semantic-scholar"}
-		// Semantic Scholar may associate the preprint's DBLP key with a published
-		// DOI. Prefer the DOI record to a CoRR preprint in that case.
 		if strings.HasPrefix(normalizeDBLP(m.First("dblp")), "journals/corr/") && normalizeDOI(m.First("doi")) != "" {
 			providers = []string{"doi", "dblp", "semantic-scholar"}
+		}
+	}
+	// Expensive retrieval is a last resort, after every selected programmatic
+	// provider. Browser use additionally requires an explicit opt-in.
+	if source == "auto" || source == "dblp" {
+		if c.Options.DeepSeekKey != "" {
+			providers = append(providers, "dblp-fetch")
+		}
+		if c.Options.BibTeXBrowser {
+			providers = append(providers, "dblp-browser")
 		}
 	}
 	for _, provider := range providers {
@@ -70,7 +78,7 @@ func (c *Client) fetchBibTeX(ctx context.Context, m Metadata) error {
 			if !IsBibTeX(bib) {
 				err = errors.New("no valid source citation")
 			}
-		case "dblp", "doi":
+		case "dblp", "doi", "dblp-fetch", "dblp-browser":
 			identifier := normalizeDBLP(m.First("dblp"))
 			if provider == "doi" {
 				identifier = normalizeDOI(m.First("doi"))
@@ -83,27 +91,41 @@ func (c *Client) fetchBibTeX(ctx context.Context, m Metadata) error {
 					identifier = normalizeDOI(m.First("doi"))
 				}
 			}
+			if provider == "doi" && identifier == "" && normalizeDBLP(m.First("dblp")) != "" {
+				lookupCtx, lookupCancel := context.WithTimeout(ctx, 8*time.Second)
+				var lookupErr error
+				identifier, lookupErr = c.doiFromDBLP(lookupCtx, normalizeDBLP(m.First("dblp")))
+				lookupCancel()
+				if lookupErr != nil {
+					failures = append(failures, fmt.Errorf("DBLP DOI lookup: %w", lookupErr))
+				}
+				if identifier != "" {
+					m["doi"] = []string{identifier}
+				}
+			}
 			if identifier == "" {
 				continue
 			}
 			duration := 8 * time.Second
-			if provider == "dblp" {
-				duration = 12 * time.Second
-				if c.Options.BibTeXBrowser {
-					duration = 36 * time.Second
-				}
+			if provider == "dblp-browser" {
+				duration = 24 * time.Second
 			}
 			requestCtx, cancel := context.WithTimeout(ctx, duration)
-			if provider == "dblp" {
+			switch provider {
+			case "dblp":
 				bib, err = c.dblpCitation(requestCtx, identifier)
-			} else {
+			case "doi":
 				bib, err = c.doiCitation(requestCtx, identifier)
+			case "dblp-fetch":
+				bib, err = c.deepseekDBLPCitation(requestCtx, identifier)
+			case "dblp-browser":
+				bib, err = c.browserDBLPCitation(requestCtx, identifier)
 			}
 			cancel()
 		}
 		if err == nil && IsBibTeX(bib) {
 			m["bibtex"] = []string{strings.TrimSpace(bib)}
-			m["bibtexSource"] = []string{provider}
+			m["bibtexSource"] = []string{strings.TrimSuffix(strings.TrimSuffix(provider, "-fetch"), "-browser")}
 			return nil
 		}
 		if err != nil {
@@ -148,46 +170,32 @@ func (c *Client) semanticScholarCitation(ctx context.Context, m Metadata) (strin
 	return strings.TrimSpace(rows[0].CitationStyles.BibTeX), nil
 }
 func (c *Client) dblpCitation(ctx context.Context, key string) (string, error) {
+	ctx, cancel := context.WithTimeout(ctx, 4*time.Second)
+	defer cancel()
 	endpoint := (&url.URL{Scheme: "https", Host: "dblp.org", Path: "/rec/" + key + ".bib"}).String()
-	directCtx, cancel := context.WithTimeout(ctx, 4*time.Second)
-	bib, err := c.citationExport(directCtx, endpoint)
-	cancel()
-	if err == nil {
-		return bib, nil
-	}
-	if ctx.Err() != nil {
-		return "", err
-	}
-	if c.Options.BibTeXBrowser {
-		if c.Warnf != nil {
-			c.Warnf("DBLP direct export failed: %v; trying full-html2", err)
-		}
-		browserCtx, browserCancel := context.WithTimeout(ctx, 24*time.Second)
-		page := (&url.URL{Scheme: "https", Host: "dblp.uni-trier.de", Path: "/rec/" + key + ".html", RawQuery: "view=bibtex"}).String()
-		raw, browserErr := c.LoadHTML(browserCtx, page)
-		browserCancel()
-		if browserErr == nil {
-			bib, browserErr = htmlBibTeX(raw, key)
-		}
-		if browserErr == nil {
-			return bib, nil
-		}
-		err = fmt.Errorf("direct export: %v; full-html2: %w", err, browserErr)
-	}
-	if c.Options.DeepSeekKey == "" || ctx.Err() != nil {
-		return "", err
-	}
+	return c.citationExport(ctx, endpoint)
+}
+func (c *Client) browserDBLPCitation(ctx context.Context, key string) (string, error) {
 	if c.Warnf != nil {
-		c.Warnf("DBLP direct export failed: %v; trying DeepSeek Fetch", err)
+		c.Warnf("programmatic citation providers unavailable; trying full-html2 as last resort")
 	}
+	page := (&url.URL{Scheme: "https", Host: "dblp.uni-trier.de", Path: "/rec/" + key + ".html", RawQuery: "view=bibtex"}).String()
+	raw, err := c.LoadHTML(ctx, page)
+	if err != nil {
+		return "", err
+	}
+	return htmlBibTeX(raw, key)
+}
+func (c *Client) deepseekDBLPCitation(ctx context.Context, key string) (string, error) {
+	endpoint := (&url.URL{Scheme: "https", Host: "dblp.org", Path: "/rec/" + key + ".bib"}).String()
 	body, _ := json.Marshal(map[string]string{"url": endpoint})
-	raw, _, fetchErr := c.request(ctx, http.MethodPost, "https://api.deepseek.com/v1/tools/fetch", body, map[string]string{"Authorization": "Bearer " + c.Options.DeepSeekKey, "Content-Type": "application/json"})
-	if fetchErr != nil {
-		return "", fmt.Errorf("direct export: %v; DeepSeek Fetch: %w", err, fetchErr)
+	raw, _, err := c.request(ctx, http.MethodPost, "https://api.deepseek.com/v1/tools/fetch", body, map[string]string{"Authorization": "Bearer " + c.Options.DeepSeekKey, "Content-Type": "application/json"})
+	if err != nil {
+		return "", err
 	}
-	payload, fetchErr := decode(raw)
-	if fetchErr != nil {
-		return "", fetchErr
+	payload, err := decode(raw)
+	if err != nil {
+		return "", err
 	}
 	return fetchedBibTeX(str(payload["content"]), key)
 }

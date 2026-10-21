@@ -104,8 +104,9 @@ org-paper-metadata-updater --write --no-bibtex '<directory-root>'
 to Semantic Scholar use `--scraper page-data --bibtex-source semantic-scholar`.
 Automatic citations may contact DBLP, DOI registration agencies, and configured
 DeepSeek Fetch for DBLP export recovery. `--bibtex-browser` additionally enables
-bounded `full-html2` recovery from DBLP’s official Trier mirror; it is off by
-default. Only public identifiers/URLs are sent.
+bounded `full-html2` recovery from DBLP’s official Trier mirror as a last
+resort after direct exports, exact SPARQL DOI lookup, DOI/SS citations and
+optional DeepSeek have failed; it is off by default. Only public identifiers/URLs are sent.
 
 Normal freshness rules apply to additions and refreshes. Use `--force` to add
 BibTeX to entries whose metadata is still recent. `--no-bibtex` also removes

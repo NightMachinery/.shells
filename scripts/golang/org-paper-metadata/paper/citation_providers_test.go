@@ -221,7 +221,7 @@ func TestFetchBibTeXRejectsWrongKeyAndTruncation(t *testing.T) {
 	}
 }
 
-func TestDeniedDeepSeekFallsThroughToDOI(t *testing.T) {
+func TestDOIPrecedesDeepSeekRecovery(t *testing.T) {
 	c := fakeClient(Options{BibTeXSource: "auto", DeepSeekKey: "key-sentinel"}, func(r *http.Request) (int, string, map[string]string) {
 		switch r.URL.Host {
 		case "api.semanticscholar.org":
@@ -270,5 +270,55 @@ func TestOptInBrowserRecoversSourceCitation(t *testing.T) {
 	c.Options.BibTeXBrowser = false
 	if err := c.fetchBibTeX(context.Background(), m); err == nil || calls != 1 {
 		t.Fatal("browser was not opt-in", calls, err)
+	}
+}
+
+func TestProgrammaticSourcesPrecedeExpensiveRecovery(t *testing.T) {
+	var calls []string
+	c := fakeClient(Options{BibTeXSource: "auto", DeepSeekKey: "unused", BibTeXBrowser: true}, func(r *http.Request) (int, string, map[string]string) {
+		calls = append(calls, r.URL.Host)
+		switch r.URL.Host {
+		case "api.semanticscholar.org":
+			return 200, citationBatch(testID, "10.1234/test", "conf/example/Test25", nativeCitation), nil
+		case "dblp.org", "doi.org":
+			return 404, "", nil
+		default:
+			t.Fatal("expensive provider ran before cached SS citation", r.URL)
+		}
+		return 404, "", nil
+	})
+	c.LoadHTML = func(context.Context, string) ([]byte, error) { t.Fatal("browser was not last resort"); return nil, nil }
+	m := Metadata{"paperId": {testID}}
+	if err := c.fetchBibTeX(context.Background(), m); err != nil || m.First("bibtexSource") != "semantic-scholar" || len(calls) != 3 {
+		t.Fatal(m, calls, err)
+	}
+}
+func TestExactSPARQLDOILookupBeforeFallback(t *testing.T) {
+	c := fakeClient(Options{BibTeXSource: "auto"}, func(r *http.Request) (int, string, map[string]string) {
+		if r.Header.Get("Authorization") != "" || r.Header.Get("x-api-key") != "" {
+			t.Fatal("credential leak")
+		}
+		switch r.URL.Host {
+		case "api.semanticscholar.org":
+			return 200, citationBatch(testID, "", "conf/example/Test25", nativeCitation), nil
+		case "dblp.org":
+			return 403, "", nil
+		case "sparql.dblp.org":
+			if r.URL.Query().Get("query") != "SELECT ?doi WHERE { <https://dblp.org/rec/conf/example/Test25> <https://dblp.org/rdf/schema#doi> ?doi } LIMIT 2" {
+				t.Fatal(r.URL)
+			}
+			return 200, `{"results":{"bindings":[{"doi":{"type":"uri","value":"https://doi.org/10.1234/Test"}}]}}`, nil
+		case "doi.org":
+			if r.URL.Path != "/10.1234/test" {
+				t.Fatal(r.URL)
+			}
+			return 200, nativeCitation, nil
+		}
+		t.Fatal(r.URL)
+		return 404, "", nil
+	})
+	m := Metadata{"paperId": {testID}}
+	if err := c.fetchBibTeX(context.Background(), m); err != nil || m.First("bibtexSource") != "doi" || m.First("doi") != "10.1234/test" {
+		t.Fatal(m, err)
 	}
 }
