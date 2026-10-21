@@ -83,11 +83,33 @@ func RenderOrgWithOptions(m Metadata, options OrgOptions) (string, error) {
 var venueWords = regexp.MustCompile(`[\s-]+`)
 
 func VenueTag(venue string) string {
+	venue = OneLine(venue)
+	for _, entry := range venuePatterns {
+		if strings.EqualFold(venue, entry.tag) {
+			return entry.tag
+		}
+	}
 	for _, entry := range venuePatterns {
 		if entry.re.MatchString(venue) {
 			return entry.tag
 		}
 	}
+	return fallbackVenueTag(venue)
+}
+
+// VenueTagAliases identifies current and former generated tags for safe refreshes.
+func VenueTagAliases(venue string) []string {
+	if strings.TrimSpace(venue) == "" {
+		return nil
+	}
+	canonical, fallback := VenueTag(venue), fallbackVenueTag(venue)
+	if canonical == fallback {
+		return []string{canonical}
+	}
+	return []string{canonical, fallback}
+}
+
+func fallbackVenueTag(venue string) string {
 	words := venueWords.Split(strings.TrimSpace(venue), -1)
 	for i, word := range words {
 		if word != "" {

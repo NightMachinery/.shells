@@ -218,6 +218,13 @@ func (d Document) PlanWithOptions(t Target, m paper.Metadata, options paper.OrgO
 	for _, tag := range paper.HeadingTags(t.Properties) {
 		oldTags[tag] = true
 	}
+	oldVenue := t.Properties.First("venue")
+	if oldVenue == "" {
+		oldVenue = t.Properties.First("journal_name")
+	}
+	for _, tag := range paper.VenueTagAliases(oldVenue) {
+		oldTags["@"+tag] = true
+	}
 	// Only generated citation/date tags and the old metadata's venue tag are owned.
 	var keep strings.Builder
 	keptWords := map[string]bool{}

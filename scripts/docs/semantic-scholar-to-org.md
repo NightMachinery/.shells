@@ -91,6 +91,23 @@ inside the same folded `@abstract` heading. Comment-marked summary and abstract 
 identify generated content for later refreshes. Zero counts are preserved;
 missing values are omitted.
 
+## Venue tags
+
+Known venues use canonical abbreviations, including `@ECAI`, `@ACCV`, `@AIES`,
+`@IJCAI/ECAI`, `@IDA`, `@IWANN`, `@ICSSE`, `@GlobalSIP`, `@IJCV`, and `@TMLR`,
+alongside the existing ACL/ICLR/ICML/NeurIPS mappings. Full venue names remain
+in the drawer. Unknown venues retain the full-name tag rather than an invented
+acronym. Acronym inputs are recognized without regard to case.
+
+On refresh, a former generated tag such as
+`@EuropeanConferenceOnArtificialIntelligence` is replaced by `@ECAI` when the
+stored venue identifies it. Personal tags survive even between generated tags;
+their order relative to regenerated tags may change. Recent entries retain the
+normal seven-day skip; `--force` applies the new mappings immediately.
+
+Verified conference names: [ECAI](https://eurai.org/ecai),
+[ACCV](https://accv2026.org/), [AIES](https://aaai.org/conference/aies/).
+
 ## BibTeX
 
 Org output includes a folded `@bibtex` sibling immediately after `@abstract`:

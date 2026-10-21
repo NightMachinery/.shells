@@ -2,11 +2,21 @@ package paper
 
 import "regexp"
 
-// Preserve the venue abbreviations used by the retired Lisp formatter.
+// Canonical venue tags, including abbreviations from the retired Lisp formatter.
 var venuePatterns = []struct {
 	re  *regexp.Regexp
 	tag string
 }{
+	{regexp.MustCompile("(?i)\\bIJCAI[- /]+ECAI\\b|International Joint Conference on Artificial Intelligence.*European Conference on Artificial Intelligence"), "IJCAI/ECAI"},
+	{regexp.MustCompile("(?i)European Conference on Artificial Intelligence"), "ECAI"},
+	{regexp.MustCompile("(?i)Asian Conference on Computer Vision"), "ACCV"},
+	{regexp.MustCompile("(?i)(?:AAAI/ACM|ACM/AAAI) Conference on (?:AI|Artificial Intelligence),? Ethics,? and Society"), "AIES"},
+	{regexp.MustCompile("(?i)(?:International )?Symposium on Intelligent Data Analysis"), "IDA"},
+	{regexp.MustCompile("(?i)International Work[- ]Conference on Artificial (?:and Natural )?Neural Networks"), "IWANN"},
+	{regexp.MustCompile("(?i)International Conference on System Science and Engineering"), "ICSSE"},
+	{regexp.MustCompile("(?i)Global Conference on Signal and Information Processing"), "GlobalSIP"},
+	{regexp.MustCompile("(?i)International Journal of Computer Vision"), "IJCV"},
+	{regexp.MustCompile("(?i)Transactions on Machine Learning Research|^Trans\\.\\s*Mach\\.\\s*Learn\\.\\s*Res\\.?$"), "TMLR"},
 	{regexp.MustCompile("(?i)^arXiv(\\.org)?$"), "arXiv"},
 	{regexp.MustCompile("(?i)IEEE/CVF International Conference on Computer Vision Workshop"), "ICCVW"},
 	{regexp.MustCompile("(?i)Conference on Computer Vision and Pattern Recognition Workshops"), "CVPRW"},
