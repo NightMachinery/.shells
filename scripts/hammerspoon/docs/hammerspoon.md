@@ -110,15 +110,29 @@ or from the console, if an app with several windows,
 on several spaces say, ever comes forward with the wrong one.
 
 Hyper's Secure Input workaround temporarily unfocuses the current control.
-`core/hyper-focus-restore.lua` records its process and native window first, and
-requests restoration only if both still own focus on release. Unknown ownership
-leaves the control untouched. App/window switch requests cancel restoration
-immediately, including while macOS is still activating the requested target.
-The legacy `prevFocusedElement = nil` cancellation used by mouse bindings still
-works. AX failures clear the saved state, and each queried element has a
-0.15-second timeout. `lua tests/hyper-focus-restore.lua` covers ownership changes,
-pending activation, Chromium focus proxies, invalid elements, missing identity,
-and failed AX writes. This guard does not change the app activation policy.
+`core/hyper-focus-restore.lua` first records its process and native focused
+window, refusing missing or conflicting window identity before touching focus.
+Release requests restoration only while the same app and window own focus.
+Known temporary focus borrowers in `recentAppsTransient`, such as clipboard
+managers, are allowed while the original app's own focused window still matches.
+App/window switch requests cancel restoration immediately, including while
+macOS is still activating the requested target. The legacy
+`prevFocusedElement = nil` cancellation used by mouse bindings still works.
+
+A failed unfocus keeps the validated restoration token: a timed-out write may
+still take effect. Release makes at most one guarded compensating request and
+consumes the token even if restoration fails, with no delayed retries. Error
+results remain available as `lastUnfocusError` and `lastRestoreError` on
+`HyperFocusRestore`. Every queried AX element has a 0.15-second timeout.
+`lua tests/hyper-focus-restore.lua` covers ownership changes, pending activation,
+Chromium focus proxies, temporary focus borrowers, missing or conflicting
+identity, invalid elements, and failed AX writes with or without an effect.
+This guard leaves the app activation policy unchanged.
+
+Unknown ownership leaves the control untouched, so Secure Input can remain on
+and block Hyper keys that have no additional modifier. An intentional switch
+leaves the old control unfocused instead of pulling focus back. Switch paths
+outside the guarded app/window helpers rely on the release-time ownership check.
 
 The second press of a hotkey hides its app and returns you to the app you were
 in before. Left to itself, macOS activates an app of its own choosing when the

@@ -64,7 +64,12 @@ local hyperModeIndicator = hyperModeIndicatorOrig
 hyper_mode = ModalMode.create{name="hyper"}
 ModalMode.installGlobals(hyper_mode, "hyper")
 
-HyperFocusRestore = dofile(nightdir .. "/hammerspoon/core/hyper-focus-restore.lua")()
+HyperFocusRestore = dofile(nightdir .. "/hammerspoon/core/hyper-focus-restore.lua")({
+    isTransient = function(app)
+        local bid = app:bundleID()
+        return bid and recentAppsTransient and recentAppsTransient[bid]
+    end,
+})
 prevFocusedElement = nil
 function hyper_modality:entered()
     -- When hs.hotkey.modal has finished enabling the mode's keys and hands
@@ -97,8 +102,9 @@ function hyper_modality:entered()
         hyperModeIndicator = hyperModeIndicatorSI
         -- Unfocus the app's focused element over Accessibility; exited()
         -- focuses it again only while that same native window owns focus.
-        -- Two older tries, unused for a while, are in git history: an Escape, and focusing a Hammerspoon webview at the
-        -- primary screen's corner, with a wait for Secure Input to end and a
+        -- Two older tries, unused for a while, are in git history: an Escape,
+        -- and focusing a Hammerspoon webview at the primary screen's corner,
+        -- with a wait for Secure Input to end and a
         -- warning band when it did not.
         prevFocusedElement = HyperFocusRestore.capture(hs.application.frontmostApplication())
     else
