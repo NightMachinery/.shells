@@ -60,7 +60,9 @@ local magic=dofile("brave/query-actions.lua")({chooser=chooser,magic=true,engine
     openChatGPT=function(url,query) routed[#routed+1]={url=url,query=query,kind="chatgpt"} end,
     openGemini=function(query) routed[#routed+1]={query=query,kind="gemini"} end,
 }})
-local routes={["?"]="google",[".a"]="amazon",[".k"]="keepa",[".c"]="chatgpt",[".g"]="gemini",[".l"]="claude"}
+local routes={["?"]="google",[".a"]="amazon",[".k"]="keepa",[".c"]="chatgpt",[".g"]="gemini",[".l"]="claude",
+    [".s"]="semanticscholar",[".gh"]="github",[".y"]="youtube",[".w"]="wikipedia",
+    [".r"]="reddit",[".gs"]="googlescholar",[".ni"]="ninisite"}
 for token,destination in pairs(routes) do
     local body="  a+b & ü\nsecond line"
     local actual,text=magic.magic(token.." "..body)
@@ -80,6 +82,8 @@ assert(magic.url("a+b & ü","amazon")=="https://www.amazon.de/s?k=a%2Bb%20%26%20
 assert(magic.url("a b","keepa")=="https://keepa.com/#!search/3-a%20b")
 assert(magic.url("a b","claude")=="https://claude.ai/new?q=a%20b")
 assert(magic.url("a b","gemini")=="https://gemini.google.com/app")
+assert(magic.url("a b","reddit")=="https://www.google.com/search?q=site%3Areddit.com%20a%20b")
+assert(magic.url("a+b & ü","ninisite")=="https://www.google.com/search?q=site%3Aninisite.com%20a%2Bb%20%26%20%C3%BC")
 assert(magic.url("a b","unsupported")==nil)
 show(" .g literal");assert(not magic.key(36,{})) -- leading space keeps local selection
 chooser.row={};assert(magic.key(36,{}));flush()

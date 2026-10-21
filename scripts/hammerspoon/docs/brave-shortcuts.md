@@ -238,6 +238,13 @@ highlighted:
 - `.g query`: the Gemini consumer app at `https://gemini.google.com/app`,
   selecting 4 Argon and High thinking before submitting.
 - `.l query`: a fresh Claude page with its query link for prefill.
+- `.s query`: Semantic Scholar.
+- `.gs query`: Google Scholar.
+- `.gh query`: GitHub repository search.
+- `.y query`: YouTube.
+- `.w query`: English Wikipedia.
+- `.r query`: Google restricted to `site:reddit.com`.
+- `.ni query`: Google restricted to `site:ninisite.com`.
 
 The token must begin at character one and be followed by one literal ASCII
 space. `.g question` is magic; ` .g question`, bare `.g`, `.gquestion`, and a tab

@@ -10,7 +10,9 @@ return function(config)
     end
 
     local prefixes = { ["?"]="google", [".a"]="amazon", [".k"]="keepa", [".c"]="chatgpt",
-        [".g"]="gemini", [".l"]="claude" }
+        [".g"]="gemini", [".l"]="claude", [".s"]="semanticscholar",
+        [".gh"]="github", [".y"]="youtube", [".w"]="wikipedia",
+        [".r"]="reddit", [".gs"]="googlescholar", [".ni"]="ninisite" }
 
     function Q.magic(query)
         if not config.magic or type(query)~="string" then return nil end
@@ -25,6 +27,13 @@ return function(config)
         local bases = {
             google="https://www.google.com/search?q=",
             amazon="https://www.amazon.de/s?k=",
+            semanticscholar="https://www.semanticscholar.org/search?sort=relevance&q=",
+            github="https://github.com/search?type=repositories&q=",
+            youtube="https://www.youtube.com/results?search_query=",
+            wikipedia="https://en.wikipedia.org/w/index.php?title=Special:Search&search=",
+            reddit="https://www.google.com/search?q=site%3Areddit.com%20",
+            googlescholar="https://scholar.google.com/scholar?q=",
+            ninisite="https://www.google.com/search?q=site%3Aninisite.com%20",
             chatgpt="https://chatgpt.com/?q=",
             keepa="https://keepa.com/#!search/3-",
             claude="https://claude.ai/new?q=",
