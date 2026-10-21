@@ -27,7 +27,7 @@ return function(config)
             for _, tab in ipairs(result.ok and result.tabs or {}) do
                 choices[#choices+1] = {
                     text=tab.title ~= "" and tab.title or tab.url,
-                    subText="Tab · Window " .. tab.windowNumber .. " · " .. tab.url,
+                    subText="Tab " .. tab.index .. " · Window " .. tab.windowNumber .. " · " .. tab.url,
                     kind="tab",tabId=tab.tabId,url=tab.url,
                 }
             end

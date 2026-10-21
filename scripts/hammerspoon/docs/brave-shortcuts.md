@@ -160,6 +160,8 @@ opens native Tab Search. The action implementations stay the same.
 
 Omni Prompt snapshots tabs across all Brave windows when opened, then appends
 bookmarks from the same private file as Cmd+,. Each row identifies its source.
+Tab subtitles show the position within their window, the window number, and URL
+(for example, `Tab 3 · Window 1 · https://example.org/`).
 Selecting a tab uses its stable ID, even if it moved to another window. A closed
 tab reports an error instead of opening a replacement. Selecting a bookmark
 uses the existing switch-or-open behavior. Reopen the chooser to refresh tabs.
