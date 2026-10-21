@@ -268,3 +268,12 @@ and [Requestly documents this specific override](https://requestly.com/use-case/
 An extension override is technically feasible, but neither the required current
 ChatGPT value nor whether that change alone restores auto-submit was verified.
 The working Hammerspoon send step remains in place.
+
+The installed `chrome-cli` likewise has no custom-header navigation option.
+Its [upstream documentation](https://github.com/prasmussen/chrome-cli)
+identifies Scripting Bridge as its transport. `execute` can run page JavaScript
+when Allow JavaScript from Apple Events is enabled, permitting DOM-based
+submission, but page JavaScript still cannot override `Sec-` headers. A separate
+[chrome-devtools-cli](https://github.com/aeroxy/chrome-devtools-cli) uses CDP
+and documents `--extra-headers` for navigation; whether a specific fetch metadata
+override restores ChatGPT auto-submit still needs verification.
