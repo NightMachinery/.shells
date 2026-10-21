@@ -1,19 +1,5 @@
 function notes-push-logged {
-    : "Runs notes-push with dated logs under ~/logs."
-
-    local log_dir="${notes_push_logged_dir:-${HOME}/logs}"
-    local started
-    started="$(command date '+%Y-%m-%d %H:%M:%S %z')" @RET
-    local log_file="${log_dir}/notes-push-${started[1,10]}.log"
-    command mkdir -p -- "${log_dir}" @RET
-
-    local ret=0
-    {
-        print -r -- "[${started}] notes-push started"
-        notes-push "$@" || ret=$?
-        print -r -- "[$(command date '+%Y-%m-%d %H:%M:%S %z')] notes-push finished (exit ${ret})"
-        return "${ret}"
-    } >> "${log_file}" 2>&1
+    log-to "${HOME}/logs/notes-push.log" notes-push "$@"
 }
 ##
 ###
