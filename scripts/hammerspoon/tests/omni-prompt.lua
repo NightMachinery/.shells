@@ -2,7 +2,23 @@
 nightdir='..'
 local pending, opened, selected = {}, {}, {}
 local front=true
+local activeChooser
+local field={setTimeout=function(self)return self end}
+function field:attributeValue(k)
+ if k=='AXRole' then return 'AXTextField' end
+ if k=='AXValue' then return activeChooser and activeChooser.text end
+end
+function field:setAttributeValue(k,v)
+ assert(k=='AXSelectedTextRange');activeChooser.range=v;return self
+end
 hs={
+ processInfo={processID=123},
+ axuielement={applicationElement=function(pid)
+  assert(pid==123)
+  return {setTimeout=function(self)return self end,attributeValue=function(_,key)
+   assert(key=='AXFocusedUIElement');return activeChooser and field
+  end}
+ end},
  timer={doAfter=function(_,fn)
   local t={fn=fn,stop=function(self)self.stopped=true end}
   pending[#pending+1]=t;return t
@@ -23,7 +39,7 @@ hs={
   function c:enableDefaultForQuery()return self end
   function c:selectedRowContents()return self.items[1] end
   function c:isVisible()return self.visible end
-  function c:show()self.visible=true;if self.onShow then self.onShow() end;return self end
+  function c:show()self.visible=true;activeChooser=self;self.range={location=0,length=#self.text};if self.onShow then self.onShow() end;return self end
   function c:hide()self.visible=false;if self.onHide then self.onHide() end;return self end
   function c:cancel()self:hide();self.completion(nil) end
   function c:delete()self.deleted=true end
@@ -61,6 +77,12 @@ assert(#o.helpChooser.items==1 and o.helpChooser.items[1].prefix=='.s')
 local choice=o.helpChooser.items[1];o.helpChooser:hide();o.helpChooser.completion(choice)
 assert(not o.chooser.visible);flush()
 assert(o.chooser.visible and o.chooser:query()=='.s ' and #opened==0 and #selected==0)
+assert(o.chooser.range.location==3 and o.chooser.range.length==0)
+-- Typing after choosing a magic appends to its prefix instead of replacing it.
+local range=o.chooser.range
+local value=o.chooser:query()
+typeQuery(o.chooser,value:sub(1,range.location)..'papers'..value:sub(range.location+range.length+1))
+assert(o.chooser:query()=='.s papers')
 -- Exact .help is the only command; modified Enter still uses the whole input.
 assert(not o.queryActions.help(' .help') and not o.queryActions.help('.help '))
 typeQuery(o.chooser,'.help');assert(o.queryActions.key(36,{shift=true}));flush()

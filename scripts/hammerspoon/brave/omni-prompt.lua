@@ -34,6 +34,20 @@ return function(config)
         return true
     end
 
+    local function placeCaretAfterPrefix(query)
+        if not query or query=="" or not O.chooser:isVisible() or O.chooser:query()~=query then return end
+        -- Native show selects the entire query. Touch only our own query field,
+        -- immediately after show, without posting keys that could reach an app.
+        local app=hs.axuielement.applicationElement(hs.processInfo.processID)
+        if not app or not app:setTimeout(.15) then return end
+        local field=app:attributeValue("AXFocusedUIElement")
+        if not field or not field:setTimeout(.15) then return end
+        if field:attributeValue("AXRole")=="AXTextField" and field:attributeValue("AXValue")==query then
+            -- Help prefills only ASCII prefixes, so bytes equal UTF-16 units.
+            field:setAttributeValue("AXSelectedTextRange",{location=#query,length=0})
+        end
+    end
+
     function O.show(query)
         if O.stopped or not config.braveInFront() then return false end
         O.generation = O.generation + 1
@@ -59,6 +73,7 @@ return function(config)
             O.choiceCount = #choices
             O.chooser:query(query or "")
             ChooserSearch.setChoices(O.chooser, config.searchAliases.apply(choices)):show()
+            placeCaretAfterPrefix(query)
         end)
         return true
     end
