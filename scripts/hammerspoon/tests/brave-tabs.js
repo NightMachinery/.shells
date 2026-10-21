@@ -24,3 +24,19 @@ assert.equal(activation,1);
 result=context.handle({action:'selectTab',tabId:'999'},browser);
 assert.equal(result.ok,false); assert.equal(activation,1);
 console.log('native tab list and selection tests passed');
+
+// Query actions must make fresh tabs even if an identical URL is already open.
+const made=[];
+let current=1;
+const tabs={id:()=>made.map((t,i)=>String(i+100)),push:t=>made.push(t)};
+const tabCollection=()=>made;
+Object.assign(tabCollection,tabs);
+const win={id:()=>3,tabs:tabCollection,get activeTabIndex(){return ()=>current},set activeTabIndex(v){current=v}};
+const fresh={windows:()=>[win],Tab:({url})=>({url}),activate(){}};
+for(let i=0;i<2;i++) {
+  result=context.handle({action:'openURL',url:'https://www.google.com/search?q=fixture'},fresh);
+  assert.equal(result.ok,true); assert.equal(result.reused,false);
+}
+assert.equal(made.length,2);
+assert.equal(context.handle({action:'openURL',url:'javascript:alert(1)'},fresh).ok,false);
+console.log('fresh query tab tests passed');

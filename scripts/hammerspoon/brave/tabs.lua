@@ -55,6 +55,11 @@ return function(config)
         E.request({action="selectTab",tabId=tabId}, report)
     end
 
+    function E.openURL(url)
+        E.request({action="openURL",url=url}, report)
+        return true
+    end
+
     function E.openBookmark(url)
         E.request({action="bookmark",url=url}, report)
         return true

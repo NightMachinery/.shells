@@ -69,11 +69,11 @@ function handle(request, b) {
         var step = request.direction === -1 ? -1 : 1;
         return select(w, (state.index - 1 + step + state.tabIds.length) % state.tabIds.length + 1);
     }
-    if (request.action === 'bookmark') {
+    if (request.action === 'bookmark' || request.action === 'openURL') {
         var url = request.url;
-        if (typeof url !== 'string' || !/^https?:\/\/[^\s]+$/i.test(url)) return {ok:false,error:'Bookmark must be an HTTP or HTTPS URL'};
+        if (typeof url !== 'string' || !/^https?:\/\/[^\s]+$/i.test(url)) return {ok:false,error:'URL must be an HTTP or HTTPS URL'};
         var list = windows(), wanted = canonicalURL(url), account = gmailAccount(url);
-        for (var i=0;i<list.length;i++) {
+        for (var i=0;request.action === 'bookmark' && i<list.length;i++) {
             var urls = list[i].tabs.url();
             var titles = account ? list[i].tabs.title() : [];
             for (var j=0;j<urls.length;j++) {

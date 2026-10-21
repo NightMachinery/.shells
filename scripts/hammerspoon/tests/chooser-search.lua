@@ -25,4 +25,7 @@ ChooserSearch.setChoices(chooser,rows)
 callback("work example"); assert(#shown==1)
 callback("other"); assert(#shown==1 and shown[1]==rows[2])
 callback(""); assert(#shown==2) -- filtering never loses the source list
+local hiddenURL = {{text="Generic title", subText="Tab", url="https://example.org/unique-route"}}
+assert(#ChooserSearch.filter(hiddenURL,"generic unique-route")==1)
+assert(#ChooserSearch.filter({{text="Channel", searchText="Chat server"}},"channel server")==1)
 print("chooser search tests passed")

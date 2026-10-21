@@ -2235,7 +2235,8 @@ assumes only `net.kovidgoyal.kitty` exists.
 Use `ChooserSearch.new(completion)` for local lists and
 `ChooserSearch.setChoices(chooser, rows)` whenever the source changes. The
 shared default splits a query on whitespace and requires all terms as literal,
-case-insensitive substrings across `text` and `subText`, in any order. An
+case-insensitive substrings across `text`, `subText`, `url`, and optional hidden
+`searchText`, in any order. An
 optional second constructor argument selects different searchable fields.
 Punctuation has no pattern meaning and matching preserves source order.
 This policy covers bookmarks, Omni Prompt, emoji, and Wi-Fi choosers.
@@ -2247,4 +2248,5 @@ refresh rows; typing and showing a chooser invoke filtering automatically.
 The native `hs.chooser` API remains available for custom providers.
 
 Run focused checks from `hammerspoon/` with `lua tests/chooser-search.lua` and
-`node tests/brave-tabs.js`.
+`node tests/brave-tabs.js`. Browser chooser query actions and aliases also have
+`lua tests/browser-query-actions.lua` and `lua tests/browser-search-aliases.lua`.

@@ -2,14 +2,17 @@ return function(config)
     local O = {generation=0}
     O.chooser = ChooserSearch.new(function(choice)
         O.generation = O.generation + 1
-        if not choice then return end
+        if not choice or O.queryActions.accept(choice) then return end
         if choice.kind == "tab" then
             config.engine.selectTab(choice.tabId)
         else
             config.engine.openBookmark(choice.url)
         end
     end)
-    O.chooser:placeholderText("Omni Prompt: open tabs and bookmarks")
+    O.queryActions = dofile(nightdir .. "/hammerspoon/brave/query-actions.lua")({
+        chooser=O.chooser, engine=config.engine,
+    })
+    O.chooser:placeholderText("Omni Prompt · Shift+Enter: Google · Cmd+Enter: ChatGPT")
     O.chooser:width(65):rows(12)
 
     function O.show()
@@ -34,15 +37,15 @@ return function(config)
             end
             if not result.ok then config.unavailable(result.error) end
             if bookmarkError then config.unavailable(bookmarkError) end
-            if #choices == 0 then return config.unavailable("No open tabs or bookmarks found") end
             O.choiceCount = #choices
             O.chooser:query("")
-            ChooserSearch.setChoices(O.chooser, choices):show()
+            ChooserSearch.setChoices(O.chooser, config.searchAliases.apply(choices)):show()
         end)
         return true
     end
 
     function O.stop()
+        O.queryActions.stop()
         O.stopped = true
         O.generation = O.generation + 1
         O.chooser:hide(); O.chooser:delete()

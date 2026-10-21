@@ -21,28 +21,30 @@ return function(config)
     end
 
     B.chooser = ChooserSearch.new(function(choice)
-        if choice then config.engine.openBookmark(choice.url) end
+        if choice and not B.queryActions.accept(choice) then config.engine.openBookmark(choice.url) end
     end)
+    B.queryActions = dofile(nightdir .. "/hammerspoon/brave/query-actions.lua")({
+        chooser=B.chooser, engine=config.engine,
+    })
     B.chooser:searchSubText(true)
-    B.chooser:placeholderText("Bookmarks: switch to an open tab or open a new one")
+    B.chooser:placeholderText("Bookmarks · Shift+Enter: Google · Cmd+Enter: ChatGPT")
 
     function B.read()
         local file = io.open(B.path,"r")
         if not file then return nil, "Bookmark file is missing: " .. B.path end
         local content = file:read("*a"); file:close()
         local choices = B.parse(content)
-        return choices
+        return config.searchAliases.apply(choices)
     end
 
     function B.show()
         local choices, err = B.read()
         if not choices then return config.unavailable(err) end
-        if #choices == 0 then return config.unavailable("No uncommented titled bookmarks found") end
         B.chooser:query("")
         ChooserSearch.setChoices(B.chooser, choices):show()
         return true
     end
 
-    function B.stop() B.chooser:hide(); B.chooser:delete() end
+    function B.stop() B.queryActions.stop(); B.chooser:hide(); B.chooser:delete() end
     return B
 end

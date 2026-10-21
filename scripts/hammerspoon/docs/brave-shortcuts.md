@@ -182,3 +182,45 @@ syntax checks, and live hotkey checks. Typed queries matched terms across
 fields, absent terms cleared rows, choosing a tab selected its stable ID without
 creating a tab, and Cmd+Shift+/ focused native Tab Search. The tab bridge test
 also covers a tab moved between windows and a tab closed after listing.
+
+## Browser chooser query actions
+
+Both Omni Prompt and Cmd+, search the title, displayed subtitle, URL, and hidden
+hostname keywords using the shared literal AND matcher.
+
+- Enter selects the highlighted result. With no matching rows, it searches
+  Google for the entire query.
+- Shift+Enter always searches Google, even when a result matches.
+- Cmd+Enter opens the query in a new ChatGPT tab using
+  `https://chatgpt.com/?q=ENCODED_QUERY`.
+
+Query actions always create a fresh Brave tab. Empty or whitespace-only queries
+perform no navigation. Query text is encoded as UTF-8 URI-component bytes, so
+spaces, `&`, `+`, and non-ASCII text stay part of the query. Modified Return is
+intercepted only while its chooser is visible, including keypad Enter. Other
+choosers retain their own Return actions. Query text is never sent as a shell
+command. The ChatGPT browser query link depends on the site's current behavior;
+it is separate from the documented desktop app deep links.
+
+Exact-host aliases live in `$nightNotesPrivate/browser/search-aliases.json`
+(with the same private-notes fallback as bookmarks). The JSON object maps
+lowercase hostnames to keyword lists, for example:
+
+```json
+{"chat.example.org": ["Team chat"]}
+```
+
+A query such as `team channel` can match a channel URL on that host even when
+its title does not name the service. Ports and host case are normalized; paths,
+lookalike domains, and unrelated subdomains do not acquire the alias. Keywords
+remain hidden in the chooser. Reopen either chooser to reload the file. A
+missing file means no aliases; malformed JSON shows a warning.
+
+Version 1.6.0 adds query actions and exact-host aliases. Focused tests cover
+explicit URL matching, URI encoding, Enter variants, callback cleanup, fresh
+query tabs, alias AND matching, and lookalike-domain rejection.
+
+Live checks captured outgoing navigation locally: no-match Enter requested
+Google, Shift+Enter did so with matching rows, and Cmd+Enter requested ChatGPT
+with the complete query. These checks did not send test queries to either site.
+The configured private hostname alias also passed an exact-host fixture check.

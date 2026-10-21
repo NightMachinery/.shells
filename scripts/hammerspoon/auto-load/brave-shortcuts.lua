@@ -3,7 +3,7 @@
 -- Cmd+. opens a new tab; Cmd+/ opens Omni Prompt; Cmd+Shift+/ native Tab Search.
 if BraveShortcuts then BraveShortcuts.stop() end
 
-BraveShortcuts = { version = "1.5.0", hotkeys = {} }
+BraveShortcuts = { version = "1.6.0", hotkeys = {} }
 local M = BraveShortcuts
 local bundleID = "com.brave.Browser"
 local log = hs.logger.new("brave-shortcuts", "warning")
@@ -212,12 +212,16 @@ M.tabs = dofile(nightdir .. "/hammerspoon/brave/tabs.lua")({
     clearError = function() M.lastError=nil end,
 })
 
+M.searchAliases = dofile(nightdir .. "/hammerspoon/brave/search-aliases.lua")({
+    unavailable=unavailable,
+})
 M.bookmarks = dofile(nightdir .. "/hammerspoon/brave/bookmarks.lua")({
-    engine = M.tabs, unavailable = unavailable,
+    engine = M.tabs, unavailable = unavailable, searchAliases=M.searchAliases,
 })
 
 M.omniPrompt = dofile(nightdir .. "/hammerspoon/brave/omni-prompt.lua")({
     engine=M.tabs, bookmarks=M.bookmarks, braveInFront=braveInFront, unavailable=unavailable,
+    searchAliases=M.searchAliases,
 })
 M.bitwarden = dofile(nightdir .. "/hammerspoon/brave/bitwarden.lua")({
     braveInFront = braveInFront, nativeWindow = nativeWindow,

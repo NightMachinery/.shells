@@ -1,5 +1,5 @@
 -- Shared local chooser policy. Remote query providers keep their own callbacks.
-ChooserSearch = {version = "1.0.0"}
+ChooserSearch = {version = "1.1.0"}
 local S = ChooserSearch
 local states = setmetatable({}, {__mode="k"})
 
@@ -15,7 +15,7 @@ function S.filter(choices, query, fields)
     for term in (query or ""):gmatch("%S+") do terms[#terms+1] = term:lower() end
     for _, choice in ipairs(choices or {}) do
         local parts = {}
-        for _, field in ipairs(fields or {"text", "subText"}) do
+        for _, field in ipairs(fields or {"text", "subText", "url", "searchText"}) do
             parts[#parts+1] = plain(choice[field]):lower()
         end
         local text, matches = table.concat(parts, "\n"), true
