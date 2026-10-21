@@ -56,6 +56,9 @@ func AbstractSection(m Metadata, level int) string {
 	return strings.Repeat("*", level) + " @abstract\n:PROPERTIES:\n:visibility: folded\n:END:\n" + ContentBlocks(m) + "\n"
 }
 func RenderOrg(m Metadata) (string, error) {
+	return RenderOrgWithOptions(m, OrgOptions{})
+}
+func RenderOrgWithOptions(m Metadata, options OrgOptions) (string, error) {
 	if err := m.Validate(); err != nil {
 		return "", err
 	}
@@ -71,8 +74,8 @@ func RenderOrg(m Metadata) (string, error) {
 	b.WriteString(strings.Join(PropertyLines(m), "\n"))
 	b.WriteString("\n:END:\n")
 	b.WriteString(AbstractSection(m, 1))
-	if bib := m.First("bibtex"); bib != "" {
-		b.WriteString("#+BEGIN_SRC bibtex\n" + strings.ReplaceAll(bib, "\n#+", "\n,#+") + "\n#+END_SRC\n")
+	if !options.NoBibTeX {
+		b.WriteString(BibTeXSection(m, 1))
 	}
 	return b.String(), nil
 }

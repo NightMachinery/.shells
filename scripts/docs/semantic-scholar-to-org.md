@@ -7,6 +7,7 @@ clipboard input work as before. Emacs uses the same command through BrishGarden.
 
 ```zsh
 semantic-scholar-to-org '<paper-url>'
+semantic-scholar-to-org --no-bibtex '<paper-url>'
 semantic-scholar-to-json '<paper-url>'
 org-paper-metadata --format json '<paper-url>'
 ```
@@ -90,6 +91,31 @@ inside the same folded `@abstract` heading. Comment-marked summary and abstract 
 identify generated content for later refreshes. Zero counts are preserved;
 missing values are omitted.
 
+## BibTeX
+
+Org output includes a folded `@bibtex` sibling immediately after `@abstract`:
+
+```org
+* @bibtex
+:PROPERTIES:
+:visibility: folded
+:orgPaperMetadataGenerated: bibtex
+:END:
+#+BEGIN_SRC bibtex
+@misc{…}
+#+END_SRC
+```
+
+`--bibtex` enables it (the default); `--no-bibtex` omits it. Both flags are
+available on `semantic-scholar-to-org`, `org-paper-metadata`, and the updater.
+Put flags before URLs or the directory argument. The last BibTeX switch wins.
+These flags change Org output, not JSON metadata.
+
+Source-supplied BibTeX is used when available. Otherwise the helper creates a
+`@misc` citation with a stable key from known title, authors, year, URL, DOI, arXiv ID,
+and venue. It does not infer a publication type or make an extra API request.
+The source block escapes Org control lines.
+
 ## Refreshing existing notes
 
 Use [org-paper-metadata-updater](org-paper-metadata-updater.md) to refresh paper
@@ -113,4 +139,4 @@ TLDR, publication date, counts, and PDF link.
 
 Run `brishz-restart` after shell changes. No Elisp reload is needed.
 
-Verified by @OpenAI on 2026-10-20.
+Verified by @OpenAI on 2026-10-21.

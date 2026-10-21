@@ -11,7 +11,7 @@ ROOT = Path(__file__).resolve().parents[2]
 URL = "https://www.semanticscholar.org/paper/" + "a" * 40
 
 class ShellContracts(unittest.TestCase):
-    def run_shell(self, function, *, input_url=URL, fail=False):
+    def run_shell(self, function, *, input_url=URL, fail=False, arguments=None):
         with tempfile.TemporaryDirectory() as directory:
             binary = Path(directory) / "org-paper-metadata"
             binary.write_text("""#!/usr/bin/env python3
@@ -34,9 +34,9 @@ function pbcopy { print -ru2 -- 'Unexpected clipboard write'; return 99 }
 SemanticScholar_API_key=synthetic-key
 deepseek_api_key=synthetic-key
 semantic_scholar_scraper=page-data
-"$1" "$2"
+"$1" "${@:2}"
 '''
-            return subprocess.run(["zsh", "-c", script, "_", function, input_url], env=env,
+            return subprocess.run(["zsh", "-c", script, "_", function, *(arguments if arguments is not None else [input_url])], env=env,
                                   text=True, capture_output=True, timeout=25)
 
     def test_json_delegates_to_go_and_exports_configuration(self):
@@ -69,6 +69,15 @@ semantic_scholar_scraper=page-data
         data=json.loads(result.stdout)
         self.assertEqual(data['args'],['/tmp/synthetic root'])
         self.assertTrue(data['key_present'])
+
+    def test_bibtex_flags_are_forwarded(self):
+        for function, arguments, expected in [
+            ("semantic-scholar-to-org", ["--no-bibtex", URL], ["--format", "org", "--no-bibtex", URL]),
+            ("org-paper-metadata-updater", ["--write", "--no-bibtex", "/tmp/synthetic root"], ["--write", "--no-bibtex", "/tmp/synthetic root"]),
+        ]:
+            result = self.run_shell(function, arguments=arguments)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertEqual(json.loads(result.stdout)['args'], expected)
 
     def test_explicit_api_remains_available(self):
         result=self.run_shell("semantic-scholar-to-json-api")

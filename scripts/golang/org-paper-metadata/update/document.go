@@ -208,6 +208,9 @@ func Recent(m paper.Metadata, now time.Time, maxAge time.Duration) bool {
 }
 
 func (d Document) Plan(t Target, m paper.Metadata) []Edit {
+	return d.PlanWithOptions(t, m, paper.OrgOptions{})
+}
+func (d Document) PlanWithOptions(t Target, m paper.Metadata, options paper.OrgOptions) []Edit {
 	var edits []Edit
 	line := d.Lines[t.Heading.Start]
 	prefix := line[:t.LinkStart]
@@ -274,36 +277,18 @@ func (d Document) Plan(t Target, m paper.Metadata) []Edit {
 		edits = append(edits, Edit{Start: t.DrawerStart, End: t.DrawerEnd, Lines: props})
 	}
 	edits = append(edits, d.bodyEdits(t, m)...)
+	edits = append(edits, d.BibTeXEdits(t, m, options.NoBibTeX)...)
 	return edits
 }
 
 func (d Document) bodyEdits(t Target, m paper.Metadata) []Edit {
-	var abstracts, summaries []Heading
-	for _, h := range d.Headings {
-		if h.Start <= t.Heading.Start || h.Start >= t.Heading.End || h.Level != t.Heading.Level+1 {
-			continue
-		}
-		switch strings.TrimSpace(d.Lines[h.Start][h.Level:]) {
-		case "@abstract":
-			abstracts = append(abstracts, h)
-		case "@summary":
-			summaries = append(summaries, h)
-		}
-	}
-	var child *Heading
-	if len(abstracts) > 1 {
-		return nil
-	}
-	if len(abstracts) == 1 {
-		child = &abstracts[0]
-	} else if len(summaries) == 1 {
-		child = &summaries[0]
-	} else if len(summaries) > 1 {
+	child, ambiguous := d.metadataChild(t)
+	if ambiguous {
 		return nil
 	}
 	if child == nil {
 		body := strings.Split(strings.TrimSuffix(paper.AbstractSection(m, t.Heading.Level+1), "\n"), "\n")
-		return []Edit{{Start: t.Heading.End, End: t.Heading.End, Lines: append([]string{""}, body...), Priority: 10000 - t.Heading.Level}}
+		return []Edit{{Start: t.Heading.End, End: t.Heading.End, Lines: append([]string{""}, body...), Priority: 10000 - 2*t.Heading.Level}}
 	}
 	start, end, _, err := d.drawer(*child)
 	if err != nil {
@@ -358,6 +343,9 @@ func (d Document) bodyEdits(t Target, m paper.Metadata) []Edit {
 			block := strings.SplitN(paper.ContentBlocks(m), "# org-paper-metadata: abstract", 2)[0]
 			edits = append(edits, Edit{Start: bodyStart, End: bodyStart, Lines: strings.Split(strings.TrimSuffix(block, "\n"), "\n")})
 		}
+		if strings.TrimSpace(d.Lines[child.Start][child.Level:]) == "@summary" {
+			edits = append(edits, Edit{Start: child.Start, End: child.Start + 1, Lines: []string{strings.Repeat("*", child.Level) + " @abstract"}})
+		}
 		return edits
 	}
 	// Legacy output may carry a BibTeX example after its single abstract quote.
@@ -402,11 +390,24 @@ func legacyCitationTail(lines []string) bool {
 		return true
 	}
 	parts := strings.Split(tail, "\n")
-	if len(parts) < 3 || !regexp.MustCompile(`(?i)^#\+BEGIN_EXAMPLE(?:\s+.+)?$`).MatchString(strings.TrimSpace(parts[0])) || !strings.EqualFold(strings.TrimSpace(parts[len(parts)-1]), "#+END_EXAMPLE") {
+	if len(parts) < 3 {
+		return false
+	}
+	begin := strings.ToUpper(strings.TrimSpace(parts[0]))
+	end := "#+END_EXAMPLE"
+	if strings.HasPrefix(begin, "#+BEGIN_SRC ") {
+		end = "#+END_SRC"
+		if !regexp.MustCompile(`(?i)^#\+BEGIN_SRC\s+bibtex(?:\s+.+)?$`).MatchString(begin) {
+			return false
+		}
+	} else if !regexp.MustCompile(`(?i)^#\+BEGIN_EXAMPLE(?:\s+.+)?$`).MatchString(begin) {
+		return false
+	}
+	if !strings.EqualFold(strings.TrimSpace(parts[len(parts)-1]), end) {
 		return false
 	}
 	content := strings.TrimSpace(strings.Join(parts[1:len(parts)-1], "\n"))
-	return regexp.MustCompile(`^@[A-Za-z]+\s*[{(]`).MatchString(content) && !strings.Contains(strings.ToUpper(content), "#+END_EXAMPLE")
+	return paper.IsBibTeX(content) && !strings.Contains(strings.ToUpper(content), end)
 }
 
 func (d Document) Apply(edits []Edit) (string, error) {

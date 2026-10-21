@@ -81,9 +81,44 @@ If there is no abstract child, one is added. Mixed or handwritten abstract
 sections without generated markers are preserved. Other text around marked
 blocks is left in place.
 
-Every successful fetch requires authors and a full abstract. A failed paper is
-left unchanged and does not receive a new timestamp. Successful papers can
-still be refreshed; the command exits nonzero when any retrieval or file edit
+## BibTeX sections
+
+BibTeX is enabled by default, or explicitly with `--bibtex`. A generated
+`@bibtex` child is folded and placed immediately after the `@abstract` subtree,
+at the same heading level. Its drawer carries
+`:orgPaperMetadataGenerated: bibtex`. Source citations are preferred; otherwise
+a citation is built from known metadata, as described in the
+[converter documentation](semantic-scholar-to-org.md#bibtex).
+
+```zsh
+org-paper-metadata-updater --diff --bibtex '<directory-root>'
+org-paper-metadata-updater --write --force --bibtex '<directory-root>'
+org-paper-metadata-updater --write --no-bibtex '<directory-root>'
+```
+
+Normal freshness rules apply to additions and refreshes. Use `--force` to add
+BibTeX to entries whose metadata is still recent. `--no-bibtex` also removes
+marked sections from recent entries without fetching metadata. If a stale
+paper's retrieval fails, the requested removal still applies, and its metadata
+and fetch timestamp remain unchanged. Writing still requires `--write`.
+
+Recognizable legacy citation blocks at the end of an abstract are relocated
+unchanged into a folded `@bibtex` sibling. They remain unmarked because their
+keys or contents may have been edited by hand. Existing unmarked `@bibtex`
+sections are preserved and do not receive a duplicate generated citation.
+`--no-bibtex` never removes an unmarked citation. Ambiguous multiple citation
+blocks are left intact.
+
+Generated citations are refreshed on later updates. If a generated heading
+has acquired personal prose, IDs, custom properties, or child headings,
+`--no-bibtex` removes the citation block and ownership marker while keeping
+that personal content and its heading. A section containing only generated
+content is removed completely.
+
+Every successful fetch requires authors and a full abstract. A failed paper's
+metadata is left unchanged and does not receive a new timestamp. Only explicitly
+requested removal of generated BibTeX can still change that entry. Successful
+papers can still be refreshed; the command exits nonzero when any retrieval or file edit
 fails, and prints a summary of updates, recent entries, failures, and locks.
 
 Writes use a synced temporary file in the destination directory followed by
@@ -103,4 +138,4 @@ use temporary Org files. A read-only audit across a research tree also checked
 custom properties, handwritten content, saved citations, source blocks, heading
 hierarchy, and every generated field against its fetched source.
 
-Verified by @OpenAI on 2026-10-20.
+Verified by @OpenAI on 2026-10-21.

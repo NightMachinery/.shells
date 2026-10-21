@@ -18,6 +18,7 @@ func updaterCode(args []string) int {
 	o := paper.EnvOptions()
 	var u update.Options
 	flags := flag.NewFlagSet("org-paper-metadata-updater", flag.ContinueOnError)
+	bibtex := bibTeXFlags(flags)
 	flags.BoolVar(&u.Write, "write", false, "write changes atomically (default: dry run)")
 	dry := flags.Bool("dry-run", false, "explicitly select dry run; incompatible with --write")
 	flags.BoolVar(&u.Diff, "diff", false, "print a patch instead of per-heading status")
@@ -44,6 +45,7 @@ func updaterCode(args []string) int {
 		fmt.Fprintln(os.Stderr, err)
 		return 2
 	}
+	u.NoBibTeX = !*bibtex
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 	_, err := update.Run(ctx, flags.Arg(0), u, client(o).Fetch, time.Now(), os.Stdout, os.Stderr)

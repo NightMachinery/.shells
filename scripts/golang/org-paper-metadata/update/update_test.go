@@ -271,7 +271,7 @@ func TestLegacyAbstractWithBibTeXPreserved(t *testing.T) {
 	citation := "\n\n#+BEGIN_EXAMPLE bibtex\n@article{synthetic,\n  title={Saved citation},\n  year={2025}\n}\n#+END_EXAMPLE\n\n"
 	text := "* [[" + page + "][Old]]\n** @abstract\n:PROPERTIES:\n:ID: saved-abstract\n:END:\n\n#+BEGIN_QUOTE\nOld abstract.\n#+END_QUOTE" + citation + "** My notes\nKeep these notes.\n"
 	out := transform(t, text)
-	for _, want := range []string{citation, ":ID: saved-abstract", "The new complete abstract.", "*Semantic Scholar TLDR:* The new summary.", "** My notes\nKeep these notes.\n"} {
+	for _, want := range []string{strings.TrimSpace(citation), ":ID: saved-abstract", "The new complete abstract.", "*Semantic Scholar TLDR:* The new summary.", "** My notes\nKeep these notes.\n"} {
 		if !strings.Contains(out, want) {
 			t.Errorf("lost %q\n%s", want, out)
 		}

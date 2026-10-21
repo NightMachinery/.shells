@@ -2,12 +2,19 @@ package cli
 
 import (
 	"io"
+	"org-paper-metadata/paper"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 )
 
 func capture(t *testing.T, input string, args ...string) (int, string, string) {
+	t.Helper()
+	return captureCommand(t, input, mainCode, args...)
+}
+func captureCommand(t *testing.T, input string, run func([]string) int, args ...string) (int, string, string) {
 	t.Helper()
 	file, err := os.CreateTemp(t.TempDir(), "stdin")
 	if err != nil {
@@ -29,7 +36,7 @@ func capture(t *testing.T, input string, args ...string) (int, string, string) {
 	oldIn, oldOut, oldErr := os.Stdin, os.Stdout, os.Stderr
 	os.Stdin, os.Stdout, os.Stderr = file, stdout, stderr
 	defer func() { os.Stdin, os.Stdout, os.Stderr = oldIn, oldOut, oldErr }()
-	code := mainCode(args)
+	code := run(args)
 	stdout.Seek(0, 0)
 	stderr.Seek(0, 0)
 	out, _ := io.ReadAll(stdout)
@@ -54,5 +61,37 @@ func TestInvalidOptionsBeforeNetwork(t *testing.T) {
 		if code == 0 || out != "" {
 			t.Fatal(args, code, out)
 		}
+	}
+}
+
+func TestBibTeXFlagsAndLastSwitchWins(t *testing.T) {
+	input := `{"title":["Synthetic paper"],"abstract":["Full abstract."],"authors_names":["Example Author"],"url":["https://www.semanticscholar.org/paper/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"]}`
+	for _, tc := range []struct {
+		args    []string
+		enabled bool
+	}{
+		{nil, true}, {[]string{"--bibtex"}, true}, {[]string{"--no-bibtex"}, false},
+		{[]string{"--bibtex=false"}, false}, {[]string{"--no-bibtex", "--bibtex"}, true},
+		{[]string{"--bibtex", "--no-bibtex"}, false},
+	} {
+		args := append(append([]string{}, tc.args...), "--from-json", "https://www.semanticscholar.org/paper/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
+		code, out, err := capture(t, input, args...)
+		if code != 0 || strings.Contains(out, ":orgPaperMetadataGenerated: bibtex") != tc.enabled {
+			t.Fatal(tc, code, out, err)
+		}
+	}
+}
+func TestUpdaterNoBibTeXCleansRecentEntry(t *testing.T) {
+	root := t.TempDir()
+	path := filepath.Join(root, "papers.org")
+	m := paper.Metadata{"title": {"Synthetic paper"}, "authors_names": {"Example Author"}, "abstract": {"Full abstract."}, "url": {"https://www.semanticscholar.org/paper/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}}
+	m.Stamp("synthetic", time.Now())
+	org, _ := paper.RenderOrg(m)
+	text := "* " + strings.ReplaceAll(org, "\n* @", "\n** @")
+	os.WriteFile(path, []byte(text), 0600)
+	code, out, err := captureCommand(t, "", updaterCode, "--write", "--no-bibtex", root)
+	after, _ := os.ReadFile(path)
+	if code != 0 || strings.Contains(string(after), "@bibtex") || !strings.Contains(err, "recent=1") {
+		t.Fatal(code, out, err, string(after))
 	}
 }

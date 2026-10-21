@@ -21,8 +21,8 @@ import (
 )
 
 type Options struct {
-	Write, Force, Diff        bool
-	MaxAge, Interval, Timeout time.Duration
+	Write, Force, Diff, NoBibTeX bool
+	MaxAge, Interval, Timeout    time.Duration
 }
 type Stats struct{ Files, Headings, Recent, Updated, Failed, Locked int }
 type FetchFunc func(context.Context, string) (paper.Metadata, error)
@@ -175,6 +175,12 @@ func Run(ctx context.Context, root string, o Options, fetch FetchFunc, now time.
 			}
 			if !o.Force && Recent(target.Properties, now, o.MaxAge) {
 				stats.Recent++
+				if o.NoBibTeX {
+					if u := doc.BibTeXEdits(target, nil, true); len(u) > 0 {
+						edits = append(edits, u...)
+						updated++
+					}
+				}
 				continue
 			}
 			key, _ := paper.Identity(target.URL)
@@ -215,9 +221,15 @@ func Run(ctx context.Context, root string, o Options, fetch FetchFunc, now time.
 				stats.Failed++
 				failures = append(failures, r.err)
 				fmt.Fprintf(log, "%s:%d: %v\n", path, target.Heading.Start+1, r.err)
+				if o.NoBibTeX {
+					if cleanup := doc.BibTeXEdits(target, nil, true); len(cleanup) > 0 {
+						edits = append(edits, cleanup...)
+						updated++
+					}
+				}
 				continue
 			}
-			edits = append(edits, doc.Plan(target, r.metadata)...)
+			edits = append(edits, doc.PlanWithOptions(target, r.metadata, paper.OrgOptions{NoBibTeX: o.NoBibTeX})...)
 			updated++
 			if !o.Diff {
 				action := "would update"

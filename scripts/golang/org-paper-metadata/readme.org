@@ -6,6 +6,8 @@ page data, without an API key. Successful results require authors and a full
 abstract; a supplied TLDR appears before the abstract in the same heading.
 HTML retrieval is opt-in through =--scraper full-html2=; automatic retrieval
 uses page data and configured API/DeepSeek backends.
+A folded =@bibtex= sibling follows the abstract by default; =--no-bibtex=
+omits it. Generated sections carry an ownership property for safe updates.
 
 * Try it
 
@@ -36,6 +38,7 @@ The updater uses this module directly, with a dry run as its default:
 go install . ./cmd/org-paper-metadata-updater
 org-paper-metadata-updater --diff '<directory-root>'
 org-paper-metadata-updater --write '<directory-root>'
+org-paper-metadata-updater --write --no-bibtex '<directory-root>'
 #+end_src
 
 Entries fetched within seven days are skipped. Only existing paper headings
