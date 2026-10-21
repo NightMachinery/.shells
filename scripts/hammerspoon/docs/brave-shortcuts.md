@@ -9,6 +9,7 @@
 - **Cmd+Up / Cmd+Down** select the previous/next tab in tab-strip order.
 - **Cmd+Left / Cmd+Right** navigate page history through History > Back/Forward.
 - **Cmd+,** opens the titled-bookmark chooser, replacing Brave Preferences.
+- **Cmd+B** presses Bitwarden’s native extension action.
 
 The existing auto-load scan loads the module after the core configuration.
 Other apps retain their normal shortcuts. Shift/Option/Ctrl variants are not bound, and
@@ -120,3 +121,18 @@ comment blocks, duplicate entries and non-HTTP links. Live tests checked the
 seeded chooser entry, selecting a fixture in another window without adding a
 tab, opening one missing fixture, and reselecting it without adding another tab.
 The private bookmark itself was not opened during testing.
+
+## Native Bitwarden action
+
+Cmd+B presses the native Bitwarden toolbar button. If the button is not exposed,
+it opens the native Extensions menu and selects Bitwarden there. Pin/Unpin
+controls and webpage accessibility trees are excluded from the search. An
+already-open extension popup or side panel stays open. The action never sends
+Cmd+B to the browser. If no native action is available, it shows a warning.
+
+Bitwarden must be enabled and available in the current browser window. Pinning
+its action avoids the menu step. `BraveShortcuts.bitwarden.open()` runs the
+lookup, and `.lastResult` records toolbar/menu/already-open success.
+
+The selector tests cover native toolbar and menu actions, page imitation
+rejection, Pin/Unpin rejection, and already-open extension URL detection.

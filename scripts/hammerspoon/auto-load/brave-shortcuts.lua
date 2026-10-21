@@ -3,7 +3,7 @@
 -- Cmd+. opens native Tab Search; Cmd+/ opens a new tab.
 if BraveShortcuts then BraveShortcuts.stop() end
 
-BraveShortcuts = { version = "1.2.0", hotkeys = {} }
+BraveShortcuts = { version = "1.3.1", hotkeys = {} }
 local M = BraveShortcuts
 local bundleID = "com.brave.Browser"
 local log = hs.logger.new("brave-shortcuts", "warning")
@@ -196,6 +196,7 @@ end
 function M.stop()
     M.finishRecency()
     if M.flags then M.flags:stop() end
+    if M.bitwarden then M.bitwarden.stop() end
     if M.bookmarks then M.bookmarks.stop() end
     if M.tabs then M.tabs.stop() end
     if M.pending then M.pending:stop(); M.pending = nil end
@@ -214,7 +215,13 @@ M.bookmarks = dofile(nightdir .. "/hammerspoon/brave/bookmarks.lua")({
     engine = M.tabs, unavailable = unavailable,
 })
 
+M.bitwarden = dofile(nightdir .. "/hammerspoon/brave/bitwarden.lua")({
+    braveInFront = braveInFront, nativeWindow = nativeWindow,
+    unavailable = unavailable, clearError = function() M.lastError=nil end,
+})
+
 M.hotkeys = {
+    hs.hotkey.new({"cmd"}, "b", function() schedule(function() M.finishRecency(); M.bitwarden.open() end) end),
     hs.hotkey.new({"cmd"}, ",", function() schedule(function() M.finishRecency(); M.bookmarks.show() end) end),
     hs.hotkey.new({"cmd", "fn"}, "left", function() schedule(function() M.history(-1) end) end),
     hs.hotkey.new({"cmd", "fn"}, "right", function() schedule(function() M.history(1) end) end),
