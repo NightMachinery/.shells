@@ -1,9 +1,10 @@
 # Scheduled notes pushes
 
 `notes-push-logged` uses `log-to` to append dated entries, stdout and stderr
-from `notes-push` to the single file `~/logs/notes-push.log`. The existing
-logging helper adds a timestamp and separators around each run, creates the
-log directory when needed, and locks each append.
+from `notes-push` to `~/logs/notes-push/YYYY-MM-DD.log`. Runs on the same
+local calendar date share a file. The existing logging helper adds a timestamp
+and separators around each run, creates the log directory when needed, and
+locks each append.
 
 Both active cron jobs use `brishzgo` at minute 30 of each hour:
 
@@ -18,4 +19,4 @@ wrapper so the persistent garden loads it.
 
 For a manual logged push, run `notes-push-logged`, or
 `"$HOME/go/bin/brishzgo" notes-push-logged` from outside the configured shell.
-The log is retained until removed manually.
+Log files are retained until removed manually.

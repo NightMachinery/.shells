@@ -1,5 +1,5 @@
 function notes-push-logged {
-    log-to "${HOME}/logs/notes-push.log" notes-push "$@"
+    log-to "${HOME}/logs/notes-push/$(command date '+%Y-%m-%d').log" notes-push "$@"
 }
 ##
 ###
