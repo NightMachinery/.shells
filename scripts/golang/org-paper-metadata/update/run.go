@@ -169,18 +169,31 @@ func Run(ctx context.Context, root string, o Options, fetch FetchFunc, now time.
 		stats.Headings += len(targets)
 		var edits []Edit
 		updated := 0
+		applyLocal := func(target Target) {
+			local := doc.DrawerLinkEdits(target)
+			if o.NoBibTeX {
+				local = append(local, doc.BibTeXEdits(target, nil, true)...)
+			}
+			if len(local) == 0 {
+				return
+			}
+			edits = append(edits, local...)
+			updated++
+			if !o.Diff {
+				action := "would normalize"
+				if o.Write {
+					action = "normalize"
+				}
+				fmt.Fprintf(out, "%s %s:%d %s\n", action, path, target.Heading.Start+1, target.URL)
+			}
+		}
 		for _, target := range targets {
 			if ctx.Err() != nil {
 				return ctx.Err()
 			}
 			if !o.Force && Recent(target.Properties, now, o.MaxAge) {
 				stats.Recent++
-				if o.NoBibTeX {
-					if u := doc.BibTeXEdits(target, nil, true); len(u) > 0 {
-						edits = append(edits, u...)
-						updated++
-					}
-				}
+				applyLocal(target)
 				continue
 			}
 			key, _ := paper.Identity(target.URL)
@@ -221,12 +234,7 @@ func Run(ctx context.Context, root string, o Options, fetch FetchFunc, now time.
 				stats.Failed++
 				failures = append(failures, r.err)
 				fmt.Fprintf(log, "%s:%d: %v\n", path, target.Heading.Start+1, r.err)
-				if o.NoBibTeX {
-					if cleanup := doc.BibTeXEdits(target, nil, true); len(cleanup) > 0 {
-						edits = append(edits, cleanup...)
-						updated++
-					}
-				}
+				applyLocal(target)
 				continue
 			}
 			edits = append(edits, doc.PlanWithOptions(target, r.metadata, paper.OrgOptions{NoBibTeX: o.NoBibTeX})...)

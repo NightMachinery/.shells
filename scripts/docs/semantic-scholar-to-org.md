@@ -70,6 +70,26 @@ paper ID, with validation, cycle detection, and a bounded chain. Arbitrary
 mismatched payloads are rejected. This undocumented website endpoint can change,
 which is why the other backends remain available.
 
+## Latest arXiv links and privacy
+
+Recognized arXiv drawer URLs use `https://arxiv.org/abs/<id>`,
+`https://arxiv.org/pdf/<id>`, or `https://arxiv.org/html/<id>` without a `vN`
+suffix. The helper removes pinned version suffixes, normalizes official arXiv
+hosts and PDF suffixes, and deduplicates generated link fields. Query strings
+and fragments such as `#page=4` are preserved. Versionless identifiers refer to
+the latest version, as documented by [arXiv](https://info.arxiv.org/help/arxiv_identifier.html).
+
+The updater also normalizes existing paper drawers locally when their metadata
+is still recent, without a network request or a new fetch timestamp. Heading
+URLs, personal prose and saved BibTeX remain unchanged by this normalization.
+Optional links missing from a refresh are retained in versionless form.
+
+The updater reads and edits notes locally. Retrieval sends only paper
+identifiers/public URLs, never note text, drawer contents or local file paths.
+Automatic retrieval can send the public paper URL to configured DeepSeek Fetch.
+Use `--scraper page-data` to restrict retrieval to Semantic Scholar's keyless
+endpoint. Source/API credentials go only to their respective services.
+
 ## Org output
 
 Every successful conversion requires a title, authors, and a full abstract.

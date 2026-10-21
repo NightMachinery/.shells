@@ -23,7 +23,7 @@ func PropertyLines(m Metadata) []string {
 			if i > 0 {
 				name += "+"
 			}
-			if v = OneLine(v); v != "" {
+			if v = OneLine(LatestArxivURLs(v)); v != "" {
 				lines = append(lines, fmt.Sprintf(":%s: %s", name, v))
 			}
 		}

@@ -138,6 +138,7 @@ func ParsePageData(raw []byte, url string) (Metadata, error) {
 	for _, link := range links {
 		m.AddLink(str(object(link)["url"]), str(object(link)["linkType"]) == "pdf")
 	}
+	m.normalizeArxivLinks()
 	return m, m.Validate()
 }
 
@@ -185,6 +186,7 @@ func ParseJSON(raw []byte, fallbackURL string) (Metadata, error) {
 	if value := m.First("corpusID"); value != "" {
 		m["corpusID"] = []string{regexp.MustCompile(`(?i)^\s*Corpus\s*ID:\s*`).ReplaceAllString(value, "")}
 	}
+	m.normalizeArxivLinks()
 	return m, m.Validate()
 }
 
@@ -192,6 +194,8 @@ func (m Metadata) AddLink(link string, pdf bool) {
 	if !webURL(link) {
 		return
 	}
+	pdf = pdf || arxivPDF(link)
+	link = LatestArxivURL(link)
 	m.Put("links", link)
 	if pdf || strings.HasSuffix(strings.ToLower(strings.Split(link, "?")[0]), ".pdf") {
 		m.Put("pdf_urls", link)

@@ -277,7 +277,7 @@ func (d Document) PlanWithOptions(t Target, m paper.Metadata, options paper.OrgO
 			if match != nil && updatedKeys[strings.ToLower(strings.TrimSuffix(match[1], "+"))] {
 				continue
 			}
-			props = append(props, line)
+			props = append(props, paper.LatestArxivURLs(line))
 		}
 		props = append(props, newProps...)
 		props = append(props, d.Lines[t.DrawerEnd-1])
