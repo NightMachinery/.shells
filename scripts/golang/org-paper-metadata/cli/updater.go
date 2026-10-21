@@ -19,6 +19,8 @@ func updaterCode(args []string) int {
 	var u update.Options
 	flags := flag.NewFlagSet("org-paper-metadata-updater", flag.ContinueOnError)
 	bibtex := bibTeXFlags(flags)
+	flags.BoolVar(&o.BibTeXBrowser, "bibtex-browser", o.BibTeXBrowser, "allow full-html2 browser recovery for DBLP exports (default: disabled)")
+	flags.StringVar(&o.BibTeXSource, "bibtex-source", o.BibTeXSource, "auto (DBLP, DOI, Semantic Scholar), dblp, doi, or semantic-scholar")
 	flags.BoolVar(&u.Write, "write", false, "write changes atomically (default: dry run)")
 	dry := flags.Bool("dry-run", false, "explicitly select dry run; incompatible with --write")
 	flags.BoolVar(&u.Diff, "diff", false, "print a patch instead of per-heading status")

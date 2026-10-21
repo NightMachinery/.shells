@@ -17,7 +17,7 @@ func TestAnonymousCitationExport(t *testing.T) {
 		if calls == 1 {
 			return 200, pageJSON, nil
 		}
-		if r.Method != "POST" || r.URL.String() != "https://api.semanticscholar.org/graph/v1/paper/batch?fields=citationStyles" {
+		if r.Method != "POST" || r.URL.String() != "https://api.semanticscholar.org/graph/v1/paper/batch?fields=externalIds,citationStyles" {
 			t.Fatal(r.Method, r.URL)
 		}
 		if r.Header.Get("Authorization") != "" || r.Header.Get("x-api-key") != "" {
@@ -64,7 +64,7 @@ func TestDisabledCitationExportMakesNoExtraRequest(t *testing.T) {
 }
 func TestGraphCitationStylesRetainedWithoutSecondRequest(t *testing.T) {
 	raw := strings.TrimSuffix(apiJSON, "}") + `,"citationStyles":{"bibtex":"@article{NativeKey, title={API paper}}"}}`
-	c := fakeClient(Options{Scraper: "api", FetchBibTeX: true}, func(r *http.Request) (int, string, map[string]string) {
+	c := fakeClient(Options{Scraper: "api", FetchBibTeX: true, BibTeXSource: "semantic-scholar"}, func(r *http.Request) (int, string, map[string]string) {
 		if r.Method != "GET" || !strings.Contains(r.URL.Query().Get("fields"), "citationStyles") {
 			t.Fatal(r.Method, r.URL)
 		}

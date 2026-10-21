@@ -7,10 +7,15 @@ abstract; a supplied TLDR appears before the abstract in the same heading.
 HTML retrieval is opt-in through =--scraper full-html2=; automatic retrieval
 uses page data and configured API/DeepSeek backends.
 A folded =@bibtex= sibling follows the abstract when a citation is available.
-BibTeX comes from Semantic Scholar’s anonymous export, never local synthesis;
+BibTeX prefers DBLP, DOI, then Semantic Scholar, never local synthesis;
 =--no-bibtex= skips export and output. Managed sections carry an ownership
 property. The updater removes old marked, locally synthesized =@misc= records,
 including on recent entries, while preserving personal additions.
+Citation providers are independent of =--scraper=; use
+=--bibtex-source semantic-scholar= to restrict citations to Semantic Scholar.
+Configured DeepSeek Fetch can recover DBLP exports blocked by bot checks.
+=--bibtex-browser= opts into bounded =full-html2= recovery from an official
+DBLP mirror; browser fallback remains disabled by default.
 
 * Try it
 

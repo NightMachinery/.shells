@@ -90,14 +90,22 @@ Retrieved BibTeX is enabled by default, or explicitly with `--bibtex`. A managed
 `@bibtex` child is folded and placed immediately after the `@abstract` subtree,
 at the same heading level. Its drawer carries
 `:orgPaperMetadataGenerated: bibtex`. Only source-supplied citations are used,
-including Semantic Scholar’s anonymous batch export, as described in the
+preferentially DBLP, DOI, then Semantic Scholar’s anonymous export, as described
+in the
 [converter documentation](semantic-scholar-to-org.md#bibtex).
 
 ```zsh
-org-paper-metadata-updater --diff --bibtex '<directory-root>'
+org-paper-metadata-updater --diff --bibtex-source auto --bibtex '<directory-root>'
 org-paper-metadata-updater --write --force --bibtex '<directory-root>'
 org-paper-metadata-updater --write --no-bibtex '<directory-root>'
 ```
+
+`--bibtex-source` is independent of `--scraper`. To keep all requests limited
+to Semantic Scholar use `--scraper page-data --bibtex-source semantic-scholar`.
+Automatic citations may contact DBLP, DOI registration agencies, and configured
+DeepSeek Fetch for DBLP export recovery. `--bibtex-browser` additionally enables
+bounded `full-html2` recovery from DBLP’s official Trier mirror; it is off by
+default. Only public identifiers/URLs are sent.
 
 Normal freshness rules apply to additions and refreshes. Use `--force` to add
 BibTeX to entries whose metadata is still recent. `--no-bibtex` also removes

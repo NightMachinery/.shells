@@ -104,6 +104,7 @@ func ParsePageData(raw []byte, url string) (Metadata, error) {
 		return nil, errors.New("page-data paper ID does not match the requested paper")
 	}
 	m := Metadata{"paperId": {id}, "url": {url}}
+	m.addExternalIDs(object(p["externalIds"]))
 	for key, field := range map[string]string{"title": "title", "abstract": "paperAbstract", "year": "year", "venue": "venue", "corpusID": "corpusId", "publicationDate": "pubDate", "tldr": "tldr"} {
 		m.Put(key, str(p[field]))
 	}
@@ -159,6 +160,7 @@ func ParseJSON(raw []byte, fallbackURL string) (Metadata, error) {
 		}
 	}
 	m.Put("bibtex", str(firstObject(d["citationStyles"])["bibtex"]))
+	m.addExternalIDs(firstObject(d["externalIds"]))
 	for _, a := range array(d["authors"]) {
 		m.Put("authors_names", str(object(a)["name"]))
 	}
@@ -196,6 +198,12 @@ func (m Metadata) AddLink(link string, pdf bool) {
 		return
 	}
 	pdf = pdf || arxivPDF(link)
+	if doi := normalizeDOIURL(link); doi != "" {
+		m.Put("doi", doi)
+	}
+	if key := normalizeDBLPURL(link); key != "" {
+		m.Put("dblp", key)
+	}
 	link = LatestArxivURL(link)
 	m.Put("links", link)
 	if pdf || strings.HasSuffix(strings.ToLower(strings.Split(link, "?")[0]), ".pdf") {

@@ -27,6 +27,8 @@ func mainCode(args []string) int {
 	o := paper.EnvOptions()
 	flags := flag.NewFlagSet("org-paper-metadata", flag.ContinueOnError)
 	bibtex := bibTeXFlags(flags)
+	flags.BoolVar(&o.BibTeXBrowser, "bibtex-browser", o.BibTeXBrowser, "allow full-html2 browser recovery for DBLP exports (default: disabled)")
+	flags.StringVar(&o.BibTeXSource, "bibtex-source", o.BibTeXSource, "auto (DBLP, DOI, Semantic Scholar), dblp, doi, or semantic-scholar")
 	format := flags.String("format", "org", "org or json (JSONL for multiple URLs)")
 	resolve := flags.Bool("resolve", false, "resolve the Semantic Scholar page without fetching metadata")
 	parse := flags.String("parse", "", "parse stdin: page-data, json, html, fetch-json, or markdown")

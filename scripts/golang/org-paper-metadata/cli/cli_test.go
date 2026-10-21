@@ -56,7 +56,7 @@ func TestIncompleteJSONHasNoStdout(t *testing.T) {
 	}
 }
 func TestInvalidOptionsBeforeNetwork(t *testing.T) {
-	for _, args := range [][]string{{"--scraper", "typo", "https://example.org"}, {"--format", "typo", "https://example.org"}, {"--timeout", "0s", "https://example.org"}} {
+	for _, args := range [][]string{{"--scraper", "typo", "https://example.org"}, {"--format", "typo", "https://example.org"}, {"--timeout", "0s", "https://example.org"}, {"--bibtex-source", "typo", "https://example.org"}} {
 		code, out, _ := capture(t, "", args...)
 		if code == 0 || out != "" {
 			t.Fatal(args, code, out)

@@ -87,9 +87,12 @@ Optional links missing from a refresh are retained in versionless form.
 The updater reads and edits notes locally. Retrieval sends only paper
 identifiers/public URLs, never note text, drawer contents or local file paths.
 Automatic retrieval can send the public paper URL to configured DeepSeek Fetch.
-Use `--scraper page-data` to restrict retrieval to Semantic Scholar's keyless
-endpoints (page data and anonymous BibTeX export). Source/API credentials go only
-to their respective services.
+`--scraper page-data` selects keyless Semantic Scholar metadata. Citation
+providers are independent: the default also sends public DBLP/DOI identifiers
+to those services (and DOI registration-agency redirects). DBLP recovery can
+send its public export URL to configured DeepSeek Fetch. Use both
+`--scraper page-data --bibtex-source semantic-scholar` to restrict all retrieval
+to Semantic Scholar. Source/API credentials go only to their respective services.
 
 ## Org output
 
@@ -151,15 +154,50 @@ Put flags before URLs or the directory argument. The last BibTeX switch wins.
 `--no-bibtex` also skips the extra citation export request. Stdin parsing
 (`--from-json` or `--parse`) stays offline and uses only supplied BibTeX.
 
-The helper never synthesizes BibTeX. When the metadata does not already contain
-one, it requests Semantic Scholar's own export with an anonymous
-`POST https://api.semanticscholar.org/graph/v1/paper/batch?fields=citationStyles`,
-sending only `{"ids":["<paper-id>"]}`. No API key is needed or sent, even if one
-is configured. The response must identify the requested paper. Export has a
-15-second cap within the paper deadline. A missing or failed export emits a
-warning and leaves new output without a BibTeX section; metadata can still
-refresh. Existing retrieved or manually saved citations survive export failure.
-The source block escapes Org control lines; citation fields and keys are kept.
+The helper never synthesizes BibTeX. The default `--bibtex-source auto` selects
+DBLP, then DOI, then Semantic Scholar. If the DBLP key refers to a CoRR preprint
+and a DOI is available, DOI is tried first to prefer the published record.
+Each successful source record is kept without rewriting its fields or key.
+
+Identifiers come from the resolved Semantic Scholar paper's `externalIds.DBLP`
+and `externalIds.DOI`, or recognized DBLP/DOI URLs in fetched metadata. The
+keyless batch request asks for `externalIds,citationStyles`; its paper ID must
+match before either identifiers or its fallback citation are trusted. No title
+search, fuzzy matching, or LLM identification is used. Missing identifiers skip
+a provider. Incorrect upstream associations can still give incorrect citations.
+
+DBLP exports use `https://dblp.org/rec/<publication-key>.bib`. Direct requests
+that fail or return bot-check HTML can recover through configured DeepSeek
+Fetch, using the same export URL. DeepSeek may also be denied.
+`--bibtex-browser` explicitly enables `full-html2` recovery from the official
+Trier mirror’s record page with `?view=bibtex`, which passed a live challenge
+and returned source BibTeX. Its environment default is
+`semantic_scholar_bibtex_browser` (disabled). `fhMode` selects the existing
+browser mode, defaulting to `curlfull_s5`; `curlfull_s10` allows more rendering
+time. Browser recovery precedes DeepSeek when enabled. It is independent of
+the metadata scraper and remains off by default. Recovery accepts only a
+complete source BibTeX entry whose `DBLP:` key matches the requested publication. It does not
+generate or repair citations. DOI exports use `https://doi.org/<doi>` with
+`Accept: application/x-bibtex` and follow registration-agency redirects.
+Semantic Scholar's anonymous batch export is cached as the final fallback;
+no Semantic Scholar API key is sent by citation requests.
+
+`--bibtex-source dblp`, `doi`, or `semantic-scholar` selects only that citation
+provider (Semantic Scholar may still supply identifiers). The environment
+default is `semantic_scholar_bibtex_source`. Both Go commands accept the flag,
+and the Org shell wrapper forwards it. `--no-bibtex` skips citation enrichment.
+`bibtexSource` records the selected provider in JSON, without adding an Org
+property. Stdin parsing remains offline.
+
+Citation enrichment has a 30-second cap within the paper deadline. Individual
+SS/DOI attempts have eight seconds; DBLP has twelve, with up to four for direct
+export before optional DeepSeek recovery. With `--bibtex-browser`, the total
+citation cap is 50 seconds, DBLP gets 36 seconds including up to 24 for the
+browser, and the whole paper’s timeout still takes precedence. Unavailable
+providers fall through.
+If none succeeds, a warning is emitted and new output has no BibTeX section;
+metadata can still refresh and existing saved source citations survive.
+The source block escapes Org control lines.
 
 The ownership property marks sections maintained by the tool, not locally
 fabricated records. Old marked `@misc{ss<40-hex-id>,...}` or
@@ -170,14 +208,13 @@ without an extra request. Unmarked saved citations are never removed. Personal
 notes, IDs, custom properties, and child headings in a marked section survive
 cleanup, retaining their heading.
 
-Semantic Scholar exports may lack proceedings details. Other keyless options
-are [DOI content negotiation](https://citation.doi.org/docs.html)
-(`GET https://doi.org/<doi>` with `Accept: application/x-bibtex`) and
-[DBLP publication exports](https://blog.dblp.org/2020/08/18/new-dblp-url-scheme-and-api-changes/)
-(`https://dblp.org/rec/<publication-key>.bib`). DOI exports reflect registered
-publisher metadata; DBLP is useful for computer-science proceedings. These are
-alternatives, not automatic requests made by this helper. It does not search
-for publication matches or invent missing conference fields.
+Official interfaces: [DBLP publication exports](https://blog.dblp.org/2020/08/18/new-dblp-url-scheme-and-api-changes/),
+[DBLP search API](https://dblp.org/faq/How%2Bto%2Buse%2Bthe%2Bdblp%2Bsearch%2BAPI.html),
+[DBLP SPARQL](https://blog.dblp.org/2024/09/09/introducing-our-public-sparql-query-service/),
+[official DBLP mirrors](https://dblp.org/faq/Which%2Bmirror%2Bsites%2Bexist%2Bfor%2Bdblp.html),
+and [DOI content negotiation](https://citation.doi.org/docs.html).
+The helper uses citation exports and exact external-ID crosswalks; it does not
+query title search or serialize SPARQL metadata into new BibTeX.
 
 ## Refreshing existing notes
 

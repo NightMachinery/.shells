@@ -21,6 +21,8 @@ type Options struct {
 	Scraper                       string
 	APIEnabled                    bool
 	FetchBibTeX                   bool
+	BibTeXSource                  string
+	BibTeXBrowser                 bool
 	APIKey, DeepSeekKey, HTMLMode string
 }
 
@@ -32,7 +34,10 @@ func Enabled(s string) bool {
 	return true
 }
 func EnvOptions() Options {
-	o := Options{Scraper: os.Getenv("semantic_scholar_scraper"), APIKey: os.Getenv("SemanticScholar_API_key"), DeepSeekKey: os.Getenv("deepseek_api_key"), HTMLMode: os.Getenv("fhMode")}
+	o := Options{Scraper: os.Getenv("semantic_scholar_scraper"), APIKey: os.Getenv("SemanticScholar_API_key"), DeepSeekKey: os.Getenv("deepseek_api_key"), HTMLMode: os.Getenv("fhMode"), BibTeXSource: os.Getenv("semantic_scholar_bibtex_source"), BibTeXBrowser: Enabled(os.Getenv("semantic_scholar_bibtex_browser"))}
+	if o.BibTeXSource == "" {
+		o.BibTeXSource = "auto"
+	}
 	if o.Scraper == "" {
 		o.Scraper = "auto"
 	}
@@ -45,9 +50,14 @@ func EnvOptions() Options {
 func (o Options) Validate() error {
 	switch o.Scraper {
 	case "", "auto", "page-data", "api", "deepseek", "full-html2":
+	default:
+		return fmt.Errorf("scraper must be auto, page-data, api, deepseek, or full-html2")
+	}
+	switch o.BibTeXSource {
+	case "", "auto", "dblp", "doi", "semantic-scholar":
 		return nil
 	}
-	return fmt.Errorf("scraper must be auto, page-data, api, deepseek, or full-html2")
+	return fmt.Errorf("bibtex-source must be auto, dblp, doi, or semantic-scholar")
 }
 
 type Client struct {
@@ -268,12 +278,16 @@ func (c *Client) Fetch(ctx context.Context, input string) (Metadata, error) {
 			err = m.Validate()
 		}
 		if err == nil {
-			if c.Options.FetchBibTeX && BibTeX(m) == "" {
-				citationCtx, cancel := context.WithTimeout(ctx, 15*time.Second)
+			if c.Options.FetchBibTeX {
+				citationTimeout := 30 * time.Second
+				if c.Options.BibTeXBrowser {
+					citationTimeout = 50 * time.Second
+				}
+				citationCtx, cancel := context.WithTimeout(ctx, citationTimeout)
 				citationErr := c.fetchBibTeX(citationCtx, m)
 				cancel()
 				if citationErr != nil && c.Warnf != nil {
-					c.Warnf("Semantic Scholar BibTeX export failed: %v", citationErr)
+					c.Warnf("BibTeX export failed: %v", citationErr)
 				}
 			}
 			if ctx.Err() != nil {
