@@ -67,6 +67,14 @@ return function(config)
         return true
     end
 
+    function E.openGemini(query)
+        E.request({action="openURL",url="https://gemini.google.com/app"}, function(result)
+            report(result)
+            if result.ok then config.submitGemini(result, query) end
+        end)
+        return true
+    end
+
     function E.openURL(url)
         E.request({action="openURL",url=url}, report)
         return true

@@ -9,11 +9,27 @@ return function(config)
         end))
     end
 
+    local prefixes = { ["?"]="google", [".k"]="keepa", [".c"]="chatgpt",
+        [".g"]="gemini", [".l"]="claude" }
+
+    function Q.magic(query)
+        if not config.magic or type(query)~="string" then return nil end
+        -- Anchor before any normalization. Only an ASCII space is a separator.
+        local token, body = query:match("^(%S+) (.*)$")
+        return prefixes[token], body
+    end
+
     function Q.url(query, destination)
         if not query or not query:find("%S") then return nil end
-        local base = destination == "chatgpt" and "https://chatgpt.com/?q="
-            or "https://www.google.com/search?q="
-        return base .. encode(query)
+        if destination=="gemini" then return "https://gemini.google.com/app" end
+        local bases = {
+            google="https://www.google.com/search?q=",
+            chatgpt="https://chatgpt.com/?q=",
+            keepa="https://keepa.com/#!search/3-",
+            claude="https://claude.ai/new?q=",
+        }
+        local base=bases[destination]
+        return base and base .. encode(query) or nil
     end
 
     function Q.submit(destination, query)
@@ -26,6 +42,7 @@ return function(config)
             Q.pending = nil
             if not Q.stopped then
                 if destination=="chatgpt" then config.engine.openChatGPT(url, query)
+                elseif destination=="gemini" then config.engine.openGemini(query)
                 else config.engine.openURL(url) end
             end
         end)
@@ -35,7 +52,8 @@ return function(config)
     function Q.accept(choice)
         if not choice or choice.kind or choice.url then return false end
         -- enableDefaultForQuery supplies {text=query} when no result remains.
-        Q.submit("google", choice.text)
+        local destination, query=Q.magic(choice.text)
+        Q.submit(destination or "google", destination and query or choice.text)
         return true
     end
 
@@ -44,6 +62,8 @@ return function(config)
         if flags.alt or flags.ctrl or (flags.cmd and flags.shift) then return false end
         if flags.cmd then Q.submit("chatgpt"); return true end
         if flags.shift then Q.submit("google"); return true end
+        local destination, query=Q.magic(chooser:query())
+        if destination then Q.submit(destination, query); return true end
         local first = chooser:selectedRowContents(1)
         if not first or not first.text then Q.submit("google"); return true end
         return false

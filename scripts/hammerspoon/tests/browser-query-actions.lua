@@ -51,3 +51,46 @@ show("keep native combos"); assert(not Q.key(36,{cmd=true,shift=true}))
 assert(not Q.key(36,{ctrl=true,shift=true})); assert(not Q.key(20,{cmd=true}))
 show("cancel pending on reload"); Q.key(36,{cmd=true}); Q.stop(); flush(); assert(#opened==3)
 print("browser query action tests passed")
+
+-- Magic routing is opt-in for Omni. Bookmarks retain literal query behavior.
+assert(Q.magic(".g hello")==nil)
+local routed={}
+local magic=dofile("brave/query-actions.lua")({chooser=chooser,magic=true,engine={
+    openURL=function(url) routed[#routed+1]={url=url} end,
+    openChatGPT=function(url,query) routed[#routed+1]={url=url,query=query,kind="chatgpt"} end,
+    openGemini=function(query) routed[#routed+1]={query=query,kind="gemini"} end,
+}})
+local routes={["?"]="google",[".k"]="keepa",[".c"]="chatgpt",[".g"]="gemini",[".l"]="claude"}
+for token,destination in pairs(routes) do
+    local body="  a+b & ü\nsecond line"
+    local actual,text=magic.magic(token.." "..body)
+    assert(actual==destination and text==body) -- only one separator is removed
+    for _,query in ipairs({" "..token.." q","\t"..token.." q",token,token.."q",token.."\tq",token.."\nq","before "..token.." q"}) do
+        assert(magic.magic(query)==nil,query)
+    end
+    show(token.." "..body) -- even a highlighted matching row cannot steal it
+    assert(magic.key(36,{}));flush()
+    local action=routed[#routed]
+    if destination=="gemini" then assert(action.kind=="gemini" and action.query==body)
+    else assert(action.url==magic.url(body,destination)) end
+    if destination=="chatgpt" then assert(action.query==body) end
+end
+assert(magic.magic(".G query")==nil and magic.magic(".unknown query")==nil)
+assert(magic.url("a b","keepa")=="https://keepa.com/#!search/3-a%20b")
+assert(magic.url("a b","claude")=="https://claude.ai/new?q=a%20b")
+assert(magic.url("a b","gemini")=="https://gemini.google.com/app")
+assert(magic.url("a b","unsupported")==nil)
+show(" .g literal");assert(not magic.key(36,{})) -- leading space keeps local selection
+chooser.row={};assert(magic.key(36,{}));flush()
+assert(routed[#routed].url==magic.url(" .g literal","google"))
+show(".g full query");assert(magic.key(36,{shift=true}));flush()
+assert(routed[#routed].url==magic.url(".g full query","google"))
+show(".g full query");assert(magic.key(36,{cmd=true}));flush()
+assert(routed[#routed].kind=="chatgpt" and routed[#routed].query==".g full query")
+local count=#routed
+show(".g ");assert(magic.key(76,{}));flush();assert(chooser.visible and #routed==count)
+show(".c  \t");assert(magic.key(36,{}));flush();assert(chooser.visible and #routed==count)
+assert(magic.accept({text=".l from callback"}));flush()
+assert(routed[#routed].url==magic.url("from callback","claude"))
+magic.stop()
+print("strict Omni prefix tests passed")

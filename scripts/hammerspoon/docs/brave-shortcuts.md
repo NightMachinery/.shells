@@ -224,6 +224,40 @@ Google, Shift+Enter did so with matching rows, and Cmd+Enter requested ChatGPT
 with the complete query. These checks did not send test queries to either site.
 The configured private hostname alias also passed an exact-host fixture check.
 
+### Omni magic prefixes
+
+Version 1.7.0 adds these destinations on plain Enter, including when a local
+result is highlighted:
+
+- `? query`: Google.
+- `.k query`: Keepa search on Amazon Germany (domain 3).
+- `.c query`: a fresh ChatGPT conversation with automatic submission.
+- `.g query`: the Gemini consumer app at `https://gemini.google.com/app`,
+  selecting 4 Argon and High thinking before submitting.
+- `.l query`: a fresh Claude page with its query link for prefill.
+
+The token must begin at character one and be followed by one literal ASCII
+space. `.g question` is magic; ` .g question`, bare `.g`, `.gquestion`, and a tab
+immediately after `.g` are ordinary local searches. Tokens are case-sensitive.
+Only the token and its first separator space are removed; remaining whitespace
+and line breaks are preserved. An empty magic payload keeps the chooser open.
+These prefixes apply only to Omni, not the bookmarks chooser. Shift+Enter and
+Cmd+Enter retain their explicit destinations and use the full typed query.
+
+Gemini ignores a plain prompt query parameter in the tested browser, so
+`brave/gemini-submit.lua` fills its accessible composer directly. It verifies
+Argon and High through the menu's selected labels, waits for focus and value
+changes, and sends once. Some web menus open on focus; the submitter checks for
+that before sending a key that could close them again. Changing tabs or apps,
+an existing composer draft, unavailable Argon, or unconfirmed High cancels or
+times out without sending. Readiness expires after 45 seconds. This uses native
+scripting and Accessibility, without page JavaScript or clipboard changes.
+
+Run `lua tests/browser-query-actions.lua` and `lua tests/gemini-submit.lua` for
+prefix boundaries, destination precedence, delayed readiness, model selection,
+focus/tab cancellation, and one-send checks. A live harmless-prompt test also
+verified automatic Gemini submission with Argon High.
+
 ### Automatic ChatGPT submission
 
 Version 1.6.1 fixes the draft-only ChatGPT query link. After creating the fresh

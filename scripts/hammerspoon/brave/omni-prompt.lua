@@ -10,7 +10,7 @@ return function(config)
         end
     end)
     O.queryActions = dofile(nightdir .. "/hammerspoon/brave/query-actions.lua")({
-        chooser=O.chooser, engine=config.engine,
+        chooser=O.chooser, engine=config.engine, magic=true,
     })
     O.chooser:placeholderText("Omni Prompt · Shift+Enter: Google · Cmd+Enter: ChatGPT")
     O.chooser:width(65):rows(12)
