@@ -56,6 +56,24 @@ Invalid enum values fail before network access. Shell wrappers report backend
 failures through `ecgray`. Credentials travel through environment variables and
 HTTP headers, never command arguments or repository files.
 
+## Request pacing and rate limits
+
+The converter and updater space actual HTTP requests by at least one second
+per service, including redirects and retries. Semantic Scholar's website and
+Graph API share one budget, as do DBLP's `dblp.org` subdomains. Other hosts
+have independent budgets so a paused provider does not block another provider.
+The budget is shared across all papers within one invocation; separate
+processes do not coordinate their requests. Browser/shell retrieval is outside
+this HTTP limiter and remains opt-in.
+
+HTTP 429 and server errors receive at most two retries, with one- and two-second
+backoff. A longer `Retry-After` value (seconds or an HTTP date) takes precedence.
+Cooldowns also apply to subsequent papers and fallbacks, even after a request
+exhausts its retries or is canceled. Rate-limit retries produce a diagnostic
+through the existing warning channel. All waits respect cancellation and the
+paper timeout; the tool never retries sooner just to fit that timeout.
+Shared upstream quotas can still cause rate limits despite local pacing.
+
 ## URL identification
 
 arXiv URLs are identifiers, rather than substitute metadata sources. The helper

@@ -155,6 +155,9 @@ type transportFunc func(*http.Request) (*http.Response, error)
 func (f transportFunc) RoundTrip(r *http.Request) (*http.Response, error) { return f(r) }
 func fakeClient(o Options, serve func(*http.Request) (int, string, map[string]string)) *Client {
 	c := NewClient(o)
+	// Provider routing fixtures do not need real-time spacing. Pacing and
+	// cooldown behavior are exercised separately with a controlled clock.
+	c.pacer.interval = 0
 	c.HTTP.Transport = transportFunc(func(r *http.Request) (*http.Response, error) {
 		code, body, headers := serve(r)
 		h := http.Header{}

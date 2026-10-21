@@ -11,7 +11,6 @@ import (
 	"net/url"
 	"os"
 	"os/exec"
-	"strconv"
 	"strings"
 	"sync"
 	"syscall"
@@ -64,6 +63,7 @@ func (o Options) Validate() error {
 }
 
 type Client struct {
+	pacer *requestPacer
 	// Only the website's BibTeX export is disabled after a confirmed bot gate.
 	// SPARQL and other providers retain their own independent availability.
 	dblpExportMu      sync.Mutex
@@ -76,7 +76,7 @@ type Client struct {
 }
 
 func NewClient(o Options) *Client {
-	c := &Client{HTTP: &http.Client{Timeout: 90 * time.Second}, Options: o, Now: time.Now}
+	c := &Client{HTTP: &http.Client{Timeout: 90 * time.Second}, Options: o, Now: time.Now, pacer: newRequestPacer()}
 	c.HTTP.CheckRedirect = func(req *http.Request, via []*http.Request) error {
 		if len(via) >= 10 {
 			return errors.New("too many redirects")
@@ -104,6 +104,7 @@ func NewClient(o Options) *Client {
 }
 
 func (c *Client) request(ctx context.Context, method, endpoint string, body []byte, headers map[string]string) ([]byte, *http.Response, error) {
+	var previous error
 	for attempt := 0; attempt < 3; attempt++ {
 		req, err := http.NewRequestWithContext(ctx, method, endpoint, bytes.NewReader(body))
 		if err != nil {
@@ -113,12 +114,18 @@ func (c *Client) request(ctx context.Context, method, endpoint string, body []by
 		for k, v := range headers {
 			req.Header.Set(k, v)
 		}
-		resp, err := c.HTTP.Do(req)
+		httpClient := *c.HTTP
+		base := httpClient.Transport
+		if base == nil {
+			base = http.DefaultTransport
+		}
+		httpClient.Transport = pacedTransport{base: base, pacer: c.pacer, backoff: time.Second << attempt}
+		resp, err := httpClient.Do(req)
 		if err != nil {
-			return nil, nil, err
+			return nil, resp, errors.Join(previous, err)
 		}
 		// HEAD redirects identify a page even when its HTML is bot-challenged.
-		if method == http.MethodHead && PaperID(resp.Request.URL.String()) != "" {
+		if method == http.MethodHead && resp.StatusCode != 429 && resp.StatusCode < 500 && PaperID(resp.Request.URL.String()) != "" {
 			resp.Body.Close()
 			return nil, resp, nil
 		}
@@ -133,23 +140,13 @@ func (c *Client) request(ctx context.Context, method, endpoint string, body []by
 		if resp.StatusCode >= 200 && resp.StatusCode < 300 {
 			return data, resp, nil
 		}
+		previous = fmt.Errorf("%s returned HTTP %d", resp.Request.URL.Hostname(), resp.StatusCode)
 		if attempt == 2 || (resp.StatusCode != 429 && resp.StatusCode < 500) {
-			return nil, resp, fmt.Errorf("%s returned HTTP %d", req.URL.Hostname(), resp.StatusCode)
+			return nil, resp, previous
 		}
-		delay := time.Duration(attempt+1) * time.Second
-		if n, e := strconv.Atoi(resp.Header.Get("Retry-After")); e == nil && n > 0 {
-			delay = time.Duration(n) * time.Second
-		}
-		if d, e := http.ParseTime(resp.Header.Get("Retry-After")); e == nil && time.Until(d) > 0 {
-			delay = time.Until(d)
-		}
-		if delay > 30*time.Second {
-			return nil, resp, fmt.Errorf("%s returned HTTP %d; retry requested after %s", req.URL.Hostname(), resp.StatusCode, delay.Round(time.Second))
-		}
-		select {
-		case <-ctx.Done():
-			return nil, resp, ctx.Err()
-		case <-time.After(delay):
+		if resp.StatusCode == 429 && c.Warnf != nil {
+			delay := retryDelay(resp.Header.Get("Retry-After"), c.pacer.now(), time.Second<<attempt)
+			c.Warnf("%s rate limited (HTTP 429); retry %d/2 after at least %s", service(resp.Request.URL.Hostname()), attempt+1, delay.Round(time.Millisecond))
 		}
 	}
 	panic("unreachable")

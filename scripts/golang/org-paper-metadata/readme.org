@@ -9,6 +9,9 @@ default, preserving SS abstracts, summaries and counts. Use
 =--dblp-metadata=false= to disable publication enrichment.
 HTML retrieval is opt-in through =--scraper full-html2=; automatic retrieval
 uses page data and configured API/DeepSeek backends.
+HTTP requests are spaced by one second per service, including redirects and
+retries. Semantic Scholar's website and API share a budget across papers;
+rate-limit retries honor =Retry-After= within the paper timeout.
 A folded =@bibtex= sibling follows the abstract when a citation is available.
 BibTeX prefers DBLP, DOI, then Semantic Scholar, never local synthesis;
 =--no-bibtex= skips export and output. Managed sections carry an ownership

@@ -38,8 +38,11 @@ go install . ./cmd/org-paper-metadata-updater
   or changing the timestamp.
   File modification times are irrelevant. Missing or invalid
   timestamps trigger retrieval; an entry exactly seven days old is eligible.
-- Duplicate paper URLs share one fetch during a run. Requests are sequential,
-  with a one-second minimum interval between uncached fetches by default.
+- Duplicate paper URLs share one fetch during a run. Paper fetches are sequential,
+  with a one-second minimum interval between uncached fetch starts by default.
+  Actual HTTP requests also have a separate one-second minimum spacing per
+  service, including redirects and retries. Semantic Scholar's website and
+  API share that budget across all papers in the run.
 - Descendant symlinks, hidden subdirectories, `node_modules`, and files carrying an Emacs
   `.#filename` lock are skipped. Existing editor locks are reported separately. An explicitly supplied symlink
   root is resolved before walking.
@@ -53,8 +56,13 @@ org-paper-metadata-updater --scraper page-data --timeout 2m '<directory-root>'
 ```
 
 `--force` bypasses freshness checks. `--max-age` defaults to `168h`; `--timeout`
-defaults to one minute per paper, including all fallbacks. `--interval`
-controls spacing. Source selection and credentials follow the
+defaults to one minute per paper, including all fallbacks and rate-limit waits.
+`--interval` controls paper-fetch spacing; setting it to zero does not disable
+HTTP request pacing. HTTP 429 and server errors get at most two retries with
+backoff, honoring longer `Retry-After` values. A cooldown persists across
+fallbacks and subsequent papers, and cancellation interrupts waits. Budgets
+are local to one invocation, so other clients can still consume a shared quota.
+Source selection, rate-limit details and credentials follow the
 [paper converter](semantic-scholar-to-org.md). Automatic mode never launches
 `full-html2`; select it explicitly to enable HTML retrieval. Each network fetch
 is logged before it starts, followed by its elapsed time on success. Ctrl-C
