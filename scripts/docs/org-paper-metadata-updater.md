@@ -84,6 +84,18 @@ If there is no abstract child, one is added. Mixed or handwritten abstract
 sections without generated markers are preserved. Other text around marked
 blocks is left in place.
 
+## DBLP publication fields
+
+DBLP SPARQL JSON enriches publication fields by default, using exact identifiers.
+It can replace a preprint DBLP association with a unique published DOI match,
+and supplies canonical title/authors, venue/year, proceedings, publisher, pages,
+volume/issue, series, ISBN/ISSN and a DBLP URL when available. Full abstracts,
+TLDRs, counts and dates remain from Semantic Scholar. Missing DBLP values do
+not erase saved fields, and failed enrichment leaves SS metadata available.
+Use `--dblp-metadata=false` to disable it. Recent entries retain their normal
+skip; `--force` applies enrichment immediately. This remains active with
+`--no-bibtex` because it does not create citations.
+
 ## BibTeX sections
 
 Retrieved BibTeX is enabled by default, or explicitly with `--bibtex`. A managed
@@ -101,7 +113,8 @@ org-paper-metadata-updater --write --no-bibtex '<directory-root>'
 ```
 
 `--bibtex-source` is independent of `--scraper`. To keep all requests limited
-to Semantic Scholar use `--scraper page-data --bibtex-source semantic-scholar`.
+to Semantic Scholar use
+`--scraper page-data --bibtex-source semantic-scholar --dblp-metadata=false`.
 Automatic citations may contact DBLP, DOI registration agencies, and configured
 DeepSeek Fetch for DBLP export recovery. `--bibtex-browser` additionally enables
 bounded `full-html2` recovery from DBLP’s official Trier mirror as a last

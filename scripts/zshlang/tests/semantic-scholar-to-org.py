@@ -19,7 +19,7 @@ import json,os,sys
 if os.environ['TEST_PAPER_FAIL']:
     print('api failed: synthetic failure', file=sys.stderr)
     sys.exit(22)
-print(json.dumps({'args':sys.argv[1:],'key_present':bool(os.getenv('SemanticScholar_API_key')),'scraper':os.getenv('semantic_scholar_scraper')}))
+print(json.dumps({'args':sys.argv[1:],'key_present':bool(os.getenv('SemanticScholar_API_key')),'scraper':os.getenv('semantic_scholar_scraper'),'bibtex_source':os.getenv('semantic_scholar_bibtex_source'),'bibtex_browser':os.getenv('semantic_scholar_bibtex_browser'),'dblp_metadata':os.getenv('semantic_scholar_dblp_metadata')}))
 """)
             binary.chmod(0o755)
             updater = Path(directory) / "org-paper-metadata-updater"
@@ -34,6 +34,9 @@ function pbcopy { print -ru2 -- 'Unexpected clipboard write'; return 99 }
 SemanticScholar_API_key=synthetic-key
 deepseek_api_key=synthetic-key
 semantic_scholar_scraper=page-data
+semantic_scholar_bibtex_source=doi
+semantic_scholar_bibtex_browser=y
+semantic_scholar_dblp_metadata=n
 "$1" "${@:2}"
 '''
             return subprocess.run(["zsh", "-c", script, "_", function, *(arguments if arguments is not None else [input_url])], env=env,
@@ -46,6 +49,9 @@ semantic_scholar_scraper=page-data
         self.assertEqual(data['args'],['--format','json',URL])
         self.assertTrue(data['key_present'])
         self.assertEqual(data['scraper'],'page-data')
+        self.assertEqual(data['bibtex_source'],'doi')
+        self.assertEqual(data['bibtex_browser'],'y')
+        self.assertEqual(data['dblp_metadata'],'n')
 
     def test_org_delegates_without_lisp(self):
         result=self.run_shell("semantic-scholar-to-org")
@@ -69,6 +75,9 @@ semantic_scholar_scraper=page-data
         data=json.loads(result.stdout)
         self.assertEqual(data['args'],['/tmp/synthetic root'])
         self.assertTrue(data['key_present'])
+        self.assertEqual(data['bibtex_source'],'doi')
+        self.assertEqual(data['bibtex_browser'],'y')
+        self.assertEqual(data['dblp_metadata'],'n')
 
     def test_bibtex_flags_are_forwarded(self):
         for function, arguments, expected in [

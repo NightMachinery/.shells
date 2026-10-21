@@ -202,3 +202,23 @@ func TestLegacyMiscReplacedWithRetrievedCitation(t *testing.T) {
 		t.Fatal(out)
 	}
 }
+
+func TestPublicationFieldsRefreshPreservesPersonalNotes(t *testing.T) {
+	text := "* TODO @someTag [[" + page + "][Old]]\n:PROPERTIES:\n:ID: saved-id\n:custom: My annotation\n:publisher: Old publisher\n:END:\nPrivate analysis sentinel.\n** My questions\nKeep this child.\n"
+	d, _ := Parse(text)
+	targets, _ := d.Targets()
+	m := freshCitation()
+	m["publisher"] = []string{"Example Publisher"}
+	m["booktitle"] = []string{"Proceedings of Example Conference"}
+	m["pages"] = []string{"12-24"}
+	m["dblp"] = []string{"https://dblp.org/rec/conf/example/Test25"}
+	out, err := d.Apply(d.PlanWithOptions(targets[0], m, paper.OrgOptions{}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{"TODO @someTag", ":ID: saved-id", ":custom: My annotation", "Private analysis sentinel.", "** My questions\nKeep this child.", ":publisher: Example Publisher", ":booktitle: Proceedings of Example Conference", ":pages: 12-24"} {
+		if !strings.Contains(out, want) {
+			t.Fatal(want, out)
+		}
+	}
+}

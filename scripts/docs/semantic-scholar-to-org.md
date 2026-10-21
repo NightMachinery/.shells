@@ -91,7 +91,8 @@ Automatic retrieval can send the public paper URL to configured DeepSeek Fetch.
 providers are independent: the default also sends public DBLP/DOI identifiers
 to those services (and DOI registration-agency redirects). DBLP recovery can
 send its public export URL to configured DeepSeek Fetch. Use both
-`--scraper page-data --bibtex-source semantic-scholar` to restrict all retrieval
+`--scraper page-data --bibtex-source semantic-scholar --dblp-metadata=false`
+to restrict all retrieval
 to Semantic Scholar. Source/API credentials go only to their respective services.
 
 ## Org output
@@ -114,6 +115,34 @@ A supplied TLDR appears in a plain quote block before the full abstract,
 inside the same folded `@abstract` heading. Comment-marked summary and abstract blocks
 identify generated content for later refreshes. Zero counts are preserved;
 missing values are omitted.
+
+## DBLP publication metadata
+
+DBLP enrichment is enabled by default, independently of citation output.
+`--dblp-metadata=false` disables it; the environment default is
+`semantic_scholar_dblp_metadata` (enabled). Stdin parsing remains offline.
+`--no-bibtex` suppresses citation retrieval and output, while publication
+metadata enrichment may still fetch exact external identifiers and SPARQL JSON.
+
+The helper obtains the resolved paper’s DBLP/DOI identifiers from Semantic
+Scholar. If its DBLP key is absent or points to CoRR and a DOI is known, an
+indexed, exact DOI lookup tries to locate the published DBLP record. DOI case
+variants are rechecked; multiple matches, mismatched IDs and conflicting
+published DOIs are rejected. No title search or LLM matching is involved.
+
+The matched record and its proceedings supply title, complete ordered authors,
+publication year, venue, publication type, proceedings title, publisher, pages,
+volume, issue, series/series volume, ISBN and ISSN when available. The canonical
+DBLP record URL is recorded as `dblp`. CoRR records never downgrade published
+metadata. Incomplete author lists retain the Semantic Scholar authors.
+
+The Semantic Scholar heading URL, full abstract, TLDR, citation counts, subjects,
+open-access status and publication dates are retained. DBLP’s publication year
+can differ from the first-publication date, for example for an older preprint.
+Missing DBLP fields do not erase existing data. Enrichment is bounded to 20
+seconds within the paper timeout; failure warns and keeps Semantic Scholar data.
+Org updates continue to preserve personal notes and unrelated properties.
+This maps source metadata into Org; it does not construct BibTeX.
 
 ## Venue tags
 
@@ -186,7 +215,8 @@ no Semantic Scholar API key is sent by citation requests.
 `--bibtex-source dblp`, `doi`, or `semantic-scholar` selects only that citation
 provider (Semantic Scholar may still supply identifiers). The environment
 default is `semantic_scholar_bibtex_source`. Both Go commands accept the flag,
-and the Org shell wrapper forwards it. `--no-bibtex` skips citation enrichment.
+and the Org shell wrapper forwards it. `--no-bibtex` skips citation export;
+DBLP publication-metadata enrichment remains independently configurable.
 `bibtexSource` records the selected provider in JSON, without adding an Org
 property. Stdin parsing remains offline.
 

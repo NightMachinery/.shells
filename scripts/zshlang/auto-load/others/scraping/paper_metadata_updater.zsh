@@ -16,6 +16,9 @@ Refresh existing Org paper headings, skipping metadata fetched within seven days
     local -x deepseek_api_key="${deepseek_api_key}"
     local -x semantic_scholar_api_p="${semantic_scholar_api_p}"
     local -x semantic_scholar_scraper="${semantic_scholar_scraper:-auto}"
+    local -x semantic_scholar_bibtex_source="${semantic_scholar_bibtex_source:-auto}"
+    local -x semantic_scholar_bibtex_browser="${semantic_scholar_bibtex_browser:-n}"
+    local -x semantic_scholar_dblp_metadata="${semantic_scholar_dblp_metadata:-y}"
     local -x fhMode="${fhMode}"
     local line
     command org-paper-metadata-updater "$@" 2> >(while IFS= read -r line ; do ecgray "${line}" ; done)

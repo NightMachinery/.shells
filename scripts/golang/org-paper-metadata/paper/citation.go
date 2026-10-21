@@ -29,7 +29,7 @@ func (c *Client) fetchBibTeX(ctx context.Context, m Metadata) error {
 			return
 		}
 		ssLoaded = true
-		if fallback != "" && (source == "semantic-scholar" || (normalizeDBLP(m.First("dblp")) != "" && normalizeDOI(m.First("doi")) != "")) {
+		if fallback != "" && (source == "semantic-scholar" || (normalizeDBLP(m.First("dblp")) != "")) {
 			return
 		}
 		requestCtx, cancel := context.WithTimeout(ctx, 8*time.Second)
@@ -144,12 +144,19 @@ func (c *Client) fetchBibTeX(ctx context.Context, m Metadata) error {
 // The public batch export accepts anonymous requests. Only the resolved public
 // paper ID is sent, never local notes, titles, paths, or configured credentials.
 func (c *Client) semanticScholarCitation(ctx context.Context, m Metadata) (string, error) {
+	return c.semanticScholarIdentifiers(ctx, m, true)
+}
+func (c *Client) semanticScholarIdentifiers(ctx context.Context, m Metadata, withBib bool) (string, error) {
 	id := strings.ToLower(m.First("paperId"))
 	if !idPattern.MatchString(id) {
 		return "", errors.New("no valid Semantic Scholar paper ID for citation export")
 	}
 	body, _ := json.Marshal(map[string][]string{"ids": {id}})
-	raw, _, err := c.request(ctx, http.MethodPost, "https://api.semanticscholar.org/graph/v1/paper/batch?fields=externalIds,citationStyles", body, map[string]string{"Content-Type": "application/json"})
+	fields := "externalIds"
+	if withBib {
+		fields += ",citationStyles"
+	}
+	raw, _, err := c.request(ctx, http.MethodPost, "https://api.semanticscholar.org/graph/v1/paper/batch?fields="+fields, body, map[string]string{"Content-Type": "application/json"})
 	if err != nil {
 		return "", err
 	}

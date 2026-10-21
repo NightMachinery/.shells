@@ -23,6 +23,7 @@ type Options struct {
 	FetchBibTeX                   bool
 	BibTeXSource                  string
 	BibTeXBrowser                 bool
+	EnrichDBLP                    bool
 	APIKey, DeepSeekKey, HTMLMode string
 }
 
@@ -35,6 +36,7 @@ func Enabled(s string) bool {
 }
 func EnvOptions() Options {
 	o := Options{Scraper: os.Getenv("semantic_scholar_scraper"), APIKey: os.Getenv("SemanticScholar_API_key"), DeepSeekKey: os.Getenv("deepseek_api_key"), HTMLMode: os.Getenv("fhMode"), BibTeXSource: os.Getenv("semantic_scholar_bibtex_source"), BibTeXBrowser: Enabled(os.Getenv("semantic_scholar_bibtex_browser"))}
+	o.EnrichDBLP = os.Getenv("semantic_scholar_dblp_metadata") == "" || Enabled(os.Getenv("semantic_scholar_dblp_metadata"))
 	if o.BibTeXSource == "" {
 		o.BibTeXSource = "auto"
 	}
@@ -278,6 +280,18 @@ func (c *Client) Fetch(ctx context.Context, input string) (Metadata, error) {
 			err = m.Validate()
 		}
 		if err == nil {
+			if c.Options.EnrichDBLP {
+				enrichmentCtx, enrichmentCancel := context.WithTimeout(ctx, 20*time.Second)
+				enrichmentErr := c.enrichDBLP(enrichmentCtx, m)
+				enrichmentCancel()
+				if enrichmentErr != nil && c.Warnf != nil {
+					if errors.Is(enrichmentErr, context.DeadlineExceeded) {
+						c.Warnf("DBLP metadata enrichment timed out; keeping Semantic Scholar metadata")
+					} else {
+						c.Warnf("DBLP metadata enrichment failed: %v", enrichmentErr)
+					}
+				}
+			}
 			if c.Options.FetchBibTeX {
 				citationTimeout := 30 * time.Second
 				if c.Options.BibTeXBrowser {

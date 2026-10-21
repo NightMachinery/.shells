@@ -27,6 +27,7 @@ func mainCode(args []string) int {
 	o := paper.EnvOptions()
 	flags := flag.NewFlagSet("org-paper-metadata", flag.ContinueOnError)
 	bibtex := bibTeXFlags(flags)
+	flags.BoolVar(&o.EnrichDBLP, "dblp-metadata", o.EnrichDBLP, "enrich publication metadata through DBLP SPARQL (default: enabled)")
 	flags.BoolVar(&o.BibTeXBrowser, "bibtex-browser", o.BibTeXBrowser, "allow full-html2 browser recovery for DBLP exports (default: disabled)")
 	flags.StringVar(&o.BibTeXSource, "bibtex-source", o.BibTeXSource, "auto (DBLP, DOI, Semantic Scholar), dblp, doi, or semantic-scholar")
 	format := flags.String("format", "org", "org or json (JSONL for multiple URLs)")

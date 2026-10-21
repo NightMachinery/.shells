@@ -4,6 +4,9 @@ Native Semantic Scholar fetching, normalization, and Org rendering, shared by
 the shell converter and paper-note tooling. Default retrieval starts with public
 page data, without an API key. Successful results require authors and a full
 abstract; a supplied TLDR appears before the abstract in the same heading.
+Exact DBLP/DOI crosswalks enrich publication fields through SPARQL JSON by
+default, preserving SS abstracts, summaries and counts. Use
+=--dblp-metadata=false= to disable publication enrichment.
 HTML retrieval is opt-in through =--scraper full-html2=; automatic retrieval
 uses page data and configured API/DeepSeek backends.
 A folded =@bibtex= sibling follows the abstract when a citation is available.
