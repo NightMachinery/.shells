@@ -3,8 +3,8 @@
 `hammerspoon/auto-load/brave-shortcuts.lua` installs browser hotkeys while Brave
 (`com.brave.Browser`) is frontmost:
 
-- **Cmd+.** opens Brave's native Tab Search.
-- **Cmd+/** opens a new tab through File > New Tab.
+- **Cmd+.** opens a new tab through File > New Tab.
+- **Cmd+/** opens Brave's native Tab Search.
 - **Cmd+N / Cmd+M** move older/newer through tab recency in the current window.
 - **Cmd+Up / Cmd+Down** select the previous/next tab in tab-strip order.
 - **Cmd+Left / Cmd+Right** navigate page history through History > Back/Forward.
@@ -14,7 +14,7 @@
 The existing auto-load scan loads the module after the core configuration.
 Other apps retain their normal shortcuts. Shift/Option/Ctrl variants are not bound, and
 holding a key does not repeat the action.
-Pressing Cmd+. while its native search input is already focused leaves it open.
+Pressing Cmd+/ while its native search input is already focused leaves it open.
 
 These hotkeys consume the original chord and activate native browser controls,
 without forwarding Cmd+Shift+A or Cmd+T. Webpage keyboard handlers therefore
@@ -44,8 +44,8 @@ before replacing them.
 
 Version 1.0.2 passed Lua syntax validation and live Hammerspoon checks in a
 temporary Brave window. A page with canceling keyboard handlers received
-neither shortcut: Cmd+. focused the native Tab Search combo box, and Cmd+/
-created a new tab with the page textarea focused. Repeated Cmd+. kept the
+neither shortcut under the original mapping: Cmd+. focused the native Tab Search
+combo box, and Cmd+/ created a new tab with the page textarea focused. Repeated Cmd+. kept the
 search open without a warning. Re-running the module replaced its previous
 bindings and watcher. App scoping and loading through the full configuration
 were checked after restoring the previous app.
@@ -136,3 +136,6 @@ lookup, and `.lastResult` records toolbar/menu/already-open success.
 
 The selector tests cover native toolbar and menu actions, page imitation
 rejection, Pin/Unpin rejection, and already-open extension URL detection.
+
+Version 1.3.2 swaps the two browser actions: Cmd+. creates a tab and Cmd+/
+opens native Tab Search. The action implementations stay the same.

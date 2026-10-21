@@ -1,9 +1,9 @@
 -- Brave-only browser actions, ahead of webpage keyboard handlers.
 -- Loaded by core/reload.lua's auto-load directory scan.
--- Cmd+. opens native Tab Search; Cmd+/ opens a new tab.
+-- Cmd+. opens a new tab; Cmd+/ opens native Tab Search.
 if BraveShortcuts then BraveShortcuts.stop() end
 
-BraveShortcuts = { version = "1.3.1", hotkeys = {} }
+BraveShortcuts = { version = "1.3.2", hotkeys = {} }
 local M = BraveShortcuts
 local bundleID = "com.brave.Browser"
 local log = hs.logger.new("brave-shortcuts", "warning")
@@ -229,8 +229,8 @@ M.hotkeys = {
     hs.hotkey.new({"cmd"}, "m", function() schedule(function() M.recency(-1) end) end),
     hs.hotkey.new({"cmd", "fn"}, "up", function() schedule(function() M.finishRecency(); M.tabs.step(-1) end) end),
     hs.hotkey.new({"cmd", "fn"}, "down", function() schedule(function() M.finishRecency(); M.tabs.step(1) end) end),
-    hs.hotkey.new({"cmd"}, ".", function() schedule(M.tabSearch) end),
-    hs.hotkey.new({"cmd"}, "/", function() schedule(M.newTab) end),
+    hs.hotkey.new({"cmd"}, ".", function() schedule(M.newTab) end),
+    hs.hotkey.new({"cmd"}, "/", function() schedule(M.tabSearch) end),
 }
 M.flags = hs.eventtap.new({hs.eventtap.event.types.flagsChanged}, function(event)
     if not event:getFlags().cmd then M.finishRecency() end
