@@ -50,6 +50,10 @@ search open without a warning. Re-running the module replaced its previous
 bindings and watcher. App scoping and loading through the full configuration
 were checked after restoring the previous app.
 
+Version 1.4.0 passed live checks of the swapped New Tab and Tab Search chords,
+and reuse of redirected Gmail account tabs. Gmail matching checks cover encoded
+email addresses, different accounts, malformed parameters and lookalike origins.
+
 ## Tab navigation
 
 Enable **Cycle through the most recently used tabs with Ctrl-Tab** in
@@ -121,6 +125,17 @@ comment blocks, duplicate entries and non-HTTP links. Live tests checked the
 seeded chooser entry, selecting a fixture in another window without adding a
 tab, opening one missing fixture, and reselecting it without adding another tab.
 The private bookmark itself was not opened during testing.
+
+### Gmail accounts
+
+Gmail account bookmarks can use
+`https://mail.google.com/mail/?authuser=ADDRESS#inbox`, with the email address
+URL-encoded in place of `ADDRESS`. This preserves the account identity when
+Google changes session numbers. Gmail redirects to `/mail/u/N/`; the chooser
+recognizes that account from Gmail's own tab title and reuses it across windows.
+Only the exact HTTPS Gmail origin and mail path participate in this matching.
+An existing tab for that account is selected even if it shows another folder.
+Other websites retain exact URL matching.
 
 ## Native Bitwarden action
 

@@ -10,6 +10,22 @@ function canonicalURL(value) {
     return scheme + '://' + host + (m[3] || '/') + (m[4] || '');
 }
 
+// Google redirects email-based authuser links to session-number URLs. Match
+// the account on Gmail's own tab title after that redirect, not the number.
+function gmailAccount(url, title) {
+    var canonical = canonicalURL(url);
+    if (!/^https:\/\/mail\.google\.com\/mail(?:\/|[?#]|$)/.test(canonical)) return null;
+    var auth = canonical.match(/[?&]authuser=([^&#]*)/);
+    if (auth) {
+        try {
+            var email = decodeURIComponent(auth[1].replace(/\+/g, ' '));
+            if (/^[^\s@]+@[^\s@]+$/.test(email)) return email.toLowerCase();
+        } catch (_) { /* A malformed parameter is not an account identity. */ }
+    }
+    var match = String(title || '').match(/(?:^| - )([^\s@]+@[^\s@]+) - Gmail$/i);
+    return match ? match[1].toLowerCase() : null;
+}
+
 function handle(request, b) {
     function windows() { return b.windows(); }
     function snapshot(w) {
@@ -35,11 +51,12 @@ function handle(request, b) {
     if (request.action === 'bookmark') {
         var url = request.url;
         if (typeof url !== 'string' || !/^https?:\/\/[^\s]+$/i.test(url)) return {ok:false,error:'Bookmark must be an HTTP or HTTPS URL'};
-        var list = windows(), wanted = canonicalURL(url);
+        var list = windows(), wanted = canonicalURL(url), account = gmailAccount(url);
         for (var i=0;i<list.length;i++) {
             var urls = list[i].tabs.url();
+            var titles = account ? list[i].tabs.title() : [];
             for (var j=0;j<urls.length;j++) {
-                if (canonicalURL(urls[j]) === wanted) {
+                if (canonicalURL(urls[j]) === wanted || (account && gmailAccount(urls[j], titles[j]) === account)) {
                     var result = select(list[i], j+1);
                     result.reused = true;
                     return result;
