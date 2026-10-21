@@ -240,3 +240,20 @@ submitted, cancelled, or timeout. `lua tests/chatgpt-submit.lua` covers delayed
 readiness, exact text, disabled Send, changed focus/tab, wrong origin/path,
 reload cancellation, and one-send behavior. A live test verified that the
 prompt left the composer and became an actual ChatGPT conversation.
+
+### Community evidence for URL submission (2026-10-21)
+
+URL auto-submit existed historically. [Tenable's July 2025 disclosure](https://www.tenable.com/security/research/tra-2025-22)
+records automatic submission through `q=` and OpenAI reporting protections based
+on `Sec-Fetch-Site` on July 11, 2025. This establishes a security-related change,
+not a complete specification of current behavior for every launch context.
+
+More recent community tools report draft-only behavior for both `q=` and
+`prompt=` and add their own Send-button automation:
+[January 2026 userscript](https://greasyfork.org/en/scripts/564702-chatgpt-auto-submit-query)
+and [September 2026 userscript](https://greasyfork.org/en/scripts/592577-chatgpt-url-prompt-auto-submit).
+[Community reports](https://www.reddit.com/r/ClaudeAI/comments/1kvuz7u/any_way_to_autosubmit_queries_via_url_parameters/)
+also describe previously working auto-submit becoming prefill-only. URL options
+such as `#autoSubmit=1` in [ChatGPT-URL-Extension](https://github.com/GrayXu/ChatGPT-URL-Extension)
+are implemented by that extension, not evidence of a native ChatGPT switch.
+No dependable current URL-only submission parameter was established by this search.
