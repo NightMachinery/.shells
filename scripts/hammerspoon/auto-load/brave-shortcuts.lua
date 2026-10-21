@@ -3,7 +3,7 @@
 -- Cmd+. opens native Tab Search; Cmd+/ opens a new tab.
 if BraveShortcuts then BraveShortcuts.stop() end
 
-BraveShortcuts = { version = "1.0.2", hotkeys = {} }
+BraveShortcuts = { version = "1.1.4", hotkeys = {} }
 local M = BraveShortcuts
 local bundleID = "com.brave.Browser"
 local log = hs.logger.new("brave-shortcuts", "warning")
@@ -104,6 +104,30 @@ local function findTabSearch(win)
     end
 end
 
+-- Brave owns the MRU list. Its controller commits on Ctrl release, whereas
+-- these bindings use Cmd. Preserve all physical flags and never release a
+-- physically held Ctrl key.
+function M.finishRecency()
+    if not M.cycling then return end
+    local flags = hs.eventtap.checkKeyboardModifiers()
+    if flags.ctrl then return end
+    M.cycling = false
+    if braveInFront() then
+        hs.eventtap.event.newKeyEvent("ctrl", false):setFlags(flags):post()
+    end
+end
+
+function M.recency(direction)
+    local app = braveInFront()
+    if not app then return false end
+    local title = direction == -1 and "Select Previous Tab" or "Select Next Tab"
+    if not app:selectMenuItem({"Tab", title}) then return unavailable(title .. " menu action unavailable") end
+    M.cycling = true
+    M.lastError = nil
+    if not hs.eventtap.checkKeyboardModifiers().cmd then M.finishRecency() end
+    return true
+end
+
 function M.newTab()
     local app = braveInFront()
     if not app then return false end
@@ -114,6 +138,18 @@ function M.newTab()
         return true
     end
     return unavailable("New Tab menu action unavailable")
+end
+
+function M.history(direction)
+    local app = braveInFront()
+    if not app then return false end
+    M.finishRecency()
+    local path = {"History", direction == -1 and "Back" or "Forward"}
+    local item = app:findMenuItem(path)
+    -- Reaching a history boundary is a normal no-op.
+    if item and not item.enabled then return false end
+    if app:selectMenuItem(path) then M.lastError=nil; return true end
+    return unavailable("History menu action unavailable")
 end
 
 function M.tabSearch()
@@ -147,6 +183,7 @@ end
 
 function M.sync()
     local active = braveInFront() ~= nil
+    if not active then M.cycling = false end
     for _, binding in ipairs(M.hotkeys) do
         if active then
             if not binding:enable() then unavailable("could not register a browser hotkey") end
@@ -157,6 +194,9 @@ function M.sync()
 end
 
 function M.stop()
+    M.finishRecency()
+    if M.flags then M.flags:stop() end
+    if M.tabs then M.tabs.stop() end
     if M.pending then M.pending:stop(); M.pending = nil end
     if M.watcher then M.watcher:stop(); M.watcher = nil end
     for _, binding in ipairs(M.hotkeys) do binding:delete() end
@@ -164,10 +204,25 @@ function M.stop()
     M.searchButton, M.searchWindow = nil, nil
 end
 
+M.tabs = dofile(nightdir .. "/hammerspoon/brave/tabs.lua")({
+    braveInFront = braveInFront, unavailable = unavailable,
+    clearError = function() M.lastError=nil end,
+})
+
 M.hotkeys = {
+    hs.hotkey.new({"cmd", "fn"}, "left", function() schedule(function() M.history(-1) end) end),
+    hs.hotkey.new({"cmd", "fn"}, "right", function() schedule(function() M.history(1) end) end),
+    hs.hotkey.new({"cmd"}, "n", function() schedule(function() M.recency(1) end) end),
+    hs.hotkey.new({"cmd"}, "m", function() schedule(function() M.recency(-1) end) end),
+    hs.hotkey.new({"cmd", "fn"}, "up", function() schedule(function() M.finishRecency(); M.tabs.step(-1) end) end),
+    hs.hotkey.new({"cmd", "fn"}, "down", function() schedule(function() M.finishRecency(); M.tabs.step(1) end) end),
     hs.hotkey.new({"cmd"}, ".", function() schedule(M.tabSearch) end),
     hs.hotkey.new({"cmd"}, "/", function() schedule(M.newTab) end),
 }
+M.flags = hs.eventtap.new({hs.eventtap.event.types.flagsChanged}, function(event)
+    if not event:getFlags().cmd then M.finishRecency() end
+    return false
+end):start()
 M.watcher = hs.application.watcher.new(function(_, event)
     if event == hs.application.watcher.activated or
         event == hs.application.watcher.deactivated or
