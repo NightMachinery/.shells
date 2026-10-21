@@ -55,6 +55,18 @@ return function(config)
         E.request({action="selectTab",tabId=tabId}, report)
     end
 
+    function E.activeState(callback)
+        E.request({action="activeState"}, callback)
+    end
+
+    function E.openChatGPT(url, query)
+        E.request({action="openURL",url=url}, function(result)
+            report(result)
+            if result.ok then config.submitChatGPT(result, query) end
+        end)
+        return true
+    end
+
     function E.openURL(url)
         E.request({action="openURL",url=url}, report)
         return true

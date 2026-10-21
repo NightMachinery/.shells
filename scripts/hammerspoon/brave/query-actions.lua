@@ -17,13 +17,17 @@ return function(config)
     end
 
     function Q.submit(destination, query)
-        local url = Q.url(query or chooser:query(), destination)
+        query = query or chooser:query()
+        local url = Q.url(query, destination)
         if not url or Q.stopped then return false end
         if chooser:isVisible() then chooser:cancel() end
         -- Exit the event callback and let chooser focus restoration finish.
         Q.pending = hs.timer.doAfter(0, function()
             Q.pending = nil
-            if not Q.stopped then config.engine.openURL(url) end
+            if not Q.stopped then
+                if destination=="chatgpt" then config.engine.openChatGPT(url, query)
+                else config.engine.openURL(url) end
+            end
         end)
         return true
     end

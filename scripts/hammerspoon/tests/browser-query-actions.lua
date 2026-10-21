@@ -18,7 +18,13 @@ function chooser:cancel() self.visible=false; self.hideFn() end
 function chooser:enableDefaultForQuery(value) self.fallback=value end
 function chooser:showCallback(fn) self.showFn=fn end
 function chooser:hideCallback(fn) self.hideFn=fn end
-local Q=dofile("brave/query-actions.lua")({chooser=chooser,engine={openURL=function(url) opened[#opened+1]=url end}})
+local Q=dofile("brave/query-actions.lua")({chooser=chooser,engine={
+    openURL=function(url) opened[#opened+1]=url end,
+    openChatGPT=function(url,query)
+        assert(query=="always chat")
+        opened[#opened+1]=url
+    end,
+}})
 local function show(query) chooser.text=query; chooser.row={text="Matching row"}; chooser.visible=true; chooser.showFn() end
 local function flush()
     local work=pending; pending={}

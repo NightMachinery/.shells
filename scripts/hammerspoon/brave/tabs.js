@@ -41,6 +41,14 @@ function handle(request, b) {
         return snapshot(w);
     }
     if (request.action === 'snapshot' || request.action === 'active') return snapshot(windows()[0]);
+    if (request.action === 'activeState') {
+        var w = windows()[0], state = snapshot(w);
+        if (state.ok) {
+            state.url = w.tabs.url()[state.index-1];
+            state.frontmost = b.frontmost();
+        }
+        return state;
+    }
     if (request.action === 'list') {
         var list = windows(), tabs = [];
         for (var i=0;i<list.length;i++) {

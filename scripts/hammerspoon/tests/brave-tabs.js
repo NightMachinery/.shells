@@ -11,7 +11,10 @@ function window(id, entries) {
 const entry = id=>({id,title:'Duplicate',url:'https://example.org/'});
 const a=window(1,[entry(10),entry(11)]), b=window(2,[entry(20)]);
 let activation=0;
-const browser={windows:()=>[a,b],activate(){activation++}};
+const browser={windows:()=>[a,b],frontmost:()=>true,activate(){activation++}};
+let state=context.handle({action:'activeState'},browser);
+assert.equal(state.tabId,'10'); assert.equal(state.url,'https://example.org/');
+assert.equal(state.frontmost,true);
 let result=context.handle({action:'list'},browser);
 assert.equal(result.tabs.length,3);
 assert.equal(new Set(result.tabs.map(t=>t.tabId)).size,3);

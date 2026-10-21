@@ -3,7 +3,7 @@
 -- Cmd+. opens a new tab; Cmd+/ opens Omni Prompt; Cmd+Shift+/ native Tab Search.
 if BraveShortcuts then BraveShortcuts.stop() end
 
-BraveShortcuts = { version = "1.6.0", hotkeys = {} }
+BraveShortcuts = { version = "1.6.1", hotkeys = {} }
 local M = BraveShortcuts
 local bundleID = "com.brave.Browser"
 local log = hs.logger.new("brave-shortcuts", "warning")
@@ -197,6 +197,7 @@ function M.stop()
     M.finishRecency()
     if M.flags then M.flags:stop() end
     if M.bitwarden then M.bitwarden.stop() end
+    if M.chatgpt then M.chatgpt.stop() end
     if M.omniPrompt then M.omniPrompt.stop() end
     if M.bookmarks then M.bookmarks.stop() end
     if M.tabs then M.tabs.stop() end
@@ -210,6 +211,10 @@ end
 M.tabs = dofile(nightdir .. "/hammerspoon/brave/tabs.lua")({
     braveInFront = braveInFront, unavailable = unavailable,
     clearError = function() M.lastError=nil end,
+    submitChatGPT = function(opened, query) M.chatgpt.submit(opened, query) end,
+})
+M.chatgpt = dofile(nightdir .. "/hammerspoon/brave/chatgpt-submit.lua")({
+    engine=M.tabs, braveInFront=braveInFront, nativeWindow=nativeWindow, unavailable=unavailable,
 })
 
 M.searchAliases = dofile(nightdir .. "/hammerspoon/brave/search-aliases.lua")({

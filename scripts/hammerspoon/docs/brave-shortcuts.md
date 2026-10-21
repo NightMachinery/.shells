@@ -191,8 +191,7 @@ hostname keywords using the shared literal AND matcher.
 - Enter selects the highlighted result. With no matching rows, it searches
   Google for the entire query.
 - Shift+Enter always searches Google, even when a result matches.
-- Cmd+Enter opens the query in a new ChatGPT tab using
-  `https://chatgpt.com/?q=ENCODED_QUERY`.
+- Cmd+Enter opens the query in a new ChatGPT tab and submits it automatically.
 
 Query actions always create a fresh Brave tab. Empty or whitespace-only queries
 perform no navigation. Query text is encoded as UTF-8 URI-component bytes, so
@@ -224,3 +223,20 @@ Live checks captured outgoing navigation locally: no-match Enter requested
 Google, Shift+Enter did so with matching rows, and Cmd+Enter requested ChatGPT
 with the complete query. These checks did not send test queries to either site.
 The configured private hostname alias also passed an exact-host fixture check.
+
+### Automatic ChatGPT submission
+
+Version 1.6.1 fixes the draft-only ChatGPT query link. After creating the fresh
+tab, `brave/chatgpt-submit.lua` waits for its composer to contain the exact
+query and an enabled Send control. It focuses that composer and posts Return
+once. Native tab identity, the ChatGPT new-chat URL, and Brave focus are checked
+before sending. Changing the active tab or app cancels submission. A query that
+does not become ready within 45 seconds reports a warning. A delivered Return
+is never retried.
+
+This uses Brave's native tab scripting and Accessibility, so no userscript
+update is required. `BraveShortcuts.chatgpt.lastResult` reports waiting,
+submitted, cancelled, or timeout. `lua tests/chatgpt-submit.lua` covers delayed
+readiness, exact text, disabled Send, changed focus/tab, wrong origin/path,
+reload cancellation, and one-send behavior. A live test verified that the
+prompt left the composer and became an actual ChatGPT conversation.
