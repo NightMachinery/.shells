@@ -273,7 +273,15 @@ The installed `chrome-cli` likewise has no custom-header navigation option.
 Its [upstream documentation](https://github.com/prasmussen/chrome-cli)
 identifies Scripting Bridge as its transport. `execute` can run page JavaScript
 when Allow JavaScript from Apple Events is enabled, permitting DOM-based
-submission, but page JavaScript still cannot override `Sec-` headers. A separate
+submission, but page JavaScript still cannot override `Sec-` headers.
+For a future DOM submitter, a page-local readiness observer and direct Send-button
+click could reduce AX round trips and avoid dependence on keyboard focus or
+Enter preferences. It would require Apple Events JavaScript permission and
+maintenance of ChatGPT DOM selectors; background tab suspension remains relevant.
+The existing JXA bridge exposes the same JavaScript execution command, so this
+would not require adding a chrome-cli subprocess dependency. This is an
+architectural comparison, not a live-verified replacement for the current AX code.
+A separate
 [chrome-devtools-cli](https://github.com/aeroxy/chrome-devtools-cli) uses CDP
 and documents `--extra-headers` for navigation; whether a specific fetch metadata
 override restores ChatGPT auto-submit still needs verification.
