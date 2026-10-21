@@ -9,10 +9,47 @@ return function(config)
         end))
     end
 
-    local prefixes = { ["?"]="google", [".a"]="amazon", [".k"]="keepa", [".c"]="chatgpt",
-        [".g"]="gemini", [".l"]="claude", [".s"]="semanticscholar",
-        [".gh"]="github", [".y"]="youtube", [".w"]="wikipedia",
-        [".r"]="reddit", [".gs"]="googlescholar", [".ni"]="ninisite" }
+    local magics = {
+        {"?", "google", "Google", "Web search"},
+        {".a", "amazon", "Amazon Germany", "Product search"},
+        {".k", "keepa", "Keepa", "Amazon Germany price search"},
+        {".c", "chatgpt", "ChatGPT", "New conversation, automatically submitted"},
+        {".g", "gemini", "Gemini", "Consumer app, Argon High, automatically submitted"},
+        {".l", "claude", "Claude", "New conversation with query prefilled"},
+        {".s", "semanticscholar", "Semantic Scholar", "Research papers"},
+        {".gs", "googlescholar", "Google Scholar", "Scholarly literature"},
+        {".gh", "github", "GitHub", "Repositories"},
+        {".y", "youtube", "YouTube", "Videos"},
+        {".w", "wikipedia", "Wikipedia", "English encyclopedia"},
+        {".r", "reddit", "Reddit", "Google with site:reddit.com"},
+        {".ni", "ninisite", "Ninisite", "Google with site:ninisite.com"},
+    }
+    local prefixes = {}
+    for _, magic in ipairs(magics) do prefixes[magic[1]]=magic[2] end
+
+    function Q.helpChoices()
+        local choices = {}
+        for _, magic in ipairs(magics) do
+            choices[#choices+1] = {text=magic[1] .. " · " .. magic[3],
+                subText=magic[4], prefix=magic[1], kind="magic"}
+        end
+        return choices
+    end
+
+    local function defer(action)
+        if chooser:isVisible() then chooser:cancel() end
+        -- Exit the event callback and let chooser focus restoration finish.
+        Q.pending = hs.timer.doAfter(0, function()
+            Q.pending = nil
+            if not Q.stopped then action() end
+        end)
+    end
+
+    function Q.help(query)
+        if not config.magic or query~=".help" or not config.showHelp or Q.stopped then return false end
+        defer(config.showHelp)
+        return true
+    end
 
     function Q.magic(query)
         if not config.magic or type(query)~="string" then return nil end
@@ -46,15 +83,10 @@ return function(config)
         query = query or chooser:query()
         local url = Q.url(query, destination)
         if not url or Q.stopped then return false end
-        if chooser:isVisible() then chooser:cancel() end
-        -- Exit the event callback and let chooser focus restoration finish.
-        Q.pending = hs.timer.doAfter(0, function()
-            Q.pending = nil
-            if not Q.stopped then
-                if destination=="chatgpt" then config.engine.openChatGPT(url, query)
-                elseif destination=="gemini" then config.engine.openGemini(query)
-                else config.engine.openURL(url) end
-            end
+        defer(function()
+            if destination=="chatgpt" then config.engine.openChatGPT(url, query)
+            elseif destination=="gemini" then config.engine.openGemini(query)
+            else config.engine.openURL(url) end
         end)
         return true
     end
@@ -62,6 +94,7 @@ return function(config)
     function Q.accept(choice)
         if not choice or choice.kind or choice.url then return false end
         -- enableDefaultForQuery supplies {text=query} when no result remains.
+        if Q.help(choice.text) then return true end
         local destination, query=Q.magic(choice.text)
         Q.submit(destination or "google", destination and query or choice.text)
         return true
@@ -72,6 +105,7 @@ return function(config)
         if flags.alt or flags.ctrl or (flags.cmd and flags.shift) then return false end
         if flags.cmd then Q.submit("chatgpt"); return true end
         if flags.shift then Q.submit("google"); return true end
+        if Q.help(chooser:query()) then return true end
         local destination, query=Q.magic(chooser:query())
         if destination then Q.submit(destination, query); return true end
         local first = chooser:selectedRowContents(1)

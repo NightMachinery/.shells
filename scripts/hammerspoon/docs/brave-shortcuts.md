@@ -246,6 +246,16 @@ highlighted:
 - `.r query`: Google restricted to `site:reddit.com`.
 - `.ni query`: Google restricted to `site:ninisite.com`.
 
+Type exactly `.help` and press Enter to open a searchable magic cheatsheet.
+Filter by prefix, destination name, or description using the usual literal AND
+matching. Selecting a row reopens Omni with that prefix and a trailing space,
+ready for the query; it does not navigate or submit anything. Escape closes the
+cheatsheet. The list and routing share one registry, so new entries appear in
+help automatically. `.help` is an exact command and needs no trailing space;
+leading whitespace or extra text keeps it a normal local query. Modified Enter
+retains its Google/ChatGPT behavior. Run `lua tests/omni-prompt.lua` for the
+cheatsheet selection, filtering, and cancellation checks.
+
 The token must begin at character one and be followed by one literal ASCII
 space. `.g question` is magic; ` .g question`, bare `.g`, `.gquestion`, and a tab
 immediately after `.g` are ordinary local searches. Tokens are case-sensitive.

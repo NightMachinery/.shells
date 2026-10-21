@@ -11,11 +11,30 @@ return function(config)
     end)
     O.queryActions = dofile(nightdir .. "/hammerspoon/brave/query-actions.lua")({
         chooser=O.chooser, engine=config.engine, magic=true,
+        showHelp=function() O.showHelp() end,
     })
-    O.chooser:placeholderText("Omni Prompt · Shift+Enter: Google · Cmd+Enter: ChatGPT")
+    O.chooser:placeholderText("Omni Prompt · .help: shortcuts · Shift+Enter: Google · Cmd+Enter: ChatGPT")
     O.chooser:width(65):rows(12)
 
-    function O.show()
+    O.helpChooser = ChooserSearch.new(function(choice)
+        if not choice or O.stopped then return end
+        -- A chooser's completion restores focus before the next chooser opens.
+        O.pendingHelp = hs.timer.doAfter(0, function()
+            O.pendingHelp = nil
+            if not O.stopped then O.show(choice.prefix .. " ") end
+        end)
+    end)
+    O.helpChooser:placeholderText("Magic shortcuts · filter by name · Enter: use prefix · Esc: close")
+    O.helpChooser:width(65):rows(12)
+
+    function O.showHelp()
+        if O.stopped or not config.braveInFront() then return false end
+        O.helpChooser:query("")
+        ChooserSearch.setChoices(O.helpChooser, O.queryActions.helpChoices()):show()
+        return true
+    end
+
+    function O.show(query)
         if O.stopped or not config.braveInFront() then return false end
         O.generation = O.generation + 1
         local generation = O.generation
@@ -38,7 +57,7 @@ return function(config)
             if not result.ok then config.unavailable(result.error) end
             if bookmarkError then config.unavailable(bookmarkError) end
             O.choiceCount = #choices
-            O.chooser:query("")
+            O.chooser:query(query or "")
             ChooserSearch.setChoices(O.chooser, config.searchAliases.apply(choices)):show()
         end)
         return true
@@ -48,7 +67,9 @@ return function(config)
         O.queryActions.stop()
         O.stopped = true
         O.generation = O.generation + 1
+        if O.pendingHelp then O.pendingHelp:stop(); O.pendingHelp=nil end
         O.chooser:hide(); O.chooser:delete()
+        O.helpChooser:hide(); O.helpChooser:delete()
     end
     return O
 end
