@@ -64,12 +64,15 @@ local hyperModeIndicator = hyperModeIndicatorOrig
 hyper_mode = ModalMode.create{name="hyper"}
 ModalMode.installGlobals(hyper_mode, "hyper")
 
+HyperFocusRestore = dofile(nightdir .. "/hammerspoon/core/hyper-focus-restore.lua")()
 prevFocusedElement = nil
 function hyper_modality:entered()
     -- When hs.hotkey.modal has finished enabling the mode's keys and hands
     -- over to this; see the timing lines in core/app-hotkeys/main.lua.
     hyper_mode.enteredAt = hs.timer.absoluteTime()
     hyper_modality.entered_p = true
+    HyperFocusRestore.cancel()
+    prevFocusedElement = nil
 
     -- First, before the Secure Input dance below, which does synchronous AX
     -- work and can take its time: the blackout chords are dispatched from this
@@ -93,15 +96,11 @@ function hyper_modality:entered()
 
         hyperModeIndicator = hyperModeIndicatorSI
         -- Unfocus the app's focused element over Accessibility; exited()
-        -- focuses it again. Two older tries, unused for a while, are in git
-        -- history: an Escape, and focusing a Hammerspoon webview at the
+        -- focuses it again only while that same native window owns focus.
+        -- Two older tries, unused for a while, are in git history: an Escape, and focusing a Hammerspoon webview at the
         -- primary screen's corner, with a wait for Secure Input to end and a
         -- warning band when it did not.
-        local axApp = hs.axuielement.applicationElement(hs.application.frontmostApplication())
-        prevFocusedElement = axApp and axApp.AXFocusedUIElement
-        if prevFocusedElement then
-            prevFocusedElement.AXFocused = false
-        end
+        prevFocusedElement = HyperFocusRestore.capture(hs.application.frontmostApplication())
     else
         hyperModeIndicator = hyperModeIndicatorOrig
     end
@@ -117,9 +116,7 @@ function hyper_modality:exited()
 
     if alertV2PeekEnd then alertV2PeekEnd() end
 
-    if prevFocusedElement and prevFocusedElement:isValid() then
-        prevFocusedElement.AXFocused = true
-    end
+    HyperFocusRestore.restore(prevFocusedElement)
     prevFocusedElement = nil
 
     hyperModeIndicator:hide()

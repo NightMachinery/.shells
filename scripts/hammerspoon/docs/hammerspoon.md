@@ -109,6 +109,17 @@ answers promptly, and unbounded for one that does not. Set it to `true` there,
 or from the console, if an app with several windows,
 on several spaces say, ever comes forward with the wrong one.
 
+Hyper's Secure Input workaround temporarily unfocuses the current control.
+`core/hyper-focus-restore.lua` records its process and native window first, and
+requests restoration only if both still own focus on release. Unknown ownership
+leaves the control untouched. App/window switch requests cancel restoration
+immediately, including while macOS is still activating the requested target.
+The legacy `prevFocusedElement = nil` cancellation used by mouse bindings still
+works. AX failures clear the saved state, and each queried element has a
+0.15-second timeout. `lua tests/hyper-focus-restore.lua` covers ownership changes,
+pending activation, Chromium focus proxies, invalid elements, missing identity,
+and failed AX writes. This guard does not change the app activation policy.
+
 The second press of a hotkey hides its app and returns you to the app you were
 in before. Left to itself, macOS activates an app of its own choosing when the
 frontmost app hides: hyper+x, hyper+k, hyper+k landed in Telegram rather than

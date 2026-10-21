@@ -589,9 +589,17 @@ local kModalPanelLayer = 8
 -- older value is dropped.
 local appFloatingGen = 0
 
+local function appCancelHyperFocusRestore()
+    -- Cancel at intent time: the old app can still be active while macOS
+    -- asynchronously brings the requested app/window forward.
+    prevFocusedElement = nil
+    if HyperFocusRestore then HyperFocusRestore.cancel() end
+end
+
 --- Drops every floating check still waiting: call it when a key moves focus
 --- some other way (hyper+z, hyper+;).
 function appFloatingSupersede()
+    appCancelHyperFocusRestore()
     appFloatingGen = appFloatingGen + 1
 end
 
@@ -707,6 +715,7 @@ end
 --- and otherwise the app through appBringForward, which asks it nothing and
 --- so may raise a floating window: that is checked once the app activates.
 function screenReturnFocus(t, label)
+    appCancelHyperFocusRestore()
     if t.window and pcall(function() t.window:focus() end) then return end
     appCheckFloatingOnActivation(t.app, label)
     appBringForward(t.app)
@@ -841,6 +850,7 @@ end)
 appHideWatcher:start()
 
 local function toggleFocusApp(app)
+    appCancelHyperFocusRestore()
     local t0 = hs.timer.absoluteTime()
     local hyperNote = appSwitchHyperNote(t0)
 
