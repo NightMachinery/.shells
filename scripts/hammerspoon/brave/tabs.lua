@@ -47,6 +47,11 @@ return function(config)
         return true
     end
 
+    function E.openBookmark(url)
+        E.request({action="bookmark",url=url}, report)
+        return true
+    end
+
     function E.stop()
         E.stopped = true
         E.queue = {}

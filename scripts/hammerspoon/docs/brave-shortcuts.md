@@ -8,6 +8,7 @@
 - **Cmd+N / Cmd+M** move older/newer through tab recency in the current window.
 - **Cmd+Up / Cmd+Down** select the previous/next tab in tab-strip order.
 - **Cmd+Left / Cmd+Right** navigate page history through History > Back/Forward.
+- **Cmd+,** opens the titled-bookmark chooser, replacing Brave Preferences.
 
 The existing auto-load scan loads the module after the core configuration.
 Other apps retain their normal shortcuts. Shift/Option/Ctrl variants are not bound, and
@@ -89,3 +90,33 @@ traversed and reversed the list, separate completed Cmd+N presses toggled the
 last two tabs, Up/Down wrapped in strip order, and native Back/Forward moved
 between controlled history entries. The asynchronous strip task was checked
 after completion. App scoping remained disabled outside Brave.
+
+## Bookmark chooser
+
+Bookmarks live in `$nightNotesPrivate/browser/bookmarks.org`, falling back to
+`$HOME/notes/private/browser/bookmarks.org`. Use one titled Org link per line:
+
+```org
+- [[https://example.org/][Example]]
+# [[https://example.org/paused][Commented out]]
+```
+
+The file is re-read whenever Cmd+, opens the chooser. Any line whose first
+non-whitespace character is `#` is ignored, as are `#+BEGIN_COMMENT` blocks.
+Only titled HTTP(S) links appear. Empty titles are ignored, surrounding title
+whitespace is trimmed, and identical URL/title pairs are deduplicated. Search
+matches both the displayed title and URL.
+
+Selecting an entry scans native tabs across Brave windows. A matching tab is
+selected and its window raised; otherwise a new tab opens in the front Brave
+window (or a new window if none exists). Matching normalizes the scheme,
+host case, default port and empty root path. Other paths, trailing path slashes,
+queries and fragments stay distinct. This avoids substring matches activating
+an unrelated page. Bookmark data stays in the private notes file; URLs travel
+to the scripting bridge as JSON on stdin, with no shell interpolation.
+
+Version 1.2.0 passed parser cases for commented lines, indented comments,
+comment blocks, duplicate entries and non-HTTP links. Live tests checked the
+seeded chooser entry, selecting a fixture in another window without adding a
+tab, opening one missing fixture, and reselecting it without adding another tab.
+The private bookmark itself was not opened during testing.

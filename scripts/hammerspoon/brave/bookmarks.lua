@@ -1,0 +1,41 @@
+return function(config)
+    local B = {}
+    B.path = (os.getenv("nightNotesPrivate") or (os.getenv("HOME") .. "/notes/private")) .. "/browser/bookmarks.org"
+
+    function B.parse(text)
+        local choices, seen, commentBlock = {}, {}, false
+        for line in (text .. "\n"):gmatch("([^\n]*)\n") do
+            if line:upper():match("^%s*#%+BEGIN_COMMENT%s*$") then commentBlock=true end
+            if line:upper():match("^%s*#%+END_COMMENT%s*$") then commentBlock=false end
+            if not commentBlock and not line:match("^%s*#") then
+                for url, title in line:gmatch("%[%[([^%]]+)%]%[([^%]]+)%]%]") do
+                    title = title:match("^%s*(.-)%s*$")
+                    if url:match("^https?://%S+$") and title ~= "" and not seen[url .. "\0" .. title] then
+                        seen[url .. "\0" .. title] = true
+                        choices[#choices+1] = {text=title,subText=url,url=url}
+                    end
+                end
+            end
+        end
+        return choices
+    end
+
+    B.chooser = hs.chooser.new(function(choice)
+        if choice then config.engine.openBookmark(choice.url) end
+    end)
+    B.chooser:searchSubText(true)
+    B.chooser:placeholderText("Bookmarks: switch to an open tab or open a new one")
+
+    function B.show()
+        local file = io.open(B.path,"r")
+        if not file then return config.unavailable("Bookmark file is missing: " .. B.path) end
+        local content = file:read("*a"); file:close()
+        local choices = B.parse(content)
+        if #choices == 0 then return config.unavailable("No uncommented titled bookmarks found") end
+        B.chooser:choices(choices):query(""):show()
+        return true
+    end
+
+    function B.stop() B.chooser:hide(); B.chooser:delete() end
+    return B
+end
