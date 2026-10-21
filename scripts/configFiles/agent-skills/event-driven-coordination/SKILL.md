@@ -140,6 +140,6 @@ Otherwise append nothing and reply in one line.
   threshold in a few hours. Switching them to checkpoint-plus-events cut the
   traffic to a handful of hand-backs per night.
 
-Related skills: `long-run-handoff` for the state file, the result-file
-protocol and zero-token waiters; `quota-management` for the quota watcher and
-the pause-and-resume mechanics.
+Related skills: `long-run-handoff` for durable state and the result-file
+protocol; `event-driven-waiting` for completion notifications and plain waiters;
+`quota-management` for the quota watcher and pause-and-resume mechanics.
