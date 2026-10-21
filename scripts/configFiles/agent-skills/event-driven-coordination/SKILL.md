@@ -5,6 +5,8 @@ description: Coordinate long-running workers (subagents, GPU lanes, remote jobs)
 
 # Event-driven coordination
 
+This skill supplies fleet policy; `event-driven-waiting` owns single-event mechanics.
+
 Terms used below:
 
 - An **event** is a state transition somebody must act on: a job drained, a
@@ -13,9 +15,8 @@ Terms used below:
   event.
 - A **hand-back** is the message a worker sends its coordinator. It is sent on
   events only.
-- A **watch** is a zero-token waiter whose exit, or whose emitted line, is the
-  event: a background `until` loop, a Monitor tool call, a `tail` that ends at
-  a done marker.
+- A **watch** is a zero-token event source. Use `event-driven-waiting` for
+  its implementation; this skill decides which fleet transitions it watches.
 - A **one-shot timer** is a scheduled wakeup for a milestone that is expected
   at a known time (CronCreate with `recurring: false`).
 - The **recovery ping** is one recurring hourly wakeup whose only job is to
@@ -41,10 +42,10 @@ these cases the coordinator sees silence, and silence looks exactly like
 "nothing happened yet". A drained fleet then idles for hours at full price.
 That is what the recovery ping is for.
 
-## Three layers, all armed at launch
+## Three layers
 
-1. **Watches** for the events you already know are coming, armed in the same
-   turn as the launch. "I will check later" does not survive a compaction.
+1. **Watches** for anticipated worker transitions, using the mechanics in
+   `event-driven-waiting`.
 2. **One-shot timers** for milestones with a known time: a quota reset, a
    projected drain, a deadline. The timer's prompt carries the check and the
    action, so it is self-contained after a compaction.
@@ -62,9 +63,9 @@ That is what the recovery ping is for.
   do first after a pause. The coordinator reads the checkpoint, not your
   transcript, so a stale checkpoint is a lie.
 - One lean watch, as a script file. Test it once in single-pass mode before
-  arming it, use absolute paths, filter to the lines you would act on, and
-  make it emit on every terminal state, not only success. Watches expire: on
-  expiry re-arm and note the time in the checkpoint.
+  arming it, filter to the lines you would act on, and make it emit on every
+  terminal state, not only success. Watches expire: on expiry re-arm and note
+  the time in the checkpoint.
 - Query remote state with the cheapest call that answers the question (a
   plain batch-mode ssh, a single list command), on an interval measured in
   tens of minutes. A heavy interactive shell wrapper per poll multiplied by
@@ -74,9 +75,9 @@ That is what the recovery ping is for.
 
 ## Rules for the coordinator
 
-- When you launch or resume a worker, in the same turn arm a one-shot for the
-  time by which it should have handed back. Resuming by message counts as a
-  launch.
+- Give each launched or resumed worker a fallback one-shot for the time by
+  which it should have handed back. Resuming by message counts as a launch;
+  use `event-driven-waiting` for arming and delivery mechanics.
 - Keep exactly one recovery ping. Its prompt is one facts call (the resource
   list, the checkpoints' modification times and last lines), a comparison
   against the latest dated line of your own state file, and a fixed list of
@@ -118,7 +119,7 @@ Otherwise append nothing and reply in one line.
 ## Anti-patterns
 
 - Per-cell progress hand-backs and coordinator relays of them.
-- A watch typed inline and armed untested, or armed with relative paths.
+- A watch typed inline and armed untested.
 - Two pollers covering the same fleet, one of them "just to be safe".
 - Treating a quiet notification stream as proof that nothing changed.
 - Releasing a resource on a completion log line without counting the durable
