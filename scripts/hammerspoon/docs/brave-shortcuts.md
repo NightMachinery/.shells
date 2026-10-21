@@ -257,3 +257,14 @@ also describe previously working auto-submit becoming prefill-only. URL options
 such as `#autoSubmit=1` in [ChatGPT-URL-Extension](https://github.com/GrayXu/ChatGPT-URL-Extension)
 are implemented by that extension, not evidence of a native ChatGPT switch.
 No dependable current URL-only submission parameter was established by this search.
+
+Brave's installed scripting dictionary exposes tab URL navigation but no request
+header argument, so the current Hammerspoon/JXA route cannot override fetch
+metadata. [Browser-generated Sec-Fetch-Site](https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Sec-Fetch-Site)
+is forbidden to ordinary page JavaScript; `none` represents user-originated
+navigation. Privileged extensions can modify request headers through
+[declarativeNetRequest](https://developer.chrome.com/docs/extensions/reference/api/declarativeNetRequest),
+and [Requestly documents this specific override](https://requestly.com/use-case/header/sec-fetch-site/).
+An extension override is technically feasible, but neither the required current
+ChatGPT value nor whether that change alone restores auto-submit was verified.
+The working Hammerspoon send step remains in place.
