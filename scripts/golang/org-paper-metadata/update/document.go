@@ -314,7 +314,7 @@ func (d Document) bodyEdits(t Target, m paper.Metadata) []Edit {
 		switch strings.ToLower(name) {
 		case "# org-paper-metadata: summary", "#+name: semantic-scholar-summary":
 			kind = "summary"
-			content = "*Semantic Scholar TLDR:* " + m.First("tldr")
+			content = m.First("tldr")
 		case "# org-paper-metadata: abstract", "#+name: semantic-scholar-abstract":
 			kind = "abstract"
 			content = m.First("abstract")

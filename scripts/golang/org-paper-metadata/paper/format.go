@@ -46,7 +46,7 @@ func quoteBlock(name, text string) string {
 func ContentBlocks(m Metadata) string {
 	var b strings.Builder
 	if summary := m.First("tldr"); summary != "" {
-		b.WriteString(quoteBlock("summary", "*Semantic Scholar TLDR:* "+summary))
+		b.WriteString(quoteBlock("summary", summary))
 		b.WriteString("\n")
 	}
 	b.WriteString(quoteBlock("abstract", m.First("abstract")))

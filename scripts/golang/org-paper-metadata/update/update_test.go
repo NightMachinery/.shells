@@ -45,7 +45,7 @@ func transform(t *testing.T, text string) string {
 func TestPreserveNotesTagsAndProperties(t *testing.T) {
 	text := "* TODO [#A] @great @citations/3 @2025/May @ICLR [[" + page + "][Old title]] :research:\nSCHEDULED: <2026-10-22 Thu>\n:PROPERTIES:\n:ID: synthetic-id\n:custom: Keep this\n:metadataSource: semantic-scholar-page-data\n:venue: International Conference on Learning Representations\n:year: 2025\n:publicationDate: 2025-05-01\n:citationCount: 3\n:END:\nMy notes must stay.\n** @abstract\n:PROPERTIES:\n:visibility: folded\n:ID: abstract-id\n:END:\n#+BEGIN_QUOTE\nOld abstract.\n#+END_QUOTE\n\n** My analysis\nKeep this child.\n* Next heading\nUntouched.\n"
 	out := transform(t, text)
-	for _, want := range []string{"* TODO [#A] @great @citations/12 @2026/October @ICLR [[" + page + "][New title]] :research:", "SCHEDULED: <2026-10-22 Thu>", ":ID: synthetic-id", ":custom: Keep this", ":ID: abstract-id", "My notes must stay.", "** My analysis\nKeep this child.\n* Next heading\nUntouched.", "*Semantic Scholar TLDR:* The new summary.", "The new complete abstract."} {
+	for _, want := range []string{"* TODO [#A] @great @citations/12 @2026/October @ICLR [[" + page + "][New title]] :research:", "SCHEDULED: <2026-10-22 Thu>", ":ID: synthetic-id", ":custom: Keep this", ":ID: abstract-id", "My notes must stay.", "** My analysis\nKeep this child.\n* Next heading\nUntouched.", "The new summary.", "The new complete abstract."} {
 		if !strings.Contains(out, want) {
 			t.Errorf("missing %q\n%s", want, out)
 		}
@@ -271,7 +271,7 @@ func TestLegacyAbstractWithBibTeXPreserved(t *testing.T) {
 	citation := "\n\n#+BEGIN_EXAMPLE bibtex\n@article{synthetic,\n  title={Saved citation},\n  year={2025}\n}\n#+END_EXAMPLE\n\n"
 	text := "* [[" + page + "][Old]]\n** @abstract\n:PROPERTIES:\n:ID: saved-abstract\n:END:\n\n#+BEGIN_QUOTE\nOld abstract.\n#+END_QUOTE" + citation + "** My notes\nKeep these notes.\n"
 	out := transform(t, text)
-	for _, want := range []string{strings.TrimSpace(citation), ":ID: saved-abstract", "The new complete abstract.", "*Semantic Scholar TLDR:* The new summary.", "** My notes\nKeep these notes.\n"} {
+	for _, want := range []string{strings.TrimSpace(citation), ":ID: saved-abstract", "The new complete abstract.", "The new summary.", "** My notes\nKeep these notes.\n"} {
 		if !strings.Contains(out, want) {
 			t.Errorf("lost %q\n%s", want, out)
 		}
@@ -298,7 +298,7 @@ func TestEmptyLegacyAbstractAndCitationOnlyGetContent(t *testing.T) {
 	for _, citation := range []string{"", "#+BEGIN_EXAMPLE tex\n@article{synthetic, title={Saved citation}}\n#+END_EXAMPLE\n"} {
 		text := "* [[" + page + "][Old]]\n** @abstract\n:PROPERTIES:\n:ID: empty-abstract\n:END:\n\n" + citation
 		out := transform(t, text)
-		for _, want := range []string{citation, ":ID: empty-abstract", "The new complete abstract.", "*Semantic Scholar TLDR:* The new summary."} {
+		for _, want := range []string{citation, ":ID: empty-abstract", "The new complete abstract.", "The new summary."} {
 			if !strings.Contains(out, want) {
 				t.Errorf("lost %q\n%s", want, out)
 			}

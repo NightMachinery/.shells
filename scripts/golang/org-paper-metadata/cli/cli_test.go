@@ -45,7 +45,7 @@ func captureCommand(t *testing.T, input string, run func([]string) int, args ...
 }
 func TestFromJSONUsesNativeRenderer(t *testing.T) {
 	code, out, err := capture(t, `{"title":["Synthetic paper"],"abstract":["Full abstract."],"authors_names":["Example Author"],"tldr":["Short summary."],"url":["https://www.semanticscholar.org/paper/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"]}`, "--from-json", "https://www.semanticscholar.org/paper/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
-	if code != 0 || !strings.Contains(out, "*Semantic Scholar TLDR:* Short summary.") || !strings.Contains(out, "Full abstract.") {
+	if code != 0 || !strings.Contains(out, "Short summary.") || !strings.Contains(out, "Full abstract.") {
 		t.Fatal(code, out, err)
 	}
 }
