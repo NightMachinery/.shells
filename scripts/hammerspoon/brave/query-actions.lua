@@ -9,7 +9,7 @@ return function(config)
         end))
     end
 
-    local prefixes = { ["?"]="google", [".k"]="keepa", [".c"]="chatgpt",
+    local prefixes = { ["?"]="google", [".a"]="amazon", [".k"]="keepa", [".c"]="chatgpt",
         [".g"]="gemini", [".l"]="claude" }
 
     function Q.magic(query)
@@ -24,6 +24,7 @@ return function(config)
         if destination=="gemini" then return "https://gemini.google.com/app" end
         local bases = {
             google="https://www.google.com/search?q=",
+            amazon="https://www.amazon.de/s?k=",
             chatgpt="https://chatgpt.com/?q=",
             keepa="https://keepa.com/#!search/3-",
             claude="https://claude.ai/new?q=",

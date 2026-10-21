@@ -60,7 +60,7 @@ local magic=dofile("brave/query-actions.lua")({chooser=chooser,magic=true,engine
     openChatGPT=function(url,query) routed[#routed+1]={url=url,query=query,kind="chatgpt"} end,
     openGemini=function(query) routed[#routed+1]={query=query,kind="gemini"} end,
 }})
-local routes={["?"]="google",[".k"]="keepa",[".c"]="chatgpt",[".g"]="gemini",[".l"]="claude"}
+local routes={["?"]="google",[".a"]="amazon",[".k"]="keepa",[".c"]="chatgpt",[".g"]="gemini",[".l"]="claude"}
 for token,destination in pairs(routes) do
     local body="  a+b & ü\nsecond line"
     local actual,text=magic.magic(token.." "..body)
@@ -76,6 +76,7 @@ for token,destination in pairs(routes) do
     if destination=="chatgpt" then assert(action.query==body) end
 end
 assert(magic.magic(".G query")==nil and magic.magic(".unknown query")==nil)
+assert(magic.url("a+b & ü","amazon")=="https://www.amazon.de/s?k=a%2Bb%20%26%20%C3%BC")
 assert(magic.url("a b","keepa")=="https://keepa.com/#!search/3-a%20b")
 assert(magic.url("a b","claude")=="https://claude.ai/new?q=a%20b")
 assert(magic.url("a b","gemini")=="https://gemini.google.com/app")

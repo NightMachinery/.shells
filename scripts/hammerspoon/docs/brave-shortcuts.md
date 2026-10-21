@@ -228,10 +228,11 @@ The configured private hostname alias also passed an exact-host fixture check.
 
 ### Omni magic prefixes
 
-Version 1.7.0 adds these destinations on plain Enter, including when a local
-result is highlighted:
+Plain Enter supports these destinations, including when a local result is
+highlighted:
 
 - `? query`: Google.
+- `.a query`: Amazon Germany search (`amazon.de`, added in 1.7.4).
 - `.k query`: Keepa search on Amazon Germany (domain 3).
 - `.c query`: a fresh ChatGPT conversation with automatic submission.
 - `.g query`: the Gemini consumer app at `https://gemini.google.com/app`,
