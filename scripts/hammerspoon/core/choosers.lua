@@ -135,6 +135,7 @@ loadEmojiData()
 local kEmojiAlertId = "emoji-chooser"
 
 function emojiChooser()
+    local recent=ChooserSearch.recent("emoji")
     local selectedEmojis = {} -- Table to store selected emojis
 
     local function updateAlert()
@@ -173,6 +174,7 @@ function emojiChooser()
             -- hs.eventtap.keyStrokes(emojiString)
             -- =keyStrokes= cannot insert some emojis.
             ---
+            recent.record(selectedEmojis)
             copyToClipboard(emojiString)
             doPaste()
             ---
@@ -196,7 +198,10 @@ function emojiChooser()
         })
     end
 
-    table.sort(choices, function(a, b) return a.subText < b.subText end)
+    recent.sort(choices,function(row)return row.text end, function(a,b)
+        if a.subText~=b.subText then return a.subText<b.subText end
+        return a.text<b.text
+    end)
 
     ChooserSearch.setChoices(chooser, choices)
 

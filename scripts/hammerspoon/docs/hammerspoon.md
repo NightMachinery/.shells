@@ -2276,3 +2276,12 @@ The native `hs.chooser` API remains available for custom providers.
 Run focused checks from `hammerspoon/` with `lua tests/chooser-search.lua` and
 `node tests/brave-tabs.js`. Browser chooser query actions and aliases also have
 `lua tests/browser-query-actions.lua` and `lua tests/browser-search-aliases.lua`.
+
+### OmniPrompter and chooser ordering
+
+Hyper+Shift+Z opens the global [OmniPrompter](omni-prompter.md). It supports ordered
+prompt-function pipelines, Cmd+R catalog refresh and guarded copy/paste. Hyper+A
+emoji choices use recent-first order. Small usage records persist in
+`hs.settings` and are loaded once per namespace, with sorting/filtering in memory.
+Browser Omni and OmniPrompter recalculate width at each opening: 75% of the active
+display, capped at 1800 logical pixels.

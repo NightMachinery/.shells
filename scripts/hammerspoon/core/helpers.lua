@@ -164,7 +164,7 @@ end
 --- temporary files instead. The shell execs the binary, so PID and signals
 --- still belong to the client. Completion reads the files as Lua byte strings.
 --- Returns task, discard; call discard when creation/start fails or on timeout.
-function taskCollectWithPath(bin, callback, args)
+function taskCollectWithPath(bin, callback, args, stdin)
     local paths = setmetatable({}, {__gc = function(files)
         for _, path in pairs(files) do os.remove(path) end
     end})
@@ -174,7 +174,7 @@ function taskCollectWithPath(bin, callback, args)
         finished = true
         for i, path in pairs(paths) do os.remove(path); paths[i] = nil end
     end
-    for i = 1, 2 do
+    for i = 1, stdin==nil and 2 or 3 do
         -- os.tmpname uses mkstemp (0600) on this POSIX host.
         local ok, path = pcall(os.tmpname)
         if not ok then discard(); return nil, discard end
@@ -189,6 +189,16 @@ function taskCollectWithPath(bin, callback, args)
     end
     local argv = {"-c", 'out=$1; err=$2; shift 2; exec "$@" >"$out" 2>"$err"',
                   "task-capture", paths[1], paths[2], bin}
+    if stdin~=nil then
+        local file=io.open(paths[3],"wb")
+        if not file then discard();return nil,discard end
+        local written=file:write(stdin)
+        local closed=file:close()
+        if not written or not closed then discard();return nil,discard end
+        -- File-backed stdin also avoids blocking HS on a full input pipe.
+        argv={"-c",'out=$1; err=$2; input=$3; shift 3; exec "$@" <"$input" >"$out" 2>"$err"',
+              "task-capture",paths[1],paths[2],paths[3],bin}
+    end
     for _, arg in ipairs(args or {}) do argv[#argv + 1] = arg end
     local task = taskWithPath("/bin/sh", function(code, out, err)
         if finished then return end
@@ -294,6 +304,7 @@ end
 --             or state to take back. notSent means a possible connection
 --             error with a failed probe, subject to the race described above.
 
+BrishHelpersVersion = "1.2.0"
 local gardenBrishzgo = os.getenv("BRISHZGO_BIN")
 if not gardenBrishzgo or gardenBrishzgo == "" then
     gardenBrishzgo = os.getenv("HOME") .. "/go/bin/brishzgo"
@@ -412,7 +423,7 @@ end
 --- still running then, and reports code -2. A task that cannot start
 --- reports -1, and one killed by a signal 128 plus the signal. Returns
 --- whether it started.
-function gardenTask(bin, args, cb, timeout, env, label)
+function gardenTask(bin, args, cb, timeout, env, label, stdin)
     label = label or bin
     local taskKey, timer, discardCapture
 
@@ -433,7 +444,7 @@ function gardenTask(bin, args, cb, timeout, env, label)
             code = 128 + code
         end
         finish(code, out, err)
-    end, args)
+    end, args, stdin)
     if not task then
         finish(-1, "", "could not create a task for " .. bin)
         return false
@@ -465,6 +476,8 @@ local function gardenCall(args, label, opts, onResult, noquote)
     opts = opts or {}
     local bin = gardenBrishzgo
     local env = gardenClientEnvironment(noquote)
+    if opts.stdin~=nil then env.brishz_in="MAGIC_READ_STDIN" end
+    if opts.nolog then env.brishz_nolog="y" end
     local clientArgs = {"--"}
     for _, arg in ipairs(args) do clientArgs[#clientArgs + 1] = arg end
 
@@ -497,7 +510,7 @@ local function gardenCall(args, label, opts, onResult, noquote)
             end
             onResult(code, out, err)
         end)
-    end, opts.timeout or 30, env, label)
+    end, opts.timeout or 30, env, label, opts.stdin)
 end
 
 --- Runs `cmd' in the garden without blocking, and says so when it fails.
@@ -537,11 +550,17 @@ end
 --- next from the callback. See hyperBrightnessStep in
 --- core/window-media-bindings.lua, where doing that is the difference between
 --- ten brightness steps landing and one. Captured output has no pipe limit.
+local function gardenOutput(out,opts)
+    out=tostring(out or "")
+    if opts and opts.trim==false then return out end
+    return out:gsub("^%s+", ""):gsub("%s+$", "")
+end
+
 function brishz_eval_out_hs(cmd, callback, label, opts)
     label = label or "brishz_eval_out_hs"
     gardenCall({ cmd }, label, opts, function(code, out)
         if code ~= 0 then return callback(nil) end
-        callback((tostring(out or "")):gsub("^%s+", ""):gsub("%s+$", ""))
+        callback(gardenOutput(out,opts))
     end, true)
 end
 
@@ -551,7 +570,7 @@ function brishz_eval_q_out_hs(argv, callback, label, opts)
     label = label or "brishz_eval_q_out_hs"
     gardenCall(argv, label, opts, function(code, out)
         if code ~= 0 then return callback(nil) end
-        callback((tostring(out or "")):gsub("^%s+", ""):gsub("%s+$", ""))
+        callback(gardenOutput(out,opts))
     end)
 end
 
@@ -589,4 +608,20 @@ function has_value (tab, val)
     end
 
     return false
+end
+
+--- A quoted argv array per pipeline stage; stdin/raw output use the same options.
+function brishz_eval_pipeline_out_hs(stages, callback, label, opts)
+    assert(type(stages)=="table" and #stages>0,"pipeline needs stages")
+    local commands={}
+    for _,argv in ipairs(stages) do
+        assert(type(argv)=="table" and #argv>0,"pipeline stage needs argv")
+        local words={}
+        for _,value in ipairs(argv) do
+            assert(type(value)=="string","pipeline arguments must be strings")
+            words[#words+1]="'" .. value:gsub("'","'\\''") .. "'"
+        end
+        commands[#commands+1]=table.concat(words," ")
+    end
+    brishz_eval_out_hs("( setopt pipefail; " .. table.concat(commands," | ") .. " )",callback,label,opts)
 end

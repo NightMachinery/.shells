@@ -39,3 +39,20 @@ callback('paper 4999');assert(#shown==1 and shown[1]==big[4999])
 big[4999].text='Changed'
 ChooserSearch.setChoices(bounded,big);callback('changed 4999');assert(#shown==1)
 print('Cached chooser index and bounded native result tests passed')
+
+local prefs,reads,writes={},0,0
+hs.settings={get=function(k)reads=reads+1;return prefs[k]end,set=function(k,v)writes=writes+1;prefs[k]=v end}
+local recent=ChooserSearch.recent('test')
+assert(ChooserSearch.recent('test')==recent and reads==1)
+recent.record({'z','a','z'})
+local entries={{text='b'},{text='a'},{text='z'}}
+local function order()recent.sort(entries,function(r)return r.text end,function(a,b)return a.text<b.text end)end
+order();assert(entries[1].text=='z' and entries[2].text=='a' and writes==1)
+for _=1,100 do order()end;assert(reads==1 and writes==1)
+local width
+local c={width=function(_,v)width=v end}
+for _,w in ipairs({800,1280,1920,3440,5120}) do
+ ChooserSearch.fit(c,{frame=function()return {w=w}end})
+ assert(width<=75 and width*w/100<=1800.01)
+end
+print('Recent order caches preferences and adaptive chooser width fits small and large screens')

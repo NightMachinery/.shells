@@ -35,6 +35,7 @@ local function countPins()
     return n
 end
 local baseline = countPins()
+local backgroundPins = 0
 local function complete(task, code, out, err)
     assert(task.bin == "/bin/sh")
     for i, text in ipairs({out or "", err or ""}) do
@@ -45,7 +46,7 @@ local function complete(task, code, out, err)
     task.running = false
     task.callback(code, "", "")
     for _, path in ipairs(paths) do assert(not io.open(path, "rb")) end
-    assert(countPins() == baseline, "task/timer leak")
+    assert(countPins() == baseline + backgroundPins, "task/timer leak")
 end
 local calls = 0
 local bigOut = string.rep("€🎤\0", 40000)
@@ -73,6 +74,17 @@ assert(task.env.brishz_c == "" and task.env.brishz_in == "" and task.env.brishz_
 complete(task, 0, "  output \n", "")
 assert(outValue == "output")
 
+-- Clipboard input stays out of argv/environment and is byte-exact, including NULs.
+local stdinValue="  clipboard €🎤\0\n\ntrailing  "
+local rawValue="  raw output €🎤\n\n"
+brishz_eval_q_out_hs({"command","cat"},function(out)outValue=out end,"stdin test",{stdin=stdinValue,trim=false,nolog=true})
+task=tasks[#tasks]
+assert(task.env.brishz_in=="MAGIC_READ_STDIN" and task.env.brishz_nolog=="y")
+assert(task.args[7]:match("/brishzgo$") and task.args[9]=="command" and task.args[10]=="cat")
+local inputPath=task.args[6]
+local inputFile=assert(io.open(inputPath,"rb"));assert(inputFile:read("*a")==stdinValue);inputFile:close()
+complete(task,0,rawValue,"");assert(outValue==rawValue and not io.open(inputPath,"rb"))
+
 brishz_eval_out_hs("cd /tmp; print state", function(out) outValue = out end)
 task = tasks[#tasks]
 assert(task.args[8] == "cd /tmp; print state" and task.env.brishz_noquote == "y")
@@ -84,6 +96,8 @@ local opts = {quiet = true, onFail = function(code, notSent) failure = {code, no
 brishz_eval_out_hs("return 7", function(out) outValue = out end, "remote failure", opts)
 complete(tasks[#tasks], 7, "", "expected")
 assert(outValue == nil and failure[1] == 7 and not failure[2] and #bands == 0)
+-- A down-garden announcement legitimately retains its background recheck timer.
+backgroundPins = 1
 probeUp = false
 garden_port_override = 7231
 brishz_eval_q_hs({"printf", "sentinel"}, "closed garden", opts)
@@ -99,7 +113,7 @@ for _, fail in ipairs({"create", "start"}) do
     assert(not gardenTask("/absent", {}, function(code)
         calls = calls + 1; assert(code == -1)
     end, 30))
-    assert(calls == 1 and countPins() == baseline)
+    assert(calls == 1 and countPins() == baseline + backgroundPins)
     if fail == "start" then
         for i = 4, 5 do assert(not io.open(tasks[#tasks].args[i], "rb")) end
     end
@@ -123,7 +137,7 @@ end
 timers[#timers].callback()
 os.execute, io.popen = execute, popen
 task.callback(15, "", "")
-assert(calls == 1 and countPins() == baseline)
+assert(calls == 1 and countPins() == baseline + backgroundPins)
 for i = 4, 5 do assert(not io.open(task.args[i], "rb")) end
 
 calls = 0
