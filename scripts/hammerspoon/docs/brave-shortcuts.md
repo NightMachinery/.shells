@@ -238,7 +238,7 @@ highlighted:
 - `.c query`: a fresh ChatGPT conversation with automatic submission.
 - `.g query`: the Gemini consumer app at `https://gemini.google.com/app`,
   selecting 4 Argon and High thinking before submitting.
-- `.l query`: a fresh Claude page with its query link for prefill.
+- `.l query`: a fresh Claude conversation with automatic submission.
 - `.s query`: Semantic Scholar.
 - `.gs query`: Google Scholar.
 - `.gh query`: GitHub repository search.
@@ -301,6 +301,27 @@ missing values, draft preservation, AX page identity, focus/tab cancellation, an
 one-send checks. A live ready-page fast-path check completed submission in about
 0.4 seconds with two native identity checks, and the owned tab became a Gemini
 conversation. Cold page loading and model changes can take longer.
+
+### Automatic Claude submission
+
+Version 1.10.0 makes `.l query` submit the URL-prefilled prompt.
+`brave/claude-submit.lua` waits for the new Claude `/new` page to expose the exact
+query and an enabled native Send message button. It checks the active native tab
+ID after each read-only AX scan. If the button supports `AXPress`, that action is
+requested once. Chromium currently exposes only menu/scroll actions for it, so
+the submitter focuses the Send button, confirms that focus and query again, and
+activates the button with Space. It does not send Return to the composer.
+
+Changing tabs/apps, a different query, missing controls, or unconfirmed button
+focus prevents submission. Readiness expires after 45 seconds. Stop/reload
+cancels timers and pending callbacks. A Send action is never retried, including
+an ambiguous AX failure. No existing text is overwritten, no clipboard is used,
+and page JavaScript is not required. `BraveShortcuts.claude.lastResult` reports
+waiting, submitted, cancelled, timeout, or an unconfirmed action.
+
+Run `lua tests/claude-submit.lua` for delayed prefill, disabled Send, delayed
+focus, changed tab/app/query, wrong origin, reload, and one-send checks. A native
+live test confirmed that activating the button created a new Claude conversation.
 
 ### Automatic ChatGPT submission
 

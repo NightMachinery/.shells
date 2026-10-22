@@ -3,7 +3,7 @@
 -- Cmd+. opens Omni Prompt; Cmd+/ opens a new tab; Cmd+Shift+/ native Tab Search.
 if BraveShortcuts then BraveShortcuts.stop() end
 
-BraveShortcuts = { version = "1.9.1", hotkeys = {} }
+BraveShortcuts = { version = "1.10.0", hotkeys = {} }
 local M = BraveShortcuts
 local bundleID = "com.brave.Browser"
 local log = hs.logger.new("brave-shortcuts", "warning")
@@ -198,6 +198,7 @@ function M.stop()
     if M.flags then M.flags:stop() end
     if M.bitwarden then M.bitwarden.stop() end
     if M.chatgpt then M.chatgpt.stop() end
+    if M.claude then M.claude.stop() end
     if M.gemini then M.gemini.stop() end
     if M.omniPrompt then M.omniPrompt.stop() end
     if M.bookmarks then M.bookmarks.stop() end
@@ -213,9 +214,14 @@ M.tabs = dofile(nightdir .. "/hammerspoon/brave/tabs.lua")({
     braveInFront = braveInFront, unavailable = unavailable,
     clearError = function() M.lastError=nil end,
     submitChatGPT = function(opened, query) M.chatgpt.submit(opened, query) end,
+    submitClaude = function(opened, query) M.claude.submit(opened, query) end,
     submitGemini = function(opened, query) M.gemini.submit(opened, query) end,
 })
 M.chatgpt = dofile(nightdir .. "/hammerspoon/brave/chatgpt-submit.lua")({
+    engine=M.tabs, braveInFront=braveInFront, nativeWindow=nativeWindow, unavailable=unavailable,
+})
+
+M.claude = dofile(nightdir .. "/hammerspoon/brave/claude-submit.lua")({
     engine=M.tabs, braveInFront=braveInFront, nativeWindow=nativeWindow, unavailable=unavailable,
 })
 

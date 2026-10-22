@@ -65,6 +65,7 @@ local magic=dofile("brave/query-actions.lua")({chooser=chooser,magic=true,engine
     openURL=function(url) routed[#routed+1]={url=url} end,
     openChatGPT=function(url,query) routed[#routed+1]={url=url,query=query,kind="chatgpt"} end,
     openGemini=function(query) routed[#routed+1]={query=query,kind="gemini"} end,
+    openClaude=function(url,query) routed[#routed+1]={url=url,query=query,kind="claude"} end,
 }})
 local routes={["?"]="google",[".a"]="amazon",[".k"]="keepa",[".c"]="chatgpt",[".g"]="gemini",[".l"]="claude",
     [".s"]="semanticscholar",[".gh"]="github",[".y"]="youtube",[".w"]="wikipedia",
@@ -81,7 +82,7 @@ for token,destination in pairs(routes) do
     local action=routed[#routed]
     if destination=="gemini" then assert(action.kind=="gemini" and action.query==body)
     else assert(action.url==magic.url(body,destination)) end
-    if destination=="chatgpt" then assert(action.query==body) end
+    if destination=="chatgpt" or destination=="claude" then assert(action.query==body and action.kind==destination) end
 end
 assert(magic.magic(".G query")==nil and magic.magic(".unknown query")==nil)
 assert(magic.url("a+b & ü","amazon")=="https://www.amazon.de/s?k=a%2Bb%20%26%20%C3%BC")
@@ -104,6 +105,6 @@ local count=#routed
 show(".g ");assert(magic.key(76,{}));flush();assert(chooser.visible and #routed==count)
 show(".c  \t");assert(magic.key(36,{}));flush();assert(chooser.visible and #routed==count)
 assert(magic.accept({text=".l from callback"}));flush()
-assert(routed[#routed].url==magic.url("from callback","claude"))
+assert(routed[#routed].url==magic.url("from callback","claude") and routed[#routed].kind=="claude")
 magic.stop()
 print("strict Omni prefix tests passed")

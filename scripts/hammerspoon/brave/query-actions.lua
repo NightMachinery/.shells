@@ -15,7 +15,7 @@ return function(config)
         {".k", "keepa", "Keepa", "Amazon Germany price search"},
         {".c", "chatgpt", "ChatGPT", "New conversation, automatically submitted"},
         {".g", "gemini", "Gemini", "Argon High, automatically submitted · Alt+Enter"},
-        {".l", "claude", "Claude", "New conversation with query prefilled"},
+        {".l", "claude", "Claude", "New conversation, automatically submitted"},
         {".s", "semanticscholar", "Semantic Scholar", "Research papers"},
         {".gs", "googlescholar", "Google Scholar", "Scholarly literature"},
         {".gh", "github", "GitHub", "Repositories"},
@@ -86,6 +86,7 @@ return function(config)
         defer(function()
             if destination=="chatgpt" then config.engine.openChatGPT(url, query)
             elseif destination=="gemini" then config.engine.openGemini(query)
+            elseif destination=="claude" then config.engine.openClaude(url, query)
             else config.engine.openURL(url) end
         end)
         return true

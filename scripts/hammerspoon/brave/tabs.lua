@@ -67,6 +67,14 @@ return function(config)
         return true
     end
 
+    function E.openClaude(url, query)
+        E.request({action="openURL",url=url}, function(result)
+            report(result)
+            if result.ok then config.submitClaude(result, query) end
+        end)
+        return true
+    end
+
     function E.openGemini(query)
         E.request({action="openURL",url="https://gemini.google.com/app"}, function(result)
             report(result)
