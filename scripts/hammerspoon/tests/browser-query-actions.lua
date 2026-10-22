@@ -20,6 +20,7 @@ function chooser:showCallback(fn) self.showFn=fn end
 function chooser:hideCallback(fn) self.hideFn=fn end
 local Q=dofile("brave/query-actions.lua")({chooser=chooser,engine={
     openURL=function(url) opened[#opened+1]=url end,
+    openGemini=function(query) opened[#opened+1]='gemini:'..query end,
     openChatGPT=function(url,query)
         assert(query=="always chat")
         opened[#opened+1]=url
@@ -50,6 +51,11 @@ show("   "); assert(Q.key(36,{shift=true})); flush(); assert(#opened==3)
 show("keep native combos"); assert(not Q.key(36,{cmd=true,shift=true}))
 assert(not Q.key(36,{ctrl=true,shift=true})); assert(not Q.key(20,{cmd=true}))
 show("cancel pending on reload"); Q.key(36,{cmd=true}); Q.stop(); flush(); assert(#opened==3)
+Q=dofile("brave/query-actions.lua")({chooser=chooser,engine={openGemini=function(query) opened[#opened+1]='gemini:'..query end}})
+show("whole query");assert(Q.key(36,{alt=true}));flush();assert(opened[#opened]=="gemini:whole query")
+show("numpad query");assert(Q.key(76,{alt=true}));flush();assert(opened[#opened]=="gemini:numpad query")
+show("no combined modifiers");assert(not Q.key(36,{alt=true,cmd=true}))
+assert(not Q.key(36,{alt=true,shift=true}));assert(not Q.key(36,{alt=true,ctrl=true}))
 print("browser query action tests passed")
 
 -- Magic routing is opt-in for Omni. Bookmarks retain literal query behavior.
@@ -92,6 +98,8 @@ show(".g full query");assert(magic.key(36,{shift=true}));flush()
 assert(routed[#routed].url==magic.url(".g full query","google"))
 show(".g full query");assert(magic.key(36,{cmd=true}));flush()
 assert(routed[#routed].kind=="chatgpt" and routed[#routed].query==".g full query")
+show(".g full query");assert(magic.key(36,{alt=true}));flush()
+assert(routed[#routed].kind=="gemini" and routed[#routed].query==".g full query")
 local count=#routed
 show(".g ");assert(magic.key(76,{}));flush();assert(chooser.visible and #routed==count)
 show(".c  \t");assert(magic.key(36,{}));flush();assert(chooser.visible and #routed==count)

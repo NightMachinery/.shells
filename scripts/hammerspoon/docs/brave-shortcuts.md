@@ -194,6 +194,7 @@ hostname keywords using the shared literal AND matcher.
   Google for the entire query.
 - Shift+Enter always searches Google, even when a result matches.
 - Cmd+Enter opens the query in a new ChatGPT tab and submits it automatically.
+- Alt+Enter opens the query in a new Gemini tab with Argon High and submits it.
 
 Query actions always create a fresh Brave tab. Empty or whitespace-only queries
 perform no navigation. Query text is encoded as UTF-8 URI-component bytes, so
@@ -254,7 +255,7 @@ navigate or submit anything. Escape closes the
 cheatsheet. The list and routing share one registry, so new entries appear in
 help automatically. `.help` is an exact command and needs no trailing space;
 leading whitespace or extra text keeps it a normal local query. Modified Enter
-retains its Google/ChatGPT behavior. Run `lua tests/omni-prompt.lua` for the
+retains its Google/ChatGPT/Gemini behavior. Run `lua tests/omni-prompt.lua` for the
 cheatsheet selection, filtering, and cancellation checks.
 
 The token must begin at character one and be followed by one literal ASCII
@@ -262,22 +263,44 @@ space. `.g question` is magic; ` .g question`, bare `.g`, `.gquestion`, and a ta
 immediately after `.g` are ordinary local searches. Tokens are case-sensitive.
 Only the token and its first separator space are removed; remaining whitespace
 and line breaks are preserved. An empty magic payload keeps the chooser open.
-These prefixes apply only to Omni, not the bookmarks chooser. Shift+Enter and
-Cmd+Enter retain their explicit destinations and use the full typed query.
+These prefixes apply only to Omni, not the bookmarks chooser. Shift+Enter,
+Cmd+Enter, and Alt+Enter retain their explicit destinations and use the full typed
+query, including any prefix. Additional mixed modifiers keep their native behavior.
 
 Gemini ignores a plain prompt query parameter in the tested browser, so
-`brave/gemini-submit.lua` fills its accessible composer directly. It verifies
-Argon and High through the menu's selected labels, waits for focus and value
-changes, and sends once. Some web menus open on focus; the submitter checks for
-that before sending a key that could close them again. Changing tabs or apps,
-an existing composer draft, unavailable Argon, or unconfirmed High cancels or
-times out without sending. Readiness expires after 45 seconds. This uses native
-scripting and Accessibility, without page JavaScript or clipboard changes.
+`brave/gemini-submit.lua` fills its accessible composer directly. Version 1.9.0
+uses the native picker label as a fast path when it already confirms Argon High,
+skipping both menus. Otherwise, it verifies model and thinking selections through
+the dependent menus. Focusing can open a web menu itself, so each dependency must
+be observed before a Return event that could toggle the menu closed.
+
+Fill and focus are issued together. A subsequent scan verifies the exact query,
+focused composer, and enabled Send control before one Return, with no retry.
+There is one native tab-identity check immediately after each read-only AX scan,
+instead of two AppleScript launches per step. Pure state transitions run together;
+newly revealed menus still yield to the event loop. Each queried AX reference
+has a 0.1-second timeout. The WebArea must belong to the new Gemini `/app` page;
+LuaSkin's structured AX URL values are handled explicitly.
+
+An absent composer value means not ready, not an existing draft. Empty Unicode
+formatting and exposed placeholders are allowed; real draft text is preserved.
+Changing tabs or apps, unavailable Argon, or unconfirmed High cancels or times out
+without sending. Readiness expires after 45 seconds. `lastResult` includes elapsed
+time, check count, and whether the confirmed-picker fast path was used. This
+uses native scripting and Accessibility, without page JavaScript or clipboard
+changes.
+
+No supported consumer-app model or thinking-level URL parameters were found.
+[Google's model instructions](https://support.google.com/gemini/answer/18648722?hl=en)
+describe selection through the picker. API thinking settings are not a documented
+web-app deep-link contract, so the shortcut does not guess URL parameters.
 
 Run `lua tests/browser-query-actions.lua` and `lua tests/gemini-submit.lua` for
-prefix boundaries, destination precedence, delayed readiness, model selection,
-focus/tab cancellation, and one-send checks. A live harmless-prompt test also
-verified automatic Gemini submission with Argon High.
+prefix and modifier precedence, immediate and delayed readiness, model selection,
+missing values, draft preservation, AX page identity, focus/tab cancellation, and
+one-send checks. A live ready-page fast-path check completed submission in about
+0.4 seconds with two native identity checks, and the owned tab became a Gemini
+conversation. Cold page loading and model changes can take longer.
 
 ### Automatic ChatGPT submission
 

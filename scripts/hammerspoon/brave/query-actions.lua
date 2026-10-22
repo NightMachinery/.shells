@@ -14,7 +14,7 @@ return function(config)
         {".a", "amazon", "Amazon Germany", "Product search"},
         {".k", "keepa", "Keepa", "Amazon Germany price search"},
         {".c", "chatgpt", "ChatGPT", "New conversation, automatically submitted"},
-        {".g", "gemini", "Gemini", "Consumer app, Argon High, automatically submitted"},
+        {".g", "gemini", "Gemini", "Argon High, automatically submitted · Alt+Enter"},
         {".l", "claude", "Claude", "New conversation with query prefilled"},
         {".s", "semanticscholar", "Semantic Scholar", "Research papers"},
         {".gs", "googlescholar", "Google Scholar", "Scholarly literature"},
@@ -102,7 +102,8 @@ return function(config)
 
     function Q.key(code, flags)
         if not chooser:isVisible() or (code ~= 36 and code ~= 76) then return false end
-        if flags.alt or flags.ctrl or (flags.cmd and flags.shift) then return false end
+        if flags.ctrl or (flags.cmd and flags.shift) or (flags.alt and (flags.cmd or flags.shift)) then return false end
+        if flags.alt then Q.submit("gemini"); return true end
         if flags.cmd then Q.submit("chatgpt"); return true end
         if flags.shift then Q.submit("google"); return true end
         if Q.help(chooser:query()) then return true end
