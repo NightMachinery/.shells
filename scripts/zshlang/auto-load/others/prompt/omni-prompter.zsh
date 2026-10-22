@@ -1,5 +1,5 @@
 ## Loaded function catalog, with literal AND terms and shortest-name fallback.
-typeset -g omni_prompter_catalog_version=1.0.0
+typeset -g omni_prompter_catalog_version=1.1.0
 
 function omni-prompter-functions {
     local query="$*" function_name term matched length
@@ -7,6 +7,11 @@ function omni-prompter-functions {
     terms=(${=query})
     {
         for function_name in ${(k)functions}; do
+            case "$function_name" in
+                prompt-input-file|prompt-instruction-input|prompt-instruction-input-*|prompt-blockify|\
+                snippet-input|snippet-input-file|snippet-chain|snippet-chain-copy|snippet-preamble-gen1|\
+                fragment-from-snippet) continue ;;
+            esac
             case "$function_name" in
                 fragment-*|prompt-*|metaprompt-*|snippet-*) ;;
                 *) continue ;;

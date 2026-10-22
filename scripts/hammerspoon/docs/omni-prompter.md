@@ -45,6 +45,10 @@ pipeline API: each stage is a quoted argv array. It shares `opts.stdin`,
 `opts.trim=false`, timeout handling and private file-backed I/O with the existing
 Brish helpers. Other callers keep their previous trimming/stdin defaults.
 
-Some prompt-family functions require arguments or ignore stdin. Those names
-remain available, but they need adapters or metadata to work as transformations.
-See the [prompt-family review](../../docs/prompt-family-review.md).
+Catalog version 1.1.0 explicitly excludes internal instruction/file helpers,
+chain runners/copy wrappers, the argument-taking preamble generator and fragment
+definition generator. The exclusion list lives in the Zsh catalog, so discovery
+and manual catalog queries agree. Public builders such as IMDb recommendations
+now use the standard stdin helper. See the linked prompt-family corrections for
+pipeline, mode, code-fence and JSON fixes in the
+[prompt-family corrections](../../docs/prompt-family-review.md).

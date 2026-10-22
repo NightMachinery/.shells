@@ -1,3 +1,4 @@
+typeset -g image_prompt_helpers_version=1.1.0
 ##
 function h-prompt-image-v1 {
     #: @globalInput `prompt`
@@ -13,7 +14,7 @@ function h-prompt-image-v1 {
     fi
 
     prompt_input_mode="${prompt_input_mode:-none}" \
-        prompt-instruction-input "${prompt}" "$*"
+        prompt-instruction-input "${prompt}" "$@"
 }
 
 ##

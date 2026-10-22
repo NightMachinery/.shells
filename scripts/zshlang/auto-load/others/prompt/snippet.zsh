@@ -1,14 +1,35 @@
 ##
+typeset -g snippet_helpers_version=1.1.0
+
 function snippet-chain {
-    local snippets=($@)
-
-    local snippet out=""
-    for snippet in "${snippets[@]}"; do
-        out="$(ec "${out}" | reval "${snippet}")" @RET
-    done
-
-    ec-copy "${out}"
+    : "Apply snippet functions in order to stdin, writing only final stdout."
+    setopt local_options pipefail
+    if (( $# == 0 )); then
+        command cat
+        return
+    fi
+    local snippet="$1"
+    shift
+    if (( $# > 0 )); then
+        reval "${snippet}" | snippet-chain "$@"
+    else
+        reval "${snippet}"
+    fi
 }
+
+function snippet-chain-copy {
+    : "Interactive compatibility: clipboard/stdin to a chain, copy once on success."
+    setopt local_options pipefail
+    local output_file
+    output_file="$(command mktemp)" @RET
+    {
+        cat-paste-if-tty | snippet-chain "$@" > "${output_file}" @RET
+        cat-copy < "${output_file}"
+    } always {
+        command rm -f -- "${output_file}"
+    }
+}
+
 ##
 function snippet-input-file {
     local file="$1"
@@ -159,7 +180,7 @@ function snippet-review-diff-do {
 }
 
 function review-diff-do {
-    snippet-chain "$@" snippet-review-diff-do
+    snippet-chain-copy "$@" snippet-review-diff-do
 }
 ##
 function snippet-zsh-heredoc-file-updater {

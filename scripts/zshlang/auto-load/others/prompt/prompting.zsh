@@ -1,3 +1,4 @@
+typeset -g prompt_library_version=1.1.0
 ##
 alias 2per='\noglob llm-run prompt-translate2per'
 alias 2fa='2per'
@@ -31,14 +32,18 @@ function prompt-instruction-input {
 
     if test -n "$input" ; then
         if [[ "${input_mode}" == 'block' ]] ; then
-            input='```'$'\n'"$input"$'\n''```'
+            local fence='```'
+            while [[ "${input}" == *"${fence}"* ]]; do
+                fence+='`'
+            done
+            input="${fence}"$'\n'"${input}"$'\n'"${fence}"
 
         elif [[ "${input_mode}" =~ '^org(?:2md)?$' ]] ; then
             input="$(ec "$input" |
             org-remove-inline-images |
             org2md)" @TRET
 
-        elif test -z "${input_mode}" || [[ "${input_mode}" =~ '(?i)^none|n$' ]] ; then
+        elif [[ -z "${input_mode}" || "${input_mode:l}" == none || "${input_mode:l}" == n ]] ; then
             #: do nothing
 
         else
@@ -323,10 +328,7 @@ function prompt-tex-yc {
 }
 
 function prompt-web-define-tex {
-    local url="$1" query="$2"
-
-    ec "Using the URL [${url}], write the definition of ${query} using inline LaTeX." |
-        cat-copy-if-tty
+    prompt-instruction-input 'Using the URL and query below, write the definition of the query using inline LaTeX.' "$@"
 }
 
 function prompt-tex2plain {
@@ -476,7 +478,8 @@ function prompt-summarize-text {
 function prompt-summarize-url {
     #: @seeAlso [agfi:summarize-url]
     ##
-    local url="$1"
+    local url
+    url="$(in-or-args "$@")" @RET
     assert-args url @RET
 
     readmoz-md2 "$url" |
@@ -509,7 +512,15 @@ function prompt-define-long {
 ```json
 {
   "word": "the word to be defined",
-  "definitions": [{"definition": "...", "detailed_definition": "...", "IPA_American": "...", "IPA_British": "...", "example_usages": [...]}, ...],
+  "definitions": [
+    {
+      "definition": "A concise definition",
+      "detailed_definition": "A paragraph explaining this meaning",
+      "IPA_American": "/American IPA/",
+      "IPA_British": "/British IPA/",
+      "example_usages": ["An example sentence using this meaning."]
+    }
+  ]
 }
 ```
 
@@ -647,7 +658,8 @@ function prompt-slide-complete-orgbeamer {
 }
 ##
 function prompt-coco2imagenet {
-    local coco_label="$1"
+    local coco_label
+    coco_label="$(in-or-args "$@")" @RET
     assert-args coco_label @RET
 
     {
@@ -674,18 +686,14 @@ EOF
 }
 ##
 function prompt-imdb-recommend {
-    ec "Recommend $*. Include their IMDB ratings (to the best of your knowledge), the year of publication, a plot hook, the reason for recommending/disrecommending it (pros/cons)." |
-        cat-copy-if-tty
-    # "Try to keep the IMDB ratings above 7."
-    #: Asking it for high IMDB scores seem to bias the model in a bad way.
-
-    # ec "Recommend $*. Include their IMDB ratings (to the best of your knowledge) and the year of publication. Include a summary of each one's production, plot, and pros/cons." |
+    #: Asking for high IMDB scores can bias recommendations.
+    prompt-instruction-input 'Recommend movies or series matching the following request. Include their IMDB ratings (to the best of your knowledge), the year of publication, a plot hook, and the reasons for recommending or not recommending each one (pros/cons).' "$@"
 }
 
 function prompt-imdb-adaptations {
-    ec "List all adaptations of $* with their IMDB ratings and year of publication. Include a summary of each one's production and pros/cons." |
-        cat-copy-if-tty
+    prompt-instruction-input 'List all adaptations of the following work with their IMDB ratings and year of publication. Include a summary of each production and its pros/cons.' "$@"
 }
+
 ##
 function prompt-ocr-correct {
     prompt_input_mode="${prompt_input_mode:-block}" prompt-instruction-input 'Please find below the output of an OCR. Correct any errors that the OCR may have introduced into the following output text. Correct whitespace mistakes, too. Only output the corrected text in a code block.' "$@"
@@ -891,13 +899,15 @@ function run-with-html-prompt-clean2org-v2 {
 alias '2org'='run-with-html-prompt-clean2org-v2'
 ##
 function prompt-music-curate-playlist {
+    local theme
+    theme="$(in-or-args "$@")" @RET
     {
         ec "Create a highly curated themed playlist from my local music files.
 
 GOAL
 Select only tracks that strongly and explicitly fit the theme in THEME. Quality over quantity.
 
-THEME: $*
+THEME: ${theme}
 
 RULES
 1) Use only the files listed under MUSIC FILES. Do not invent or correct paths or titles.
