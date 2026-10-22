@@ -269,7 +269,7 @@ All local chooser callers benefit; call `setChoices()` again after mutating rows
 Omni uses its optional `{limit=200}` constructor setting to bound native rows.
 Parsed bookmarks and aliases are cached by file metadata and checked on opening.
 
-Version 1.11.0 passes tests for source isolation, asynchronous Enter behavior,
+Version 1.11.1 passes tests for source isolation, asynchronous Enter behavior,
 stale-response cancellation, configuration, cache invalidation, indexed matching,
 and bounded rows. Go tests cover actual exclusive locks, pending rollback/WAL
 transactions, matching/aliases, duplicate suppression, authorization, and request
@@ -278,6 +278,7 @@ in about 60 ms, local HTTP queries took about 1.2 ms median, and resident memory
 was about 18 MiB. Ten warm Hammerspoon queries averaged 3 ms end to end
 (maximum 8.5 ms), separate from the 40 ms typing debounce. The pure indexed
 worst-case fixture search measured 0.13 ms.
+Completed requests clear timer/task references so callbacks can be collected.
 Timings depend on the machine and database. Existing native tab and query
 submission checks remain passing.
 

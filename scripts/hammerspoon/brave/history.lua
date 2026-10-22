@@ -1,6 +1,6 @@
 -- A managed Go service owns snapshots/indexing; Lua receives bounded matches.
 return function(config)
-    local H={version="2.0.0",waiting={},requests={}}
+    local H={version="2.0.1",waiting={},requests={}}
     local source=nightdir .. "/golang/omni-history"
     local function finishWaiting(ok)
         local waiting=H.waiting;H.waiting={}
@@ -14,7 +14,7 @@ return function(config)
         if H.stopped then return end
         local frame=""
         H.task=hs.task.new(binary,function()
-            H.endpoint=nil
+            H.task=nil;H.endpoint=nil
             if not H.stopped then fail("Browser history helper stopped") end
         end,function(_,out)
             if H.stopped then return false end
@@ -62,6 +62,7 @@ return function(config)
         if not H.build then fail("Could not build browser history helper");return end
         H.build:setWorkingDirectory(source)
         H.buildTimer=hs.timer.doAfter(60,function()
+            H.buildTimer=nil
             if H.build then H.build:terminate() end
             fail("Browser history helper build timed out")
         end)
@@ -74,8 +75,8 @@ return function(config)
         local function finish(value)
             if request.done then return end
             request.done=true;H.requests[request]=nil
-            if request.timeout then request.timeout:stop() end
-            if request.retry then request.retry:stop() end
+            if request.timeout then request.timeout:stop();request.timeout=nil end
+            if request.retry then request.retry:stop();request.retry=nil end
             if not H.stopped then callback(value) end
         end
         local function send()
@@ -112,13 +113,13 @@ return function(config)
         H.stopped=true;H.waiting={}
         for request in pairs(H.requests) do
             request.done=true
-            if request.timeout then request.timeout:stop() end
-            if request.retry then request.retry:stop() end
+            if request.timeout then request.timeout:stop();request.timeout=nil end
+            if request.retry then request.retry:stop();request.retry=nil end
         end
         H.requests={}
-        if H.buildTimer then H.buildTimer:stop() end
-        if H.build then H.build:terminate() end
-        if H.task then H.task:terminate() end
+        if H.buildTimer then H.buildTimer:stop();H.buildTimer=nil end
+        if H.build then H.build:terminate();H.build=nil end
+        if H.task then H.task:terminate();H.task=nil end
     end
     return H
 end

@@ -38,6 +38,6 @@ H.search('timeout',{},receive);local late=http[#http]
 pending[#pending].fn();assert(calls==2 and not last.ok)
 late(200,'success');assert(calls==2)
 H.search('cancel',{},receive);late=http[#http]
-H.stop();assert(tasks[1].terminated)
+H.stop();assert(tasks[1].terminated and H.task==nil and next(H.requests)==nil)
 late(200,'success');assert(calls==2)
 print('Managed history service client readiness, timeout, late reply and stop tests passed')
