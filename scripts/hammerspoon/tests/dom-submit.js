@@ -59,3 +59,9 @@ const repeated=fixture('chatgpt','inert prompt');repeated.c.location.pathname='/
 const oldQuery=repeated.c.document.querySelectorAll;repeated.c.document.querySelectorAll=s=>s.includes('data-message-author-role')?[{innerText:'inert prompt'}]:oldQuery(s);
 assert.equal(repeated.run().status,'submitted');assert.equal(repeated.clicks(),1);
 console.log('A historical matching message never suppresses a new exact draft');
+
+const cold=fixture('chatgpt');cold.c.location.pathname='/auth/callback';
+assert.equal(JSON.parse(cold.c.omniDOMSubmit({nonce:'cold',destination:'chatgpt',query:'inert prompt',initial:true})).navigationPending,true);
+assert.equal(cold.filled(),0);cold.c.location.pathname='/';
+assert.equal(JSON.parse(cold.c.omniDOMSubmit({nonce:'cold',destination:'chatgpt',query:'inert prompt',initial:true})).status,'waiting');
+console.log('Initial redirect pages are read-only while the intended page loads');

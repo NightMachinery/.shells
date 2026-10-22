@@ -2,13 +2,13 @@
 function omniDOMSubmit(request) {
     const normalize=value=>String(value||'').replace(/\r\n/g,'\n').trim();
     const origin={chatgpt:'https://chatgpt.com',claude:'https://claude.ai',gemini:'https://gemini.google.com'}[request.destination];
-    if(location.origin!==origin)return JSON.stringify({status:'cancelled',reason:'Query tab navigated away'});
+    if(location.origin!==origin)return JSON.stringify(request.initial?{status:'waiting',navigationPending:true}:{status:'cancelled',reason:'Query tab navigated away'});
     const key='__omniSubmissionV1';
     let job=window[key];
     if(job && job.nonce===request.nonce && job.sent)return JSON.stringify({status:'submitted'});
     const paths={chatgpt:['/'],claude:['/new','/new/'],gemini:['/app','/app/']};
     const conversation=request.destination==='chatgpt' && /^\/c\/[^/]+\/?$/.test(location.pathname);
-    if(!paths[request.destination].includes(location.pathname) && !conversation)return JSON.stringify({status:'cancelled',reason:'Query tab navigated away'});
+    if(!paths[request.destination].includes(location.pathname) && !conversation)return JSON.stringify(request.initial?{status:'waiting',navigationPending:true}:{status:'cancelled',reason:'Query tab navigated away'});
     if(!job || job.nonce!==request.nonce)job=window[key]={nonce:request.nonce};
     const visible=e=>e && e.isConnected && e.getClientRects().length>0;
     const find=selector=>Array.from(document.querySelectorAll(selector)).find(visible);

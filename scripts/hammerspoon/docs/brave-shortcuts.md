@@ -569,3 +569,11 @@ do not. The cached parser rows are copied before sorting.
 Usage persists in `chooser.recent.bookmarks.v1` through the shared in-memory
 `hs.settings` helper. There are no preference reads while typing. No new service
 or Redis dependency is needed.
+
+Version 1.15.1 fixes an initial-navigation race in the DOM route. A new tab may
+still be blank, loading, or on an intermediate redirect when its first execution
+runs. Those states are read-only waits until the intended chat page is first
+observed. Subsequent navigation away still cancels. Initial support detection
+and the disabled-support cache keep their existing behavior. Tests cover blank,
+loading and redirect transitions. A live inert ChatGPT fixture reached a real
+conversation after a marked Send action.

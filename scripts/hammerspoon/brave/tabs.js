@@ -106,8 +106,14 @@ function handle(request, b) {
                 if (String(tabs[j].id())!==request.tabId) continue;
                 var url=tabs[j].url();
                 var origins={chatgpt:'https://chatgpt.com',claude:'https://claude.ai',gemini:'https://gemini.google.com'};
-                if (!origins[request.destination] || url.split('/').slice(0,3).join('/')!==origins[request.destination]) return {ok:false,error:'Query tab navigated away'};
-                try { return {ok:true,result:JSON.parse(tabs[j].execute({javascript:request.code}))}; }
+                if (!origins[request.destination]) return {ok:false,error:'Unknown chat destination'};
+                if (typeof tabs[j].loading==='function' && tabs[j].loading())
+                    return {ok:true,jsExecuted:false,result:{status:'waiting',navigationPending:true}};
+                if (url.split('/').slice(0,3).join('/')!==origins[request.destination]) {
+                    if (request.initial) return {ok:true,jsExecuted:false,result:{status:'waiting',navigationPending:true}};
+                    return {ok:false,error:'Query tab navigated away'};
+                }
+                try { return {ok:true,jsExecuted:true,result:JSON.parse(tabs[j].execute({javascript:request.code}))}; }
                 catch (error) {
                     return {ok:false,jsUnavailable:/JavaScript.*(?:turned off|disabled|not allowed)/i.test(String(error)),error:'Tab JavaScript execution failed'};
                 }

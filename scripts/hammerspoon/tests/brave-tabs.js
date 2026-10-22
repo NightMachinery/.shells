@@ -68,3 +68,10 @@ fresh.activate=()=>{throw Error('query batch must not activate the browser')};
 result=context.handle({action:'openMany',items:[{url:'https://example.org/a'},{url:'https://example.org/b'}]},fresh);
 assert.equal(result.opened.length,2);assert.equal(current,made.length);assert.equal(result.anchor,String(100+made.length-1));
 console.log('Combined opens select the last new tab without activating the application');
+
+dt.url=()=> 'about:blank';
+assert.equal(context.handle({action:'dom',tabId:'dom-owned',destination:'chatgpt',initial:true,code:'inert'},domBrowser).result.navigationPending,true);
+assert.equal(context.handle({action:'dom',tabId:'dom-owned',destination:'chatgpt',initial:false,code:'inert'},domBrowser).ok,false);
+dt.url=()=> 'https://chatgpt.com/';dt.loading=()=>true;
+assert.equal(context.handle({action:'dom',tabId:'dom-owned',destination:'chatgpt',initial:true,code:'inert'},domBrowser).result.navigationPending,true);
+console.log('Initial blank/loading navigation waits; later navigation away cancels');

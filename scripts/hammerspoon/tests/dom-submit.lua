@@ -30,3 +30,21 @@ assert(#requests==start+1)
 requests[#requests].cb({ok=false,jsUnavailable=true})
 assert(#requests==start+1 and done==3)
 print('Concurrent disabled-support detection coalesces to one Apple Event request')
+
+D=make();local first=#requests+1
+D.submit({tabId='cold'},'chatgpt','inert',cb);assert(requests[first].r.initial)
+requests[first].cb({ok=true,result={status='waiting',navigationPending=true}})
+pending[#pending].fn();assert(requests[first+1].r.initial)
+requests[first+1].cb({ok=true,result={status='waiting'}})
+pending[#pending].fn();assert(requests[first+2].r.initial==false)
+requests[first+2].cb({ok=true,result={status='submitted'}})
+print('Cold navigation keeps waiting until the intended page is first observed')
+
+D=make();first=#requests+1
+D.submit({tabId='loading'},'chatgpt','inert',cb)
+D.submit({tabId='also-loading'},'claude','inert',cb)
+requests[first].cb({ok=true,jsExecuted=false,result={status='waiting',navigationPending=true}})
+assert(D.supported==nil and #requests==first)
+pending[#pending].fn();requests[first+1].cb({ok=false,jsUnavailable=true})
+assert(D.supported==false and #requests==first+1)
+print('Native loading waits never incorrectly mark JavaScript support as enabled')
