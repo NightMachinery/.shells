@@ -562,4 +562,4 @@ Define, for each command, a function of the same name that runs it with shebang-
     done
 }
 #: Measured hot paths only; see docs/macos-shebang-leak.md.
-shebang-bypass-def paste_files.swift brew sponge kitty vcsh rtl_reshaper.dash
+shebang-bypass-def paste_files.swift brew sponge kitty vcsh rtl_reshaper.dash screen_color_filter.py
