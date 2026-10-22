@@ -1,11 +1,14 @@
 return function(config)
     local O={generation=0,querySerial=0,baseChoices={},historyRows={}}
     local sources=config.sources or {tabs=true,bookmarks=true,history=true}
+    local recentBookmarks=sources.bookmarks and ChooserSearch.recent("bookmarks")
     local function complete(choice)
         O.generation=O.generation+1;O.querySerial=O.querySerial+1;O.pendingEnter=nil
         if not choice or O.queryActions.accept(choice) then return end
         if choice.kind=="tab" then config.engine.selectTab(choice.tabId)
-        else config.engine.openBookmark(choice.url,{replace=O.queryActions.replace,tabId=O.queryActions.targetTabId}) end
+        else config.engine.openBookmark(choice.url,{replace=O.queryActions.replace,tabId=O.queryActions.targetTabId},function(result)
+            if result.ok and choice.kind=="bookmark" then recentBookmarks.record({choice.url}) end
+        end) end
     end
     O.chooser=ChooserSearch.new(complete,nil,{limit=200})
     O.queryActions=dofile(nightdir .. "/hammerspoon/brave/query-actions.lua")({
@@ -118,7 +121,14 @@ return function(config)
         O.generation=O.generation+1
         local generation=O.generation
         local bookmarks,bookmarkError
-        if sources.bookmarks then bookmarks,bookmarkError=config.bookmarks.read() end
+        if sources.bookmarks then
+            bookmarks,bookmarkError=config.bookmarks.read()
+            -- Copy before sorting: parsed bookmark rows belong to the shared cache.
+            local sorted={}
+            for i,row in ipairs(bookmarks or {}) do sorted[i]={text=row.text,url=row.url,order=i} end
+            recentBookmarks.sort(sorted,function(row)return row.url end,function(a,b)return a.order<b.order end)
+            bookmarks=sorted
+        end
         local function ready(result)
             if O.stopped or generation~=O.generation or not config.braveInFront() then return end
             O.queryActions.targetTabId=result.activeTabId

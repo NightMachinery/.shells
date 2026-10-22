@@ -123,9 +123,12 @@ return function(config)
     function E.openURL(url,options)
         return E.openQueries({{destination="url",url=url}},options)
     end
-    function E.openBookmark(url,options)
+    function E.openBookmark(url,options,callback)
         options=options or {}
-        E.request({action="bookmark",url=url,replace=options.replace,tabId=options.tabId},report)
+        E.request({action="bookmark",url=url,replace=options.replace,tabId=options.tabId},function(result)
+            report(result)
+            if callback then callback(result) end
+        end)
         return true
     end
 

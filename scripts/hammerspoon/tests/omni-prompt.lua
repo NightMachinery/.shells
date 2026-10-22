@@ -12,6 +12,7 @@ function field:setAttributeValue(k,v)
  assert(k=='AXSelectedTextRange');activeChooser.range=v;return self
 end
 hs={
+ settings={get=function()return nil end,set=function()end},
  screen={mainScreen=function()return {frame=function()return {w=1280}end}end},
  processInfo={processID=123},
  axuielement={applicationElement=function(pid)
@@ -152,3 +153,34 @@ old({ok=true,history={{title='Wrong new',url='https://example.org/wrong'}}});ass
 historyCallback({ok=false,error='History unavailable'});assert(stale.chooser.visible and #warnings==1)
 v.stop();b.stop();h.stop();no.stop();stale.stop()
 print('Omni asynchronous variants, stale responses and pending Enter tests passed')
+
+-- Bookmark usage is shared across variants, survives reload, and never mutates
+-- cached parser rows. Failed opens, history selections and cancellation do not rank.
+local prefs,writes={},0
+hs.settings={get=function(k)return prefs[k]end,set=function(k,v)prefs[k]=v;writes=writes+1 end}
+dofile('core/chooser-search.lua')
+local cached={{text='First',url='https://example.org/first'},{text='Second',url='https://example.org/second'},
+ {text='Third',url='https://example.org/third'}}
+local succeeded=true
+local function ranked(tabs)
+ return dofile('brave/omni-prompt.lua')({sources={tabs=tabs,bookmarks=true},magic=false,queryActions=false,
+  braveInFront=function()return true end,unavailable=error,
+  bookmarks={read=function()return cached end},searchAliases={apply=function(rows)return rows end},
+  engine={listTabs=function(cb)cb({ok=true,activeTabId='1',tabs={{title='Tab',url='https://example.org/tab',index=1,windowNumber=1,tabId='1'}}})end,
+   openBookmark=function(_,_,cb)cb({ok=succeeded})end,selectTab=function()end},
+ })
+end
+local only=ranked(false);only.show();assert(only.chooser.items[1].text=='First')
+only.chooser.completion(only.chooser.items[3]);assert(writes==1)
+local mixed=ranked(true);mixed.show()
+assert(mixed.chooser.items[1].kind=='tab' and mixed.chooser.items[2].text=='Third')
+assert(mixed.chooser.items[3].text=='First' and mixed.chooser.items[4].text=='Second')
+assert(cached[1].text=='First' and cached[3].text=='Third' and cached[1].order==nil)
+succeeded=false;mixed.chooser.completion(mixed.chooser.items[4]);assert(writes==1)
+only.chooser.completion(nil);assert(writes==1)
+only.stop();mixed.stop()
+dofile('core/chooser-search.lua')
+only=ranked(false);only.show();assert(only.chooser.items[1].text=='Third')
+assert(only.chooser.items[2].text=='First' and only.chooser.items[3].text=='Second')
+only.stop()
+print('Bookmark recency shares variants, preserves grouping/cache/file fallback, persists, and ignores failed opens')

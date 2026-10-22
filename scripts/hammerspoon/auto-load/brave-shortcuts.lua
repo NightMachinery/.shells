@@ -3,7 +3,7 @@
 -- Cmd+. opens Omni Prompt; Cmd+/ opens a new tab; Cmd+Shift+/ native Tab Search.
 if BraveShortcuts then BraveShortcuts.stop() end
 
-BraveShortcuts = { version = "1.14.1", hotkeys = {} }
+BraveShortcuts = { version = "1.15.0", hotkeys = {} }
 local M = BraveShortcuts
 local bundleID = "com.brave.Browser"
 local log = hs.logger.new("brave-shortcuts", "warning")

@@ -555,3 +555,17 @@ accepts an exact prefilled draft on an allocated conversation URL, and recognize
 an already-sent latest message when the composer is empty. A historical matching
 message cannot suppress sending a new exact draft. Generic failure reasons are
 retained in submission diagnostics without storing prompt text.
+
+## Bookmark recency
+
+Version 1.15.0 ranks bookmark rows by their most recent successful chooser
+selection, shared across every bookmark-enabled Omni variant. Unused bookmarks
+keep their order in the bookmark file. Tabs remain before bookmarks in mixed
+Omni, and history stays after them. Filtering preserves this order. Renaming a
+bookmark preserves its usage because its URL is the identity. Successful opening
+and switching to an existing tab both count; failed operations and cancellation
+do not. The cached parser rows are copied before sorting.
+
+Usage persists in `chooser.recent.bookmarks.v1` through the shared in-memory
+`hs.settings` helper. There are no preference reads while typing. No new service
+or Redis dependency is needed.

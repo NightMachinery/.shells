@@ -2285,3 +2285,11 @@ emoji choices use recent-first order. Small usage records persist in
 `hs.settings` and are loaded once per namespace, with sorting/filtering in memory.
 Browser Omni and OmniPrompter recalculate width at each opening: 75% of the active
 display, capped at 1800 logical pixels.
+
+Bookmark-enabled Omni variants now share recent-first ordering for successful
+bookmark selections, with bookmark-file order as fallback. App/window switching
+currently uses AltTab through Hyper+[ rather than an HS chooser. Its unset
+`windowOrder` preference defaults to `recentlyFocused`, as defined in
+[AltTab's preferences](https://github.com/lwouis/alt-tab-macos/blob/master/src/preferences/Preferences.swift).
+Hammerspoon's existing app-return lists also already insert activations at the
+front. These existing app/window orders are retained.
