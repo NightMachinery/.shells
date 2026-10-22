@@ -24,7 +24,7 @@ return function(config)
     function O.updatePlaceholder()
         local mode=O.queryActions.modeLabel()
         O.chooser:placeholderText(mode .. " · " .. (config.name or "Omni") .. (config.magic~=false and " · .help" or "") .. " · Tab: toggle" .. hint)
-        if O.chooser.fgColor then O.chooser:fgColor(O.queryActions.replace and {red=1,green=.65,blue=.2,alpha=1} or nil) end
+        ChooserSearch.inputColor(O.chooser,O.queryActions.replace and {red=1,green=.65,blue=.2,alpha=1} or nil)
     end
     O.updatePlaceholder()
     O.chooser:rows(12)

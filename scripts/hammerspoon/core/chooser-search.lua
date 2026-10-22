@@ -1,5 +1,5 @@
 -- Shared local chooser policy. Remote query providers keep their own callbacks.
-ChooserSearch = {version = "1.3.0"}
+ChooserSearch = {version = "1.3.1"}
 local S = ChooserSearch
 local states = setmetatable({}, {__mode="k"})
 
@@ -94,4 +94,36 @@ function S.recent(namespace)
     end
     recentStores[namespace]=R
     return R
+end
+
+-- hs.chooser:fgColor also changes result titles and shortcut hints. This small
+-- native extension touches only the input, including its active field editor.
+local inputColorModule, inputColorError
+function S.inputColor(chooser, color)
+    if not inputColorModule and not inputColorError then
+        local root=nightdir .. "/hammerspoon/native/chooser-input-color/"
+        local function read(path)
+            local file=assert(io.open(path,"rb"))
+            local contents=file:read("*a");file:close();return contents
+        end
+        local ok,result=pcall(function()
+            local bundle=hs.processInfo.bundlePath
+            local key=hs.hash.SHA256(read(root .. "module.m") .. read(root .. "build.sh") ..
+                bundle .. tostring(hs.processInfo.version) .. tostring(hs.processInfo.arch))
+            local binary=os.getenv("HOME") .. "/Library/Caches/org.hammerspoon.Hammerspoon/chooser-input-color/" .. key .. ".so"
+            if not hs.fs.attributes(binary) then
+                local function quote(value)return "'" .. value:gsub("'", "'\\''") .. "'" end
+                local output,success=hs.execute("/bin/sh " .. quote(root .. "build.sh") .. " " .. quote(bundle) .. " " .. quote(binary) .. " 2>&1",false)
+                assert(success,"Cannot build chooser input color helper: " .. output)
+            end
+            return assert(package.loadlib(binary,"luaopen_chooser_input_color"))()
+        end)
+        if ok then inputColorModule=result else inputColorError=result;print(result) end
+    end
+    if inputColorModule then
+        local ok,result=pcall(inputColorModule.color,chooser,color)
+        if ok then return result end
+        if not inputColorError then inputColorError=result;print(result) end
+    end
+    return chooser -- The textual replacement indicator still works if unavailable.
 end

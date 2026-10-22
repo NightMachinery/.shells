@@ -288,8 +288,19 @@ submission checks remain passing.
 
 ## Browser chooser query actions
 
+Version 1.15.2 limits the replacement indicator to the query input.
+
+The query-only color uses a small LuaSkin extension under
+`native/chooser-input-color/`. It builds once into the user's cache using Xcode
+Command Line Tools, keyed by source and Hammerspoon version/architecture. It
+changes the chooser's input field and active editor directly, without styling
+result rows or changing their selection. If compilation or the internal
+`queryField` accessor is unavailable, the textual replacement indicator remains
+usable and an error is logged once. No query or result contents are logged.
+
 Tab toggles **New tab** and **REPLACE CURRENT TAB**. Replacement mode colors
-chooser text orange. It targets the tab captured when Omni opened, even if the
+only the query text orange; results and shortcut hints retain their normal
+colors. It targets the tab captured when Omni opened, even if the
 active tab later changes; a closed target is refused. Existing matching tabs are
 still reused. For combined magic destinations, only the first replaces the
 captured tab; subsequent destinations open new background tabs. All destinations open up front

@@ -49,6 +49,7 @@ hs={
  end},
 }
 dofile('core/chooser-search.lua')
+ChooserSearch.inputColor=function(c,color)c.inputColor=color;return c end
 local function flush()
  local work=pending;pending={}
  for _,t in ipairs(work)do if not t.stopped then t.fn() end end
@@ -159,6 +160,7 @@ print('Omni asynchronous variants, stale responses and pending Enter tests passe
 local prefs,writes={},0
 hs.settings={get=function(k)return prefs[k]end,set=function(k,v)prefs[k]=v;writes=writes+1 end}
 dofile('core/chooser-search.lua')
+ChooserSearch.inputColor=function(c,color)c.inputColor=color;return c end
 local cached={{text='First',url='https://example.org/first'},{text='Second',url='https://example.org/second'},
  {text='Third',url='https://example.org/third'}}
 local succeeded=true
@@ -180,6 +182,7 @@ succeeded=false;mixed.chooser.completion(mixed.chooser.items[4]);assert(writes==
 only.chooser.completion(nil);assert(writes==1)
 only.stop();mixed.stop()
 dofile('core/chooser-search.lua')
+ChooserSearch.inputColor=function(c,color)c.inputColor=color;return c end
 only=ranked(false);only.show();assert(only.chooser.items[1].text=='Third')
 assert(only.chooser.items[2].text=='First' and only.chooser.items[3].text=='Second')
 only.stop()
