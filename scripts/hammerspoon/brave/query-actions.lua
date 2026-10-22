@@ -80,6 +80,7 @@ return function(config)
     end
 
     function Q.submit(destination, query)
+        if config.enabled==false then return false end
         query = query or chooser:query()
         local url = Q.url(query, destination)
         if not url or Q.stopped then return false end
@@ -93,6 +94,7 @@ return function(config)
     end
 
     function Q.accept(choice)
+        if config.enabled==false then return false end
         if not choice or choice.kind or choice.url then return false end
         -- enableDefaultForQuery supplies {text=query} when no result remains.
         if Q.help(choice.text) then return true end
@@ -102,6 +104,7 @@ return function(config)
     end
 
     function Q.key(code, flags)
+        if config.enabled==false then return false end
         if not chooser:isVisible() or (code ~= 36 and code ~= 76) then return false end
         local modifiers=(flags.ctrl and 1 or 0)+(flags.alt and 1 or 0)
             +(flags.cmd and 1 or 0)+(flags.shift and 1 or 0)
@@ -114,6 +117,7 @@ return function(config)
         local destination, query=Q.magic(chooser:query())
         if destination then Q.submit(destination, query); return true end
         local first = chooser:selectedRowContents(1)
+        if config.waitForResults and (not first or (not first.kind and not first.url)) and config.waitForResults() then return true end
         if not first or not first.text then Q.submit("google"); return true end
         return false
     end
@@ -121,8 +125,8 @@ return function(config)
     Q.tap = hs.eventtap.new({hs.eventtap.event.types.keyDown}, function(event)
         return Q.key(event:getKeyCode(), event:getFlags())
     end)
-    chooser:enableDefaultForQuery(true)
-    chooser:showCallback(function() if not Q.stopped then Q.tap:start() end end)
+    chooser:enableDefaultForQuery(config.enabled~=false)
+    chooser:showCallback(function() if not Q.stopped and config.enabled~=false then Q.tap:start() end end)
     chooser:hideCallback(function() Q.tap:stop() end)
 
     function Q.stop()

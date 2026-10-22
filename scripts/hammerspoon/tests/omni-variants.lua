@@ -1,0 +1,16 @@
+local V=dofile('brave/omni-variants.lua')
+assert(V.validate(V.defaults))
+local function make()
+ return {{id='history',name='History',mods={'cmd','alt'},key='h',sources={history=true},magic=false,queryActions=false}}
+end
+assert(V.validate(make()))
+assert(not V.validate(make(),{x=1}))
+assert(V.validate(make(),{h=1}))
+local bad=make();bad[1].sources.hisotry=true;assert(not V.validate(bad))
+bad=make();bad[1].magic=true;assert(not V.validate(bad))
+bad=make();bad[1].mods={'cmd'};bad[1].key='/';assert(not V.validate(bad))
+bad=make();bad[2]=make()[1];bad[2].id='other';bad[2].mods={'alt','cmd'};assert(not V.validate(bad))
+bad=make();bad[1].mods={'cmd','cmd'};assert(not V.validate(bad))
+bad=make();bad[1].surprise=true;assert(not V.validate(bad))
+assert(not V.validate({[2]=make()[1]}))
+print('Omni variant configuration tests passed')

@@ -3,7 +3,7 @@
 `hammerspoon/auto-load/brave-shortcuts.lua` installs browser hotkeys while Brave
 (`com.brave.Browser`) is frontmost:
 
-- **Cmd+.** opens Omni Prompt, combining open tabs and bookmarks.
+- **Cmd+.** opens Omni Prompt, combining open tabs, bookmarks, and browser history.
 - **Cmd+/** opens a new tab through File > New Tab.
 - **Cmd+Shift+/** opens Brave's native Tab Search.
 - **Cmd+N / Cmd+M** move older/newer through tab recency in the current window.
@@ -107,7 +107,8 @@ Bookmarks live in `$nightNotesPrivate/browser/bookmarks.org`, falling back to
 # [[https://example.org/paused][Commented out]]
 ```
 
-The file is re-read whenever Cmd+, opens the chooser. Any line whose first
+The parsed file is cached until its modification time, size, change time, or inode
+changes. Metadata is checked whenever a variant using bookmarks opens. Any line whose first
 non-whitespace character is `#` is ignored, as are `#+BEGIN_COMMENT` blocks.
 Only titled HTTP(S) links appear. Empty titles are ignored, surrounding title
 whitespace is trimmed, and identical URL/title pairs are deduplicated. Search
@@ -159,13 +160,15 @@ opens native Tab Search. The action implementations stay the same.
 ## Omni Prompt and local matching
 
 Omni Prompt snapshots tabs across all Brave windows when opened, then appends
-bookmarks from the same private file as Cmd+,. Each row identifies its source.
+bookmarks from the same private file as Cmd+, and recent browser history. Each
+row identifies its source. Cmd+, is a bookmarks-only instance of the same chooser.
 Tab subtitles show the position within their window, the window number, and URL
 (for example, `Tab 3 · Window 1 · https://example.org/`).
 Selecting a tab uses its stable ID, even if it moved to another window. A closed
 tab reports an error instead of opening a replacement. Selecting a bookmark
-uses the existing switch-or-open behavior. Reopen the chooser to refresh tabs.
-An unavailable source reports a warning while the other source remains usable.
+uses the existing switch-or-open behavior, as does selecting history. Reopen
+the chooser to refresh its sources. An unavailable source reports a warning
+while other sources remain usable.
 
 Both choosers use case-insensitive literal substring matching: split the query
 on whitespace and require every term, in any order, across the title and URL.
@@ -184,6 +187,99 @@ syntax checks, and live hotkey checks. Typed queries matched terms across
 fields, absent terms cleared rows, choosing a tab selected its stable ID without
 creating a tab, and Cmd+Shift+/ focused native Tab Search. The tab bridge test
 also covers a tab moved between windows and a tab closed after listing.
+
+## Configurable Omni variants and history
+
+Edit `$nightNotesPrivate/browser/omni-variants.json` (or
+`$HOME/notes/private/browser/omni-variants.json`) and reload Hammerspoon. The JSON
+array replaces the default variant list. Defaults preserve these two bindings:
+
+```json
+[
+  {
+    "id": "omni", "name": "Omni", "mods": ["cmd"], "key": ".",
+    "sources": {"tabs": true, "bookmarks": true, "history": true},
+    "magic": true, "queryActions": true
+  },
+  {
+    "id": "bookmarks", "name": "Bookmarks", "mods": ["cmd"], "key": ",",
+    "sources": {"tabs": false, "bookmarks": true, "history": false},
+    "magic": false, "queryActions": true
+  }
+]
+```
+
+Add another object to bind another variant. For example, use `id: "history"`,
+`name: "History"`, `mods: ["cmd", "alt"]`, `key: "h"`, and
+`sources: {"history": true}` for history only on Cmd+Alt+H. Set both `magic` and
+`queryActions` explicitly. Supported modifiers are `cmd`, `alt`, `ctrl`, `shift`,
+and `fn`; keys are single printable ASCII characters available on the current
+keyboard layout. IDs and chords must be
+unique. Native browser action chords are reserved. Invalid configuration warns
+and falls back to the entire default list.
+
+Omitted sources are off. Disabled sources perform no reads. `magic` enables
+prefix routing and `.help`; `queryActions` enables modified Enter and no-match
+Google search. With both off, Enter only selects a result. Magics require query
+actions. Turning all sources off with query actions on creates a query launcher.
+All variants share literal AND matching, aliases, and switch-or-open behavior.
+`BraveShortcuts.showOmni("history")` opens an installed variant by ID, and
+`BraveShortcuts.omniVariants` contains the live chooser instances.
+
+History uses the most recently used Brave profile from `Local State`, falling
+back to `Default`. This can differ from the front window's profile when using
+multiple profiles. It does not aggregate profiles or expose incognito visits.
+Brave holds an exclusive SQLite lock, so direct read-only queries can fail.
+The managed Go helper in `golang/omni-history` copies `History` and any rollback
+or WAL journal into a private temporary directory, requiring unchanged source
+file identities, nanosecond timestamps and sizes during copying (up to three
+attempts). System SQLite recovers and integrity-checks the copy. The source is
+never opened for writing, and the temporary snapshot is deleted after reading.
+The 5,000 most recently visited non-hidden HTTP(S) URLs are indexed in memory,
+newest first, including untitled entries under their URL. Older entries remain
+available through Brave's full history search.
+
+Hammerspoon builds the helper once per source hash using the installed Go
+compiler and caches only the executable under `~/Library/Caches/hammerspoon/`.
+The build uses the Go standard library and system SQLite through Cgo, without
+third-party modules. The helper starts when a configured variant enables
+history, stops on Hammerspoon reload/stop, and also exits if its parent dies.
+It checks database/journal metadata every two seconds and rebuilds a changed
+index at most once per five seconds. Unchanged snapshots are skipped, with a
+one-minute fallback refresh. Failed refreshes return an error rather than
+serving another profile's old data. No history index is persisted.
+
+The service listens on a random loopback port, authenticates each request with
+a per-run token, rejects browser-origin requests, and does not log history or
+queries. HS sends literal AND queries, the cached host aliases, and URLs already
+represented by tabs/bookmarks. Go uses precomputed searchable strings and returns
+at most 200 unique matching rows. History never crosses the process stdout pipe.
+Typing is debounced by 40 ms; generations and query serials discard stale replies.
+
+Tabs and bookmarks appear immediately after the native tab snapshot. History
+matches append asynchronously, preserving a highlighted local result. The chooser
+transfers at most 200 matching rows to its native UI; all source entries remain
+searchable by refining the query. Plain no-match Enter waits for an outstanding
+history query before deciding between a result and Google search. Modified
+Enter and magic actions remain immediate. A failed source leaves others usable,
+and a three-second history-request timeout prevents indefinite waiting.
+
+`core/chooser-search.lua` precomputes lowercase search strings at `setChoices()`.
+All local chooser callers benefit; call `setChoices()` again after mutating rows.
+Omni uses its optional `{limit=200}` constructor setting to bound native rows.
+Parsed bookmarks and aliases are cached by file metadata and checked on opening.
+
+Version 1.11.0 passes tests for source isolation, asynchronous Enter behavior,
+stale-response cancellation, configuration, cache invalidation, indexed matching,
+and bounded rows. Go tests cover actual exclusive locks, pending rollback/WAL
+transactions, matching/aliases, duplicate suppression, authorization, and request
+bounds. Race checks and `go vet` pass. On this host, a live 5,000-URL index loaded
+in about 60 ms, local HTTP queries took about 1.2 ms median, and resident memory
+was about 18 MiB. Ten warm Hammerspoon queries averaged 3 ms end to end
+(maximum 8.5 ms), separate from the 40 ms typing debounce. The pure indexed
+worst-case fixture search measured 0.13 ms.
+Timings depend on the machine and database. Existing native tab and query
+submission checks remain passing.
 
 ## Browser chooser query actions
 
@@ -216,8 +312,9 @@ lowercase hostnames to keyword lists, for example:
 A query such as `team channel` can match a channel URL on that host even when
 its title does not name the service. Ports and host case are normalized; paths,
 lookalike domains, and unrelated subdomains do not acquire the alias. Keywords
-remain hidden in the chooser. Reopen either chooser to reload the file. A
-missing file means no aliases; malformed JSON shows a warning.
+remain hidden in the chooser. Alias parsing is cached by the same file metadata
+as bookmarks. Reopening a chooser checks for edits, replacements, deletion, or
+recreation. A missing file means no aliases; malformed JSON shows a warning.
 
 Version 1.6.0 adds query actions and exact-host aliases. Focused tests cover
 explicit URL matching, URI encoding, Enter variants, callback cleanup, fresh

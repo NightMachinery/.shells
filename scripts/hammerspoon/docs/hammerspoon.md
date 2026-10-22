@@ -38,9 +38,10 @@ alphabetical order after the core modules are ready.
 Put core features in `core/` and add them to the explicit list in `boot.lua`.
 Put app-specific add-ons that can run after all core modules in `auto-load/`.
 
-`auto-load/brave-shortcuts.lua` binds Cmd+. to Omni Prompt (tabs and bookmarks),
+`auto-load/brave-shortcuts.lua` binds Cmd+. to Omni Prompt (tabs, bookmarks, and history),
 Cmd+/ to New Tab, and Cmd+Shift+/ to native Tab Search while Brave is
-frontmost. See
+frontmost. Omni variants configure their own hotkeys, sources, and query features
+in the private browser settings file; Cmd+, is a bookmarks-only variant. See
 [Brave shortcuts](brave-shortcuts.md) for behavior and console helpers.
 
 ## App hotkeys

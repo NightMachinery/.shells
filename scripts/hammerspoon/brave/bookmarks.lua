@@ -1,5 +1,6 @@
 return function(config)
     local B = {}
+    local cache = dofile(nightdir .. "/hammerspoon/brave/file-cache.lua")()
     B.path = (os.getenv("nightNotesPrivate") or (os.getenv("HOME") .. "/notes/private")) .. "/browser/bookmarks.org"
 
     function B.parse(text)
@@ -20,31 +21,11 @@ return function(config)
         return choices
     end
 
-    B.chooser = ChooserSearch.new(function(choice)
-        if choice and not B.queryActions.accept(choice) then config.engine.openBookmark(choice.url) end
-    end)
-    B.queryActions = dofile(nightdir .. "/hammerspoon/brave/query-actions.lua")({
-        chooser=B.chooser, engine=config.engine,
-    })
-    B.chooser:searchSubText(true)
-    B.chooser:placeholderText("Bookmarks · Shift+Enter: Google · Cmd+Enter: ChatGPT · Alt+Enter: Gemini · Ctrl+Enter: Claude")
-
     function B.read()
-        local file = io.open(B.path,"r")
-        if not file then return nil, "Bookmark file is missing: " .. B.path end
-        local content = file:read("*a"); file:close()
-        local choices = B.parse(content)
-        return config.searchAliases.apply(choices)
+        local choices,err=cache.read(B.path,B.parse)
+        if not choices then return nil,"Bookmark file could not be read: " .. (err or "Unknown error") end
+        return choices
     end
 
-    function B.show()
-        local choices, err = B.read()
-        if not choices then return config.unavailable(err) end
-        B.chooser:query("")
-        ChooserSearch.setChoices(B.chooser, choices):show()
-        return true
-    end
-
-    function B.stop() B.queryActions.stop(); B.chooser:hide(); B.chooser:delete() end
     return B
 end

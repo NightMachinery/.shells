@@ -99,3 +99,55 @@ local other=make();other.showHelp();local row=other.helpChooser.items[1]
 other.helpChooser:hide();other.helpChooser.completion(row);other.stop();flush()
 assert(not other.chooser.visible and other.pendingHelp==nil)
 print('Omni magic cheatsheet tests passed')
+
+-- Disabled sources do no I/O. History results arrive after local rows.
+local tabCallback,historyCallback,tabReads,historyReads,bookmarkReads
+local warnings={}
+tabReads,historyReads,bookmarkReads=0,0,0
+local function variant(sources,features)
+ return dofile('brave/omni-prompt.lua')({
+  sources=sources,name='Test',magic=not features or features.magic,queryActions=not features or features.actions,
+  braveInFront=function()return front end,
+  bookmarks={read=function()bookmarkReads=bookmarkReads+1;return {{text='Saved',url='https://example.org/saved'}} end},
+  history={search=function(query,options,fn)
+   historyReads=historyReads+1;historyCallback=fn
+   assert(type(options.aliases)=='table' and type(options.exclude)=='table')
+  end},
+  searchAliases={apply=function(rows)return rows end},unavailable=function(err)warnings[#warnings+1]=err end,
+  engine={listTabs=function(fn)tabReads=tabReads+1;tabCallback=fn end,
+   openBookmark=function(url)opened[#opened+1]=url end,selectTab=function(id)selected[#selected+1]=id end,
+   openURL=function(url)opened[#opened+1]=url end},
+ })
+end
+local v=variant({tabs=true,bookmarks=true,history=true})
+assert(v.show());assert(not v.chooser.visible and historyReads==0)
+tabCallback({ok=true,tabs={{title='Current',url='https://example.org/',index=1,windowNumber=1,tabId='9'}}})
+assert(v.chooser.visible and #v.chooser.items==2 and v.historyPending)
+historyCallback({ok=true,total=5000,history={{title='Historical paper',url='https://archive.example.org/paper'}}})
+assert(#v.chooser.items==3 and not v.historyPending and v.historyTotal==5000)
+assert(v.chooser.items[3].kind=='history' and v.chooser.items[3].subText=='History · https://archive.example.org/paper')
+typeQuery(v.chooser,'historical archive.example');assert(#v.chooser.items==1)
+v.chooser.completion(v.chooser.items[1]);assert(opened[#opened]=='https://archive.example.org/paper')
+flush() -- stale remote completion remains harmless
+local reads=historyReads
+local b=variant({bookmarks=true},{magic=false,actions=false});b.show()
+assert(#b.chooser.items==1 and tabReads==1 and historyReads==reads and bookmarkReads==2)
+assert(not b.queryActions.key(36,{cmd=true}) and not b.queryActions.magic('.c test'))
+-- Plain no-match Enter waits for the latest history response instead of Googling early.
+local h=variant({history=true});h.show();local old=historyCallback
+local count=#opened
+typeQuery(h.chooser,'deep paper');assert(h.queryActions.key(36,{}));assert(#opened==count)
+flush();old({ok=true,history={}});assert(h.historyPending and #opened==count)
+historyCallback({ok=true,total=5000,history={{title='Deep paper',url='https://example.org/deep'}}})
+flush();assert(opened[#opened]=='https://example.org/deep' and not h.chooser.visible)
+local no=variant({history=true});no.show()
+typeQuery(no.chooser,'no match');assert(no.queryActions.key(36,{}));flush()
+historyCallback({ok=true,total=5000,history={}});flush()
+assert(opened[#opened]=='https://www.google.com/search?q=no%20match')
+local stale=variant({history=true});stale.show();old=historyCallback
+stale.cancel();old({ok=true,history={{title='Old',url='https://example.org/old'}}});assert(not stale.chooser.visible)
+stale.show();old=historyCallback;typeQuery(stale.chooser,'new');flush()
+old({ok=true,history={{title='Wrong new',url='https://example.org/wrong'}}});assert(#stale.chooser.items==0)
+historyCallback({ok=false,error='History unavailable'});assert(stale.chooser.visible and #warnings==1)
+v.stop();b.stop();h.stop();no.stop();stale.stop()
+print('Omni asynchronous variants, stale responses and pending Enter tests passed')

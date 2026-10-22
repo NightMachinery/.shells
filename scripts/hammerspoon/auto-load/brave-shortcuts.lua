@@ -3,7 +3,7 @@
 -- Cmd+. opens Omni Prompt; Cmd+/ opens a new tab; Cmd+Shift+/ native Tab Search.
 if BraveShortcuts then BraveShortcuts.stop() end
 
-BraveShortcuts = { version = "1.10.1", hotkeys = {} }
+BraveShortcuts = { version = "1.11.0", hotkeys = {} }
 local M = BraveShortcuts
 local bundleID = "com.brave.Browser"
 local log = hs.logger.new("brave-shortcuts", "warning")
@@ -200,8 +200,8 @@ function M.stop()
     if M.chatgpt then M.chatgpt.stop() end
     if M.claude then M.claude.stop() end
     if M.gemini then M.gemini.stop() end
-    if M.omniPrompt then M.omniPrompt.stop() end
-    if M.bookmarks then M.bookmarks.stop() end
+    for _,variant in pairs(M.omniVariants or {}) do variant.stop() end
+    if M.browserHistory then M.browserHistory.stop() end
     if M.tabs then M.tabs.stop() end
     if M.pending then M.pending:stop(); M.pending = nil end
     if M.watcher then M.watcher:stop(); M.watcher = nil end
@@ -232,14 +232,29 @@ M.gemini = dofile(nightdir .. "/hammerspoon/brave/gemini-submit.lua")({
 M.searchAliases = dofile(nightdir .. "/hammerspoon/brave/search-aliases.lua")({
     unavailable=unavailable,
 })
-M.bookmarks = dofile(nightdir .. "/hammerspoon/brave/bookmarks.lua")({
-    engine = M.tabs, unavailable = unavailable, searchAliases=M.searchAliases,
-})
-
-M.omniPrompt = dofile(nightdir .. "/hammerspoon/brave/omni-prompt.lua")({
-    engine=M.tabs, bookmarks=M.bookmarks, braveInFront=braveInFront, unavailable=unavailable,
-    searchAliases=M.searchAliases,
-})
+M.bookmarkStore = dofile(nightdir .. "/hammerspoon/brave/bookmarks.lua")({})
+M.browserHistory = dofile(nightdir .. "/hammerspoon/brave/history.lua")({})
+M.variantConfig = dofile(nightdir .. "/hammerspoon/brave/omni-variants.lua")
+M.omniVariants={}
+local variants=M.variantConfig.load(unavailable)
+for _,variant in ipairs(variants) do
+    M.omniVariants[variant.id]=dofile(nightdir .. "/hammerspoon/brave/omni-prompt.lua")({
+        engine=M.tabs, bookmarks=M.bookmarkStore, history=M.browserHistory,
+        braveInFront=braveInFront, unavailable=unavailable, searchAliases=M.searchAliases,
+        name=variant.name, sources=variant.sources, magic=variant.magic, queryActions=variant.queryActions,
+    })
+    if variant.sources.history then M.browserHistory.start() end
+end
+-- Keep the established console aliases when their default IDs exist.
+M.omniPrompt=M.omniVariants.omni
+M.bookmarks=M.omniVariants.bookmarks
+function M.showOmni(id)
+    local selected=M.omniVariants[id]
+    if not selected or not braveInFront() then return false end
+    for _,variant in pairs(M.omniVariants) do variant.cancel() end
+    M.finishRecency()
+    return selected.show()
+end
 M.bitwarden = dofile(nightdir .. "/hammerspoon/brave/bitwarden.lua")({
     braveInFront = braveInFront, nativeWindow = nativeWindow,
     unavailable = unavailable, clearError = function() M.lastError=nil end,
@@ -247,17 +262,21 @@ M.bitwarden = dofile(nightdir .. "/hammerspoon/brave/bitwarden.lua")({
 
 M.hotkeys = {
     hs.hotkey.new({"cmd"}, "b", function() schedule(function() M.finishRecency(); M.bitwarden.open() end) end),
-    hs.hotkey.new({"cmd"}, ",", function() schedule(function() M.finishRecency(); M.bookmarks.show() end) end),
     hs.hotkey.new({"cmd", "fn"}, "left", function() schedule(function() M.history(-1) end) end),
     hs.hotkey.new({"cmd", "fn"}, "right", function() schedule(function() M.history(1) end) end),
     hs.hotkey.new({"cmd"}, "n", function() schedule(function() M.recency(1) end) end),
     hs.hotkey.new({"cmd"}, "m", function() schedule(function() M.recency(-1) end) end),
     hs.hotkey.new({"cmd", "fn"}, "up", function() schedule(function() M.finishRecency(); M.tabs.step(-1) end) end),
     hs.hotkey.new({"cmd", "fn"}, "down", function() schedule(function() M.finishRecency(); M.tabs.step(1) end) end),
-    hs.hotkey.new({"cmd"}, ".", function() schedule(function() M.finishRecency(); M.omniPrompt.show() end) end),
     hs.hotkey.new({"cmd"}, "/", function() schedule(M.newTab) end),
     hs.hotkey.new({"cmd", "shift"}, "/", function() schedule(M.tabSearch) end),
 }
+for _,variant in ipairs(variants) do
+    local id=variant.id
+    M.hotkeys[#M.hotkeys+1]=hs.hotkey.new(variant.mods,variant.key,function()
+        schedule(function() M.showOmni(id) end)
+    end)
+end
 M.flags = hs.eventtap.new({hs.eventtap.event.types.flagsChanged}, function(event)
     if not event:getFlags().cmd then M.finishRecency() end
     return false

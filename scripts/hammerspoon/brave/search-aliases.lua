@@ -1,19 +1,18 @@
 -- Exact-host keywords live beside private bookmarks, not in the public config.
 return function(config)
     local A = {}
+    local cache = dofile(nightdir .. "/hammerspoon/brave/file-cache.lua")()
     A.path = (os.getenv("nightNotesPrivate") or (os.getenv("HOME") .. "/notes/private"))
         .. "/browser/search-aliases.json"
 
     function A.read()
-        local file = io.open(A.path, "r")
-        if not file then return {} end
-        local content = file:read("*a"); file:close()
-        local ok, aliases = pcall(hs.json.decode, content)
-        if not ok or type(aliases) ~= "table" then
-            config.unavailable("Browser search aliases must be a JSON object")
-            return {}
-        end
-        return aliases
+        local aliases,err=cache.read(A.path,function(content)
+            local ok,value=pcall(hs.json.decode,content)
+            if not ok or type(value)~="table" then return nil,"Browser search aliases must be a JSON object" end
+            return value
+        end)
+        if err and err~="File is unavailable" then config.unavailable(err) end
+        return aliases or {}
     end
 
     function A.apply(choices, aliases)

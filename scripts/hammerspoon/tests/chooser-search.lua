@@ -29,3 +29,13 @@ local hiddenURL = {{text="Generic title", subText="Tab", url="https://example.or
 assert(#ChooserSearch.filter(hiddenURL,"generic unique-route")==1)
 assert(#ChooserSearch.filter({{text="Channel", searchText="Chat server"}},"channel server")==1)
 print("chooser search tests passed")
+
+-- Bound native rows without limiting which source entries can be searched.
+local big={}
+for i=1,5000 do big[i]={text='Paper '..i,url='https://example.org/'..i} end
+local bounded=ChooserSearch.new(function()end,nil,{limit=200})
+ChooserSearch.setChoices(bounded,big);assert(#shown==200)
+callback('paper 4999');assert(#shown==1 and shown[1]==big[4999])
+big[4999].text='Changed'
+ChooserSearch.setChoices(bounded,big);callback('changed 4999');assert(#shown==1)
+print('Cached chooser index and bounded native result tests passed')

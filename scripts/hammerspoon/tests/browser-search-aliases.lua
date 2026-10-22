@@ -1,3 +1,4 @@
+nightdir='..'
 -- Run from hammerspoon/: lua tests/browser-search-aliases.lua
 local A=dofile("brave/search-aliases.lua")({unavailable=function() error("unexpected warning") end})
 local rows={
