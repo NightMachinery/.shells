@@ -195,6 +195,7 @@ hostname keywords using the shared literal AND matcher.
 - Shift+Enter always searches Google, even when a result matches.
 - Cmd+Enter opens the query in a new ChatGPT tab and submits it automatically.
 - Alt+Enter opens the query in a new Gemini tab with Argon High and submits it.
+- Ctrl+Enter opens the query in a new Claude tab and submits it.
 
 Query actions always create a fresh Brave tab. Empty or whitespace-only queries
 perform no navigation. Query text is encoded as UTF-8 URI-component bytes, so
@@ -255,7 +256,7 @@ navigate or submit anything. Escape closes the
 cheatsheet. The list and routing share one registry, so new entries appear in
 help automatically. `.help` is an exact command and needs no trailing space;
 leading whitespace or extra text keeps it a normal local query. Modified Enter
-retains its Google/ChatGPT/Gemini behavior. Run `lua tests/omni-prompt.lua` for the
+retains its Google/ChatGPT/Gemini/Claude behavior. Run `lua tests/omni-prompt.lua` for the
 cheatsheet selection, filtering, and cancellation checks.
 
 The token must begin at character one and be followed by one literal ASCII
@@ -264,8 +265,8 @@ immediately after `.g` are ordinary local searches. Tokens are case-sensitive.
 Only the token and its first separator space are removed; remaining whitespace
 and line breaks are preserved. An empty magic payload keeps the chooser open.
 These prefixes apply only to Omni, not the bookmarks chooser. Shift+Enter,
-Cmd+Enter, and Alt+Enter retain their explicit destinations and use the full typed
-query, including any prefix. Additional mixed modifiers keep their native behavior.
+Cmd+Enter, Alt+Enter, and Ctrl+Enter retain their explicit destinations and use
+the full typed query, including any prefix. Additional mixed modifiers keep their native behavior.
 
 Gemini ignores a plain prompt query parameter in the tested browser, so
 `brave/gemini-submit.lua` fills its accessible composer directly. Version 1.9.0

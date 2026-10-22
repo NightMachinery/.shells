@@ -13,7 +13,7 @@ return function(config)
         chooser=O.chooser, engine=config.engine, magic=true,
         showHelp=function() O.showHelp() end,
     })
-    O.chooser:placeholderText("Omni · .help · Shift+Enter: Google · Cmd+Enter: ChatGPT · Alt+Enter: Gemini")
+    O.chooser:placeholderText("Omni · .help · Shift+Enter: Google · Cmd+Enter: ChatGPT · Alt+Enter: Gemini · Ctrl+Enter: Claude")
     O.chooser:width(65):rows(12)
 
     O.helpChooser = ChooserSearch.new(function(choice)

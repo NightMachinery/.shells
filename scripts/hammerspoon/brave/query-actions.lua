@@ -15,7 +15,7 @@ return function(config)
         {".k", "keepa", "Keepa", "Amazon Germany price search"},
         {".c", "chatgpt", "ChatGPT", "New conversation, automatically submitted"},
         {".g", "gemini", "Gemini", "Argon High, automatically submitted · Alt+Enter"},
-        {".l", "claude", "Claude", "New conversation, automatically submitted"},
+        {".l", "claude", "Claude", "New conversation, automatically submitted · Ctrl+Enter"},
         {".s", "semanticscholar", "Semantic Scholar", "Research papers"},
         {".gs", "googlescholar", "Google Scholar", "Scholarly literature"},
         {".gh", "github", "GitHub", "Repositories"},
@@ -103,7 +103,10 @@ return function(config)
 
     function Q.key(code, flags)
         if not chooser:isVisible() or (code ~= 36 and code ~= 76) then return false end
-        if flags.ctrl or (flags.cmd and flags.shift) or (flags.alt and (flags.cmd or flags.shift)) then return false end
+        local modifiers=(flags.ctrl and 1 or 0)+(flags.alt and 1 or 0)
+            +(flags.cmd and 1 or 0)+(flags.shift and 1 or 0)
+        if modifiers>1 then return false end
+        if flags.ctrl then Q.submit("claude"); return true end
         if flags.alt then Q.submit("gemini"); return true end
         if flags.cmd then Q.submit("chatgpt"); return true end
         if flags.shift then Q.submit("google"); return true end

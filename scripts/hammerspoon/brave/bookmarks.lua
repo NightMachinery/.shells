@@ -27,7 +27,7 @@ return function(config)
         chooser=B.chooser, engine=config.engine,
     })
     B.chooser:searchSubText(true)
-    B.chooser:placeholderText("Bookmarks · Shift+Enter: Google · Cmd+Enter: ChatGPT · Alt+Enter: Gemini")
+    B.chooser:placeholderText("Bookmarks · Shift+Enter: Google · Cmd+Enter: ChatGPT · Alt+Enter: Gemini · Ctrl+Enter: Claude")
 
     function B.read()
         local file = io.open(B.path,"r")
