@@ -2,6 +2,7 @@ package main
 
 import (
 	"crypto/rand"
+	"crypto/sha256"
 	"crypto/subtle"
 	"encoding/hex"
 	"encoding/json"
@@ -24,7 +25,7 @@ import (
 	"time"
 )
 
-const version = "1.0.0"
+const version = "1.1.0"
 const maxRows = 5000
 const maxMatches = 200
 
@@ -235,11 +236,13 @@ type index struct {
 	lastError bool
 }
 
-func (idx *index) handler(token string) http.Handler {
+func (idx *index) handler(password string) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Cache-Control", "no-store")
+		user, provided, authorized := r.BasicAuth()
+		expectedHash, actualHash := sha256.Sum256([]byte(password)), sha256.Sum256([]byte(provided))
 		if r.Method != "POST" || r.URL.Path != "/search" || r.Header.Get("Origin") != "" ||
-			subtle.ConstantTimeCompare([]byte(r.Header.Get("Authorization")), []byte("Bearer "+token)) != 1 {
+			!authorized || user != "omni" || password == "" || subtle.ConstantTimeCompare(expectedHash[:], actualHash[:]) != 1 {
 			http.Error(w, "Forbidden", http.StatusForbidden)
 			return
 		}
@@ -328,7 +331,18 @@ func main() {
 	home, _ := os.UserHomeDir()
 	root := flag.String("root", filepath.Join(home, "Library", "Application Support", "BraveSoftware", "Brave-Browser"), "Chromium user-data directory")
 	parent := flag.Int("parent", 0, "exit when this parent process disappears")
+	stateFile := flag.String("state-file", "", "private discovery file; holds a singleton lock and suppresses credential stdout")
 	flag.Parse()
+	var lock *os.File
+	if *stateFile != "" {
+		var err error
+		lock, err = lockState(*stateFile)
+		if err != nil {
+			log.Print("history service state unavailable or already running")
+			os.Exit(1)
+		}
+		defer lock.Close()
+	}
 	listener, err := net.Listen("tcp4", "127.0.0.1:0")
 	if err != nil {
 		os.Exit(1)
@@ -337,13 +351,29 @@ func main() {
 	if _, err = rand.Read(secret); err != nil {
 		os.Exit(1)
 	}
-	token := hex.EncodeToString(secret)
+	password, configured := os.LookupEnv("OMNI_HISTORY_PASSWORD")
+	if configured && password == "" {
+		log.Print("history service password is empty")
+		os.Exit(1)
+	}
+	if !configured {
+		password = hex.EncodeToString(secret)
+	}
 	idx := &index{}
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, os.Interrupt, syscall.SIGTERM)
-	server := &http.Server{Handler: idx.handler(token), ReadHeaderTimeout: 2 * time.Second, ReadTimeout: 3 * time.Second, WriteTimeout: 3 * time.Second, IdleTimeout: 10 * time.Second, ErrorLog: log.New(io.Discard, "", 0)}
+	server := &http.Server{Handler: idx.handler(password), ReadHeaderTimeout: 2 * time.Second, ReadTimeout: 3 * time.Second, WriteTimeout: 3 * time.Second, IdleTimeout: 10 * time.Second, ErrorLog: log.New(io.Discard, "", 0)}
 	go func() { idx.refresh(*root, quit, *parent); server.Close() }()
-	// Only one small startup frame uses stdout. History never travels via a pipe.
-	json.NewEncoder(os.Stdout).Encode(map[string]any{"version": version, "url": "http://" + listener.Addr().String() + "/search", "token": token})
+	endpoint := discovery{Version: version, URL: "http://" + listener.Addr().String() + "/search", Password: password}
+	if *stateFile != "" {
+		if err := writeState(*stateFile, endpoint); err != nil {
+			log.Print("history service discovery unavailable")
+			return
+		}
+		defer os.Remove(*stateFile)
+	} else {
+		// Private callers may request one small startup frame. No history stdout.
+		json.NewEncoder(os.Stdout).Encode(endpoint)
+	}
 	server.Serve(listener)
 }

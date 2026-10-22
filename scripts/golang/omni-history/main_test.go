@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"bytes"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -129,13 +130,13 @@ func TestHTTPContract(t *testing.T) {
 	if call("", "", `{}`).Code != 403 {
 		t.Fatal("missing authorization accepted")
 	}
-	if call("Bearer test-token", "https://example.org", `{}`).Code != 403 {
+	if call("Basic "+base64.StdEncoding.EncodeToString([]byte("omni:test-token")), "https://example.org", `{}`).Code != 403 {
 		t.Fatal("browser-origin request accepted")
 	}
-	if call("Bearer test-token", "", `{"query":`).Code != 400 {
+	if call("Basic "+base64.StdEncoding.EncodeToString([]byte("omni:test-token")), "", `{"query":`).Code != 400 {
 		t.Fatal("malformed body accepted")
 	}
-	w := call("Bearer test-token", "", `{"query":"channel two","aliases":[],"exclude":[]}`)
+	w := call("Basic "+base64.StdEncoding.EncodeToString([]byte("omni:test-token")), "", `{"query":"channel two","aliases":[],"exclude":[]}`)
 	var result searchResult
 	if w.Code != 200 || json.Unmarshal(w.Body.Bytes(), &result) != nil || !result.OK || len(result.History) != 1 {
 		t.Fatalf("search result: %d", w.Code)
@@ -144,7 +145,7 @@ func TestHTTPContract(t *testing.T) {
 		t.Fatal("unexpected caching or CORS")
 	}
 	idx.lastError = true
-	w = call("Bearer test-token", "", `{}`)
+	w = call("Basic "+base64.StdEncoding.EncodeToString([]byte("omni:test-token")), "", `{}`)
 	if json.Unmarshal(w.Body.Bytes(), &result) != nil || result.OK || len(result.History) != 0 {
 		t.Fatal("failed refresh returned stale history")
 	}
@@ -159,5 +160,43 @@ func BenchmarkIndexedSearch(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		matches(rows, request)
+	}
+}
+
+func TestPrivateDiscoveryAndSingleton(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "private", "endpoint.json")
+	lock, err := lockState(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer lock.Close()
+	if second, err := lockState(path); err == nil {
+		second.Close()
+		t.Fatal("duplicate owner accepted")
+	}
+	value := discovery{Version: version, URL: "http://127.0.0.1:12345/search", Password: "test-password"}
+	if err := writeState(path, value); err != nil {
+		t.Fatal(err)
+	}
+	info, err := os.Stat(path)
+	if err != nil || info.Mode().Perm() != 0600 {
+		t.Fatal("discovery file must be private")
+	}
+	info, err = os.Stat(filepath.Dir(path))
+	if err != nil || info.Mode().Perm() != 0700 {
+		t.Fatal("discovery directory must be private")
+	}
+	raw, _ := os.ReadFile(path)
+	var got discovery
+	if json.Unmarshal(raw, &got) != nil || got != value {
+		t.Fatal("discovery did not roundtrip")
+	}
+	handler := (&index{}).handler("")
+	r := httptest.NewRequest(http.MethodPost, "http://127.0.0.1/search", strings.NewReader(`{}`))
+	r.SetBasicAuth("omni", "")
+	w := httptest.NewRecorder()
+	handler.ServeHTTP(w, r)
+	if w.Code != 403 {
+		t.Fatal("blank password accepted")
 	}
 }

@@ -16,6 +16,7 @@ tmuxnew neru neru launch
 ##
 
 brishgarden-boot 64
+omni-history-boot
 
 if isdefined-cmd paseo ; then
     #: The CLI backgrounds its supervisor; disable Desktop's built-in daemon management.
