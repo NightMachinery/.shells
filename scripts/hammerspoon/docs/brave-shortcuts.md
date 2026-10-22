@@ -3,8 +3,8 @@
 `hammerspoon/auto-load/brave-shortcuts.lua` installs browser hotkeys while Brave
 (`com.brave.Browser`) is frontmost:
 
-- **Cmd+.** opens a new tab through File > New Tab.
-- **Cmd+/** opens Omni Prompt, combining open tabs and bookmarks.
+- **Cmd+.** opens Omni Prompt, combining open tabs and bookmarks.
+- **Cmd+/** opens a new tab through File > New Tab.
 - **Cmd+Shift+/** opens Brave's native Tab Search.
 - **Cmd+N / Cmd+M** move older/newer through tab recency in the current window.
 - **Cmd+Up / Cmd+Down** select the previous/next tab in tab-strip order.

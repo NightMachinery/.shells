@@ -1,9 +1,9 @@
 -- Brave-only browser actions, ahead of webpage keyboard handlers.
 -- Loaded by core/reload.lua's auto-load directory scan.
--- Cmd+. opens a new tab; Cmd+/ opens Omni Prompt; Cmd+Shift+/ native Tab Search.
+-- Cmd+. opens Omni Prompt; Cmd+/ opens a new tab; Cmd+Shift+/ native Tab Search.
 if BraveShortcuts then BraveShortcuts.stop() end
 
-BraveShortcuts = { version = "1.9.0", hotkeys = {} }
+BraveShortcuts = { version = "1.9.1", hotkeys = {} }
 local M = BraveShortcuts
 local bundleID = "com.brave.Browser"
 local log = hs.logger.new("brave-shortcuts", "warning")
@@ -248,8 +248,8 @@ M.hotkeys = {
     hs.hotkey.new({"cmd"}, "m", function() schedule(function() M.recency(-1) end) end),
     hs.hotkey.new({"cmd", "fn"}, "up", function() schedule(function() M.finishRecency(); M.tabs.step(-1) end) end),
     hs.hotkey.new({"cmd", "fn"}, "down", function() schedule(function() M.finishRecency(); M.tabs.step(1) end) end),
-    hs.hotkey.new({"cmd"}, ".", function() schedule(M.newTab) end),
-    hs.hotkey.new({"cmd"}, "/", function() schedule(function() M.finishRecency(); M.omniPrompt.show() end) end),
+    hs.hotkey.new({"cmd"}, ".", function() schedule(function() M.finishRecency(); M.omniPrompt.show() end) end),
+    hs.hotkey.new({"cmd"}, "/", function() schedule(M.newTab) end),
     hs.hotkey.new({"cmd", "shift"}, "/", function() schedule(M.tabSearch) end),
 }
 M.flags = hs.eventtap.new({hs.eventtap.event.types.flagsChanged}, function(event)
