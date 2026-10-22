@@ -43,3 +43,28 @@ for(let i=0;i<2;i++) {
 assert.equal(made.length,2);
 assert.equal(context.handle({action:'openURL',url:'javascript:alert(1)'},fresh).ok,false);
 console.log('fresh query tab tests passed');
+
+// Replacement targets the captured ID, even after active-tab changes.
+let urls=['https://example.org/one','https://example.org/two'];
+const replacementTabs=()=>urls.map((url,i)=>({id:()=>String(i+500),url}));
+Object.assign(replacementTabs,{id:()=>['500','501'],title:()=>['One','Two'],url:()=>urls});
+const target={id:()=>8,tabs:replacementTabs,activeTabIndex:()=>2};
+const replacing={windows:()=>[target],activate(){throw Error('replacement must not steal focus')}};
+result=context.handle({action:'openURL',url:'https://example.org/new',replace:true,tabId:'500'},replacing);
+assert.equal(result.ok,true);assert.equal(result.tabId,'500');assert.equal(result.replaced,true);
+assert.equal(context.handle({action:'openURL',url:'https://example.org/new',replace:true,tabId:'missing'},replacing).ok,false);
+let executed=0;
+const dt={id:()=> 'dom-owned',url:()=> 'https://chatgpt.com/',execute({javascript}){executed++;return '{"status":"waiting"}'}};
+const domBrowser={windows:()=>[{tabs:()=>[dt]}],activate(){throw Error('DOM must not steal focus')}};
+result=context.handle({action:'dom',tabId:'dom-owned',destination:'chatgpt',code:'inert'},domBrowser);
+assert.equal(result.result.status,'waiting');assert.equal(executed,1);
+assert.equal(context.handle({action:'dom',tabId:'missing',destination:'chatgpt',code:'inert'},domBrowser).ok,false);
+assert.equal(context.handle({action:'dom',tabId:'dom-owned',destination:'claude',code:'inert'},domBrowser).ok,false);
+assert.equal(executed,1);
+console.log('Stable replacement and focus-independent DOM routing tests passed');
+
+// A multi-open selects the last destination internally, without app activation.
+fresh.activate=()=>{throw Error('query batch must not activate the browser')};
+result=context.handle({action:'openMany',items:[{url:'https://example.org/a'},{url:'https://example.org/b'}]},fresh);
+assert.equal(result.opened.length,2);assert.equal(current,made.length);assert.equal(result.anchor,String(100+made.length-1));
+console.log('Combined opens select the last new tab without activating the application');

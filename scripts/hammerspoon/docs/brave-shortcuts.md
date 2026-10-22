@@ -239,19 +239,23 @@ The 5,000 most recently visited non-hidden HTTP(S) URLs are indexed in memory,
 newest first, including untitled entries under their URL. Older entries remain
 available through Brave's full history search.
 
-Hammerspoon builds the helper once per source hash using the installed Go
-compiler and caches only the executable under `~/Library/Caches/hammerspoon/`.
-The build uses the Go standard library and system SQLite through Cgo, without
-third-party modules. The helper starts when a configured variant enables
-history, stops on Hammerspoon reload/stop, and also exits if its parent dies.
+`omni-history-boot`, called from `launchers/various-darwin.zsh`, builds the local
+Go tool with system SQLite and supervises it in a named tmux session. Run it once
+when installing this feature without rebooting. The shared service survives
+Hammerspoon reloads; stopping a chooser/client does not discard the index.
 It checks database/journal metadata every two seconds and rebuilds a changed
 index at most once per five seconds. Unchanged snapshots are skipped, with a
 one-minute fallback refresh. Failed refreshes return an error rather than
 serving another profile's old data. No history index is persisted.
 
 The service listens on a random loopback port, authenticates each request with
-a per-run token, rejects browser-origin requests, and does not log history or
-queries. HS sends literal AND queries, the cached host aliases, and URLs already
+Basic authentication with a mandatory password, rejects browser-origin requests, and does not log history or
+queries. A random password is generated per service run unless
+`OMNI_HISTORY_PASSWORD` is explicitly configured. Empty passwords are refused.
+The endpoint/password are atomically published in
+`~/.local/state/omni-history/server.json` (0600, parent 0700), outside the repo.
+A singleton lock prevents duplicate owners. HS validates and rereads private
+discovery metadata after replacement. HS sends literal AND queries, the cached host aliases, and URLs already
 represented by tabs/bookmarks. Go uses precomputed searchable strings and returns
 at most 200 unique matching rows. History never crosses the process stdout pipe.
 Typing is debounced by 40 ms; generations and query serials discard stale replies.
@@ -283,6 +287,22 @@ Timings depend on the machine and database. Existing native tab and query
 submission checks remain passing.
 
 ## Browser chooser query actions
+
+Tab toggles **New tab** and **REPLACE CURRENT TAB**. Replacement mode colors
+chooser text orange. It targets the tab captured when Omni opened, even if the
+active tab later changes; a closed target is refused. Existing matching tabs are
+still reused. For combined magic destinations, only the first replaces the
+captured tab; subsequent destinations open new background tabs. All destinations open up front
+in one native request and their DOM readiness checks run concurrently. Opening
+query destinations selects the last new tab inside Brave without activating the
+application or raising its window over another app.
+
+All dot magics can be combined with dots: `.g.l.c query` submits to Gemini,
+Claude and ChatGPT; `.gs.s.gh query` opens Google Scholar, Semantic Scholar and
+GitHub. Order is preserved, duplicate destinations open once, and any unknown
+component leaves the whole input as ordinary text. Prefixes still must begin at
+character one and be followed by an ASCII space.
+
 
 Both Omni Prompt and Cmd+, search the title, displayed subtitle, URL, and hidden
 hostname keywords using the shared literal AND matcher.
@@ -422,7 +442,7 @@ Run `lua tests/claude-submit.lua` for delayed prefill, disabled Send, delayed
 focus, changed tab/app/query, wrong origin, reload, and one-send checks. A native
 live test confirmed that activating the button created a new Claude conversation.
 
-### Automatic ChatGPT submission
+### Native ChatGPT fallback
 
 Version 1.6.1 fixes the draft-only ChatGPT query link. After creating the fresh
 tab, `brave/chatgpt-submit.lua` waits for its composer to contain the exact
@@ -472,14 +492,66 @@ Its [upstream documentation](https://github.com/prasmussen/chrome-cli)
 identifies Scripting Bridge as its transport. `execute` can run page JavaScript
 when Allow JavaScript from Apple Events is enabled, permitting DOM-based
 submission, but page JavaScript still cannot override `Sec-` headers.
-For a future DOM submitter, a page-local readiness observer and direct Send-button
-click could reduce AX round trips and avoid dependence on keyboard focus or
-Enter preferences. It would require Apple Events JavaScript permission and
-maintenance of ChatGPT DOM selectors; background tab suspension remains relevant.
-The existing JXA bridge exposes the same JavaScript execution command, so this
-would not require adding a chrome-cli subprocess dependency. This is an
-architectural comparison, not a live-verified replacement for the current AX code.
+The optional DOM submitter described below now uses that existing JXA execution
+command. It needs no additional chrome-cli subprocess. Background-tab suspension
+and changing site selectors remain limits of this route.
 A separate
 [chrome-devtools-cli](https://github.com/aeroxy/chrome-devtools-cli) uses CDP
 and documents `--extra-headers` for navigation; whether a specific fetch metadata
 override restores ChatGPT auto-submit still needs verification.
+
+## Adaptive layout and recent selections
+
+Browser Omni, bookmarks and the magic cheatsheet use 75% of the current display's
+usable width, capped at 1800 logical pixels, recalculated on each opening.
+Ctrl+Shift+Enter searches the full query using Google Web (`udm=14`), excluding
+AI Overviews through Google's Web filter. Shift+Enter retains regular Google,
+and Ctrl+Enter retains Claude.
+
+Hyper+Shift+Z opens [OmniPrompter](omni-prompter.md), with cached prompt-function
+discovery, ordered pipelines and guarded copy/paste. Hyper+A emoji choices now
+put recent insertions first. Both use the shared in-memory recency helper backed
+by Hammerspoon preferences, with one load per namespace and saves on selection.
+
+## Optional background DOM submission
+
+With the owner's JavaScript-from-AppleScript setting enabled, chat submissions
+first use a stable-tab-ID DOM route. Its first real execution detects support;
+there is no separate probe or subprocess. Concurrent initial checks are coalesced. An explicit disabled result is cached
+for 72 hours in memory, cleared immediately on Hammerspoon reload.
+`BraveShortcuts.tabs.dom.lastCheckMs` reports the most recent execution latency.
+Other errors and timeouts stop instead of falling back after an uncertain send.
+
+The DOM route validates origin, supported route, exact composer text and an
+enabled Send button. ChatGPT conversation routes are allowed only for an exact
+prefilled draft; an empty conversation never receives inserted text. A matching
+latest user message plus an empty composer is recognized as already submitted. It never replaces a different draft. It records its nonce before
+clicking, so a repeated readiness call cannot click twice. It can work when the
+active tab or application changes and never activates the browser application. Closing
+or navigating the target away cancels it.
+
+Gemini's DOM route clicks the observed model/effort menu items and verifies that
+the picker reports Argon High before filling. Already-correct tabs skip those
+menus. A model-menu action is issued once and allowed three seconds to settle;
+unconfirmed selection yields to the guarded native fallback before composer
+insertion. Native fallbacks run sequentially and require the original browser/active-tab ownership
+chain. Changing focus cancels native submission; key events and AX traversal do
+not provide a reliable background replacement for the DOM route. Native paths
+remain available when JavaScript execution is disabled.
+
+Version 1.14.0 adds concurrent native background opening and tab-targeted DOM
+submission. Focused tests cover generic prefix composition, replacement identity,
+coalesced support detection, negative-cache expiry/reload, model/effort transitions,
+no duplicate Send, navigation, and native fallback ownership. Live individual
+DOM sends succeeded for ChatGPT, Claude and Gemini without changing the frontmost
+app; Gemini selected Argon High from Flash/Low in about 2.4 seconds. A short native
+multi-open check preserved both NSWorkspace frontmost PID and selected tab.
+The longer concurrent live test was interrupted by the owner closing fixture
+tabs; it is not evidence about focus preservation across user activity.
+
+Version 1.14.1 clarifies tab focus: query opening selects the last destination
+inside Brave while leaving the foreground application alone. ChatGPT's DOM route
+accepts an exact prefilled draft on an allocated conversation URL, and recognizes
+an already-sent latest message when the composer is empty. A historical matching
+message cannot suppress sending a new exact draft. Generic failure reasons are
+retained in submission diagnostics without storing prompt text.

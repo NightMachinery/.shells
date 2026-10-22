@@ -1,6 +1,6 @@
 -- Submit only the exact query in the newly created, still-active ChatGPT tab.
 return function(config)
-    local C = {generation=0}
+    local C = {generation=0,version="1.1.0"}
     local function normalized(text)
         return type(text)=="string" and text:gsub("\r\n", "\n"):match("^%s*(.-)%s*$") or nil
     end
@@ -36,7 +36,7 @@ return function(config)
         if C.timer then C.timer:stop(); C.timer=nil end
     end
 
-    function C.submit(opened, query)
+    function C.submit(opened, query, done)
         C.stop()
         if type(opened)~="table" or type(opened.tabId)~="string"
             or not normalized(query) or normalized(query)=="" then
@@ -51,6 +51,7 @@ return function(config)
             C.stop()
             C.lastResult={status=status,reason=reason}
             if reason then config.unavailable(reason) end
+            if done then done(C.lastResult) end
         end
         local function valid(state)
             local path=type(state.url)=="string" and state.url:match("^https://chatgpt%.com([^?#]*)")

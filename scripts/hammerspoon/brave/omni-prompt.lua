@@ -5,20 +5,26 @@ return function(config)
         O.generation=O.generation+1;O.querySerial=O.querySerial+1;O.pendingEnter=nil
         if not choice or O.queryActions.accept(choice) then return end
         if choice.kind=="tab" then config.engine.selectTab(choice.tabId)
-        else config.engine.openBookmark(choice.url) end
+        else config.engine.openBookmark(choice.url,{replace=O.queryActions.replace,tabId=O.queryActions.targetTabId}) end
     end
     O.chooser=ChooserSearch.new(complete,nil,{limit=200})
     O.queryActions=dofile(nightdir .. "/hammerspoon/brave/query-actions.lua")({
         chooser=O.chooser,engine=config.engine,magic=config.magic~=false,enabled=config.queryActions~=false,
         showHelp=function()O.showHelp()end,
+        modeChanged=function()O.updatePlaceholder()end,
         waitForResults=function()
             if not O.historyPending then return false end
             O.pendingEnter=O.chooser:query();return true
         end,
     })
-    local hint=config.queryActions==false and "" or " · Shift+Enter: Google · Cmd+Enter: ChatGPT · Alt+Enter: Gemini · Ctrl+Enter: Claude"
-    O.chooser:placeholderText((config.name or "Omni") .. (config.magic~=false and " · .help" or "") .. hint)
-    O.chooser:width(65):rows(12)
+    local hint=config.queryActions==false and "" or " · Shift+Enter: Google · Cmd+Enter: ChatGPT · Alt+Enter: Gemini · Ctrl+Enter: Claude · Ctrl+Shift+Enter: Google Web"
+    function O.updatePlaceholder()
+        local mode=O.queryActions.modeLabel()
+        O.chooser:placeholderText(mode .. " · " .. (config.name or "Omni") .. (config.magic~=false and " · .help" or "") .. " · Tab: toggle" .. hint)
+        if O.chooser.fgColor then O.chooser:fgColor(O.queryActions.replace and {red=1,green=.65,blue=.2,alpha=1} or nil) end
+    end
+    O.updatePlaceholder()
+    O.chooser:rows(12)
     O.helpChooser=ChooserSearch.new(function(choice)
         if not choice or O.stopped then return end
         O.pendingHelp=hs.timer.doAfter(0,function()
@@ -27,11 +33,12 @@ return function(config)
         end)
     end)
     O.helpChooser:placeholderText("Magic shortcuts · filter by name · Enter: use prefix · Esc: close")
-    O.helpChooser:width(65):rows(12)
+    O.helpChooser:rows(12)
     function O.showHelp()
         if O.stopped or not config.braveInFront() then return false end
         O.helpChooser:query("")
-        ChooserSearch.setChoices(O.helpChooser,O.queryActions.helpChoices()):show()
+        ChooserSearch.setChoices(O.helpChooser,O.queryActions.helpChoices())
+        ChooserSearch.fit(O.helpChooser):show()
         return true
     end
     local function placeCaretAfterPrefix(query)
@@ -114,6 +121,7 @@ return function(config)
         if sources.bookmarks then bookmarks,bookmarkError=config.bookmarks.read() end
         local function ready(result)
             if O.stopped or generation~=O.generation or not config.braveInFront() then return end
+            O.queryActions.targetTabId=result.activeTabId
             O.baseChoices={};O.historyRows={}
             O.aliases=config.searchAliases.read and config.searchAliases.read() or {}
             for _,tab in ipairs(result.ok and result.tabs or {}) do
@@ -127,10 +135,12 @@ return function(config)
             if not result.ok then config.unavailable(result.error) end
             if bookmarkError then config.unavailable(bookmarkError) end
             O.chooser:query(query or "")
-            render();O.chooser:show();placeCaretAfterPrefix(query)
+            render();O.updatePlaceholder();ChooserSearch.fit(O.chooser):show();placeCaretAfterPrefix(query)
             O.searchHistory(query or "",true)
         end
-        if sources.tabs then config.engine.listTabs(ready) else ready({ok=true,tabs={}}) end
+        if sources.tabs then config.engine.listTabs(ready)
+        elseif config.engine.activeState then config.engine.activeState(function(state)ready({ok=true,tabs={},activeTabId=state.ok and state.tabId or nil})end)
+        else ready({ok=true,tabs={}}) end
         return true
     end
     function O.cancel()

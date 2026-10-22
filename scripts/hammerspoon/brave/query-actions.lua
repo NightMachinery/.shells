@@ -1,7 +1,7 @@
 -- Browser chooser query actions. Modified Return is captured before the
 -- chooser's native Cmd+Return handler, and only while this chooser is visible.
 return function(config)
-    local Q = {}
+    local Q = {replace=false}
     local chooser = config.chooser
     local function encode(value)
         return (value:gsub("[^A-Za-z0-9_.~-]", function(char)
@@ -55,7 +55,19 @@ return function(config)
         if not config.magic or type(query)~="string" then return nil end
         -- Anchor before any normalization. Only an ASCII space is a separator.
         local token, body = query:match("^(%S+) (.*)$")
-        return prefixes[token], body
+        if prefixes[token] then return prefixes[token],body end
+        if not token or token:sub(1,1)~="." then return nil end
+        local destinations,seen,reconstructed={},{},""
+        for part in token:gmatch("%.([^%.]+)") do
+            local prefix="." .. part
+            if not prefixes[prefix] then return nil end
+            reconstructed=reconstructed .. prefix
+            if not seen[prefixes[prefix]] then
+                seen[prefixes[prefix]]=true;destinations[#destinations+1]=prefixes[prefix]
+            end
+        end
+        if reconstructed~=token or #destinations<1 then return nil end
+        return destinations,body
     end
 
     function Q.url(query, destination)
@@ -63,6 +75,7 @@ return function(config)
         if destination=="gemini" then return "https://gemini.google.com/app" end
         local bases = {
             google="https://www.google.com/search?q=",
+            googleweb="https://www.google.com/search?udm=14&q=",
             amazon="https://www.amazon.de/s?k=",
             semanticscholar="https://www.semanticscholar.org/search?sort=relevance&q=",
             github="https://github.com/search?type=repositories&q=",
@@ -81,16 +94,36 @@ return function(config)
 
     function Q.submit(destination, query)
         if config.enabled==false then return false end
-        query = query or chooser:query()
-        local url = Q.url(query, destination)
-        if not url or Q.stopped then return false end
+        query=query or chooser:query()
+        local destinations=type(destination)=="table" and destination or {destination}
+        local requests={}
+        for _,name in ipairs(destinations) do
+            local url=Q.url(query,name)
+            if not url or Q.stopped then return false end
+            requests[#requests+1]={destination=name,url=url,query=query}
+        end
+        if #requests==0 then return false end
+        local options={replace=Q.replace,tabId=Q.targetTabId}
         defer(function()
-            if destination=="chatgpt" then config.engine.openChatGPT(url, query)
-            elseif destination=="gemini" then config.engine.openGemini(query)
-            elseif destination=="claude" then config.engine.openClaude(url, query)
-            else config.engine.openURL(url) end
+            if config.engine.openQueries then config.engine.openQueries(requests,options);return end
+            -- Compatibility for simple embedders without the batch engine.
+            for _,request in ipairs(requests) do
+                local name=request.destination
+                if name=="chatgpt" then config.engine.openChatGPT(request.url,query,options)
+                elseif name=="gemini" then config.engine.openGemini(query,options)
+                elseif name=="claude" then config.engine.openClaude(request.url,query,options)
+                else config.engine.openURL(request.url,options) end
+            end
         end)
         return true
+    end
+
+    function Q.modeLabel()
+        return Q.replace and "REPLACE CURRENT TAB" or "New tab"
+    end
+    function Q.toggleMode()
+        Q.replace=not Q.replace
+        if config.modeChanged then config.modeChanged(Q.modeLabel()) end
     end
 
     function Q.accept(choice)
@@ -105,9 +138,12 @@ return function(config)
 
     function Q.key(code, flags)
         if config.enabled==false then return false end
-        if not chooser:isVisible() or (code ~= 36 and code ~= 76) then return false end
+        if not chooser:isVisible() then return false end
+        if code==48 and not (flags.cmd or flags.alt or flags.ctrl or flags.shift or flags.fn) then Q.toggleMode();return true end
+        if code~=36 and code~=76 then return false end
         local modifiers=(flags.ctrl and 1 or 0)+(flags.alt and 1 or 0)
             +(flags.cmd and 1 or 0)+(flags.shift and 1 or 0)
+        if modifiers==2 and flags.ctrl and flags.shift then Q.submit("googleweb");return true end
         if modifiers>1 then return false end
         if flags.ctrl then Q.submit("claude"); return true end
         if flags.alt then Q.submit("gemini"); return true end

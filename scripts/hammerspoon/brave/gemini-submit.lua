@@ -1,7 +1,7 @@
 -- Gemini consumer-app submission through native Accessibility. Batch independent
 -- editor writes; await dependent menus and verify readiness before one send.
 return function(config)
-    local C={generation=0,version="2.0.0"}
+    local C={generation=0,version="2.1.0"}
     local function normalized(value)
         return type(value)=="string" and value:gsub("\r\n","\n"):match("^%s*(.-)%s*$") or nil
     end
@@ -73,7 +73,7 @@ return function(config)
         if C.timer then C.timer:stop();C.timer=nil end
     end
 
-    function C.submit(opened,query)
+    function C.submit(opened,query,done)
         C.stop()
         if type(opened)~="table" or type(opened.tabId)~="string"
             or not normalized(query) or normalized(query)=="" then return false end
@@ -92,6 +92,7 @@ return function(config)
             if not current() then return end
             C.stop();C.lastResult=result(status,reason)
             if reason then config.unavailable(reason) end
+            if done then done(C.lastResult) end
         end
         local function valid(state)
             return state.ok and state.frontmost and state.tabId==opened.tabId and newChatURL(state.url)

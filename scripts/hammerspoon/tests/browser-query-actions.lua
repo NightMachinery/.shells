@@ -49,7 +49,7 @@ show("no match"); chooser.row={}; assert(Q.key(36,{})); flush()
 assert(opened[3]==Q.url("no match","google"))
 show("   "); assert(Q.key(36,{shift=true})); flush(); assert(#opened==3)
 show("keep native combos"); assert(not Q.key(36,{cmd=true,shift=true}))
-assert(not Q.key(36,{ctrl=true,shift=true})); assert(not Q.key(20,{cmd=true}))
+assert(not Q.key(20,{cmd=true}))
 show("cancel pending on reload"); Q.key(36,{cmd=true}); Q.stop(); flush(); assert(#opened==3)
 Q=dofile("brave/query-actions.lua")({chooser=chooser,engine={
     openGemini=function(query) opened[#opened+1]='gemini:'..query end,
@@ -117,3 +117,28 @@ assert(magic.accept({text=".l from callback"}));flush()
 assert(routed[#routed].url==magic.url("from callback","claude") and routed[#routed].kind=="claude")
 magic.stop()
 print("strict Omni prefix tests passed")
+
+local web={}
+local G=dofile("brave/query-actions.lua")({chooser=chooser,engine={openURL=function(url)web[#web+1]=url end}})
+show("a+b & ü");assert(G.key(36,{ctrl=true,shift=true}));flush()
+assert(web[1]=="https://www.google.com/search?udm=14&q=a%2Bb%20%26%20%C3%BC")
+show("keypad");assert(G.key(76,{ctrl=true,shift=true}));flush();assert(#web==2)
+show("unsupported");assert(not G.key(36,{ctrl=true,shift=true,alt=true}))
+G.stop();print("Google Web Ctrl+Shift+Enter tests passed")
+
+local batch,mode
+local B=dofile('brave/query-actions.lua')({chooser=chooser,magic=true,modeChanged=function(label)mode=label end,
+ engine={openQueries=function(requests,options)batch={requests=requests,options=options}end}})
+local destinations,body=B.magic('.g.l.c query')
+assert(#destinations==3 and destinations[1]=='gemini' and destinations[2]=='claude' and destinations[3]=='chatgpt' and body=='query')
+for _,query in ipairs({'.gs.s.gh papers','.a.k.y things','.g.g.c repeated'}) do
+ local names=B.magic(query);assert(type(names)=='table' and #names>=2)
+end
+for _,query in ipairs({' .g.l.c query','.g..l query','.g.unknown query','.g.l. query','.g.l\tquery'})do assert(B.magic(query)==nil,query)end
+show('.gs.s.gh literal & query');B.targetTabId='42'
+assert(B.key(48,{}) and B.replace and mode=='REPLACE CURRENT TAB')
+assert(B.key(36,{}));flush()
+assert(#batch.requests==3 and batch.requests[1].destination=='googlescholar' and batch.requests[2].destination=='semanticscholar')
+assert(batch.requests[3].destination=='github' and batch.options.replace and batch.options.tabId=='42')
+show('regular query');assert(not B.key(48,{shift=true}));assert(B.key(48,{}) and not B.replace)
+B.stop();print('Generic combined magics and explicit replacement-mode tests passed')

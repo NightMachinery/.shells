@@ -1,6 +1,6 @@
 -- Submit Claude's URL-prefilled query by activating its native Send control.
 return function(config)
-    local C={generation=0,version="1.0.0"}
+    local C={generation=0,version="1.1.0"}
     local function normalized(value)
         return type(value)=="string" and value:gsub("\r\n","\n"):match("^%s*(.-)%s*$") or nil
     end
@@ -46,7 +46,7 @@ return function(config)
         C.generation=C.generation+1
         if C.timer then C.timer:stop();C.timer=nil end
     end
-    function C.submit(opened,query)
+    function C.submit(opened,query,done)
         C.stop()
         if type(opened)~="table" or type(opened.tabId)~="string"
             or not normalized(query) or normalized(query)=="" then return false end
@@ -59,6 +59,7 @@ return function(config)
             if not current() then return end
             C.stop();C.lastResult={status=status,reason=reason,elapsed=hs.timer.secondsSinceEpoch()-started}
             if reason then config.unavailable(reason) end
+            if done then done(C.lastResult) end
         end
         local check
         local function again(delay)

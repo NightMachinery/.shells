@@ -12,6 +12,7 @@ function field:setAttributeValue(k,v)
  assert(k=='AXSelectedTextRange');activeChooser.range=v;return self
 end
 hs={
+ screen={mainScreen=function()return {frame=function()return {w=1280}end}end},
  processInfo={processID=123},
  axuielement={applicationElement=function(pid)
   assert(pid==123)
@@ -58,14 +59,14 @@ local function make()
   bookmarks={read=function()return {{text='Bookmark',url='https://example.org/bookmark'}} end},
   searchAliases={apply=function(rows)return rows end},unavailable=error,
   engine={
-   listTabs=function(fn)fn({ok=true,tabs={{title='Help tab',index=3,windowNumber=1,tabId='42',url='https://example.org/'}}})end,
+   listTabs=function(fn)fn({ok=true,activeTabId='42',tabs={{title='Help tab',index=3,windowNumber=1,tabId='42',url='https://example.org/'}}})end,
    selectTab=function(id)selected[#selected+1]=id end,
    openBookmark=function(url)opened[#opened+1]=url end,
    openURL=function(url)opened[#opened+1]=url end,
   },
  })
 end
-local o=make();assert(o.show())
+local o=make();assert(o.show());assert(o.queryActions.targetTabId=='42')
 assert(o.chooser.items[1].subText=='Tab 3 · Window 1 · https://example.org/')
 typeQuery(o.chooser,'.help')
 assert(o.queryActions.key(36,{}));assert(not o.chooser.visible and not o.helpChooser.visible)
