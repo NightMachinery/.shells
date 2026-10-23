@@ -1,6 +1,6 @@
 -- Native extension actions only. Never send the conflicting Cmd+B to Brave.
 return function(config)
-    local B = {}
+    local B = {version="1.1.0"}
     local extensionID = "nngceckbapebfimnlniiiahkandclblb"
     local buttonRoles = {AXButton=true, AXPopUpButton=true, AXMenuButton=true}
 
@@ -48,7 +48,11 @@ return function(config)
             if role == "AXWebArea" then
                 local url=e:attributeValue("AXURL")
                 if type(url)=="table" then url=url.url end
-                if type(url)=="string" and url:match("^chrome%-extension://"..extensionID.."/") then return true end
+                if type(url)=="string" then
+                    if url:match("^chrome%-extension://"..extensionID.."/") then return true end
+                    if (url:match("^moz%-extension://") or url:match("^safari%-web%-extension://")) and
+                        tostring(e:attributeValue("AXTitle") or ""):lower():find("bitwarden",1,true) then return true end
+                end
             elseif role ~= "AXRadioButton" and role ~= "AXTab" then
                 for _,child in ipairs(e:attributeValue("AXChildren") or {}) do
                     queue[#queue+1]=child

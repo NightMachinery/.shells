@@ -1,21 +1,27 @@
 -- Serialized native scripting plus optional stable-tab DOM submission.
 return function(config)
-    local E = {queue = {}}
+    local E = {version="2.0.0",queue = {}}
     local script = nightdir .. "/hammerspoon/brave/tabs.js"
 
     local function pump()
-        if E.stopped or E.task or #E.queue == 0 then return end
+        if E.stopped or E.task or E.transportBusy or #E.queue == 0 then return end
         local job = table.remove(E.queue, 1)
         local done = false
         local function finish(result)
             if done then return end
             done = true
             if E.timeout then E.timeout:stop(); E.timeout = nil end
-            E.task = nil
+            E.task = nil;E.transportBusy=false
             if not E.stopped then
                 job.callback(result)
                 pump()
             end
+        end
+        if config.transport then
+            E.transportBusy=true
+            local ok=pcall(config.transport,job.request,finish)
+            if not ok then finish({ok=false,error="Native browser automation failed; action was not retried"}) end
+            return
         end
         local task = hs.task.new("/usr/bin/osascript", function(code, out)
             local ok, result = pcall(hs.json.decode, out or "")
@@ -24,7 +30,7 @@ return function(config)
         if not task then finish({ok=false,error="Could not start browser automation"}); return end
         E.task = task
         task:setInput(hs.json.encode(job.request))
-        E.timeout = hs.timer.doAfter(4, function()
+        E.timeout = hs.timer.doAfter(config.timeout or 4, function()
             task:terminate()
             finish({ok=false,error="Browser automation timed out; action was not retried"})
         end)
@@ -32,6 +38,8 @@ return function(config)
     end
 
     function E.request(request, callback)
+        request.bundleID=config.bundleID or "com.brave.Browser"
+        if request.action=="step" or request.action=="selectTab" or request.action=="bookmark" then request.requireFrontmost=true end
         E.queue[#E.queue+1] = {request=request,callback=callback}
         pump()
     end
@@ -73,14 +81,39 @@ return function(config)
         end
         E.activeState(function(state)
             if not state.ok or not state.frontmost or state.tabId~=job.batch.anchor or not config.braveInFront() then
-                config.unavailable("Native submission needs the original browser focus; query left in its tab")
+                config.unavailable("Native submission needs the original browser focus; automatic send cancelled")
                 finish({status="cancelled"});return
             end
             local function submit()
                 job.batch.anchor=job.opened.tabId
                 local submitters={chatgpt=config.submitChatGPT,claude=config.submitClaude,gemini=config.submitGemini}
-                local accepted=submitters[job.request.destination](job.opened,job.request.query,finish)
-                if accepted==false then finish({status="cancelled"}) end
+                local function send()
+                    local accepted=submitters[job.request.destination](job.opened,job.request.query,finish)
+                    if accepted==false then finish({status="cancelled"}) end
+                end
+                if not config.waitForNavigation then send();return end
+                local deadline=hs.timer.secondsSinceEpoch()+45
+                local origins={chatgpt="https://chatgpt.com",claude="https://claude.ai",gemini="https://gemini.google.com"}
+                local ready
+                ready=function()
+                    E.nativePreparation=nil
+                    if E.stopped then return end
+                    E.activeState(function(current)
+                        if E.stopped then return end
+                        if not current.ok or not current.frontmost or current.tabId~=job.opened.tabId or not config.braveInFront() then
+                            config.unavailable("Native submission cancelled because browser focus changed")
+                            finish({status="cancelled"});return
+                        end
+                        local origin=type(current.url)=="string" and current.url:match("^(https?://[^/]+)")
+                        if origin==origins[job.request.destination] then send();return end
+                        if hs.timer.secondsSinceEpoch()>=deadline then
+                            config.unavailable("Native query tab did not finish initial navigation")
+                            finish({status="timeout"});return
+                        end
+                        E.nativePreparation=hs.timer.doAfter(.15,ready)
+                    end)
+                end
+                ready()
             end
             if job.opened.tabId==state.tabId then submit()
             else E.request({action="selectTab",tabId=job.opened.tabId,requireActiveTabId=state.tabId},function(selected)
@@ -136,6 +169,7 @@ return function(config)
         E.stopped = true
         E.queue = {};E.nativeQueue={};E.nativeActive=false
         E.dom.stop()
+        if E.nativePreparation then E.nativePreparation:stop();E.nativePreparation=nil end
         if E.timeout then E.timeout:stop(); E.timeout=nil end
         if E.task then E.task:terminate(); E.task=nil end
     end

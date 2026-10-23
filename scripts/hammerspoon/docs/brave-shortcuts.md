@@ -1,3 +1,7 @@
+For current cross-browser behavior and native adapter limits, see
+[Shared browser shortcuts](browser-shortcuts.md). The Brave API names and shared
+module paths below remain compatible.
+
 # Brave shortcuts
 
 `hammerspoon/auto-load/brave-shortcuts.lua` installs browser hotkeys while Brave
