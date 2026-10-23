@@ -25,7 +25,7 @@ import (
 	"time"
 )
 
-const version = "1.1.0"
+const version = "1.2.0"
 const maxRows = 5000
 const maxMatches = 200
 
@@ -83,7 +83,8 @@ func copyFile(source, target string) error {
 	}
 	return closeErr
 }
-func snapshot(path string) ([]entry, error) {
+func snapshot(path string) ([]entry, error) { return snapshotKind(path, "chromium") }
+func snapshotKind(path, kind string) ([]entry, error) {
 	names := []string{path, path + "-journal", path + "-wal"}
 	for attempt := 0; attempt < 3; attempt++ {
 		before := historyStamps(path)
@@ -118,8 +119,17 @@ func snapshot(path string) ([]entry, error) {
 				err = errors.New("snapshot integrity failed")
 				return
 			}
-			rows, err = sqliteQuery(target, fmt.Sprintf(`SELECT url,title FROM urls WHERE hidden=0
-                AND (url LIKE 'https://%%' OR url LIKE 'http://%%') ORDER BY last_visit_time DESC,id DESC LIMIT %d`, maxRows))
+			query := `SELECT url,title FROM urls WHERE hidden=0
+                AND (url LIKE 'https://%%' OR url LIKE 'http://%%') ORDER BY last_visit_time DESC,id DESC LIMIT %d`
+			if kind == "safari" {
+				query = `SELECT h.url,COALESCE(v.title,'') FROM history_items h JOIN history_visits v ON v.history_item=h.id
+                    WHERE h.url LIKE 'https://%%' OR h.url LIKE 'http://%%'
+                    GROUP BY h.id ORDER BY MAX(v.visit_time) DESC,h.id DESC LIMIT %d`
+			} else if kind == "firefox" {
+				query = `SELECT url,COALESCE(title,'') FROM moz_places WHERE hidden=0
+                    AND (url LIKE 'https://%%' OR url LIKE 'http://%%') ORDER BY last_visit_date DESC,id DESC LIMIT %d`
+			}
+			rows, err = sqliteQuery(target, fmt.Sprintf(query, maxRows))
 		}()
 		if err != nil {
 			time.Sleep(30 * time.Millisecond)
@@ -168,11 +178,13 @@ func canonical(value string) string {
 }
 
 type searchRequest struct {
+	Browser string          `json:"browser"`
 	Query   string          `json:"query"`
 	Aliases json.RawMessage `json:"aliases"`
 	Exclude []string        `json:"exclude"`
 }
 type searchResult struct {
+	Browser  string  `json:"browser,omitempty"`
 	OK       bool    `json:"ok"`
 	Ready    bool    `json:"ready"`
 	History  []entry `json:"history"`
@@ -236,7 +248,7 @@ type index struct {
 	lastError bool
 }
 
-func (idx *index) handler(password string) http.Handler {
+func (idx *index) handler(password string, source ...func(string) (*index, error)) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Cache-Control", "no-store")
 		user, provided, authorized := r.BasicAuth()
@@ -252,10 +264,26 @@ func (idx *index) handler(password string) http.Handler {
 			http.Error(w, "Invalid request", http.StatusBadRequest)
 			return
 		}
-		idx.RLock()
-		rows, ready, revision, failed := idx.rows, idx.ready, idx.revision, idx.lastError
-		idx.RUnlock()
-		result := searchResult{OK: true, Ready: ready, History: []entry{}, Total: len(rows), Revision: revision}
+		selected := idx
+		if len(source) > 0 {
+			var err error
+			selected, err = source[0](request.Browser)
+			if err != nil {
+				http.Error(w, "Unsupported browser history source", http.StatusBadRequest)
+				return
+			}
+		} else if request.Browser != "" && request.Browser != "brave" {
+			http.Error(w, "Unsupported browser history source", http.StatusBadRequest)
+			return
+		}
+		selected.RLock()
+		rows, ready, revision, failed := selected.rows, selected.ready, selected.revision, selected.lastError
+		selected.RUnlock()
+		browser := request.Browser
+		if browser == "" {
+			browser = "brave"
+		}
+		result := searchResult{Browser: browser, OK: true, Ready: ready, History: []entry{}, Total: len(rows), Revision: revision}
 		if failed {
 			result.OK = false
 			result.Error = "Browser history could not be refreshed"
@@ -267,6 +295,9 @@ func (idx *index) handler(password string) http.Handler {
 	})
 }
 func (idx *index) refresh(root string, quit <-chan os.Signal, parent int) {
+	idx.refreshKind(root, "chromium", quit, parent)
+}
+func (idx *index) refreshKind(root, kind string, quit <-chan os.Signal, parent int) {
 	var old []fileStamp
 	var stateStamp fileStamp
 	profile := "Default"
@@ -297,10 +328,16 @@ func (idx *index) refresh(root string, quit <-chan os.Signal, parent int) {
 			stateStamp = next
 		}
 		path := filepath.Join(root, profile, "History")
+		if kind == "safari" {
+			path = filepath.Join(root, "History.db")
+		}
+		if kind == "firefox" {
+			path = filepath.Join(firefoxProfile(root), "places.sqlite")
+		}
 		current := historyStamps(path)
 		// Retry failures and refresh at least once/minute even if timestamps lie.
 		if path != previousPath || (!sameStamps(current, old) && time.Since(checked) >= 5*time.Second) || time.Since(checked) > time.Minute {
-			rows, err := snapshot(path)
+			rows, err := snapshotKind(path, kind)
 			idx.Lock()
 			if err == nil {
 				if path != previousPath || !reflect.DeepEqual(rows, idx.rows) {
@@ -360,9 +397,12 @@ func main() {
 		password = hex.EncodeToString(secret)
 	}
 	idx := &index{}
-	quit := make(chan os.Signal, 1)
-	signal.Notify(quit, os.Interrupt, syscall.SIGTERM)
-	server := &http.Server{Handler: idx.handler(password), ReadHeaderTimeout: 2 * time.Second, ReadTimeout: 3 * time.Second, WriteTimeout: 3 * time.Second, IdleTimeout: 10 * time.Second, ErrorLog: log.New(io.Discard, "", 0)}
+	signals := make(chan os.Signal, 1)
+	signal.Notify(signals, os.Interrupt, syscall.SIGTERM)
+	quit := make(chan os.Signal)
+	go func() { <-signals; close(quit) }()
+	sources := newSources(home, *root, idx, quit, *parent)
+	server := &http.Server{Handler: idx.handler(password, sources.get), ReadHeaderTimeout: 2 * time.Second, ReadTimeout: 3 * time.Second, WriteTimeout: 3 * time.Second, IdleTimeout: 10 * time.Second, ErrorLog: log.New(io.Discard, "", 0)}
 	go func() { idx.refresh(*root, quit, *parent); server.Close() }()
 	endpoint := discovery{Version: version, URL: "http://" + listener.Addr().String() + "/search", Password: password}
 	if *stateFile != "" {

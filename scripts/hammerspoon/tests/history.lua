@@ -36,5 +36,16 @@ late(200,'success');assert(calls==3)
 available=false;H.search('missing',{},receive);assert(calls==4 and not last.ok)
 available=true;H.search('cancel',{},receive);late=http[#http];H.stop()
 assert(next(H.requests)==nil and H.endpoint==nil);late(200,'success');assert(calls==4)
+local oldDecode=hs.json.decode
+hs.json.decode=function(raw)
+ if raw=='safari'then return {ok=true,ready=true,browser='safari',history={},total=0}end
+ if raw=='wrong'then return {ok=true,ready=true,browser='brave',history={},total=0}end
+ return oldDecode(raw)
+end
+local safari=dofile('brave/history.lua')({stateFile=file,browser='safari'})
+safari.search('source',{},receive);assert(payload.browser=='safari');http[#http](200,'success');assert(not last.ok)
+safari.search('source',{},receive);http[#http](200,'wrong');assert(not last.ok)
+safari.search('source',{},receive);http[#http](200,'safari');assert(last.ok)
+safari.stop()
 os.remove(file)
 print('Shared history client authentication, rotation, readiness, timeout and cancellation tests passed')

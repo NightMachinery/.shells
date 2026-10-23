@@ -1,6 +1,6 @@
 # Omni history helper
 
-Keeps a Chromium history index in memory so Hammerspoon can request a small set
+Keeps separate browser history indexes in memory so Hammerspoon can request a small set
 of literal AND matches without copying and parsing the entire history per key.
 
 Run `omni-history-boot` to build the local Go tool and supervise it in the
@@ -26,9 +26,15 @@ otherwise a cryptographically random password is generated per run. An explicitl
 empty password is refused. No password is printed in this mode.
 
 POST `/search` with Basic authentication, username `omni`, and JSON
-`{"query":"terms","aliases":{},"exclude":[]}`. Native clients read the private
+`{"browser":"brave","query":"terms","aliases":{},"exclude":[]}`. Native clients read the private
 discovery file, never a checked-in password. Without `-state-file`, a small
 credential frame is written to stdout for private direct callers. `-parent PID`
 can additionally bound that direct invocation's lifetime.
 Responses include at most 200 matches, total indexed count, and revision. There
 is no browser-facing CORS endpoint or persistent index file.
+
+Version 1.2.0 adds isolated lazy indexes for Brave, Chrome, Edge, Safari, Arc, Dia
+and Firefox. Browser IDs are fixed; request paths are never accepted. Responses
+identify their source, and unused browser indexes do no I/O. Chromium sources
+use the last-used profile, Safari its main History.db, and Firefox the default
+relative profile from profiles.ini. See [source selection and limits](../../hammerspoon/docs/browser-history.md).

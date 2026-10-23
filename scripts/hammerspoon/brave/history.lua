@@ -1,6 +1,6 @@
 -- A managed Go service owns snapshots/indexing; Lua receives bounded matches.
 return function(config)
-    local H={version="3.0.0",waiting={},requests={}}
+    local H={version="3.1.0",waiting={},requests={}}
     local stateFile=(config and config.stateFile) or os.getenv("HOME") .. "/.local/state/omni-history/server.json"
     local function endpoint()
         local attr=hs.fs.symlinkAttributes(stateFile)
@@ -42,13 +42,17 @@ return function(config)
             if not active then
                 finish({ok=false,error=H.error or "Browser history helper is starting"});return
             end
-            local body=hs.json.encode({query=query,aliases=options.aliases or {},exclude=options.exclude or {}})
+            local body=hs.json.encode({browser=(config and config.browser) or "brave",query=query,aliases=options.aliases or {},exclude=options.exclude or {}})
             hs.http.asyncPost(active.url,body,{["Content-Type"]="application/json",
                 Authorization="Basic " .. hs.base64.encode("omni:" .. active.password)},function(status,raw)
                 if H.stopped or request.done then return end
                 local ok,result=pcall(hs.json.decode,raw or "")
                 if status~=200 or not ok or type(result)~="table" or not result.ok then
                     finish({ok=false,error="Browser history search unavailable"});return
+                end
+                local browser=(config and config.browser) or "brave"
+                if (result.browser and result.browser~=browser) or (browser~="brave" and result.browser~=browser) then
+                    finish({ok=false,error="History helper needs browser-source support; restart omni-history-boot"});return
                 end
                 if not result.ready then
                     request.retry=hs.timer.doAfter(.1,send)
