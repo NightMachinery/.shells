@@ -174,9 +174,55 @@ say `UNTRACKED` if an agent has replaced one with a file of its own.
 In order: resolve which agent this is ([agfi:ai-agent-name]) and which session
 ([agfi:h-agent-done-id], which dispatches to the adapter that knows how that
 agent exports its id); find its name from the live registry; write the summary
-plus a header — name, seat, id, transcript, directory, timestamp — to a file
-under `$(h-agent-done-dir)`; find the agent's own process; send it `SIGTERM`;
-and arrange for the report to appear once it is gone.
+plus a header (see "The report" below) to a file under `$(h-agent-done-dir)`,
+and copy it to `~/.agents/done/`; find the agent's own process; send it
+`SIGTERM`; and arrange for the report to appear once it is gone.
+
+### The report
+
+The header is there for whoever decides, later and often from another shell,
+whether to carry on. So it records every id that finds the session again,
+and then the commands that resume it. [agfi:h-agent-done-report] writes it:
+
+- `seat`, `agent` (`claude`, `codex` or `agy`) and `id`, the session's own id;
+- `paseo`, for a Paseo agent: its uuid and provider; and `paseo subagents`,
+  its direct subagents with their status and title, since the archive takes
+  them down with it;
+- `paseo parent`, for a session that merely runs under a Paseo agent, having
+  inherited `PASEO_AGENT_ID` from it (see "Which agent" below);
+- `background`, the short id of a background Claude Code session, and `pane`,
+  the tmux pane it ran in;
+- `transcript`, `cwd`, `ended`, `report` and `copy`.
+
+The resume block ([agfi:h-agent-done-resume-help]) gives one line per harness
+that can bring the session back, each a command to paste:
+
+```
+  resume, with one of these (two at once would both write the same transcript):
+    paseo:  paseo send c821264a-… 'your next message'
+              unarchives it, then runs that message as a turn
+            paseo import --provider handoff-claude-… --cwd ~/scripts c97aa4d7-…
+              unarchives it without starting a turn
+    claude: cd ~/scripts && CLAUDE_CONFIG_DIR=~/.claude-work claude --resume c97aa4d7-…
+    zsh:    agent-session-resume ~/.claude-work/projects/-Users-evar-scripts/c97aa4d7-….jsonl
+```
+
+The agent's own line ([agfi:h-agent-done-resume-native]) is the bare binary
+plus the environment variable that selects the seat (`CLAUDE_CONFIG_DIR`,
+`CODEX_HOME`), read from the shell `agent-done` runs in, which inherited it
+from the agent. So it works from any shell, zsh or not. Antigravity is the
+exception: its accounts are separate homes that only the per-account launcher
+sets up, so its line names that launcher (`agy-<account> --conversation <id>`).
+The `zsh:` line goes through our own launchers instead, which pick the seat
+from the transcript and repaint the pane cues. A session in a tmux pane also
+gets a `tmux:` line for `prefix-r` in the dead pane.
+
+The copy goes to `agent_done_copy_dir`, `~/.agents/done/` by default, next to
+the agents' other shared state (`~/.agents/runs`, `~/.agents/skills`), which
+is where an agent or a person looks first. It is a plain copy, byte for byte:
+the original stays where `agent-done-reports` and the dead-pane picker look
+for it, and either survives the other being deleted. A failed copy is reported
+on stderr and ends nothing.
 
 `--dry-run` resolves the target, saves a report, and prints what it resolved.
 It does not arm a watcher, change tmux options, unregister auto-continue, or
@@ -251,8 +297,19 @@ with a notification, as for a background Claude Code session, and archives the
 agent with [agfi:h-agent-done-paseo-archive], detached with
 [agfi:awaysh-sure], because the turn it interrupts is the one running
 `agent-done`. A failed archive is announced too, with its output in
-`<report>.archive.log`. There is no unarchive command in the CLI, but the
-native session is untouched, so the report's transcript resumes as usual.
+`<report>.archive.log`.
+
+**Bringing it back.** The CLI (0.10.2) has no `unarchive` verb, but it does
+not need one: every surface that acts on an archived agent unarchives it
+first (`unarchiveAgentState` in the 0.10.3 server). `paseo send <uuid>`
+unarchives the agent and runs the message as a turn. `paseo import --provider
+<provider> --cwd <dir> <session-id>` revives the same agent, uuid and history
+intact, without a turn, provided `--cwd` matches its recorded directory;
+for an import of a session whose agent is archived, the server unarchives
+that agent rather than making a new one. Both are in the report's resume
+block, and both were read from the server's source rather than tried on a
+live agent. The native session is untouched as well, so the agent's own
+resume also works, outside Paseo.
 
 **Which agent.** `PASEO_AGENT_ID` is not evidence on its own: everything a
 Paseo agent starts inherits it, a `claude` it opens in a tmux pane included,
@@ -379,7 +436,8 @@ The reports are kept: [agfi:agent-done-reports] lists them newest first and
 [agfi:agent-done-report-last] prints the newest, so nothing is lost if the
 terminal is closed before anyone reads it. They live next to the session
 registry rather than under `~/tmp`, which gets swept — see
-[agfi:h-agent-session-registry-dir] for the time that mattered.
+[agfi:h-agent-session-registry-dir] for the time that mattered. Each also has
+a copy in `~/.agents/done/`.
 
 ## The pane cues
 
@@ -438,6 +496,8 @@ All dynamically scoped, all read with [agfi:bool] where they are boolean:
   bypass pane-ownership checks.
 - `agent_done_resume_cmd` — what `prefix-r` runs in the dead pane instead of
   the default resume.
+- `agent_done_copy_dir` — where each report is copied; `~/.agents/done`. An
+  empty value turns the copy off.
 - `agent_skills_link_verbose_p` — say which links were made.
 - `agent_skills_src_dir`, `agy_config_dir` — where the tracked skills are, and
   where Antigravity's configuration is.

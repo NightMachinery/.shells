@@ -92,8 +92,11 @@ it does not print persistence data or credentials. A genuinely missing child
 in the complete CLI listing still blocks its parent. Closed children are
 normal cascade members: recent or pinned closed children still block.
 
-Archive is soft deletion. The inspected CLI has no unarchive command. Check
-the Paseo app for recovery support in the installed version.
+Archive is soft deletion. The CLI has no `unarchive` verb, but acting on an
+archived agent unarchives it: `paseo send ID 'message'` does, and so does
+`paseo import --provider P --cwd DIR SESSION` for that agent's native session,
+without starting a turn (read from the 0.10.3 server source; see "Paseo
+agents" in `agent-done.md`).
 
 Validation: `python3 -m unittest discover -s python/tests -p test_paseo_archive.py`.
 Tests isolate both the fake CLI and fake records, so archive requests cannot

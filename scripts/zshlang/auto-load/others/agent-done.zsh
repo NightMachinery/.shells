@@ -307,6 +307,10 @@ function h-agent-skills-doctor {
 }
 ##
 typeset -g agent_done_wait_s="${agent_done_wait_s:-20}"
+#: A second home for every report, beside the agents' shared state
+#: (~/.agents/runs, ~/.agents/skills), where any agent or person looks first.
+#: `-' rather than `:-', so that an empty value turns the copy off.
+typeset -g agent_done_copy_dir="${agent_done_copy_dir-${HOME}/.agents/done}"
 
 function h-agent-done-dir {
     #: Where the summaries live. Next to the session registry rather than
@@ -315,6 +319,121 @@ function h-agent-done-dir {
     #: more the day after than the minute after.
     ##
     ec "$(h-agent-session-registry-dir)/done"
+}
+
+function h-agent-done-copy-path {
+    #: Where the copy of a report goes; fails when copying is turned off.
+    #: Usage: h-agent-done-copy-path <report>
+    ##
+    local report="${1}"
+    assert-args report @RET
+
+    test -n "${agent_done_copy_dir-}" || return 1
+    ec "${agent_done_copy_dir}/${report:t}"
+}
+
+function h-agent-done-shq {
+    #: A path for a command line meant to be pasted: `~/rest' when the rest
+    #: needs no quoting, which keeps the line short, and fully quoted
+    #: otherwise.
+    ##
+    local p="${1}" rest="${1#${HOME}/}"
+    if [[ "${p}" == "${HOME}/"* && "${(q-)rest}" == "${rest}" ]] ; then
+        print -r -- "~/${rest}"
+    else
+        print -r -- "${(q-)p}"
+    fi
+}
+
+function h-agent-done-resume-native {
+    #: The agent's own resume command, to paste into any shell: the bare
+    #: binary, plus the environment that selects the seat this session ran
+    #: on. That environment is this shell's, inherited from the agent, so it
+    #: is the session's own answer. Antigravity is the exception: its accounts
+    #: are separate homes that only the per-account launcher sets up, so its
+    #: line names that zsh launcher.
+    #: Usage: h-agent-done-resume-native <agent> <id> <transcript>
+    ##
+    local agent="${1}" id="${2}" transcript="${3}"
+    assert-args agent id @RET
+    (( ${+functions[h-agent-session-resume-argv]} )) || return 1
+
+    local launcher="${agent}" env=''
+    case "${agent}" in
+        claude)
+            test -z "${CLAUDE_CONFIG_DIR:-}" ||
+                env="CLAUDE_CONFIG_DIR=$(h-agent-done-shq "${CLAUDE_CONFIG_DIR}") "
+            ;;
+        codex)
+            test -z "${CODEX_HOME:-}" ||
+                env="CODEX_HOME=$(h-agent-done-shq "${CODEX_HOME}") "
+            ;;
+        agy)
+            local account
+            if test -n "${transcript}" && account="$(h-agy-account-of-transcript "${transcript}" 2>/dev/null)" ; then
+                launcher="agy-${account}"
+            fi
+            ;;
+    esac
+
+    local -a reply
+    h-agent-session-resume-argv "${agent}" "${id}" "${launcher}" 2>/dev/null @RET
+    print -r -- "${env}${(j: :)${(q-)reply[@]}}"
+}
+
+function h-agent-done-resume-help {
+    #: How to bring the session back, in every harness that can: Paseo when it
+    #: ran there, the agent's own CLI, our zsh resume helper, and the dead
+    #: pane. Whoever reads a report is usually deciding whether to carry on,
+    #: often from another shell, so each line is a command to paste.
+    #: Extra ids come from `agent_done_ids'; see [agfi:h-agent-done-report].
+    #: Usage: h-agent-done-resume-help <agent> <id> <transcript> <cwd> [<paseo-uuid>]
+    ##
+    local agent="${1}" id="${2}" transcript="${3}" cwd="${4}" paseo="${5:-}"
+    local -A ids=()
+    (( ${+agent_done_ids} )) && ids=( "${(@kv)agent_done_ids}" )
+
+    local -a lines
+    if test -n "${paseo}" ; then
+        #: `--home' only when it is not the default, to keep the lines short.
+        local home='' home_arg=''
+        (( ${+functions[h-paseo-home]} )) && home="$(h-paseo-home 2>/dev/null)"
+        if test -n "${home}" && [[ "${home:A}" != "${HOME}/.paseo" ]] ; then
+            home_arg="--home $(h-agent-done-shq "${home}") "
+        fi
+        #: Both unarchive it, keeping its uuid and history: every surface
+        #: that acts on an archived agent unarchives it first
+        #: (`unarchiveAgentState' in Paseo's server), and an import of a
+        #: session whose agent is archived revives that agent rather than
+        #: making a new one, provided the directory matches.
+        lines+=( "paseo:  paseo send ${home_arg}${paseo} 'your next message'"
+            "          unarchives it, then runs that message as a turn" )
+        local provider="${ids[paseo_provider]-}" pcwd="${ids[paseo_cwd]:-${cwd}}"
+        if test -n "${provider}" && test -n "${id}" && test -n "${pcwd}" ; then
+            lines+=( "        paseo import ${home_arg}--provider ${(q-)provider} --cwd $(h-agent-done-shq "${pcwd}") ${id}"
+                "          unarchives it without starting a turn" )
+        fi
+    fi
+
+    local native
+    if test -n "${id}" && native="$(h-agent-done-resume-native "${agent}" "${id}" "${transcript}")" ; then
+        lines+=( "$(command printf '%-8s' "${agent}:")${cwd:+cd $(h-agent-done-shq "${cwd}") && }${native}" )
+    fi
+
+    if test -n "${transcript}" ; then
+        lines+=( "zsh:    agent-session-resume $(h-agent-done-shq "${transcript}")" )
+    fi
+
+    if test -n "${ids[pane]-}" && test -z "${paseo}" ; then
+        lines+=( "tmux:   prefix-r in the dead pane ${ids[pane]}" )
+    fi
+
+    if (( ! ${#lines} )) ; then
+        print -r -- "  resume: nothing was recorded to resume from"
+        return 0
+    fi
+    print -r -- "  resume, with one of these (two at once would both write the same transcript):"
+    print -rl -- "${(@)lines/#/    }"
 }
 
 function h-agent-done-id {
@@ -373,14 +492,30 @@ function h-agent-done-report {
     #: then the agent's own summary. Written as one file so the thing that
     #: displays it can be a plain `cat' -- the process doing the displaying
     #: has to be able to start in a pane whose shell is already dead.
+    #:
+    #: The header carries every id that finds the session again, and the
+    #: commands that resume it ([agfi:h-agent-done-resume-help]). The ids only
+    #: [agfi:agent-done] can see come in through the associative array
+    #: `agent_done_ids', as the summary does through `agent_done_summary':
+    #: `paseo_provider', `paseo_cwd' and `paseo_subagents' for a Paseo agent,
+    #: `paseo_parent' for a session started under one, `background' and `pane'.
+    #:
+    #: Then copied whole to [agfi:h-agent-done-copy-path]. A failed copy is
+    #: reported and nothing more: the report itself is already saved.
     #: Usage: h-agent-done-report <agent> <id> <name> <transcript> <cwd> <seat> <report-path> [<paseo-uuid>]
     ##
     local agent="${1}" id="${2}" name="${3}" transcript="${4}" cwd="${5}" seat="${6}" out="${7}" paseo="${8:-}"
     assert-args agent out @RET
 
+    local -A ids=()
+    (( ${+agent_done_ids} )) && ids=( "${(@kv)agent_done_ids}" )
+
     local glyph label
     glyph="$(h-agent-field "${agent}" glyph 2>/dev/null)" || glyph=''
     label="$(h-agent-field "${agent}" label 2>/dev/null)" || label="${agent}"
+
+    local copy=''
+    copy="$(h-agent-done-copy-path "${out}")" || copy=''
 
     {
         print -r -- "${glyph} ${label} session finished${name:+: ${name}}"
@@ -389,12 +524,25 @@ function h-agent-done-report {
         #: says which session is *live*, and this one is not any more, but
         #: which account did the work is worth recording.
         test -n "${seat}" && print -r -- "  seat:       ${seat}"
+        print -r -- "  agent:      ${agent}"
         test -n "${id}" && print -r -- "  id:         ${id}"
-        test -n "${paseo}" && print -r -- "  paseo:      ${paseo}"
+        test -n "${paseo}" && print -r -- "  paseo:      ${paseo}${ids[paseo_provider]:+ (provider ${ids[paseo_provider]})}"
+        #: Inherited, not this session's own: it ran under that Paseo agent.
+        test -n "${ids[paseo_parent]-}" && print -r -- "  paseo parent: ${ids[paseo_parent]}"
+        if test -n "${ids[paseo_subagents]-}" ; then
+            #: Archived along with this one, so worth finding again.
+            print -r -- "  paseo subagents:"
+            print -rl -- "${(@)${(@f)ids[paseo_subagents]}/#/    }"
+        fi
+        test -n "${ids[background]-}" && print -r -- "  background: ${ids[background]}"
+        test -n "${ids[pane]-}" && print -r -- "  pane:       ${ids[pane]}"
         test -n "${transcript}" && print -r -- "  transcript: ${transcript/#${HOME}/~}"
         test -n "${cwd}" && print -r -- "  cwd:        ${cwd/#${HOME}/~}"
         print -r -- "  ended:      $(date '+%Y-%m-%d %H:%M:%S')"
         print -r -- "  report:     ${out/#${HOME}/~}"
+        test -n "${copy}" && print -r -- "  copy:       ${copy/#${HOME}/~}"
+        print -r --
+        h-agent-done-resume-help "${agent}" "${id}" "${transcript}" "${cwd}" "${paseo}"
         print -r --
         if test -n "${agent_done_summary}" ; then
             print -r -- "${agent_done_summary}"
@@ -402,6 +550,12 @@ function h-agent-done-report {
             print -r -- "(no summary was given)"
         fi
     } > "${out}" @RET
+
+    if test -n "${copy}" ; then
+        { command mkdir -p -- "${copy:h}" && command cp -- "${out}" "${copy}" } ||
+            ecerr "$0: could not copy the report to ${copy}"
+    fi
+    return 0
 }
 
 function h-agent-done-pane-script {
@@ -550,17 +704,35 @@ function h-agent-done-paseo-id {
     #: agent on that evidence would archive the parent. So the agent's own
     #: record ([agfi:paseo-ls]) must name this very session as the native one
     #: it runs.
-    #: Usage: h-agent-done-paseo-id <session-id>
+    #: Usage: h-agent-done-paseo-id <session-id> <paseo-ls --json rows>
     ##
-    local id="${1}" uuid="${PASEO_AGENT_ID:-}"
-    test -n "${id}" && test -n "${uuid}" || return 1
-    (( ${+functions[paseo-ls]} )) || return 1
+    local id="${1}" rows="${2}" uuid="${PASEO_AGENT_ID:-}"
+    test -n "${id}" && test -n "${uuid}" && test -n "${rows}" || return 1
 
-    local rows
-    rows="$(paseo-ls --json 2>/dev/null)" || return 1
     print -r -- "${rows}" | command jq --exit-status --arg uuid "${uuid}" --arg id "${id}" \
         'any(.[]; .id == $uuid and .nativeSessionId == $id)' >/dev/null || return 1
     ec "${uuid}"
+}
+
+function h-agent-done-paseo-ids {
+    #: What the report needs from this agent's Paseo record besides its uuid,
+    #: into `agent_done_ids' (see [agfi:h-agent-done-report]): the provider
+    #: and directory `paseo import' wants to unarchive it, and its direct
+    #: subagents, which the archive takes down with it.
+    #: Usage: h-agent-done-paseo-ids <uuid> <paseo-ls --json rows>
+    ##
+    local uuid="${1}" rows="${2}"
+    assert-args uuid rows @RET
+
+    local -a f
+    f=( "${(@ps:\t:)$(print -r -- "${rows}" | command jq --raw-output --arg uuid "${uuid}" '
+        map(select(.id == $uuid)) | first // {}
+        | [(.provider // ""), (.cwd // "")] | @tsv')}" )
+    agent_done_ids[paseo_provider]="${f[1]-}"
+    agent_done_ids[paseo_cwd]="${f[2]-}"
+    agent_done_ids[paseo_subagents]="$(print -r -- "${rows}" | command jq --raw-output --arg uuid "${uuid}" '
+        .[] | select(.parentAgentId == $uuid)
+        | "\(.id)  \(.status // "?")  \((.title // "")[0:60])"')"
 }
 
 function h-agent-done-paseo-blocker {
@@ -679,8 +851,21 @@ work is actually finished. --dry-run writes the report and kills nothing."
     #: pane checks below would only, rightly, refuse. Paseo ends one by
     #: archiving it, and its app keeps the conversation readable, so there is
     #: no screen to put back either. See "Paseo agents" in =docs/agent-done.md=.
-    local paseo_uuid=''
-    paseo_uuid="$(h-agent-done-paseo-id "${id}")" || paseo_uuid=''
+    #: One read of Paseo's records serves both the check and the report's ids.
+    local paseo_uuid='' paseo_rows=''
+    if test -n "${PASEO_AGENT_ID:-}" && (( ${+functions[paseo-ls]} )) ; then
+        paseo_rows="$(paseo-ls --json 2>/dev/null)" || paseo_rows=''
+    fi
+    paseo_uuid="$(h-agent-done-paseo-id "${id}" "${paseo_rows}")" || paseo_uuid=''
+
+    #: The ids the report header needs beyond the session's own; see
+    #: [agfi:h-agent-done-report].
+    local -A agent_done_ids=()
+    if test -n "${paseo_uuid}" ; then
+        h-agent-done-paseo-ids "${paseo_uuid}" "${paseo_rows}" || true
+    elif test -n "${PASEO_AGENT_ID:-}" ; then
+        agent_done_ids[paseo_parent]="${PASEO_AGENT_ID}"
+    fi
 
     #: A background Claude Code session (`claude --bg', or one backgrounded
     #: from the agent view) runs under the daemon's pty host: no pane, no tty,
@@ -753,6 +938,9 @@ work is actually finished. --dry-run writes the report and kills nothing."
         fi
     fi
 
+    test -z "${bg_short}" || agent_done_ids[background]="${bg_short}"
+    test -z "${pane}" || agent_done_ids[pane]="${pane}"
+
     local dir report script
     dir="$(h-agent-done-dir)" @TRET
     mkdir -p -- "${dir}" @RET
@@ -791,6 +979,8 @@ work is actually finished. --dry-run writes the report and kills nothing."
         fi
         ec "would forget this session's /auto-continue registration, if it has one"
         ec "report: ${report}"
+        local copy
+        copy="$(h-agent-done-copy-path "${report}")" && ec "copy: ${copy}"
         test -n "${paseo_uuid}" || ec "pane script (prefix-r resumes): ${script}"
         return 0
     fi

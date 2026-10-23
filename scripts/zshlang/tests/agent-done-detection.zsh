@@ -198,6 +198,8 @@ function ec { print -r -- "$@"; }
 function ecerr { print -ru2 -- "$@"; }
 function assert-args { return 0; }
 typeset -g NIGHTDIR="${agent_done_detection_root}"
+#: Never the real ~/.agents/done.
+typeset -g agent_done_copy_dir="${agent_done_detection_tmp}/copies"
 source "${agent_done_detection_root}/zshlang/auto-load/others/agent-done.zsh"
 typeset -g agent_done_agent=codex agent_done_pid=900 agent_done_tty='' agent_done_cwd=''
 typeset -g agent_done_resume_cmd=''
@@ -340,5 +342,60 @@ agent-done inherited-in-tmux </dev/null >/dev/null 2>&1 || actual_status=$?
 [[ "$(<"${agent_done_detection_calls}")" == 'auto-continue []' ]] ||
     agent-done-detection-fail "an inherited Paseo id must not reach auto-continue: $(<"${agent_done_detection_calls}")"
 typeset -gx PASEO_AGENT_ID=''
+
+# The report itself, unstubbed: every id, the copy, and the resume commands.
+source "${agent_done_detection_root}/zshlang/auto-load/others/agent-done.zsh"
+source "${agent_done_detection_root}/zshlang/plugins/agent-session/session.zsh"
+function h-agent-field { return 1; }
+function h-paseo-home { print -r -- "${HOME}/.paseo"; }
+typeset -g agent_done_copy_dir="${agent_done_detection_tmp}/copies"
+typeset -g agent_done_summary='the summary'
+typeset -gx CLAUDE_CONFIG_DIR="${HOME}/.claude-work"
+unset CODEX_HOME
+typeset -g report_id='11111111-2222-3333-4444-555555555555'
+typeset -g report="${agent_done_detection_tmp}/reports/report.txt"
+command mkdir -p -- "${report:h}"
+
+function agent-done-detection-expect-report {
+    local description="${1}" want text
+    shift
+    text="$(<"${report}")"
+    for want in "$@" ; do
+        [[ "${text}" == *"${want}"* ]] ||
+            agent-done-detection-fail "${description}: report lacks [${want}]"$'\n'"${text}"
+    done
+}
+
+typeset -gA agent_done_ids=(
+    [paseo_provider]=handoff-claude-x [paseo_cwd]=/work/dir
+    [paseo_subagents]=$'child-1  idle  first child\nchild-2  error  second child' )
+h-agent-done-report claude "${report_id}" name /t/x.jsonl /work/dir WORK "${report}" "${agent_done_paseo_uuid}"
+command cmp -s -- "${report}" "${agent_done_copy_dir}/report.txt" ||
+    agent-done-detection-fail 'the copy should be the report, byte for byte'
+agent-done-detection-expect-report 'Paseo agent' \
+    '  agent:      claude' \
+    "  paseo:      ${agent_done_paseo_uuid} (provider handoff-claude-x)" \
+    $'  paseo subagents:\n    child-1  idle  first child\n    child-2  error  second child' \
+    "  copy:       ${agent_done_copy_dir/#${HOME}/~}/report.txt" \
+    "paseo:  paseo send ${agent_done_paseo_uuid} 'your next message'" \
+    "paseo import --provider handoff-claude-x --cwd /work/dir ${report_id}" \
+    "claude: cd /work/dir && CLAUDE_CONFIG_DIR=~/.claude-work claude --resume ${report_id}" \
+    'zsh:    agent-session-resume /t/x.jsonl' \
+    'the summary'
+[[ "$(<"${report}")" != *'tmux:'* ]] || agent-done-detection-fail 'a Paseo agent has no dead pane to restart'
+
+typeset -gA agent_done_ids=( [pane]=%7 [paseo_parent]=parent-uuid )
+typeset -g spaced="${HOME}/proj dir"
+h-agent-done-report codex "${report_id}" '' /t/c.jsonl "${spaced}" '' "${report}"
+agent-done-detection-expect-report 'pane' \
+    '  paseo parent: parent-uuid' \
+    '  pane:       %7' \
+    "codex:  cd ${(q-)spaced} && codex resume ${report_id}" \
+    'tmux:   prefix-r in the dead pane %7'
+[[ "$(<"${report}")" != *'paseo:  '* ]] || agent-done-detection-fail 'an inherited Paseo id is not this session to resume'
+
+typeset -g agent_done_copy_dir=''
+h-agent-done-copy-path "${report}" >/dev/null &&
+    agent-done-detection-fail 'an empty agent_done_copy_dir should turn the copy off'
 
 print -r -- 'ok: agent-done tmux ownership detection, and Paseo agents'
