@@ -12,6 +12,8 @@ return 0
 Keep `return 1` there while installing dependencies. It defers the full shell;
 `nsh` loads it explicitly for a bounded smoke test. Use the destination account's
 home directory. Do not copy another user's absolute `/Users/...` paths.
+Restart BrishGarden after enabling full shell loading: workers started while
+loading was deferred also need the full shell. Verify an actual `brishzgo` call.
 
 Install Homebrew's core GNU tools, Zsh, vcsh, Redis, Go, uv, Python and tmux.
 Resolve the GNU parallel/moreutils conflict with the link order in `setup_misc`.
@@ -53,3 +55,11 @@ After cloning vcsh, audit tracked symlinks for paths into the source user's
 home. Back up conflicting files before checkout. Fetch updates from the same
 GitHub repository used by the source machine, even if the transport is HTTPS
 until the new host has its own GitHub authentication.
+
+Kitty's configuration uses Fira Code and Victor Mono, plus helper commands in
+`/usr/local/bin`. Install those fonts, link `bicon_zsh.dash`, `ffscrollback.sh`,
+`emacs_scrollback.sh` and `wait4user.sh` from `zshlang/wrappers`, and expose the
+Homebrew Zsh as `/usr/local/bin/zsh`. The terminal wrapper uses `/bin/sh` because
+macOS has no `/bin/dash`. Compile Kitty's bundled `kitty.terminfo` into
+`~/.terminfo`, and verify `TERM=xterm-kitty infocmp` and an interactive login
+shell. Recheck the symlink targets before launching the GUI.

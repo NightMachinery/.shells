@@ -77,6 +77,11 @@ mpv. See [[NIGHTDIR:docs/frontapp-get.md][front-app detection]].
 [agfi:mpv-frontmost-p] recognizes both command-line mpv and the app bundle.
 Luna skips while mpv is frontmost, and Night Shift shares the same predicate.
 
+* macOS workstation setup
+
+For a new Mac, [[NIGHTDIR:docs/macos-workstation.md][macOS workstation setup]] covers the opt-in startup profile,
+shell dependencies, login services and portable app configuration.
+
 * Hammerspoon
 
 Hammerspoon shortcut notes are tracked in =./hammerspoon/docs/hammerspoon.md=.
@@ -142,7 +147,8 @@ and attaches its output in tmux. See [[NIGHTDIR:docs/paseo.md][Paseo handoff]] f
 process checks, terminal-proxy handling, profiles, and manual-exit controls.
 That guide also covers running a CLI-managed daemon independently of Desktop;
 changing ownership requires a supervisor stop/start at a suitable stopping point.
-=launchers/various-darwin.zsh= starts it through the CLI when Paseo is installed.
+=launchers/various-darwin.zsh= starts it through the CLI on legacy hosts. The
+opt-in workstation profile uses Desktop management by default.
 The official =paseo= and =paseo-help= skills are installed in the shared
 standalone skill-source layout and linked into the agents' skill directories.
 

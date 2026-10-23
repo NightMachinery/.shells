@@ -1,4 +1,4 @@
-#!/bin/dash
+#!/bin/sh
 
 export PATH="${HOME}/bin:/opt/homebrew/bin/:/usr/local/bin:$PATH"
 
