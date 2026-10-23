@@ -298,7 +298,8 @@ result rows or changing their selection. If compilation or the internal
 `queryField` accessor is unavailable, the textual replacement indicator remains
 usable and an error is logged once. No query or result contents are logged.
 
-Tab toggles **New tab** and **REPLACE CURRENT TAB**. Replacement mode colors
+Every fresh Omni invocation starts in **New tab** mode. Tab toggles **New tab**
+and **↺ Replace** for that chooser session; help-prefix continuation retains it. Replacement mode colors
 only the query text orange; results and shortcut hints retain their normal
 colors. It targets the tab captured when Omni opened, even if the
 active tab later changes; a closed target is refused. Existing matching tabs are
@@ -588,3 +589,5 @@ observed. Subsequent navigation away still cancels. Initial support detection
 and the disabled-support cache keep their existing behavior. Tests cover blank,
 loading and redirect transitions. A live inert ChatGPT fixture reached a real
 conversation after a marked Send action.
+
+Version 1.16.0 adds Alt+P/Alt+N accepted-query history through the shared chooser layer. History is separate from browsing history and result recency, cached in memory, bounded to 100 entries per chooser purpose, and saved locally only on acceptance. Blank queries and cancellations are skipped. Advancing past the newest entry restores unfinished input. `historyId=false` opts a chooser out. No query values are logged. Replacement resets before fresh asynchronous enumeration and uses a shorter label.

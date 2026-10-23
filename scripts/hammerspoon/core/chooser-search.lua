@@ -1,5 +1,11 @@
 -- Shared local chooser policy. Remote query providers keep their own callbacks.
-ChooserSearch = {version = "1.3.1"}
+if ChooserSearch then
+    if ChooserSearch.historyTap then ChooserSearch.historyTap:stop() end
+    if hs.chooser.globalCallback==ChooserSearch.historyGlobalCallback then
+        hs.chooser.globalCallback=ChooserSearch.previousGlobalCallback
+    end
+end
+ChooserSearch = {version = "1.4.0"}
 local S = ChooserSearch
 local states = setmetatable({}, {__mode="k"})
 
@@ -36,15 +42,99 @@ end
 
 -- Use this constructor for local lists; update through setChoices(), which
 -- keeps the complete source list separate from the displayed filtered rows.
-function S.new(completion, fields, options)
-    local chooser = hs.chooser.new(completion)
-    states[chooser] = {choices={}, fields=fields,limit=options and options.limit}
-    chooser:queryChangedCallback(function(query)
-        local state = states[chooser]
-        chooser:choices(S.filter(state.choices, query, state.fields,state.index,state.limit))
+local histories={}
+local function history(state)
+    if state.historyId==false then return end
+    local id=state.historyId
+    if not histories[id] then
+        local saved=hs.settings.get("chooser.queries." .. id .. ".v1")
+        local rows={}
+        for _,query in ipairs(type(saved)=="table" and saved or {}) do
+            if type(query)=="string" and query:find("%S") and #query<=65536 then
+                rows[#rows+1]=query
+                if #rows>=100 then break end
+            end
+        end
+        histories[id]=rows
+    end
+    return histories[id]
+end
+function S.recordQuery(chooser)
+    local state=states[chooser]
+    if not state then return end
+    local rows=history(state)
+    local query=chooser:query()
+    state.cursor=nil;state.expected=nil;state.draft=nil
+    if not rows or type(query)~="string" or not query:find("%S") or #query>65536 or rows[1]==query then return end
+    table.insert(rows,1,query)
+    while #rows>100 do table.remove(rows) end
+    hs.settings.set("chooser.queries." .. state.historyId .. ".v1",rows)
+end
+function S.historyKey(code,flags)
+    if not flags.alt or flags.cmd or flags.ctrl or flags.shift or flags.fn or (code~=35 and code~=45) then return false end
+    for chooser,state in pairs(states) do
+        if chooser:isVisible() and state.historyId~=false then
+            local rows=history(state)
+            local query=chooser:query()
+            if query~=state.expected or not state.cursor then state.cursor=0;state.draft=query end
+            local cursor=math.max(0,math.min(#rows,state.cursor+(code==35 and 1 or -1)))
+            state.cursor=cursor
+            state.expected=cursor==0 and state.draft or rows[cursor]
+            chooser:query(state.expected)
+            -- query() updates the field but does not run Lua filtering callbacks.
+            if state.changed then state.changed(state.expected) end
+            return true
+        end
+    end
+    return false
+end
+local function ensureHistoryTap()
+    if S.historyTap or not hs.eventtap then return end
+    S.historyTap=hs.eventtap.new({hs.eventtap.event.types.keyDown},function(event)
+        return S.historyKey(event:getKeyCode(),event:getFlags())
+    end):start()
+end
+local function create(completion,fields,options,remote)
+    options=options or {}
+    local chooser
+    chooser=hs.chooser.new(function(choice)
+        if choice then S.recordQuery(chooser) end
+        local state=states[chooser]
+        if state then state.cursor=nil;state.expected=nil;state.draft=nil end
+        completion(choice)
     end)
+    local caller=debug.getinfo(3,"Sl") or {}
+    local historyId=options.historyId
+    if historyId==nil then historyId=(caller.short_src or "chooser") .. ":" .. tostring(caller.currentline or 0) end
+    states[chooser]={choices={},fields=fields,limit=options.limit,
+        historyId=historyId}
+    if not remote then
+        S.onQueryChanged(chooser,function(query)
+            local state=states[chooser]
+            chooser:choices(S.filter(state.choices,query,state.fields,state.index,state.limit))
+        end)
+    end
+    ensureHistoryTap()
     return chooser
 end
+function S.onQueryChanged(chooser,callback)
+    assert(states[chooser],"ChooserSearch must create the chooser").changed=callback
+    chooser:queryChangedCallback(callback)
+    return chooser
+end
+function S.new(completion,fields,options)return create(completion,fields,options,false)end
+-- Remote providers retain their own filtering and get the same input history.
+function S.remote(completion,options)return create(completion,nil,options,true)end
+
+-- The global lifecycle hook survives consumers replacing show/hide callbacks.
+-- Chain Hammerspoon's focus-restoration hook and undo this wrapper on reload.
+S.previousGlobalCallback=hs.chooser.globalCallback
+S.historyGlobalCallback=function(chooser,event)
+    local state=states[chooser]
+    if state and event=="willOpen" then state.cursor=nil;state.expected=nil;state.draft=nil end
+    if S.previousGlobalCallback then S.previousGlobalCallback(chooser,event) end
+end
+hs.chooser.globalCallback=S.historyGlobalCallback
 
 function S.setChoices(chooser, choices)
     local state = assert(states[chooser], "ChooserSearch.new must create the chooser")

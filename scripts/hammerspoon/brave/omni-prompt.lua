@@ -1,16 +1,17 @@
 return function(config)
-    local O={generation=0,querySerial=0,baseChoices={},historyRows={}}
+    local O={version="1.1.0",generation=0,querySerial=0,baseChoices={},historyRows={}}
     local sources=config.sources or {tabs=true,bookmarks=true,history=true}
     local recentBookmarks=sources.bookmarks and ChooserSearch.recent("bookmarks")
     local function complete(choice)
         O.generation=O.generation+1;O.querySerial=O.querySerial+1;O.pendingEnter=nil
+        if choice then ChooserSearch.recordQuery(O.chooser) end
         if not choice or O.queryActions.accept(choice) then return end
         if choice.kind=="tab" then config.engine.selectTab(choice.tabId)
         else config.engine.openBookmark(choice.url,{replace=O.queryActions.replace,tabId=O.queryActions.targetTabId},function(result)
             if result.ok and choice.kind=="bookmark" then recentBookmarks.record({choice.url}) end
         end) end
     end
-    O.chooser=ChooserSearch.new(complete,nil,{limit=200})
+    O.chooser=ChooserSearch.new(complete,nil,{limit=200,historyId="browser-" .. (config.id or config.name or "omni")})
     O.queryActions=dofile(nightdir .. "/hammerspoon/brave/query-actions.lua")({
         chooser=O.chooser,engine=config.engine,magic=config.magic~=false,enabled=config.queryActions~=false,
         showHelp=function()O.showHelp()end,
@@ -32,7 +33,7 @@ return function(config)
         if not choice or O.stopped then return end
         O.pendingHelp=hs.timer.doAfter(0,function()
             O.pendingHelp=nil
-            if not O.stopped then O.show(choice.prefix .. " ") end
+            if not O.stopped then O.show(choice.prefix .. " ",true) end
         end)
     end)
     O.helpChooser:placeholderText("Magic shortcuts · filter by name · Enter: use prefix · Esc: close")
@@ -115,9 +116,10 @@ return function(config)
         end
         if immediate then search() else O.debounce=hs.timer.doAfter(.04,search) end
     end
-    O.chooser:queryChangedCallback(function(query)O.searchHistory(query)end)
-    function O.show(query)
+    ChooserSearch.onQueryChanged(O.chooser,function(query)O.searchHistory(query)end)
+    function O.show(query,continuing)
         if O.stopped or not config.braveInFront() then return false end
+        if not continuing then O.queryActions.replace=false;O.queryActions.targetTabId=nil;O.updatePlaceholder() end
         O.generation=O.generation+1
         local generation=O.generation
         local bookmarks,bookmarkError

@@ -70,6 +70,11 @@ local function make()
 end
 local o=make();assert(o.show());assert(o.queryActions.targetTabId=='42')
 assert(o.chooser.items[1].subText=='Tab 3 · Window 1 · https://example.org/')
+o.queryActions.toggleMode();assert(o.queryActions.replace)
+assert(o.show('fresh'));assert(not o.queryActions.replace and o.queryActions.targetTabId=='42')
+o.queryActions.toggleMode();assert(o.show('.s ',true));assert(o.queryActions.replace)
+o.queryActions.toggleMode()
+
 typeQuery(o.chooser,'.help')
 assert(o.queryActions.key(36,{}));assert(not o.chooser.visible and not o.helpChooser.visible)
 flush();assert(o.helpChooser.visible and #o.helpChooser.items==13 and #opened==0)

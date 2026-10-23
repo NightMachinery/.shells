@@ -2293,3 +2293,5 @@ currently uses AltTab through Hyper+[ rather than an HS chooser. Its unset
 [AltTab's preferences](https://github.com/lwouis/alt-tab-macos/blob/master/src/preferences/Preferences.swift).
 Hammerspoon's existing app-return lists also already insert activations at the
 front. These existing app/window orders are retained.
+
+Shared choosers support Alt+P (older query) and Alt+N (newer query). Query history is bounded per chooser purpose in local hs.settings, preserves unfinished input, and is distinct from recent-choice ranking. Constructors support `historyId=false` to opt out. Remote providers register through `ChooserSearch.remote` and `ChooserSearch.onQueryChanged` so recalled input refreshes their existing results.

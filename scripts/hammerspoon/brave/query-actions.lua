@@ -1,7 +1,7 @@
 -- Browser chooser query actions. Modified Return is captured before the
 -- chooser's native Cmd+Return handler, and only while this chooser is visible.
 return function(config)
-    local Q = {replace=false}
+    local Q = {version="1.1.0",replace=false}
     local chooser = config.chooser
     local function encode(value)
         return (value:gsub("[^A-Za-z0-9_.~-]", function(char)
@@ -103,6 +103,7 @@ return function(config)
             requests[#requests+1]={destination=name,url=url,query=query}
         end
         if #requests==0 then return false end
+        if ChooserSearch then ChooserSearch.recordQuery(chooser) end
         local options={replace=Q.replace,tabId=Q.targetTabId}
         defer(function()
             if config.engine.openQueries then config.engine.openQueries(requests,options);return end
@@ -119,7 +120,7 @@ return function(config)
     end
 
     function Q.modeLabel()
-        return Q.replace and "REPLACE CURRENT TAB" or "New tab"
+        return Q.replace and "↺ Replace" or "New tab"
     end
     function Q.toggleMode()
         Q.replace=not Q.replace

@@ -136,7 +136,7 @@ for _,query in ipairs({'.gs.s.gh papers','.a.k.y things','.g.g.c repeated'}) do
 end
 for _,query in ipairs({' .g.l.c query','.g..l query','.g.unknown query','.g.l. query','.g.l\tquery'})do assert(B.magic(query)==nil,query)end
 show('.gs.s.gh literal & query');B.targetTabId='42'
-assert(B.key(48,{}) and B.replace and mode=='REPLACE CURRENT TAB')
+assert(B.key(48,{}) and B.replace and mode=='↺ Replace')
 assert(B.key(36,{}));flush()
 assert(#batch.requests==3 and batch.requests[1].destination=='googlescholar' and batch.requests[2].destination=='semanticscholar')
 assert(batch.requests[3].destination=='github' and batch.options.replace and batch.options.tabId=='42')

@@ -1,8 +1,9 @@
+-- Chooser integrations version 1.1.0: shared accepted-query history.
 function chis()
     -- https://www.hammerspoon.org/docs/hs.chooser.html
     -- @todo it'd probably be better if we put the URLs as `subtext`, and their titles as `text`. hs.chooser has this better than fzf.
     local tab = nil
-    c = hs.chooser.new(function(x)
+    c = ChooserSearch.remote(function(x)
             if tab then tab:delete() end
             if not x then return end
             brishz_eval_hs(("chis_clean %q | inargsf open"):format(x.text))
@@ -34,7 +35,7 @@ function chis()
             end
             return out
     end)
-    c:queryChangedCallback(function(query)
+    ChooserSearch.onQueryChanged(c,function(query)
             if timer and timer:running() then
                 timer:stop()
             end
@@ -60,7 +61,7 @@ function ntagFinder()
     -- Which refresh is current, so that a late answer for an older query is
     -- dropped.
     local generation = 0
-    c = hs.chooser.new(function(x)
+    c = ChooserSearch.remote(function(x)
             if tab then tab:delete() end
             if antitab then antitab:delete() end
             if not x then return end
@@ -100,7 +101,7 @@ function ntagFinder()
             chooser:choices(out)
         end, label, { quiet = true })
     end
-    c:queryChangedCallback(function(query)
+    ChooserSearch.onQueryChanged(c,function(query)
             if timer and timer:running() then
                 timer:stop()
             end
@@ -512,7 +513,7 @@ function anycomplete()
 
     doCopy()
 
-    c = hs.chooser.new(function(x)
+    c = ChooserSearch.remote(function(x)
             if tab then tab:delete() end
             if antitab then antitab:delete() end
             if not x then return end
@@ -562,7 +563,7 @@ function anycomplete()
             chooser:choices(out)
         end)
     end
-    c:queryChangedCallback(function(query)
+    ChooserSearch.onQueryChanged(c,function(query)
             if timer and timer:running() then
                 timer:stop()
             end

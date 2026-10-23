@@ -1,6 +1,6 @@
 -- Clipboard transformations share the garden stdin/pipeline API and paste helper.
 return function(config)
-    local P={version="1.1.0",generation=0,runGeneration=0,allowed={},chain={}}
+    local P={version="1.2.0",generation=0,runGeneration=0,allowed={},chain={}}
     local clipboard=config.clipboard or hs.pasteboard
     local notify=config.notify or function(message,success)
         alert_gateway("OmniPrompter: " .. message,{id="omni-prompter",color=success and "success" or "warn",seconds=3})
@@ -81,6 +81,7 @@ return function(config)
     function P.add()
         local choice=P.chooser:selectedRowContents()
         if choice and P.allowed[choice.name] then
+            ChooserSearch.recordQuery(P.chooser)
             P.chain[#P.chain+1]=choice.name;P.chooser:query("");render();return true
         end
         return false
@@ -101,6 +102,7 @@ return function(config)
             if not P.allowed[selected] then notify("A selected function is no longer available; refresh the chain",false);return false end
             stages[#stages+1]={selected}
         end
+        ChooserSearch.recordQuery(P.chooser)
         local input,target=P.snapshot,P.target
         P.snapshot=nil;P.target=nil;P.pendingOutput=nil;P.busy=true;P.chooser:hide()
         P.runGeneration=P.runGeneration+1
@@ -134,7 +136,7 @@ return function(config)
     end
     P.chooser=ChooserSearch.new(function(choice)
         if choice then P.run(choice.name) else P.snapshot=nil;P.target=nil end
-    end,nil,{limit=200})
+    end,nil,{limit=200,historyId="omni-prompter"})
     P.chooser:rows(12)
     function P.key(code,flags)
         if not P.chooser:isVisible() or P.stopped then return false end
