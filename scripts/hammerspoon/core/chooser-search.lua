@@ -1,11 +1,11 @@
 -- Shared local chooser policy. Remote query providers keep their own callbacks.
 if ChooserSearch then
     if ChooserSearch.historyTap then ChooserSearch.historyTap:stop() end
-    if hs.chooser.globalCallback==ChooserSearch.historyGlobalCallback then
+    if hs and hs.chooser and hs.chooser.globalCallback==ChooserSearch.historyGlobalCallback then
         hs.chooser.globalCallback=ChooserSearch.previousGlobalCallback
     end
 end
-ChooserSearch = {version = "1.4.0"}
+ChooserSearch = {version = "1.4.1"}
 local S = ChooserSearch
 local states = setmetatable({}, {__mode="k"})
 
@@ -83,6 +83,18 @@ function S.historyKey(code,flags)
             chooser:query(state.expected)
             -- query() updates the field but does not run Lua filtering callbacks.
             if state.changed then state.changed(state.expected) end
+            if hs.axuielement and hs.processInfo then
+                local app=hs.axuielement.applicationElement(hs.processInfo.processID)
+                if app and app:setTimeout(.1) then
+                    local field=app:attributeValue("AXFocusedUIElement")
+                    if field and field:setTimeout(.1) and field:attributeValue("AXRole")=="AXTextField" and
+                        field:attributeValue("AXValue")==state.expected then
+                        local length=0
+                        for _,codepoint in utf8.codes(state.expected) do length=length+(codepoint>0xFFFF and 2 or 1) end
+                        field:setAttributeValue("AXSelectedTextRange",{location=length,length=0})
+                    end
+                end
+            end
             return true
         end
     end
@@ -97,12 +109,15 @@ end
 local function create(completion,fields,options,remote)
     options=options or {}
     local chooser
+    local reference=setmetatable({}, {__mode="v"})
     chooser=hs.chooser.new(function(choice)
-        if choice then S.recordQuery(chooser) end
-        local state=states[chooser]
+        local current=reference[1]
+        if choice and current then S.recordQuery(current) end
+        local state=current and states[current]
         if state then state.cursor=nil;state.expected=nil;state.draft=nil end
         completion(choice)
     end)
+    reference[1]=chooser
     local caller=debug.getinfo(3,"Sl") or {}
     local historyId=options.historyId
     if historyId==nil then historyId=(caller.short_src or "chooser") .. ":" .. tostring(caller.currentline or 0) end
@@ -122,12 +137,17 @@ function S.onQueryChanged(chooser,callback)
     chooser:queryChangedCallback(callback)
     return chooser
 end
-function S.new(completion,fields,options)return create(completion,fields,options,false)end
+function S.new(completion,fields,options)
+    local chooser=create(completion,fields,options,false);return chooser
+end
 -- Remote providers retain their own filtering and get the same input history.
-function S.remote(completion,options)return create(completion,nil,options,true)end
+function S.remote(completion,options)
+    local chooser=create(completion,nil,options,true);return chooser
+end
 
 -- The global lifecycle hook survives consumers replacing show/hide callbacks.
 -- Chain Hammerspoon's focus-restoration hook and undo this wrapper on reload.
+if hs and hs.chooser then
 S.previousGlobalCallback=hs.chooser.globalCallback
 S.historyGlobalCallback=function(chooser,event)
     local state=states[chooser]
@@ -135,6 +155,8 @@ S.historyGlobalCallback=function(chooser,event)
     if S.previousGlobalCallback then S.previousGlobalCallback(chooser,event) end
 end
 hs.chooser.globalCallback=S.historyGlobalCallback
+
+end
 
 function S.setChoices(chooser, choices)
     local state = assert(states[chooser], "ChooserSearch.new must create the chooser")

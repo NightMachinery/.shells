@@ -48,3 +48,13 @@ assert(originalCalls==beforeCalls+2)
 for i=1,105 do d:show();d:query('query '..i);d:accept()end
 assert(#saved['chooser.queries.test.v1']==100 and saved['chooser.queries.test.v1'][1]=='query 105')
 print('Chooser history: accepted queries, draft restoration, isolation, opt-out, bounds, callbacks and reload passed')
+
+-- Accessibility text ranges use UTF-16 units, not UTF-8 bytes.
+local field={setTimeout=function(self)return self end,attributeValue=function(_,key)
+ if key=='AXRole'then return 'AXTextField'elseif key=='AXValue'then return d:query()end
+end,setAttributeValue=function(_,key,value)assert(key=='AXSelectedTextRange');assert(value.location==6 and value.length==0);return true end}
+hs.processInfo={processID=1}
+hs.axuielement={applicationElement=function()return {setTimeout=function(self)return self end,
+ attributeValue=function(_,key)assert(key=='AXFocusedUIElement');return field end}end}
+d:show();d:query('🧪 متن');d:accept();d:show();d:query('draft');assert(S.historyKey(35,{alt=true}))
+print('Recalled Unicode input leaves the caret at its UTF-16 end')

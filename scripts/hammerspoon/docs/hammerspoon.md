@@ -2295,3 +2295,5 @@ Hammerspoon's existing app-return lists also already insert activations at the
 front. These existing app/window orders are retained.
 
 Shared choosers support Alt+P (older query) and Alt+N (newer query). Query history is bounded per chooser purpose in local hs.settings, preserves unfinished input, and is distinct from recent-choice ranking. Constructors support `historyId=false` to opt out. Remote providers register through `ChooserSearch.remote` and `ChooserSearch.onQueryChanged` so recalled input refreshes their existing results.
+
+Recalled chooser queries leave the caret at the end, including Unicode text; query-history completion uses weak chooser references so closed temporary choosers can be collected.
