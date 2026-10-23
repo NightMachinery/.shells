@@ -26,6 +26,58 @@ Install BrishGarden as an isolated uv tool as described in
 [python-envs.md](python-envs.md). The old `setup.basic` and `setup_macOS.zsh`
 include large optional and obsolete installs; review them before running.
 
+## Development environment
+
+A working shell does not verify the development environment. Track runtimes,
+repository helper programs, Python libraries and isolated tools separately.
+Install the build prerequisites explicitly:
+
+```zsh
+brew install go node uv ruby cmake ninja pkgconf pnpm
+npm install --global bun
+```
+
+Install stable Rust through rustup using its minimal profile and
+`--no-modify-path`, then add `rustfmt`, `clippy` and `rust-src`. The shared shell
+already includes `~/.cargo/bin`; avoid a second Homebrew-managed Rust toolchain.
+Review `setup/setup.cargo` and build its required programs, recording each failure.
+Its legacy `input_lang_get_icon` depends on a nightly-only crate and can fail
+with stable Rust. The current shell uses [agfi:input-lang-get-icon]; do not
+install another toolchain solely for the unused legacy binary.
+Beyond the local programs in `setup/setup_go`, the shell uses `ntagcolor`,
+`jalalicli`, `ntom`, `possiblycat` and `prefixer` from `setup/ins_go`.
+
+Follow [python-envs.md](python-envs.md) for libraries in Miniforge's `py314`
+environment and commands in isolated uv tool environments. Download the native
+Apple Silicon Miniforge installer and its **versioned** checksum asset from the
+same release; verify it before batch installation with `-b -p ~/miniforge3`.
+Create `py314` with Python 3.14 and pip from conda-forge. Avoid shell-init commands
+that rewrite tracked dotfiles. In host-local configuration, ensure
+`~/.local/bin` and `~/miniforge3/envs/py314/bin` precede Homebrew. A
+`~/.nightsh_private_first` that prepends Homebrew on every load can make
+`python` and `python3` select different environments.
+
+Install library manifests one requirement at a time into that environment,
+including the applicable Jupyter and script-specific manifests. Record failed
+requirements, then run `uv pip check --python ~/miniforge3/envs/py314/bin/python`.
+Install `python/uv-tools.txt` with managed interpreters through [agfi:ins-uv-tools].
+Entries with editable local paths require those source repositories first;
+record them separately instead of silently skipping them. Keep a working
+BrishGarden environment intact while installing unrelated tools.
+
+Validate from a fresh interactive login shell: print `sys.executable` for both
+`python` and `python3`, import the required libraries, and run a small compiled
+program with Go, Rust, C/C++ and Java. Check Node, Bun, pnpm and Ruby too. Verify
+actual helper commands and isolated-tool entry points, not only package-manager
+exit codes. Keep installed, validated and deferred entries distinct.
+
+For remote scripts, upload the whole file before executing it with SSH stdin
+closed. An installer reading a script's shared stdin can consume later commands.
+Require a final completion marker and validate outputs, especially when the
+remote path does not propagate nonzero exit status correctly.
+
+## Services and login startup
+
 Redis must run before a full shell load. Use a user LaunchAgent, loopback bind,
 protected mode, and the password from `~/.redis-auth` (mode 600). Keep its config,
 data and log paths under the user's Library. Verify authenticated `PING` and
