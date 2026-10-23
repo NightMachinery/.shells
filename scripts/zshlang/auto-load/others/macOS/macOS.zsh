@@ -1,4 +1,14 @@
 ##
+function password-hint-darwin {
+    : "Print the current account's macOS login password hint."
+    @darwinOnly
+    ensure-cmd dscl whoami @RET
+
+    local user_name
+    user_name="$(command whoami)" @RET
+    command dscl . -read "/Users/${user_name}" hint
+}
+##
 function dock-bounce-enable() {
     defaults write com.apple.dock no-bouncing -bool FALSE
     killall Dock
