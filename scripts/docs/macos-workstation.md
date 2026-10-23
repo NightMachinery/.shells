@@ -18,7 +18,10 @@ loading was deferred also need the full shell. Verify an actual `brishzgo` call.
 Install Homebrew's core GNU tools, Zsh, vcsh, Redis, Go, uv, Python and tmux.
 Resolve the GNU parallel/moreutils conflict with the link order in `setup_misc`.
 Compile `setup/terminfo-24bit.src` with `tic -x -o ~/.terminfo`, then run
-`setup/setup_go` in the loaded Night shell. Build `golang/omni-history` too.
+`setup/setup_go` in the loaded Night shell. Build `golang/omni-history` too. Install the
+Go command `github.com/NightMachinary/prefixer` as well, since shell error
+formatting uses it. Record the source binary's module version with `go version -m`
+when matching an existing installation.
 Install BrishGarden as an isolated uv tool as described in
 [python-envs.md](python-envs.md). The old `setup.basic` and `setup_macOS.zsh`
 include large optional and obsolete installs; review them before running.
@@ -63,3 +66,8 @@ Homebrew Zsh as `/usr/local/bin/zsh`. The terminal wrapper uses `/bin/sh` becaus
 macOS has no `/bin/dash`. Compile Kitty's bundled `kitty.terminfo` into
 `~/.terminfo`, and verify `TERM=xterm-kitty infocmp` and an interactive login
 shell. Recheck the symlink targets before launching the GUI.
+
+Generate agent instructions with [agfi:agents-md-sync] and install the available
+skill links with [agfi:agent-skills-link]. Keep generated global instruction
+files managed by those helpers. Provider sign-ins and private skill/config
+repositories remain separate, deliberate migration steps.
