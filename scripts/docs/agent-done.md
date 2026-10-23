@@ -215,7 +215,8 @@ exception: its accounts are separate homes that only the per-account launcher
 sets up, so its line names that launcher (`agy-<account> --conversation <id>`).
 The `zsh:` line goes through our own launchers instead, which pick the seat
 from the transcript and repaint the pane cues. A session in a tmux pane also
-gets a `tmux:` line for `prefix-r` in the dead pane.
+gets a `tmux:` line for `prefix-r` in the dead pane, and one whose Paseo pin
+was lifted gets the `paseo-keep` that puts it back.
 
 The copy goes to `agent_done_copy_dir`, `~/.agents/done/` by default, next to
 the agents' other shared state (`~/.agents/runs`, `~/.agents/skills`), which
@@ -319,11 +320,19 @@ and archiving on that evidence would end the parent.
 else takes the tmux path, and the inherited id is also kept away from
 [agfi:agent-auto-continue-off], which would otherwise unregister the parent.
 
-**When it refuses.** An archive cascades to the agent's subagents, so a
-running one, at any depth, would be interrupted along with it; and a pinned
-agent ([agfi:paseo-keep]) is one the archive helpers never touch. In either
-case [agfi:h-agent-done-paseo-blocker] says why, the report is still saved,
-and `agent-done` returns 2 having ended nothing.
+**Pins.** A pin ([agfi:paseo-keep]) protects an agent from bulk and
+cascading archives (`docs/paseo-archive.md`). `/done` is neither: it is the
+explicit end of this one agent. So `agent-done` lifts the agent's own pin
+with [agfi:paseo-unkeep] before anything else changes, and the report's resume
+block names the `paseo-keep` that puts it back. A pin that will not come off
+(the helper is missing, or the CLI fails) is a refusal like the ones below.
+`--dry-run` only says it would unpin.
+
+**When it refuses.** An archive cascades to the agent's subagents, at any
+depth. A running one would be interrupted along with it, and a pinned one
+would be archived despite its pin. In either case
+[agfi:h-agent-done-paseo-blocker] says why, the report is still saved, and
+`agent-done` returns 2 having ended nothing.
 
 A session ending this way is finished, so `agent-done` also forgets its
 `/auto-continue` registration ([agfi:agent-auto-continue-off]), if it has one:

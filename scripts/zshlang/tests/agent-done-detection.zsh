@@ -196,6 +196,7 @@ command rm -f -- "${agent_done_detection_panes}.fail"
 function aliasfn { :; }
 function ec { print -r -- "$@"; }
 function ecerr { print -ru2 -- "$@"; }
+function ecgray { print -ru2 -- "$@"; }
 function assert-args { return 0; }
 typeset -g NIGHTDIR="${agent_done_detection_root}"
 #: Never the real ~/.agents/done.
@@ -308,11 +309,12 @@ function agent-done-detection-paseo-refuses {
     [[ ! -s "${agent_done_detection_calls}" ]] ||
         agent-done-detection-fail "${description}: must refuse before announce, archive or unregister"
 }
-agent-done-detection-paseo-refuses 'pinned agent' true
 agent-done-detection-paseo-refuses 'running subagent' false \
     "{\"id\":\"child\",\"parentAgentId\":\"${agent_done_paseo_uuid}\",\"status\":\"running\"}"
 agent-done-detection-paseo-refuses 'running grandchild under an idle subagent' false \
     "{\"id\":\"child\",\"parentAgentId\":\"${agent_done_paseo_uuid}\",\"status\":\"idle\"},{\"id\":\"grandchild\",\"parentAgentId\":\"child\",\"status\":\"running\"}"
+agent-done-detection-paseo-refuses 'pinned grandchild' false \
+    "{\"id\":\"child\",\"parentAgentId\":\"${agent_done_paseo_uuid}\",\"status\":\"idle\"},{\"id\":\"grandchild\",\"parentAgentId\":\"child\",\"status\":\"idle\",\"keep\":true}"
 
 agent-done-detection-paseo-fixture
 agent-done-detection-paseo-rows "${agent_done_paseo_session}" false \
@@ -320,6 +322,32 @@ agent-done-detection-paseo-rows "${agent_done_paseo_session}" false \
 actual_status=0
 agent-done --dry-run idle-child </dev/null >/dev/null 2>&1 || actual_status=$?
 (( actual_status == 0 )) || agent-done-detection-fail "an idle subagent should not block the archive, got ${actual_status}"
+
+# A pinned agent is unpinned, then archived: /done is the explicit end the pin
+# guards against bulk archives for. A pin that will not come off refuses.
+agent-done-detection-paseo-fixture
+agent-done-detection-paseo-rows "${agent_done_paseo_session}" true
+output="$(agent-done --dry-run pinned </dev/null 2>&1)"
+[[ "${output}" == *"would unpin the Paseo agent ${agent_done_paseo_uuid}"* ]] ||
+    agent-done-detection-fail "dry-run should say it would unpin a pinned agent: ${output}"
+[[ ! -s "${agent_done_detection_calls}" ]] ||
+    agent-done-detection-fail 'dry-run must not unpin'
+
+function paseo-unkeep { print -r -- "unkeep ${1}" >> "${agent_done_detection_calls}"; }
+actual_status=0
+agent-done pinned </dev/null >/dev/null 2>&1 || actual_status=$?
+(( actual_status == 0 )) || agent-done-detection-fail "a pinned agent should be unpinned and archived, got ${actual_status}"
+[[ "$(<"${agent_done_detection_calls}")" == "unkeep ${agent_done_paseo_uuid}"$'\n'"auto-continue [${agent_done_paseo_uuid}]"$'\n''announce Paseo agent'$'\n'"awaysh-sure h-agent-done-paseo-archive ${agent_done_paseo_uuid}" ]] ||
+    agent-done-detection-fail "pinned archive calls: $(<"${agent_done_detection_calls}")"
+
+agent-done-detection-paseo-fixture
+function paseo-unkeep { print -r -- "unkeep ${1}" >> "${agent_done_detection_calls}"; return 1; }
+actual_status=0
+agent-done pinned-stuck </dev/null >/dev/null 2>&1 || actual_status=$?
+(( actual_status == 2 )) || agent-done-detection-fail "a pin that will not come off should refuse, got ${actual_status}"
+[[ "$(<"${agent_done_detection_calls}")" == "unkeep ${agent_done_paseo_uuid}" ]] ||
+    agent-done-detection-fail "a failed unpin must refuse before announce, archive or unregister: $(<"${agent_done_detection_calls}")"
+unfunction paseo-unkeep
 
 # An inherited PASEO_AGENT_ID: the record names another session, so this one
 # is not that agent. It must never archive the parent: in the daemon's
@@ -367,7 +395,7 @@ function agent-done-detection-expect-report {
 }
 
 typeset -gA agent_done_ids=(
-    [paseo_provider]=handoff-claude-x [paseo_cwd]=/work/dir
+    [paseo_provider]=handoff-claude-x [paseo_cwd]=/work/dir [paseo_keep]=true
     [paseo_subagents]=$'child-1  idle  first child\nchild-2  error  second child' )
 h-agent-done-report claude "${report_id}" name /t/x.jsonl /work/dir WORK "${report}" "${agent_done_paseo_uuid}"
 command cmp -s -- "${report}" "${agent_done_copy_dir}/report.txt" ||
@@ -379,6 +407,7 @@ agent-done-detection-expect-report 'Paseo agent' \
     "  copy:       ${agent_done_copy_dir/#${HOME}/~}/report.txt" \
     "paseo:  paseo send ${agent_done_paseo_uuid} 'your next message'" \
     "paseo import --provider handoff-claude-x --cwd /work/dir ${report_id}" \
+    "paseo-keep ${agent_done_paseo_uuid}" \
     "claude: cd /work/dir && CLAUDE_CONFIG_DIR=~/.claude-work claude --resume ${report_id}" \
     'zsh:    agent-session-resume /t/x.jsonl' \
     'the summary'

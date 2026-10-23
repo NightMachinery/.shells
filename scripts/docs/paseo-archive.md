@@ -68,6 +68,11 @@ set labels using `paseo agent update --label`, but has no label-delete option,
 so unpinning leaves the false label rather than removing the key. Both helpers
 change only the requested label through the CLI.
 
+`/done` is the one place that unpins on its own: it is the explicit end of a
+single agent, not a bulk or cascading archive, so `agent-done` lifts the pin of
+the agent that is ending itself, and refuses if a subagent is pinned. See
+"Paseo agents" in `agent-done.md`.
+
 ## Scope and confirmation
 
 Both commands default to every directory. `--local-dir` (`-l`) restricts them

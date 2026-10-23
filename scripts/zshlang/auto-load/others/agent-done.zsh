@@ -413,6 +413,10 @@ function h-agent-done-resume-help {
             lines+=( "        paseo import ${home_arg}--provider ${(q-)provider} --cwd $(h-agent-done-shq "${pcwd}") ${id}"
                 "          unarchives it without starting a turn" )
         fi
+        if [[ "${ids[paseo_keep]-}" == true ]] ; then
+            lines+=( "        paseo-keep ${paseo}"
+                "          re-pins it; /done lifts the pin to archive it" )
+        fi
     fi
 
     local native
@@ -497,7 +501,7 @@ function h-agent-done-report {
     #: commands that resume it ([agfi:h-agent-done-resume-help]). The ids only
     #: [agfi:agent-done] can see come in through the associative array
     #: `agent_done_ids', as the summary does through `agent_done_summary':
-    #: `paseo_provider', `paseo_cwd' and `paseo_subagents' for a Paseo agent,
+    #: `paseo_provider', `paseo_cwd', `paseo_keep' and `paseo_subagents' for a Paseo agent,
     #: `paseo_parent' for a session started under one, `background' and `pane'.
     #:
     #: Then copied whole to [agfi:h-agent-done-copy-path]. A failed copy is
@@ -717,8 +721,8 @@ function h-agent-done-paseo-id {
 function h-agent-done-paseo-ids {
     #: What the report needs from this agent's Paseo record besides its uuid,
     #: into `agent_done_ids' (see [agfi:h-agent-done-report]): the provider
-    #: and directory `paseo import' wants to unarchive it, and its direct
-    #: subagents, which the archive takes down with it.
+    #: and directory `paseo import' wants to unarchive it, whether it is pinned,
+    #: and its direct subagents, which the archive takes down with it.
     #: Usage: h-agent-done-paseo-ids <uuid> <paseo-ls --json rows>
     ##
     local uuid="${1}" rows="${2}"
@@ -727,9 +731,10 @@ function h-agent-done-paseo-ids {
     local -a f
     f=( "${(@ps:\t:)$(print -r -- "${rows}" | command jq --raw-output --arg uuid "${uuid}" '
         map(select(.id == $uuid)) | first // {}
-        | [(.provider // ""), (.cwd // "")] | @tsv')}" )
+        | [(.provider // ""), (.cwd // ""), ((.keep // false) | tostring)] | @tsv')}" )
     agent_done_ids[paseo_provider]="${f[1]-}"
     agent_done_ids[paseo_cwd]="${f[2]-}"
+    agent_done_ids[paseo_keep]="${f[3]-}"
     agent_done_ids[paseo_subagents]="$(print -r -- "${rows}" | command jq --raw-output --arg uuid "${uuid}" '
         .[] | select(.parentAgentId == $uuid)
         | "\(.id)  \(.status // "?")  \((.title // "")[0:60])"')"
@@ -738,8 +743,11 @@ function h-agent-done-paseo-ids {
 function h-agent-done-paseo-blocker {
     #: Why archiving this Paseo agent would do more than end it, or nothing.
     #: An archive cascades to the agent's subagents, so one still running would
-    #: be interrupted along with it; and a pinned agent ([agfi:paseo-keep]) is
-    #: one the archive helpers never touch, so this does not either.
+    #: be interrupted along with it, and a pinned one ([agfi:paseo-keep]) would
+    #: lose the protection its pin promises. The agent's *own* pin is not a
+    #: reason: the pin guards against bulk and cascading archives, and /done is
+    #: the explicit end of this one agent, so [agfi:agent-done] lifts it.
+    #: Reads the records afresh, since subagents may have started since.
     #: Usage: h-agent-done-paseo-blocker <uuid>
     ##
     local uuid="${1}"
@@ -755,12 +763,13 @@ function h-agent-done-paseo-blocker {
                      | select(.id | IN($seen[]) | not) ] as $kids
             | if $kids == [] then []
               else $kids + below($kids | map(.id); $seen + ($kids | map(.id))) end;
-        (map(select(.id == $uuid)) | first) as $me
-        | (below([$uuid]; [$uuid]) | map(select(.status == "running")) | length) as $busy
-        | if ($me.keep // false) then
-            "it is pinned (paseo-keep); paseo-unkeep it first, or archive it by hand"
-          elif $busy > 0 then
+        below([$uuid]; [$uuid]) as $kids
+        | ($kids | map(select(.status == "running")) | length) as $busy
+        | ($kids | map(select(.keep // false)) | length) as $pinned
+        | if $busy > 0 then
             "\($busy) of its subagents \(if $busy == 1 then "is" else "are" end) still running, and archiving it would interrupt them"
+          elif $pinned > 0 then
+            "\($pinned) of its subagents \(if $pinned == 1 then "is" else "are" end) pinned (paseo-keep), and archiving it would archive them too"
           else empty end'
 }
 
@@ -973,6 +982,8 @@ work is actually finished. --dry-run writes the report and kills nothing."
         if test -n "${bg_short}" ; then
             ec "would stop the background session ${bg_short} with \`claude stop' and notify; report: ${report}"
         elif test -n "${paseo_uuid}" ; then
+            [[ "${agent_done_ids[paseo_keep]-}" == true ]] &&
+                ec "would unpin the Paseo agent ${paseo_uuid} with paseo-unkeep"
             ec "would archive the Paseo agent ${paseo_uuid} with \`paseo archive --force' and notify; report: ${report}"
         else
             ec "would kill: pid=${pid:-<unknown>} pane=${pane:-<none>} tty=${tty:-<none>} socket=${socket:-<none>}"
@@ -994,6 +1005,18 @@ work is actually finished. --dry-run writes the report and kills nothing."
             ecerr "$0: pane ownership changed; nothing ended; report: ${report}"
             return 2
         fi
+    fi
+
+    #: A pin ([agfi:paseo-keep]) is lifted here, before anything else changes,
+    #: and not in the detached archive: a pin that will not come off is then a
+    #: refusal like the blockers above, with nothing ended yet. The report
+    #: says how to put it back.
+    if test -n "${paseo_uuid}" && [[ "${agent_done_ids[paseo_keep]-}" == true ]] ; then
+        if ! (( ${+functions[paseo-unkeep]} )) || ! paseo-unkeep "${paseo_uuid}" >/dev/null 2>&1 ; then
+            ecerr "$0: Paseo agent ${paseo_uuid} is pinned and could not be unpinned; nothing ended; report: ${report}"
+            return 2
+        fi
+        ecgray "$0: unpinned Paseo agent ${paseo_uuid}"
     fi
 
     #: A session ending on purpose is finished, and must not be typed into at
