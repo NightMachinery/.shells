@@ -89,3 +89,10 @@ scope, MRU cycling/release, asynchronous source isolation and existing DOM/nativ
 submission guards. Native background-open checks preserve the foreground app and
 track disposable fixture identities for cleanup. See the test scripts under
 `hammerspoon/tests/`; the history helper also has Go race and schema tests.
+
+Live Safari checks also cover foreground-preserving batch opens, selection, strip
+navigation, replacement, bookmark reuse, stale-identity rejection, Cmd+. Omni
+with URL matching and fresh New-tab mode, native Tab Overview and native New
+Tab. The guarded ChatGPT fallback was exercised: navigation changed the saved
+URL identity, so it cancelled. A completed Safari chat send has not been verified.
+These checks do not establish account/model or extension availability.
