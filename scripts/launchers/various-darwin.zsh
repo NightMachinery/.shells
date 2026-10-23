@@ -1,5 +1,12 @@
 #!/usr/bin/env zsh
 
+# Opt in through ~/.nightsh_private_first, without adding hostnames here.
+if [[ "${NIGHT_DARWIN_PROFILE:-}" == workstation ]] ; then
+    psource "$HOME/.startup..private..zsh"
+    source "$NIGHTDIR/launchers/darwin-workstation.zsh"
+    return $?
+fi
+
 ##
 nightshift_auto_enabled_setnx 1
 ##
