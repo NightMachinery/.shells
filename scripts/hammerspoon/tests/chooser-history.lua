@@ -58,3 +58,16 @@ hs.axuielement={applicationElement=function()return {setTimeout=function(self)re
  attributeValue=function(_,key)assert(key=='AXFocusedUIElement');return field end}end}
 d:show();d:query('🧪 متن');d:accept();d:show();d:query('draft');assert(S.historyKey(35,{alt=true}))
 print('Recalled Unicode input leaves the caret at its UTF-16 end')
+
+-- A native callback can supply another userdata wrapper for the same chooser.
+local shared={}
+local mt={__eq=function(a,b)return a.identity==b.identity end}
+local canonical=setmetatable(S.remote(function()end,{historyId='wrapper'}),mt)
+canonical.identity=shared
+local wrapper=setmetatable({identity=shared},mt)
+canonical.visible=true;hs.chooser.globalCallback(wrapper,'willOpen')
+assert(S.activeChoosers[canonical])
+canonical:query('wrapper query');canonical.visible=false
+hs.chooser.globalCallback(wrapper,'didClose');canonical.done({text='chosen'})
+assert(not S.activeChoosers[canonical]and saved['chooser.queries.wrapper.v1'][1]=='wrapper query')
+print('Native-equivalent chooser wrappers retain visible state and release it after close')
