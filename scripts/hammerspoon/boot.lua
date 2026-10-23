@@ -5,6 +5,10 @@ nightdir = os.getenv("NIGHTDIR") or (os.getenv("HOME") .. "/scripts")
 -- `luarocks path`
 package.path = package.path .. ';/usr/local/Cellar/luarocks/3.3.1/share/lua/5.4/?.lua;/usr/local/share/lua/5.4/?.lua;/usr/local/share/lua/5.4/?/init.lua;/usr/local/lib/lua/5.4/?.lua;/usr/local/lib/lua/5.4/?/init.lua;./?.lua;./?/init.lua;/Users/evar/.luarocks/share/lua/5.4/?.lua;/Users/evar/.luarocks/share/lua/5.4/?/init.lua;' .. nightdir ..  '/lua/?.lua'
 package.cpath = package.cpath .. ';/usr/local/lib/lua/5.4/?.so;/usr/local/lib/lua/5.4/loadall.so;./?.so;/Users/evar/.luarocks/lib/lua/5.4/?.so'
+-- Per-user rocks work on any account, including Apple Silicon Homebrew hosts.
+local userRocks = os.getenv("HOME") .. "/.luarocks"
+package.path = package.path .. ";" .. userRocks .. "/share/lua/5.4/?.lua;" .. userRocks .. "/share/lua/5.4/?/init.lua"
+package.cpath = package.cpath .. ";" .. userRocks .. "/lib/lua/5.4/?.so"
 
 require "pipe"
 

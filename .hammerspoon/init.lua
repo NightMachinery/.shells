@@ -1,1 +1,1 @@
-/Users/evar/scripts/hammerspoon/boot.lua
+../scripts/hammerspoon/boot.lua
