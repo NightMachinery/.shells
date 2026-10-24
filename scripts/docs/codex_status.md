@@ -287,3 +287,7 @@ one. The thread id is `agent_session codex id-of <transcript>`.
 
 The caveat from the shared doc applies unchanged: the job trusts the reset
 time it was armed with and does not re-run `codex-status` when it fires.
+Codex sometimes resets limits early, which such a job sleeps through; to be
+woken by that too, use `agent-usage-reset-wait codex`, which polls the usage
+and fires on a measured reset (`docs/agent-usage-armed.md`, "Waiting for a
+measured reset").

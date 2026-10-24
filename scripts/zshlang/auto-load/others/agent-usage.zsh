@@ -76,8 +76,6 @@ function h-agent-usage-arm {
     ##
     local poll_s="${agent_usage_arm_poll_s:-30}"
     local action="${agent_usage_arm_action:-notif}"
-    local idle_min_s="${agent_usage_continue_idle_min_s:-600}"
-    local text="${agent_usage_continue_text:-Continue.}"
     local report_p="${agent_usage_arm_report_p:-y}"
 
     #: Resuming gets the longer grace of the two; see the knobs above.
@@ -125,6 +123,31 @@ function h-agent-usage-arm {
         ecgray "$0: arming ${session} for $(date-unix-to-3339 "${deadline}") (in $(seconds-fmt-short $(( deadline - EPOCHSECONDS ))))"
     fi
 
+    h-agent-usage-arm-spawn "${session}" "${action}" "${targets}" \
+        agent_usage_arm_poll_s="${poll_s}" \
+        h-agent-usage-arm-wait "${deadline}" "${session}" "${msg}" @RET
+
+    #: No `=' exact-match prefix on the target here: unlike =has-session=,
+    #: =set-option= does not accept one and fails with "no such session".
+    silent tmux set-option -t "${session}" '@agent_usage_arm_deadline' "${deadline}" || true
+}
+
+function h-agent-usage-arm-spawn {
+    #: Starts, or replaces, the tmux session an armed job lives in, carrying
+    #: the delivery knobs with it, and records the action and targets on the
+    #: session. Shared by the deadline arm ([agfi:h-agent-usage-arm]) and the
+    #: measured one ([agfi:agent-usage-reset-wait]): only their wait bodies
+    #: differ, and each passes its own knobs as leading VAR=val words.
+    #: Usage: h-agent-usage-arm-spawn <session> <action> <targets> [VAR=val...] <body...>
+    ##
+    local idle_min_s="${agent_usage_continue_idle_min_s:-600}"
+    local text="${agent_usage_continue_text:-Continue.}"
+    local arm_log="${agent_usage_arm_log:-${HOME}/logs/agent-usage-arm.log}"
+
+    local session="${1}" action="${2}" targets="${3}"
+    assert-args session action @RET
+    shift 3
+
     #: The job runs in its own interactive shell hours from now, so every knob
     #: it reads travels with it rather than being looked up there: a value
     #: scoped to this call -- a test's, a preset's -- would otherwise be lost
@@ -143,20 +166,16 @@ function h-agent-usage-arm {
     #: =silent= because [agfi:tmux-session-processes-kill] narrates every
     #: re-arm, which would otherwise land in the middle of a usage report.
     silent tmuxnewsh2 "${session}" \
-        agent_usage_arm_poll_s="${poll_s}" \
         agent_usage_arm_action="${action}" \
         agent_usage_arm_targets="${targets}" \
         agent_usage_continue_idle_min_s="${idle_min_s}" \
         "${idle_settings[@]}" \
         agent_usage_continue_text="${text}" \
-        h-agent-usage-arm-wait "${deadline}" "${session}" "${msg}" @RET
+        agent_usage_arm_log="${arm_log}" \
+        "$@" @RET
 
     #: Recorded on the tmux session itself rather than in redis, so the
     #: bookkeeping cannot drift from whether the job actually exists.
-    #:
-    #: No `=' exact-match prefix on the target here: unlike =has-session=,
-    #: =set-option= does not accept one and fails with "no such session".
-    silent tmux set-option -t "${session}" '@agent_usage_arm_deadline' "${deadline}" || true
     silent tmux set-option -t "${session}" '@agent_usage_arm_action' "${action}" || true
     silent tmux set-option -t "${session}" '@agent_usage_arm_targets' "${targets}" || true
     #: The name is how this job is found and re-armed; the agent it resumes
@@ -467,11 +486,12 @@ function h-agent-usage-arm-fire {
         fi
     done
 
-    local -a resumed unreachable held
+    local -a resumed unreachable held missed
     for target in "${targets[@]}" ; do
         why="$(h-agent-usage-continue-held-back "${target}")"
         if test -n "${why}" ; then
             held+=("${target} (${why})")
+            missed+=("${target}")
             continue
         fi
 
@@ -479,6 +499,7 @@ function h-agent-usage-arm-fire {
             resumed+=("${target}")
         else
             unreachable+=("${target}")
+            missed+=("${target}")
         fi
     done
 
@@ -495,6 +516,11 @@ function h-agent-usage-arm-fire {
 
     h-agent-usage-arm-notify "${report}"
     h-agent-usage-arm-log "${label}: ${report}"
+
+    #: The targets held back or not reached, for a caller that tries them
+    #: again later ([agfi:h-agent-usage-reset-deliver]); the one-shot
+    #: deadline job has nothing left to retry with and ignores it.
+    reply=( "${missed[@]}" )
 }
 ##
 #: Choosing what gets resumed
@@ -774,6 +800,560 @@ aliasfn acat agent-usage-continue-at-tmux-fz
 aliasfn acap agent-usage-continue-at-paseo-fz
 aliasfn acafront agent-usage-continue-at-frontmost
 ##
+#: Waiting for a measured reset
+#:
+#: The arms above wait for a reset time the provider reported, and fire on
+#: the clock. That misses a reset nobody announced: Codex has reset limits
+#: early, at times its own report did not predict. The measured wait polls
+#: the usage itself and fires once a watched window has visibly come back.
+#: Only the wait is new; spawning, delivery, the idle gate, the log, status
+#: and cancel are the ones above. See =docs/agent-usage-armed.md=.
+##
+#: How often the measured wait reads usage, in seconds. Every read is a usage
+#: request per account, which is why this is not the clock poll's 30.
+typeset -g agent_usage_reset_wait_poll_s="${agent_usage_reset_wait_poll_s:-300}"
+#: Without a --below threshold, a fall of more than this many points between
+#: two readings counts as a reset; 0 turns that test off. The quota watcher of
+#: the quota-management skill uses the same 20.
+typeset -g agent_usage_reset_wait_drop_pts="${agent_usage_reset_wait_drop_pts:-20}"
+#: After this many failed reads in a row the targets are told, once, that
+#: headroom is unknown. A good read starts the count again.
+typeset -g agent_usage_reset_wait_fail_warn_n="${agent_usage_reset_wait_fail_warn_n:-6}"
+#: How long, in seconds, to keep retrying a target the reset message could
+#: not reach, such as a Paseo agent that was busy at that moment.
+typeset -g agent_usage_reset_wait_retry_s="${agent_usage_reset_wait_retry_s:-7200}"
+#: The instruction appended to the reset message.
+typeset -g agent_usage_reset_wait_note="${agent_usage_reset_wait_note:-Re-check usage before moving heavy work back.}"
+#: Every measured wait's tmux session starts with this, which is how status
+#: and cancel find them.
+typeset -g agent_usage_reset_wait_session_prefix='agent-usage-reset-wait'
+
+function h-agent-usage-reset-read {
+    : "usage: h-agent-usage-reset-read <codex|claude>
+Reads one provider's usage windows into reply, three words each: gauge name,
+percent used, reset epoch (or -). Fails when nothing could be read."
+    #: The readers are the providers' own, [agfi:h-codex-status-gauges] and
+    #: [agfi:h-claude-code-usage-gauges]; this only checks their rows.
+    ##
+    setopt localoptions extendedglob
+
+    local provider="${1}"
+    assert-args provider @RET
+
+    local fn
+    case "${provider}" in
+        codex) fn=h-codex-status-gauges ;;
+        claude) fn=h-claude-code-usage-gauges ;;
+        *)
+            ecerr "$0: unknown provider: ${provider} (codex, claude)"
+            return 2
+            ;;
+    esac
+    if (( ! ${+functions[${fn}]} )) ; then
+        ecerr "$0: ${fn} is not loaded"
+        return 2
+    fi
+
+    reply=()
+    local out line
+    local -a f
+    out="$("${fn}")" || return 1
+    for line in "${(@f)out}" ; do
+        f=( "${(@ps:\t:)line}" )
+        #: Anything else is not a reading, and guessing at one is how a reset
+        #: gets invented.
+        [[ "${f[1]}" == [A-Za-z0-9_-]##.[A-Za-z0-9_-]## && "${f[2]}" == <0-100> && "${f[3]}" == (<->|-) ]] || continue
+        reply+=( "${f[1]}" "${f[2]}" "${f[3]}" )
+    done
+
+    (( ${#reply} ))
+}
+
+function agent-usage-reset-wait {
+    : "usage: agent-usage-reset-wait [options] <codex|claude>
+Waits until a usage window has measurably reset, then wakes the targets, or
+only notifies when there are none. Options:
+  --below PCT       fire once every watched window reads below PCT% used
+  --gauge GLOB      watch these windows, e.g. '*.7d' or 'work.5h' (repeatable)
+  --to TARGET       paseo:<uuid>, codex:<thread>, tmux:<pane>, kitty:<id>,
+                    claude-bg:<id>, frontmost, or self (this Paseo agent)
+  --pick            add targets from the agent_usage_continue_via picker
+  --note TEXT       instruction appended to the reset message
+  --poll DUR        between reads (default 5m, at least 30s)
+  --max-wait DUR    give up after this long, telling the targets
+  --name NAME       session suffix, for several waits at once
+  --fg              wait in this shell; exit 0 on reset, 124 on timeout
+  --dry-run         print what would be sent instead of sending"
+    #: Without --gauge, --below watches the windows at or above PCT now, and
+    #: no --below watches every window and fires at the first measured reset:
+    #: a fall of more than `agent_usage_reset_wait_drop_pts', or the reset
+    #: time moving later while the window was in use. A reset time alone is
+    #: never taken as a reset.
+    #:
+    #: The first reading happens here, before anything is armed, so a broken
+    #: reader or a condition that already holds is reported now rather than
+    #: hours later.
+    ##
+    setopt localoptions extendedglob
+    zmodload zsh/datetime 2>/dev/null
+
+    local below="${agent_usage_reset_wait_below}"
+    local poll="${agent_usage_reset_wait_poll_s:-300}"
+    local max_wait="${agent_usage_reset_wait_max_s:-0}"
+    local note="${agent_usage_reset_wait_note:-Re-check usage before moving heavy work back.}"
+    local name="${agent_usage_reset_wait_name}"
+    local fg_p="${agent_usage_reset_wait_fg_p:-n}"
+    local dry_p="${agent_usage_reset_wait_dry_p:-n}"
+    local prefix="${agent_usage_reset_wait_session_prefix:-agent-usage-reset-wait}"
+    local pick_p=n
+
+    local -a globs targets
+    targets=( ${=agent_usage_arm_targets} )
+    while (( $# )) ; do
+        case "${1}" in
+            --below|--gauge|--to|--note|--poll|--max-wait|--name)
+                if (( $# < 2 )) ; then
+                    ecerr "$0: ${1} needs a value"
+                    return 2
+                fi
+                case "${1}" in
+                    --below) below="${2}" ;;
+                    --gauge) globs+=( "${2}" ) ;;
+                    --to) targets+=( "${2}" ) ;;
+                    --note) note="${2}" ;;
+                    --poll) poll="${2}" ;;
+                    --max-wait) max_wait="${2}" ;;
+                    --name) name="${2}" ;;
+                esac
+                shift 2
+                ;;
+            --pick) pick_p=y ; shift ;;
+            --fg) fg_p=y ; shift ;;
+            --dry-run) dry_p=y ; shift ;;
+            --) shift ; break ;;
+            -*)
+                ecerr "$0: unknown option: ${1}"
+                return 2
+                ;;
+            *) break ;;
+        esac
+    done
+
+    local provider="${1}"
+    if (( $# != 1 )) ; then
+        ecerr "$0: name exactly one provider (codex, claude)"
+        return 2
+    fi
+
+    if test -n "${below}" && [[ "${below}" != <1-100> ]] ; then
+        ecerr "$0: --below takes a whole percentage from 1 to 100: ${below}"
+        return 2
+    fi
+
+    integer poll_s max_s
+    poll_s="$(dur2sec "${poll}")" || return 2
+    max_s="$(dur2sec "${max_wait}")" || return 2
+    #: Each poll is a usage request per account, so a typo here must not turn
+    #: into a request every second for hours. A dry run sends nothing and may
+    #: poll as fast as a test wants.
+    integer min_poll_s=30
+    bool "${dry_p}" && min_poll_s=1
+    if (( poll_s < min_poll_s )) ; then
+        ecerr "$0: --poll must be at least ${min_poll_s}s (got ${poll_s}s)"
+        return 2
+    fi
+
+    #: The note crosses into the tmux session as an assignment word, which a
+    #: newline would end early.
+    note="${note//$'\n'/ }"
+
+    local t
+    local -a resolved
+    for t in "${targets[@]}" ; do
+        if [[ "${t}" == self ]] ; then
+            #: The commonest caller is an agent asking to be woken itself.
+            if test -z "${PASEO_AGENT_ID:-}" ; then
+                ecerr "$0: --to self needs PASEO_AGENT_ID; outside Paseo, run --fg as a background task your harness tracks"
+                return 2
+            fi
+            t="paseo:${PASEO_AGENT_ID}"
+        fi
+        if [[ "${t}" == paseo:* && ! "${t#paseo:}" =~ '^[0-9a-fA-F]{8}-([0-9a-fA-F]{4}-){3}[0-9a-fA-F]{12}$' ]] ; then
+            ecerr "$0: not a Paseo agent id: ${t#paseo:}"
+            return 2
+        fi
+        if [[ "${t}" != ((paseo|codex|tmux|kitty|claude-bg):?*|frontmost) ]] ; then
+            ecerr "$0: unknown target: ${t}"
+            return 2
+        fi
+        resolved+=( "${t}" )
+    done
+    targets=( "${resolved[@]}" )
+
+    local -a reading
+    local read_ret=0
+    h-agent-usage-reset-read "${provider}" || read_ret=$?
+    #: 2 is an unknown provider, which no amount of waiting fixes.
+    (( read_ret == 2 )) && return 2
+    if (( read_ret )) ; then
+        ecerr "$0: could not read ${provider} usage, not arming"
+        return 1
+    fi
+    reading=( "${reply[@]}" )
+
+    #: Chosen from this first reading, then fixed: the wait compares the same
+    #: windows from start to finish.
+    local g p r glob tag when
+    local -a watched baseline
+    for g p r in "${reading[@]}" ; do
+        tag=''
+        if (( ${#globs} )) ; then
+            for glob in "${globs[@]}" ; do
+                if [[ "${g}" == ${~glob} ]] ; then
+                    tag=y
+                    break
+                fi
+            done
+        elif test -n "${below}" ; then
+            (( p >= below )) && tag=y
+        else
+            tag=y
+        fi
+
+        if test -n "${tag}" ; then
+            watched+=( "${g}" )
+            baseline+=( "${g}=${p}@${r}" )
+        fi
+        when='at an unknown time'
+        [[ "${r}" == <-> ]] && when="$(date-unix-to-3339 "${r}")"
+        ecgray "$0: ${provider} ${g} ${p}% used, resets ${when}${tag:+ (watching)}"
+    done
+
+    if (( ${#watched} == 0 )) ; then
+        if (( ${#globs} )) ; then
+            ecerr "$0: no ${provider} window matches ${(j: :)globs}"
+            return 1
+        fi
+        #: The twin of the deadline arm's "already past": the condition holds
+        #: now, so there is nothing to wait for.
+        ecgray "$0: every ${provider} window is already below ${below}%, not arming"
+        return 0
+    fi
+    if test -n "${below}" ; then
+        local all_below_p=y
+        for g p r in "${reading[@]}" ; do
+            (( ${watched[(Ie)${g}]} )) || continue
+            (( p < below )) || all_below_p=n
+        done
+        if bool "${all_below_p}" ; then
+            ecgray "$0: ${(j:, :)watched} already below ${below}%, not arming"
+            return 0
+        fi
+    fi
+
+    local condition="${provider} ${(j:, :)watched}"
+    if test -n "${below}" ; then
+        condition+=" all below ${below}%"
+    else
+        condition+=": first measured reset"
+    fi
+
+    if bool "${pick_p}" ; then
+        local -a picked
+        picked=( ${(f)"$(h-agent-usage-continue-targets)"} ) @TRET
+        targets+=( "${picked[@]}" )
+    fi
+
+    local session
+    session="$(h-tmux-session-name-sanitize "${prefix}-${name:-${provider}}")" @TRET
+
+    local -a knobs=(
+        agent_usage_reset_wait_poll_s="${poll_s}"
+        agent_usage_reset_wait_below="${below}"
+        agent_usage_reset_wait_drop_pts="${agent_usage_reset_wait_drop_pts:-20}"
+        agent_usage_reset_wait_max_s="${max_s}"
+        agent_usage_reset_wait_fail_warn_n="${agent_usage_reset_wait_fail_warn_n:-6}"
+        agent_usage_reset_wait_retry_s="${agent_usage_reset_wait_retry_s:-7200}"
+        agent_usage_reset_wait_dry_p="${dry_p}"
+        agent_usage_reset_wait_note="${note}"
+        agent_usage_reset_wait_watched="${(j: :)watched}"
+        agent_usage_reset_wait_baseline="${(j: :)baseline}"
+    )
+
+    local to="${(j: :)targets}"
+    if bool "${fg_p}" ; then
+        ecgray "$0: waiting for ${condition}, reading every $(seconds-fmt-short "${poll_s}")${to:+, then waking ${to}}"
+        #: `local' is dynamically scoped, so the loop reads these exactly as
+        #: it reads the copies a tmux session is started with.
+        local "${knobs[@]}"
+        local agent_usage_reset_wait_fg_p=y
+        local agent_usage_arm_targets="${to}"
+        h-agent-usage-reset-wait-loop "${provider}" "${session}"
+        return $?
+    fi
+
+    local action=notif
+    (( ${#targets} )) && action=continue
+
+    if tmux-job-running-p "${session}" ; then
+        ecgray "$0: replacing the wait already running in ${session}"
+    fi
+
+    #: From home: the job outlives whatever directory armed it, often a
+    #: worktree that is gone by the time the reset comes.
+    local tmuxnewsh_pwd="${HOME}"
+    h-agent-usage-arm-spawn "${session}" "${action}" "${to}" "${knobs[@]}" \
+        h-agent-usage-reset-wait-loop "${provider}" "${session}" @RET
+    silent tmux set-option -t "${session}" '@agent_usage_reset_condition' "${condition}" || true
+
+    h-agent-usage-arm-log "${session}: armed: ${condition}${to:+, wakes ${to}}"
+    ecgray "$0: armed ${session}: ${condition}, reading every $(seconds-fmt-short "${poll_s}"), then ${${to:+waking ${to}}:-a notification}"
+}
+
+function h-agent-usage-reset-wait-loop {
+    #: The measured wait itself, in the tmux session [agfi:agent-usage-reset-wait]
+    #: starts or, with --fg, in the caller's shell. Everything it needs
+    #: arrives in `agent_usage_reset_wait_*', including the windows to watch
+    #: and the arm-time reading they are compared against.
+    #: Usage: h-agent-usage-reset-wait-loop <provider> <label>
+    ##
+    local poll_s="${agent_usage_reset_wait_poll_s:-300}"
+    local below="${agent_usage_reset_wait_below}"
+    local drop="${agent_usage_reset_wait_drop_pts:-20}"
+    local max_s="${agent_usage_reset_wait_max_s:-0}"
+    local fail_warn_n="${agent_usage_reset_wait_fail_warn_n:-6}"
+    local note="${agent_usage_reset_wait_note:-Re-check usage before moving heavy work back.}"
+    local fg_p="${agent_usage_reset_wait_fg_p:-n}"
+    local arm_log="${agent_usage_arm_log:-${HOME}/logs/agent-usage-arm.log}"
+    local -a watched baseline
+    watched=( ${=agent_usage_reset_wait_watched} )
+    baseline=( ${=agent_usage_reset_wait_baseline} )
+
+    local provider="${1}" label="${2}"
+    assert-args provider label watched @RET
+
+    zmodload zsh/datetime 2>/dev/null
+
+    local -A base_pct prev_pct prev_reset cur_pct cur_reset
+    local b g p r
+    for b in "${baseline[@]}" ; do
+        g="${b%%=*}"
+        base_pct[${g}]="${${b#*=}%%@*}"
+        prev_pct[${g}]="${base_pct[${g}]}"
+        prev_reset[${g}]="${b##*@}"
+    done
+
+    integer started=${EPOCHSECONDS} fails=0 nap
+    local why last msg text
+    local -a seen fired
+    while true ; do
+        if (( max_s > 0 && EPOCHSECONDS - started >= max_s )) ; then
+            last=''
+            for g in "${watched[@]}" ; do
+                last+="${last:+, }${g} ${prev_pct[${g}]:-?}%"
+            done
+            msg="${provider}: no measured reset of ${(j:, :)watched} within $(seconds-fmt-short "${max_s}")"
+            text="QUOTA WAIT ENDED WITHOUT A RESET (agent-usage-reset-wait): ${msg}; last reading ${last}."
+            ec "${text}"
+            h-agent-usage-reset-deliver "${label}" "${msg}" "${text}"
+            return 124
+        fi
+
+        #: Sleep first: the arm has just taken the reading this one is
+        #: compared with. Never past --max-wait, so a short test ends on time.
+        nap=${poll_s}
+        if (( max_s > 0 && started + max_s - EPOCHSECONDS < nap )) ; then
+            nap=$(( started + max_s - EPOCHSECONDS ))
+        fi
+        (( nap > 0 )) && sleep "${nap}"
+
+        cur_pct=() cur_reset=()
+        if h-agent-usage-reset-read "${provider}" 2>/dev/null ; then
+            for g p r in "${reply[@]}" ; do
+                cur_pct[${g}]="${p}"
+                cur_reset[${g}]="${r}"
+            done
+        fi
+        seen=( ${(k)cur_pct} )
+        seen=( ${watched:*seen} )
+
+        if (( ${#seen} == 0 )) ; then
+            fails+=1
+            ecerr "$(strftime '%H:%M' "${EPOCHSECONDS}") ${provider}: read failed (${fails} in a row)"
+            #: Once per run of failures: a reader that is down for a day must
+            #: not page the target every few minutes.
+            if (( fails == fail_warn_n )) ; then
+                msg="${provider}: usage reader failed ${fails} times in a row, headroom unknown, still polling"
+                text="QUOTA WAIT WARNING (agent-usage-reset-wait): the ${provider} usage reader failed ${fails} times in a row, so headroom is unknown. Still polling; see ${arm_log}."
+                agent_usage_reset_wait_retry_s=0 h-agent-usage-reset-deliver "${label}" "${msg}" "${text}" || true
+            fi
+            continue
+        fi
+        fails=0
+
+        last=''
+        for g in "${seen[@]}" ; do
+            last+="${last:+ }${g}=${cur_pct[${g}]}%"
+        done
+        ec "$(strftime '%H:%M' "${EPOCHSECONDS}") ${provider} ${last}"
+        if ! bool "${fg_p}" ; then
+            silent tmux set-option -t "${label}" '@agent_usage_reset_last' "$(strftime '%Y-%m-%d %H:%M' "${EPOCHSECONDS}") ${last}" || true
+        fi
+
+        fired=()
+        if test -n "${below}" ; then
+            #: Headroom is a claim about every watched window, so one that
+            #: could not be read this time keeps the wait going.
+            if (( ${#seen} == ${#watched} )) ; then
+                for g in "${watched[@]}" ; do
+                    (( ${cur_pct[${g}]} < below )) || { fired=() ; break }
+                    fired+=( "${g} ${base_pct[${g}]}% -> ${cur_pct[${g}]}%" )
+                done
+            fi
+        else
+            for g in "${seen[@]}" ; do
+                why=''
+                if (( drop > 0 && ${prev_pct[${g}]} - ${cur_pct[${g}]} > drop )) ; then
+                    why='dropped'
+                elif [[ "${cur_reset[${g}]}" == <-> && "${prev_reset[${g}]}" == <-> ]] &&
+                    (( ${cur_reset[${g}]} > ${prev_reset[${g}]} + 60 && ${prev_pct[${g}]} > 0 )) ; then
+                    #: A window nobody used keeps pushing its reset time on
+                    #: without anything having reset, hence the in-use test.
+                    #: The minute absorbs the jitter of a reported time.
+                    why='window rolled over'
+                fi
+                test -n "${why}" && fired+=( "${g} ${base_pct[${g}]}% -> ${cur_pct[${g}]}% (${why})" )
+            done
+        fi
+
+        for g in "${seen[@]}" ; do
+            prev_pct[${g}]="${cur_pct[${g}]}"
+            prev_reset[${g}]="${cur_reset[${g}]}"
+        done
+
+        if (( ${#fired} )) ; then
+            msg="${provider}: measured reset: ${(j:, :)fired}"
+            text="QUOTA RESET (measured by agent-usage-reset-wait): ${provider} ${(j:, :)fired}. ${note}"
+            ec "${text}"
+            h-agent-usage-reset-deliver "${label}" "${msg}" "${text}"
+            return 0
+        fi
+    done
+}
+
+function h-agent-usage-reset-deliver {
+    #: Delivers one message from a measured wait to `agent_usage_arm_targets':
+    #: $2 is the notification and log line, $3 the text the targets receive.
+    #: With no targets it only notifies, or, in the foreground, only prints,
+    #: since the caller is reading the output.
+    #:
+    #: Unlike the deadline job, it retries what it could not reach, every poll
+    #: for `agent_usage_reset_wait_retry_s': a Paseo agent that is busy when
+    #: the reset lands is not sent to then, and still wants to hear once idle.
+    #: Usage: h-agent-usage-reset-deliver <label> <msg> <text>
+    ##
+    local poll_s="${agent_usage_reset_wait_poll_s:-300}"
+    local retry_s="${agent_usage_reset_wait_retry_s:-7200}"
+    local dry_p="${agent_usage_reset_wait_dry_p:-n}"
+    local fg_p="${agent_usage_reset_wait_fg_p:-n}"
+    local -a targets
+    targets=( ${=agent_usage_arm_targets} )
+
+    local label="${1}" msg="${2}" text="${3}"
+    assert-args label msg text @RET
+
+    zmodload zsh/datetime 2>/dev/null
+
+    if bool "${dry_p}" ; then
+        ec "dry run, not sent${targets:+ to ${targets[*]}}: ${text}"
+        h-agent-usage-arm-log "${label}: dry run: ${msg}"
+        return 0
+    fi
+
+    if (( ${#targets} == 0 )) ; then
+        if bool "${fg_p}" ; then
+            h-agent-usage-arm-log "${label}: ${msg}"
+        else
+            agent_usage_arm_action=notif h-agent-usage-arm-fire "${label}" "${msg}"
+        fi
+        return 0
+    fi
+
+    #: What the targets receive; [agfi:h-agent-usage-continue-send] reads it.
+    local agent_usage_continue_text="${text}"
+    integer give_up_at=$(( EPOCHSECONDS + retry_s ))
+    while true ; do
+        reply=()
+        agent_usage_arm_action=continue agent_usage_arm_targets="${targets[*]}" \
+            h-agent-usage-arm-fire "${label}" "${msg}"
+        targets=( "${reply[@]}" )
+        (( ${#targets} )) || return 0
+
+        if (( EPOCHSECONDS + poll_s > give_up_at )) ; then
+            h-agent-usage-arm-log "${label}: gave up on ${(j:, :)targets}"
+            return 1
+        fi
+        ecgray "$0: could not reach ${targets[*]} yet, retrying in $(seconds-fmt-short "${poll_s}")"
+        sleep "${poll_s}"
+    done
+}
+
+function agent-usage-reset-wait-armed-sessions {
+    #: The measured waits' tmux sessions, one per line. Listed from tmux,
+    #: since --name makes the set open-ended.
+    ##
+    local prefix="${agent_usage_reset_wait_session_prefix:-agent-usage-reset-wait}"
+
+    local -a names ours
+    names=( ${(f)"$(command tmux list-sessions -F '#{session_name}' 2>/dev/null)"} )
+    ours=( "${(@M)names:#${prefix}-*}" )
+
+    ec "${(F)ours}"
+}
+
+function h-agent-usage-reset-wait-sessions-resolve {
+    #: The sessions named by the arguments, each either a full session name or
+    #: the --name it was armed with; all of them when there are none.
+    ##
+    local prefix="${agent_usage_reset_wait_session_prefix:-agent-usage-reset-wait}"
+
+    local s
+    if (( $# == 0 )) ; then
+        agent-usage-reset-wait-armed-sessions
+        return 0
+    fi
+    for s in "$@" ; do
+        [[ "${s}" == "${prefix}-"* ]] || s="${prefix}-${s}"
+        ec "${s}"
+    done
+}
+
+function agent-usage-reset-wait-armed-status {
+    : "usage: agent-usage-reset-wait-armed-status [name-or-session...]"
+    ##
+    local -a sessions
+    sessions=( ${(f)"$(h-agent-usage-reset-wait-sessions-resolve "$@")"} )
+    if (( ${#sessions} == 0 )) ; then
+        ecgray "$0: no measured wait is armed"
+        return 0
+    fi
+
+    h-agent-usage-armed-status "${sessions[@]}"
+}
+
+function agent-usage-reset-wait-armed-cancel {
+    : "usage: agent-usage-reset-wait-armed-cancel [name-or-session...]"
+    ##
+    local -a sessions
+    sessions=( ${(f)"$(h-agent-usage-reset-wait-sessions-resolve "$@")"} )
+    if (( ${#sessions} == 0 )) ; then
+        ecgray "$0: no measured wait is armed"
+        return 0
+    fi
+
+    h-agent-usage-armed-cancel "${sessions[@]}"
+}
+##
 #: Bookkeeping, over whatever sessions the caller's agent owns
 ##
 function agent-usage-armed-sessions {
@@ -799,7 +1379,8 @@ function agent-usage-armed-sessions {
     #: rather than break `status' and `cancel' for the others.
     local fn
     for fn in claude-code-usage-armed-sessions codex-status-armed-sessions \
-        agy-status-armed-sessions agent-auto-continue-armed-sessions ; do
+        agy-status-armed-sessions agent-auto-continue-armed-sessions \
+        agent-usage-reset-wait-armed-sessions ; do
         (( ${+functions[${fn}]} )) || continue
 
         out+=( "${(@f)$("${fn}")}" )
@@ -809,7 +1390,26 @@ function agent-usage-armed-sessions {
     #: defined right here, so it needs no guard.
     out+=( 'agent-usage-continue-at' )
 
+    #: A list that is empty right now contributes one empty line, which would
+    #: otherwise reach `status' as a session called "".
+    out=( ${out:#} )
     ec "${(F)out}"
+}
+
+function h-agent-usage-armed-condition {
+    #: What a measured wait ([agfi:agent-usage-reset-wait]) is waiting for and
+    #: what it last read, or nothing for a job armed for a deadline.
+    #: Usage: h-agent-usage-armed-condition <tmux-session>
+    ##
+    local s="${1}"
+    assert-args s @RET
+
+    local condition last
+    condition="$(tmux show-options -qv -t "${s}" '@agent_usage_reset_condition' 2>/dev/null)" || condition=''
+    test -n "${condition}" || return 0
+    last="$(tmux show-options -qv -t "${s}" '@agent_usage_reset_last' 2>/dev/null)" || last=''
+
+    ec "waiting for a measured reset: ${condition}${last:+; last read ${last}}"
 }
 
 function agent-usage-armed-status {
@@ -858,7 +1458,7 @@ function agent-usage-armed-cancel-fz {
     #: Keyed on the deadline so the rows can be sorted before the key is
     #: dropped again; a fired job sorts last, being bookkeeping rather than
     #: something still pending.
-    local s deadline action targets suffix
+    local s deadline action targets suffix condition
     integer remaining
     local -a keyed
     for s in "${sessions[@]}" ; do
@@ -886,7 +1486,8 @@ function agent-usage-armed-cancel-fz {
 
         deadline="$(tmux show-options -qv -t "${s}" '@agent_usage_arm_deadline' 2>/dev/null)" || deadline=''
         if test -z "${deadline}" ; then
-            keyed+=( "0"$'\t'"${s}"$'\t'"${s}  armed (no deadline recorded)${suffix}" )
+            condition="$(h-agent-usage-armed-condition "${s}")" || condition=''
+            keyed+=( "0"$'\t'"${s}"$'\t'"${s}  ${condition:-armed (no deadline recorded)}${suffix}" )
             continue
         fi
 
@@ -973,7 +1574,7 @@ function h-agent-usage-armed-status {
 
     zmodload zsh/datetime 2>/dev/null
 
-    local s deadline
+    local s deadline condition
     integer remaining
     for s in "${sessions[@]}" ; do
         if ! tmux-alive-p "${s}" ; then
@@ -1004,7 +1605,8 @@ function h-agent-usage-armed-status {
             suffix+=']'
         fi
         if test -z "${deadline}" ; then
-            ec "${s}: armed (no deadline recorded)${suffix}"
+            condition="$(h-agent-usage-armed-condition "${s}")" || condition=''
+            ec "${s}: ${condition:-armed (no deadline recorded)}${suffix}"
             continue
         fi
 

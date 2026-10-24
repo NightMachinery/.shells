@@ -239,6 +239,44 @@ function codex-status {
     )
 }
 alias cs='codex-status'
+
+function h-codex-status-gauges {
+    : "prints Codex's usage windows, one per line, tab separated:
+<auth alias>.<window> (5h, 7d, or the slot), percent used, reset epoch or -"
+    #: The reader [agfi:agent-usage-reset-wait] compares from poll to poll.
+    #: `.quota.windows', for the reason [agfi:h-codex-status-arm-auth] gives:
+    #: those are what block ordinary usage, not the per-model families. A
+    #: window is named by its length, since which slot holds which window
+    #: depends on the plan.
+    #:
+    #: Two retries rather than the report's ten: a waiter reads again in a
+    #: few minutes anyway, and a read stuck retrying only delays its count of
+    #: failures.
+    ##
+    local codex_status_retries="${codex_status_retries:-2}"
+
+    ensure-cmd jq @RET
+
+    #: Not `@TRET': with several auths one failing makes the report exit
+    #: nonzero, and the others' windows are still good readings.
+    local json
+    json="$(codex_status_strip_ansi_p=y codex-status --json 2>/dev/null)" || true
+
+    local out
+    out="$(ec "${json}" | command jq -r '
+        .authFiles[]? | select(.ok == true)
+        | ((.alias // "auth") | gsub("[^A-Za-z0-9_-]"; "_")) as $a
+        | (.quota.windows // [])[]
+        | select((.usedPercent | type) == "number")
+        | [ $a + "." + ({"300": "5h", "10080": "7d"}[(.windowDurationMins // "" | tostring)]
+                        // ((.key // "window") | gsub("[^A-Za-z0-9_-]"; "_"))),
+            (.usedPercent | round | tostring),
+            ((.resetsAt | numbers | floor | tostring) // "-") ]
+        | @tsv' 2>/dev/null)" || out=''
+
+    test -n "${out}" || return 1
+    ec "${out}"
+}
 ##
 #: Waiting out a Codex rate limit, and picking the threads back up once it
 #: lifts. Only *when* the limit resets and *what to say* about it are Codex's;

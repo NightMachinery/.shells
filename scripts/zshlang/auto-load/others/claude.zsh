@@ -795,6 +795,39 @@ aliasfn claude-code-status claude-code-usage-all
 alias ccu='claude-code-usage-all'
 alias ccs='claude-code-usage-all'
 
+function h-claude-code-usage-gauges {
+    : "prints every profile's usage windows, one per line, tab separated:
+<profile>.<window> (5h, 7d, model7d), percent used, reset epoch or -"
+    #: The reader [agfi:agent-usage-reset-wait] compares from poll to poll.
+    #: A profile with an error or a stale cache gives nothing: an old reading
+    #: next to a fresh one is how a reset gets invented. =--no-relogin=,
+    #: because a waiter polls for hours and must not start =claude= for
+    #: every expired credential; that is a failed read, counted and reported.
+    ##
+    ensure-cmd jq @RET
+
+    #: Not `@TRET': one profile failing makes the report exit nonzero, and
+    #: the others' windows are still good readings.
+    local json
+    json="$(claude-code-usage-all --json --no-relogin 2>/dev/null)" || true
+
+    local out
+    out="$(ec "${json}" | command jq -r '
+        .[]? | select(.error == null and ((.cache // {}).stale_reason // null) == null)
+        | ((.profile // "account") | gsub("[^A-Za-z0-9_-]"; "_")) as $p
+        | .windows[]?
+        | select((.utilization_percent | type) == "number")
+        | [ $p + "." + ({"session": "5h", "five_hour": "5h", "weekly_all": "7d",
+                         "seven_day": "7d", "weekly_scoped": "model7d"}[(.key // "")]
+                        // ((.key // "window") | gsub("[^A-Za-z0-9_-]"; "_"))),
+            (.utilization_percent | round | tostring),
+            ((.resets_at | numbers | floor | tostring) // "-") ]
+        | @tsv' 2>/dev/null)" || out=''
+
+    test -n "${out}" || return 1
+    ec "${out}"
+}
+
 aliasfnq claude-code-usage-all-notify claude_code_usage_arm_p=y claude-code-usage-all
 #: The bare short names mean every profile, so their =-notify= twins do too.
 aliasfn claude-code-status-notify claude-code-usage-all-notify

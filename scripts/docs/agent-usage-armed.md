@@ -17,6 +17,9 @@ deadline over:
   `agy-status-continue-*` variants.
 - Anything else, and any agent whose own reset time you do not trust, goes
   through `agent-usage-continue-at <when>`, where you name the time yourself.
+- A reset that may come early or unannounced, as Codex's do, goes through
+  `agent-usage-reset-wait`, which waits on measured usage instead of a time.
+  See "Waiting for a measured reset" below.
 - A session can also arm itself ahead of time with the shared `/auto-continue`
   skill: a watcher per account polls the usage and, once it is blocked, arms
   this job with the registered sessions' own targets preset, no picker.
@@ -260,6 +263,8 @@ defaults live.
   is added per mechanism.
 - `agent_usage_arm_targets` -- preset targets, skipping the picker.
 - `agent_usage_arm_log` -- where fires are logged.
+- `agent_usage_reset_wait_poll_s`, `_drop_pts`, `_fail_warn_n`, `_retry_s`
+  and `_note` -- the measured wait's own; see "Waiting for a measured reset".
 
 ## The log
 
@@ -282,7 +287,8 @@ silent.
 
 Each agent wraps these with its own session list --
 `claude-code-usage-armed-cancel` / `-status`, `codex-status-armed-cancel` /
-`-status`, `agy-status-armed-cancel` / `-status` -- and
+`-status`, `agy-status-armed-cancel` / `-status`,
+`agent-usage-reset-wait-armed-cancel` / `-status` -- and
 `agent-usage-armed-sessions` prints every session any of them can live in,
 Claude's, Codex's, Antigravity's and the manual one, so a single call over
 that list sees them all.
@@ -383,10 +389,77 @@ enter cancels everything selected through `h-agent-usage-armed-cancel`;
 if nothing is armed it says so and does nothing, and selecting nothing
 cancels nothing.
 
+## Waiting for a measured reset
+
+`agent-usage-reset-wait [options] <codex|claude>` waits for a reset it can
+measure, not for a time the provider announced. Codex has reset limits early,
+at times its report did not predict, and a deadline job sleeps through those.
+This one reads the provider's usage every `--poll` (default 5 minutes) and
+fires once a watched window has visibly come back:
+
+- With `--below PCT`, once every watched window reads below PCT% used.
+  Without `--gauge`, the watched windows are those at or above PCT when it is
+  armed; if there are none, the condition already holds and nothing is armed.
+- Without `--below`, at the first measured reset of any watched window (all of
+  them, unless `--gauge` narrows it): a fall of more than
+  `agent_usage_reset_wait_drop_pts` points (20) between two readings, or the
+  reset time moving more than a minute later while the window was in use. An
+  unused window pushes its reset time on without resetting, hence the in-use
+  test. A reported reset time alone never counts.
+
+Windows are named `<account>.<window>`: the Codex auth alias or the Claude
+profile, then `5h`, `7d` or `model7d` (Claude's model-scoped weekly window).
+The readers are `h-codex-status-gauges` (`codex-status --json`, its
+`.quota.windows`) and `h-claude-code-usage-gauges` (`claude-code-usage-all
+--json --no-relogin`, skipping any profile with an error or a stale cache).
+Claude's five-hour window rolls over several times a day, so name the window
+there, e.g. `--gauge 'work.7d'`.
+
+When it fires it sends `QUOTA RESET (measured by agent-usage-reset-wait):
+<provider> <window> <before>% -> <now>%. <note>` to each `--to` target,
+through the delivery described above, idle gate included; with no target it
+only notifies. Three things differ from the deadline job:
+
+- A target it cannot reach, typically a Paseo agent that is busy at that
+  moment, is retried every poll for `agent_usage_reset_wait_retry_s` (2 hours).
+- After `agent_usage_reset_wait_fail_warn_n` (6) failed reads in a row, the
+  targets are told once that headroom is unknown, and the wait goes on.
+- `--max-wait DUR` ends it early, and the targets are told that no reset came.
+
+`--to self` names the calling Paseo agent (`PASEO_AGENT_ID`), and `--pick`
+adds targets from the `agent_usage_continue_via` picker. An agent outside
+Paseo runs it with `--fg` as a background task its own harness tracks: the
+command exits 0 at the reset and 124 at `--max-wait`, and that exit is what
+wakes the agent. A coordinator in Paseo waiting for Codex to come back below
+60% would arm:
+
+```zsh
+agent-usage-reset-wait --below 60 --to paseo:<agent-uuid> --name coord \
+    --note 'Re-read usage, then resume the paused work.' codex
+```
+
+`--dry-run` sends nothing and may poll faster than the usual 30-second floor,
+so it is the way to try the reader and the condition:
+
+```zsh
+agent-usage-reset-wait --fg --dry-run --below 1 --poll 5 --max-wait 20 codex
+```
+
+Detached, the wait lives in the tmux session `agent-usage-reset-wait-<name>`
+(`<name>` defaults to the provider), started from `$HOME` because it outlives
+the directory that armed it. Arming the same name again replaces it. The
+condition and the latest reading are recorded on the session, so
+`agent-usage-armed-status` and `agent-usage-reset-wait-armed-status [name]`
+show what it is waiting for, and `agent-usage-reset-wait-armed-cancel [name]`
+stops it. Arms and fires go to `agent_usage_arm_log`; the pane shows every
+reading.
+
 ## The caveat
 
-The job trusts the reset timestamp it was armed with, plus the grace, and does
-not re-check usage when it fires. If the endpoint lags behind its own reset
-time, or the limit is hit again in the meantime, the resume is spent on a
-session that is still blocked, and nothing remains armed afterwards. The
+The deadline job trusts the reset timestamp it was armed with, plus the grace,
+and does not re-check usage when it fires. If the endpoint lags behind its own
+reset time, or the limit is hit again in the meantime, the resume is spent on
+a session that is still blocked, and nothing remains armed afterwards. The
 notification and the log line still go out, so you can tell that it happened.
+The measured wait above does not have this problem, since it fires on a
+reading rather than a clock.
