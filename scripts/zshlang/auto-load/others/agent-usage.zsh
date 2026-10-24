@@ -280,8 +280,11 @@ function h-agent-usage-continue-send {
         #: pane: hours have passed since the pick. An agent already running
         #: was resumed by someone else, and one with a pending permission is
         #: waiting on you, not on the quota.
+        #: Both paseo calls run from home: this fires hours after the pick,
+        #: the directory it was armed from (often a worktree) may be gone by
+        #: then, and the paseo CLI (Node) dies at startup without one.
         local info why
-        if ! info="$(command paseo inspect "${agent_id}" --home "${home}" --json 2>/dev/null)" ; then
+        if ! info="$(builtin cd -q ~ && command paseo inspect "${agent_id}" --home "${home}" --json 2>/dev/null)" ; then
             ecerr "$0: Paseo agent ${agent_id} could not be inspected"
             return 1
         fi
@@ -297,8 +300,8 @@ function h-agent-usage-continue-send {
 
         #: Without `PASEO_AGENT_ID', which a job armed from inside a Paseo
         #: agent would otherwise pass on as the sender.
-        reval-ec command env -u PASEO_AGENT_ID paseo send "${agent_id}" \
-            --prompt "${text}" --no-wait --json --home "${home}"
+        ( builtin cd -q ~ && reval-ec command env -u PASEO_AGENT_ID paseo send "${agent_id}" \
+            --prompt "${text}" --no-wait --json --home "${home}" )
         return $?
     fi
 

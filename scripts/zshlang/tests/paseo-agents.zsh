@@ -140,6 +140,7 @@ expect-eq "${targets}" "paseo:${a_live}" 'a Paseo row maps to its own target'
 command mkdir -p -- "${t}/bin"
 cat > "${t}/bin/paseo" <<'SH'
 #!/bin/sh
+pwd -P >/dev/null 2>&1 || { printf 'no working directory\n' >> "${PASEO_TEST_LOG}" ; exit 1 ; }
 printf '%s\n' "$*" >> "${PASEO_TEST_LOG}"
 [ "$1" = inspect ] && printf '%s\n' "${PASEO_TEST_INSPECT}"
 [ "$1" = ls ] && printf '%s\n' "${PASEO_TEST_LS}"
@@ -166,6 +167,14 @@ for case in '{"Archived":true,"Status":"idle"}' '{"Archived":false,"Status":"run
     out="$(paseo-agents-test-send "${case}" "paseo:${a_idle}")"
     expect-eq "${out}" "refused"$'\n'"inspect ${a_idle} --home ${paseo_home} --json" "no send when ${case}"
 done
+
+#: Armed from a worktree that was removed before it fired: like Node's
+#: paseo, the stub fails without a working directory.
+command mkdir -p -- "${t}/gone"
+out="$(builtin cd -q -- "${t}/gone" && command rmdir -- "${t}/gone" &&
+    paseo-agents-test-send '{"Archived":false,"Status":"idle","PendingPermissions":[]}' "paseo:${a_idle}")"
+expect-eq "${out}" "inspect ${a_idle} --home ${paseo_home} --json"$'\n'"send ${a_idle} --prompt Continue. --no-wait --json --home ${paseo_home}" \
+    'a send armed from a removed directory still goes out'
 
 out="$(paseo-agents-test-send '{}' 'paseo:not-a-uuid')"
 expect-eq "${out}" refused 'a malformed id is refused before any call'
