@@ -57,6 +57,12 @@ that rewrite tracked dotfiles. In host-local configuration, ensure
 `~/.nightsh_private_first` that prepends Homebrew on every load can make
 `python` and `python3` select different environments.
 
+Miniforge supplies `conda` and `mamba`; it does not require a second micromamba
+installation. Verify both managers and run Python from `py314` through the
+manager as well as through the shell's PATH. The older Unix bootstrap's
+micromamba recipe is an alternative environment layout, not an additional
+required install on a Mac already using Miniforge.
+
 Install library manifests one requirement at a time into that environment,
 including the applicable Jupyter and script-specific manifests. Record failed
 requirements, then run `uv pip check --python ~/miniforge3/envs/py314/bin/python`.
@@ -75,6 +81,38 @@ For remote scripts, upload the whole file before executing it with SSH stdin
 closed. An installer reading a script's shared stdin can consume later commands.
 Require a final completion marker and validate outputs, especially when the
 remote path does not propagate nonzero exit status correctly.
+
+## Unix command-line baseline
+
+Audit the basic CLI list in the Unix bootstrap separately from language runtimes.
+In addition to the GNU tools and existing shell dependencies, install the
+applicable portable tools:
+
+```zsh
+brew install mosh tmate git-delta eza ugrep less aria2 htop bandwhich \
+  fribidi pv progress ncdu tealdeer tag wireguard-tools gnupg sox sdcv rm-improved
+```
+
+Check current formula metadata before installing old entries. A missing formula
+must be recorded explicitly; `hping` is no longer available under that name in
+Homebrew. `tmate` remains installable but is marked deprecated, so retain it
+only where that workflow is needed. Installing a networking CLI does not require
+enabling a server or changing the machine's network configuration.
+
+Homebrew's `util-linux` is keg-only. Expose just its `flock` in the user's bin
+directory if needed, and test mutual exclusion with a temporary lock file.
+Avoid force-linking the whole keg over macOS utilities.
+
+The active URL helpers also use the Nim programs from `setup/setup_misc`:
+install Nim and build `htmlmetadata` and `unalix` with Nimble, then test their
+entry points. Unalix can fail to build with Nim 2.2 because of its older
+sequence/tuple assumptions. Use a compatible compiler or transfer a working
+native binary after checking its libraries and checksum. Dereference Nimble
+launcher symlinks when transferring just an executable. Verify URL cleaning
+on an inert fixture before treating it as installed. Audit Dart, Julia, Lisp and
+other specialist runtime installs against the intended workflows; keep them explicitly optional when no required
+command depends on them. A current Homebrew Ruby does not require running the
+old RVM/Rails installer too.
 
 ## Services and login startup
 
