@@ -2,6 +2,8 @@
 // Uses LuaSkin's registered HSChooser conversion, without userdata layout casts.
 #import <Cocoa/Cocoa.h>
 #import <LuaSkin/LuaSkin.h>
+#import <dlfcn.h>
+#import <objc/message.h>
 #import <objc/runtime.h>
 
 static char originalColorKey;
@@ -10,10 +12,13 @@ static int queryColor(lua_State *L) {
     LuaSkin *skin = [LuaSkin sharedWithState:L];
     [skin checkArgs:LS_TUSERDATA, "hs.chooser", LS_TTABLE | LS_TNIL | LS_TOPTIONAL, LS_TBREAK];
     id chooser = [skin toNSObjectAtIndex:1];
-    if (![chooser respondsToSelector:NSSelectorFromString(@"queryField")]) {
+    SEL getter = sel_registerName("queryField");
+    if (![chooser respondsToSelector:getter]) {
         return luaL_error(L, "hs.chooser no longer exposes queryField");
     }
-    NSTextField *field = [chooser valueForKey:@"queryField"];
+    // Call the getter directly. valueForKey: would leave this image's constant
+    // key in Foundation's process-wide accessor cache.
+    NSTextField *field = ((id (*)(id, SEL))objc_msgSend)(chooser, getter);
     if (![field isKindOfClass:NSTextField.class]) {
         return luaL_error(L, "hs.chooser queryField is not a text field");
     }
@@ -37,6 +42,14 @@ static int queryColor(lua_State *L) {
 }
 
 int luaopen_chooser_input_color(lua_State *L) {
+    // hs.reload closes the Lua state, and package.loadlib's handle then
+    // dlcloses this image. Cocoa caches can still point into it (the old
+    // valueForKey: key segfaulted every reload), so keep it mapped for the life
+    // of the process.
+    Dl_info info;
+    if (dladdr((const void *)luaopen_chooser_input_color, &info) && info.dli_fname) {
+        dlopen(info.dli_fname, RTLD_NOW | RTLD_NODELETE);
+    }
     luaL_Reg functions[] = {{"color", queryColor}, {NULL, NULL}};
     luaL_newlib(L, functions);
     return 1;
