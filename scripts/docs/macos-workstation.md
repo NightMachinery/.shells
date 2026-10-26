@@ -170,6 +170,14 @@ repositories remain separate, deliberate migration steps.
 
 ## Workflow postflight
 
+Store-backed Brave extension payloads still need native activation. Open
+`brave://extensions/`, switch each requested extension on and handle any
+`Action Required` menu entry with `Enable Extension`. Scroll lower cards into
+view before clicking. Verify that every card says `On` after activation;
+payload presence or a successful automation call does not prove enablement.
+Install Brave-maintained uBlock Origin through
+`brave://settings/extensions/v2` and accept its native `Add extension` prompt.
+
 A working Hyper key still needs its tools' data. Install the emoji repository at
 `~/code/misc/unicode-emoji-json`, rebuild from the latest stable Unicode release
 and run its consistency tests. Reload the picker and test Hyper+A search/copy.
