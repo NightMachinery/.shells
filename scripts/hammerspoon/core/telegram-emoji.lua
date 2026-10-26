@@ -86,6 +86,31 @@ function T.payload(entry)
     return data
 end
 
+local function utf16Units(text)
+    local units=0
+    for _,code in utf8.codes(text) do units=units+(code>0xffff and 2 or 1) end
+    return units
+end
+
+-- One rich paste of several premium emoji. tdesktop's DeserializeTags reads
+-- count, then per tag offset, length (UTF-16 units) and a QString id; offsets
+-- must ascend without overlap. Each tag is checked against its saved payload.
+function T.combine(entries)
+    assert(#entries>0,"Choose at least one premium emoji")
+    local texts,tags,offset={}, {},0
+    for i,entry in ipairs(entries) do
+        local text=T.payload(entry)[textType]
+        local chars={}
+        for c in ("custom-emoji://"..entry.id.."?"..i):gmatch(".") do chars[#chars+1]=string.pack(">I2",c:byte()) end
+        local wide=table.concat(chars)
+        local units=utf16Units(text)
+        tags[#tags+1]=string.pack(">i4i4I4",offset,units,#wide)..wide
+        texts[#texts+1]=text;offset=offset+units
+    end
+    local text=table.concat(texts)
+    return {[tagsType]=string.pack(">i4",#entries)..table.concat(tags),[textType]=text,["public.utf8-plain-text"]=text}
+end
+
 function T.catalogEntry(raw, folder)
     assert(type(raw.id)=="string" and raw.id:match("^%d+$"),"Catalog IDs must be decimal strings")
     assert(type(raw.alt)=="string" and #raw.alt>0,"Catalog emoji needs fallback text")
@@ -101,6 +126,7 @@ function T.catalogEntry(raw, folder)
     entry.setTitle=raw.setTitle or ""
     entry.setShortName=raw.setShortName or ""
     entry.recentRank=tonumber(raw.recentRank)
+    if raw.installed==false then entry.installed=false end
     local png=raw.png or ("png/"..raw.id.."-128.png")
     if type(png)=="string" and png:match("^png/%d+%-%d+[%w%-]*%.png$") then
         local path=folder.."/"..png
@@ -127,6 +153,8 @@ end
 
 -- Export is maintained by an opt-in Purple setting. Never discover sockets,
 -- inspect encrypted account caches, or wake the client to open this chooser.
+local catalogContent,catalogData
+
 -- The second result describes the catalog for the placeholder: state is
 -- "ok", "missing" or "invalid", and modified is its mtime when present.
 function T.entries()
@@ -138,7 +166,12 @@ function T.entries()
     local f=io.open(path,"r")
     if f then
         local content=f:read("*a");f:close()
-        local ok,catalog=pcall(hs.json.decode,content)
+        -- A catalog can hold thousands of entries; decode it only when it changes.
+        local ok,catalog=true,catalogData
+        if content~=catalogContent then
+            ok,catalog=pcall(hs.json.decode,content)
+            catalogContent,catalogData=ok and content or nil,ok and catalog or nil
+        end
         status.state="invalid"
         if ok and type(catalog)=="table" and catalog.version==1 and type(catalog.entries)=="table" then
             status.state="ok"
@@ -169,6 +202,10 @@ function T.entries()
             if not br then return true end
             return ar<br
         end
+        -- Packs the account has not installed follow installed ones; entries
+        -- without the optional flag keep catalog order.
+        local ai,bi=a.installed~=false,b.installed~=false
+        if ai~=bi then return ai end
         return a.order<b.order
     end)
     for rank,entry in ipairs(entries) do entry.rank=rank end
@@ -199,19 +236,36 @@ function T.placeholder(count,status,now)
     return table.concat(parts," · ")
 end
 
+local kAlertId="telegram-emoji-chooser"
+
 function telegramEmojiChooser()
     local app=hs.application.frontmostApplication()
     local bundle=app and (app:bundleID() or ""):lower() or ""
     local paste=bundle:find("telegram",1,true) or bundle:find("tdesktop",1,true)
     local recent=ChooserSearch.recent("telegram-emoji")
+    -- Shift+Enter collects several emoji for one rich paste, as in Hyper+A.
+    local selected={}
+    local function updateAlert()
+        if #selected==0 then alert_gateway_dismiss(kAlertId);return end
+        local text={}
+        for i,entry in ipairs(selected) do text[i]=entry.emoji end
+        alert_gateway(table.concat(text),{id=kAlertId,seconds=math.huge,screens="typing"})
+    end
     local chooser=ChooserSearch.new(function(choice)
-        if not choice then return end
+        local entries=selected
+        if #entries==0 then
+            if not choice then return end
+            entries={choice.entry}
+        elseif not choice then return end
+        selected={}
         local ok,err=pcall(function()
-            local data=T.payload(choice.entry)
+            local data=#entries==1 and T.payload(entries[1]) or T.combine(entries)
             local previous=paste and hs.pasteboard.readAllData() or nil
             assert(hs.pasteboard.writeAllData(data),"Clipboard write failed")
             local written=hs.pasteboard.changeCount()
-            recent.record({choice.entry.id})
+            local ids={}
+            for i,entry in ipairs(entries) do ids[i]=entry.id end
+            recent.record(ids)
             if paste then
                 doPaste()
                 hs.timer.doAfter(0.5,function()
@@ -236,13 +290,39 @@ function telegramEmojiChooser()
         chooser:placeholderText(T.placeholder(#rows,status))
         ChooserSearch.setChoices(chooser,rows)
     end
-    local save=hs.hotkey.bind("cmd","s",function()
-        local ok,err=pcall(T.captureClipboard)
-        if ok then refresh() else alert_gateway(tostring(err),{color="warn"}) end
-    end)
-    chooser:hideCallback(function()save:delete()end)
+    local function addCurrent()
+        local choice=chooser:selectedRowContents()
+        if choice and choice.entry then selected[#selected+1]=choice.entry;updateAlert() end
+    end
+    local function removeLast()
+        if #selected>0 then table.remove(selected);updateAlert() end
+    end
+    local hotkeys={
+        save=hs.hotkey.bind("cmd","s",function()
+            local ok,err=pcall(T.captureClipboard)
+            if ok then refresh() else alert_gateway(tostring(err),{color="warn"}) end
+        end),
+        add=hs.hotkey.bind("shift","return",addCurrent),
+        shiftTab=hs.hotkey.bind("shift","tab",removeLast),
+        backslash=hs.hotkey.bind("","\\",removeLast),
+    }
+    -- Carbon hotkeys can latch Shift+Delete; read each key-down, as Hyper+A does.
+    local deleteTap=hs.eventtap.new({hs.eventtap.event.types.keyDown},function(event)
+        local flags=event:getFlags()
+        if event:getKeyCode()==51 and flags.shift and not (flags.cmd or flags.alt or flags.ctrl) then
+            removeLast();return true
+        end
+        return false
+    end):start()
+    local function cleanup()
+        deleteTap:stop()
+        for _,hotkey in pairs(hotkeys) do hotkey:delete() end
+        selected={}
+        alert_gateway_dismiss(kAlertId)
+    end
+    ChooserSearch.onHide(chooser,cleanup)
     local ok,err=pcall(refresh)
-    if not ok then save:delete();alert_gateway(tostring(err),{color="warn"});return end
+    if not ok then cleanup();alert_gateway(tostring(err),{color="warn"});return end
     chooser:show()
 end
 hyper_bind_v2{mods={"shift"},key="a",pressedfn=telegramEmojiChooser}

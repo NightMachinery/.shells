@@ -50,11 +50,97 @@ env.io={open=function(path)
 end}
 env.hs.json={decode=function(text)assert(text=='catalog');return catalog end}
 env.hs.fs.attributes=function()return nil end
+local decodes=0
+env.hs.json={decode=function(text)assert(text=='catalog');decodes=decodes+1;return catalog end}
 local entries,status=T.entries()
 assert(status.state=='ok' and #entries==3)
+T.entries();assert(decodes==1,'An unchanged catalog is decoded once')
 assert(entries[1].id=='33' and entries[2].id=='22' and entries[3].id=='11','Telegram recent order first, then catalog order')
 assert(entries[1].rank==1 and entries[3].rank==3)
+catalog={version=1,entries={{id='44',alt='😀',installed=false},{id='55',alt='🙂'}}}
+env.io.open=function(path)
+    if path=='/inert/catalog.json' then return {read=function()return 'catalog2' end,close=function()end} end
+end
+env.hs.json={decode=function()return catalog end}
+local installed=T.entries()
+assert(installed[1].id=='55' and installed[2].id=='44','Packs the account has not installed come last')
 env.io.open=function()end
 local none,missing=T.entries()
 assert(#none==0 and missing.state=='missing')
+-- Several emoji in one rich paste, decoded as tdesktop's DeserializeTags reads it.
+local first=T.catalogEntry({id='111',alt='😍'},'/inert')
+local second=T.catalogEntry({id='222',alt='🙂‍↔️'},'/inert')
+local combined=T.combine({first,second,first})
+local raw=combined[key]
+local count,pos=string.unpack('>i4',raw)
+assert(count==3)
+local expectText='😍🙂‍↔️😍'
+assert(combined['public.utf8-plain-text']==expectText and combined['com.trolltech.anymime.application--x-td-field-text']==expectText)
+local decoded,previousEnd={},0
+for _=1,count do
+    local offset,length,bytes;offset,length,bytes,pos=string.unpack('>i4i4I4',raw,pos)
+    local id={}
+    for i=pos,pos+bytes-1,2 do id[#id+1]=string.char((string.unpack('>I2',raw,i))) end
+    pos=pos+bytes
+    assert(offset==previousEnd and length>0,'Tags ascend without gaps or overlap')
+    previousEnd=offset+length
+    decoded[#decoded+1]=table.concat(id)
+end
+assert(pos==#raw+1 and previousEnd==2+5+2,'Tags cover the UTF-16 length of the whole text')
+assert(decoded[1]:match('^custom%-emoji://111%?%d+$') and decoded[2]:match('^custom%-emoji://222%?') and decoded[3]:match('^custom%-emoji://111%?'))
+assert(not pcall(T.combine,{}))
+assert(not pcall(T.combine,{{id='999',clipboard=first.clipboard}}),'Each tag is checked against its saved payload')
+-- Chooser keys with stubs: Shift+Enter collects, Shift+Backspace removes, Enter pastes all.
+catalog={version=1,entries={{id='111',alt='😍',setTitle='Inert set'},{id='222',alt='🙂',setTitle='Inert set'}}}
+env.io.open=function(path)
+    if path=='/inert/catalog.json' then return {read=function()return 'catalog3' end,close=function()end} end
+end
+env.hs.json={decode=function()return catalog end}
+local keys,tap,chooser,alertText,pasted,clip={},nil,nil,nil,0,nil
+local recorded
+env.ChooserSearch={
+    recent=function()return {sort=function(rows,_,fallback)table.sort(rows,fallback)end,record=function(ids)recorded=ids end}end,
+    new=function(complete)
+        chooser={complete=complete,rows={},selected=1}
+        function chooser:placeholderText(t)self.placeholder=t end
+        function chooser:selectedRowContents()return self.rows[self.selected] end
+        function chooser:hideCallback(fn)self.onHide=fn end
+        function chooser:show()self.visible=true end
+        return chooser
+    end,
+    setChoices=function(c,rows)c.rows=rows end,
+    onHide=function(c,fn)c:hideCallback(fn) end,
+}
+env.emojiChooserAliases=function()return {} end
+env.emojiChooserAliasesFor=function()return {} end
+env.emojiChooserImage=function()return nil end
+env.alert_gateway=function(text)alertText=text end
+env.alert_gateway_dismiss=function()alertText=nil end
+env.doPaste=function()pasted=pasted+1 end
+env.hs.application={frontmostApplication=function()return {bundleID=function()return 'org.telegram.desktop' end}end}
+env.hs.pasteboard={readAllData=function()return {previous=true} end,writeAllData=function(d)clip=d;return true end,changeCount=function()return 1 end}
+env.hs.timer={doAfter=function()end}
+env.hs.hotkey={bind=function(mods,key,fn)
+    local hk={delete=function(self)self.deleted=true end}
+    keys[(type(mods)=='table' and table.concat(mods,' ') or mods)..':'..key]={fn=fn,hk=hk};return hk
+end}
+env.hs.eventtap={event={types={keyDown=10}},new=function(_,fn)
+    tap={callback=fn,start=function(self)self.running=true;return self end,stop=function(self)self.running=false end};return tap
+end}
+env.telegramEmojiChooser()
+assert(chooser.visible and chooser.placeholder:find('2 emoji',1,true))
+keys['shift:return'].fn();chooser.selected=2;keys['shift:return'].fn();keys['shift:return'].fn()
+assert(alertText=='😍🙂🙂')
+local shiftDelete={getKeyCode=function()return 51 end,getFlags=function()return {shift=true} end}
+assert(tap.callback(shiftDelete) and alertText=='😍🙂','Shift+Backspace removes the last pick')
+assert(not tap.callback({getKeyCode=function()return 51 end,getFlags=function()return {} end}))
+chooser.complete(chooser.rows[1])
+assert(clip['public.utf8-plain-text']=='😍🙂' and pasted==1,'Enter pastes the whole selection, not the highlight')
+assert(select(1,string.unpack('>i4',clip[key]))==2 and recorded[1]=='111' and recorded[2]=='222')
+chooser.onHide()
+assert(not tap.running and alertText==nil,'Closing releases the tap and the tally')
+for _,binding in pairs(keys) do assert(binding.hk.deleted) end
+keys={};env.telegramEmojiChooser();chooser.selected=2
+chooser.complete(chooser.rows[2])
+assert(clip['public.utf8-plain-text']=='🙂' and select(1,string.unpack('>i4',clip[key]))==1,'Without a selection Enter pastes the highlight alone')
 print('TELEGRAM_EMOJI_PAYLOAD_TESTS_PASSED')

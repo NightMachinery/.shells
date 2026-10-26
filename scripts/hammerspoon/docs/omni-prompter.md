@@ -135,10 +135,12 @@ or client automation is invoked by opening this chooser.
 
 The catalog contract is version 1 with an `entries` array. IDs are decimal
 strings; entries include `alt`, `setTitle`, `setShortName`, `recentRank` and an
-optional relative `png` path. Default icons are `png/<id>-128.png`. Client recent
-order comes first, then installed-set order; emoji you picked recently in this
-chooser come before both. The placeholder shows the row count and whether the
-catalog is missing, unreadable or more than a day old. Pack PNGs are cached
+optional relative `png` path, plus an optional `installed` flag. Default icons
+are `png/<id>-128.png`. Emoji you picked recently in this chooser come first,
+then client recent order, then installed sets, then packs marked
+`installed: false`, each in catalog order. The placeholder shows the row count
+and whether the catalog is missing, unreadable or more than a day old. The
+catalog is decoded again only when its bytes change, and pack PNGs are cached
 until their mtime changes. Search includes Unicode names,
 set titles, short names and aliases. `NIGHT_TELEGRAM_EMOJI_CATALOG` or the
 Hammerspoon setting `telegramEmoji.catalogPath` can select another export path.
@@ -149,6 +151,14 @@ it explicitly. The personal library is `~/.local/share/night-emoji/telegram.json
 its Qt rich clipboard tag, Unicode fallback, optional name and aliases. The
 picker does not inspect account/session stores or messages. Saved entries remain
 usable while Purple or its export feature is off.
+
+Shift+Enter adds the highlighted emoji to a selection shown as a tally, and
+Shift+Backspace, Shift+Tab or backslash removes the last one, as in Hyper+A.
+Enter then pastes the whole selection as one rich paste: the text of every emoji
+with one custom-emoji tag each, at ascending UTF-16 offsets, the layout tdesktop's
+`DeserializeTags` accepts. Without a selection Enter pastes the highlighted
+emoji. A multi-emoji paste has not yet been tried in the real client, and
+Telegram may cap custom emoji per message.
 
 Choosing an entry in Telegram restores its rich clipboard types and presses
 Cmd+V without sending. The old clipboard is restored after the paste if no newer
