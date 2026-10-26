@@ -183,7 +183,9 @@ review the hooks through the provider's normal interface.
 The shared Claude settings use `/usr/local/libexec/claude-askpass`. Install
 `pinentry-mac`, and link that path to `configFiles/claude-code/askpass.py` with
 executable permissions. Its password dialog is an owner interaction; do not
-invoke it during unattended setup. Install the enabled official clangd plugin
+invoke it during unattended setup. The shared settings declare the official
+`anthropics/claude-plugins-official` marketplace so new hosts discover the same
+plugin catalog. Install the enabled official clangd plugin
 with `claude plugin install clangd-lsp --marketplace
 anthropics/claude-plugins-official --json`, and check the installed payload plus
 the `clangd` executable separately from account login. Keep the tracked settings
