@@ -218,6 +218,28 @@ function dates {
     done
 }
 
+function h-tz-convert {
+    #: Usage: h-tz-convert FROM_TZ TO_TZ HOUR[:MINUTE]
+    #: Converts a wall-clock time of today in FROM_TZ to TO_TZ.
+    local from="$1" to="$2" t="$3"
+    if ! [[ "${t}" =~ '^[0-9]{1,2}(:[0-9]{1,2})?$' ]] ; then
+        ecerr "$0: expected HOUR[:MINUTE], got: ${t}"
+        return 1
+    fi
+    [[ "${t}" == *:* ]] || t="${t}:00"
+    TZ="${to}" command gdate --date="TZ=\"${from}\" ${t}" +'%H:%M %a (UTC%z)'
+}
+
+function tehran2germany {
+    h-tz-convert 'Asia/Tehran' 'Europe/Berlin' "$@"
+}
+aliasfn t2g tehran2germany
+
+function germany2tehran {
+    h-tz-convert 'Europe/Berlin' 'Asia/Tehran' "$@"
+}
+aliasfn g2t germany2tehran
+
 function date-italy {
     TZ='Europe/Rome' date +'%Y-%m-%d %A %H:%M:%S'
 }
