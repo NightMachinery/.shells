@@ -136,7 +136,10 @@ or client automation is invoked by opening this chooser.
 The catalog contract is version 1 with an `entries` array. IDs are decimal
 strings; entries include `alt`, `setTitle`, `setShortName`, `recentRank` and an
 optional relative `png` path. Default icons are `png/<id>-128.png`. Client recent
-order comes first, then installed-set order. Search includes Unicode names,
+order comes first, then installed-set order; emoji you picked recently in this
+chooser come before both. The placeholder shows the row count and whether the
+catalog is missing, unreadable or more than a day old. Pack PNGs are cached
+until their mtime changes. Search includes Unicode names,
 set titles, short names and aliases. `NIGHT_TELEGRAM_EMOJI_CATALOG` or the
 Hammerspoon setting `telegramEmoji.catalogPath` can select another export path.
 

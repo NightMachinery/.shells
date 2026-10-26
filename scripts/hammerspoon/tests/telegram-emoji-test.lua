@@ -32,4 +32,29 @@ T.mergeMetadata(recent,{setTitle='Installed pack',setShortName='InstalledPack',i
 assert(T.packName(recent)=='Installed pack' and recent.icon=='/inert.png' and recent.recentRank==1)
 T.mergeMetadata(recent,{setTitle='Different pack'})
 assert(T.packName(recent)=='Installed pack','A duplicate must not overwrite known pack metadata')
+assert(T.placeholder(1,{state='missing'})=='Telegram premium emoji · 1 emoji · no Purple catalog yet · Cmd+S: save copied emoji')
+assert(T.placeholder(3,{state='invalid'}):find('3 emoji · Purple catalog unreadable',1,true))
+assert(T.placeholder(2,{state='ok',modified=0},86400*3):find('catalog 3d old',1,true))
+assert(not T.placeholder(2,{state='ok',modified=100},200):find('old',1,true))
+local mtime,loads=1,0
+env.hs.fs.attributes=function()return mtime end
+env.hs.image={imageFromPath=function(path)loads=loads+1;return path..loads end}
+assert(T.icon('/inert/a.png')=='/inert/a.png1' and T.icon('/inert/a.png')=='/inert/a.png1' and loads==1,'Unchanged icons are cached')
+mtime=2;assert(T.icon('/inert/a.png')=='/inert/a.png2','A changed icon is reloaded')
+mtime=nil;assert(T.icon('/inert/a.png')==nil,'A deleted icon falls back to the Unicode preview')
+-- Inert catalog through stubbed io: the real personal library is never opened.
+local catalog={version=1,entries={{id='22',alt='😍',recentRank=2},{id='11',alt='🙂',setTitle='Inert set'},{id='33',alt='😀',recentRank=1}}}
+env.os={getenv=function(k)return k=='NIGHT_TELEGRAM_EMOJI_CATALOG' and '/inert/catalog.json' or nil end,time=os.time}
+env.io={open=function(path)
+    if path=='/inert/catalog.json' then return {read=function()return 'catalog' end,close=function()end} end
+end}
+env.hs.json={decode=function(text)assert(text=='catalog');return catalog end}
+env.hs.fs.attributes=function()return nil end
+local entries,status=T.entries()
+assert(status.state=='ok' and #entries==3)
+assert(entries[1].id=='33' and entries[2].id=='22' and entries[3].id=='11','Telegram recent order first, then catalog order')
+assert(entries[1].rank==1 and entries[3].rank==3)
+env.io.open=function()end
+local none,missing=T.entries()
+assert(#none==0 and missing.state=='missing')
 print('TELEGRAM_EMOJI_PAYLOAD_TESTS_PASSED')

@@ -127,16 +127,21 @@ end
 
 -- Export is maintained by an opt-in Purple setting. Never discover sockets,
 -- inspect encrypted account caches, or wake the client to open this chooser.
+-- The second result describes the catalog for the placeholder: state is
+-- "ok", "missing" or "invalid", and modified is its mtime when present.
 function T.entries()
     local path=os.getenv("NIGHT_TELEGRAM_EMOJI_CATALOG") or
         hs.settings.get("telegramEmoji.catalogPath") or
         (os.getenv("HOME").."/Library/Caches/Purple/emoji-export/catalog.json")
     local entries,seen={},{}
+    local status={state="missing",modified=hs.fs.attributes(path,"modification")}
     local f=io.open(path,"r")
     if f then
         local content=f:read("*a");f:close()
         local ok,catalog=pcall(hs.json.decode,content)
+        status.state="invalid"
         if ok and type(catalog)=="table" and catalog.version==1 and type(catalog.entries)=="table" then
+            status.state="ok"
             local folder=path:match("^(.*)/[^/]+$")
             for index,raw in ipairs(catalog.entries) do
                 local valid,entry=pcall(T.catalogEntry,raw,folder)
@@ -166,7 +171,32 @@ function T.entries()
         end
         return a.order<b.order
     end)
-    return entries
+    for rank,entry in ipairs(entries) do entry.rank=rank end
+    return entries,status
+end
+
+-- Pack PNGs are reread only when their mtime changes.
+local icons={}
+function T.icon(path)
+    local modified=hs.fs.attributes(path,"modification")
+    local cached=icons[path]
+    if not cached or cached.modified~=modified then
+        cached={modified=modified,image=modified and hs.image.imageFromPath(path) or nil}
+        icons[path]=cached
+    end
+    return cached.image
+end
+
+function T.placeholder(count,status,now)
+    local parts={"Telegram premium emoji",count==1 and "1 emoji" or (count.." emoji")}
+    if status.state=="missing" then parts[#parts+1]="no Purple catalog yet"
+    elseif status.state=="invalid" then parts[#parts+1]="Purple catalog unreadable"
+    elseif status.modified then
+        local days=math.floor(((now or os.time())-status.modified)/86400)
+        if days>=1 then parts[#parts+1]="catalog "..days.."d old" end
+    end
+    parts[#parts+1]="Cmd+S: save copied emoji"
+    return table.concat(parts," · ")
 end
 
 function telegramEmojiChooser()
@@ -194,19 +224,22 @@ function telegramEmojiChooser()
     local function refresh()
         local rows={}
         local aliases=emojiChooserAliases()
-        for _,entry in ipairs(T.entries()) do
-            local image=entry.icon and hs.image.imageFromPath(entry.icon) or emojiChooserImage(entry.emoji)
+        local entries,status=T.entries()
+        for _,entry in ipairs(entries) do
+            local image=entry.icon and T.icon(entry.icon) or emojiChooserImage(entry.emoji)
             local subtitle=T.packName(entry)
             rows[#rows+1]={text=entry.name,subText=subtitle,
                            image=image,entry=entry,searchText=entry.emoji.." "..(entry.setTitle or "").." "..(entry.setShortName or "").." "..table.concat(entry.aliases or {}," ").." "..table.concat(emojiChooserAliasesFor(aliases,entry.emoji)," ")}
         end
+        -- Your own picks first, then Telegram's recent order, then the catalog.
+        recent.sort(rows,function(row)return row.entry.id end,function(a,b)return a.entry.rank<b.entry.rank end)
+        chooser:placeholderText(T.placeholder(#rows,status))
         ChooserSearch.setChoices(chooser,rows)
     end
     local save=hs.hotkey.bind("cmd","s",function()
         local ok,err=pcall(T.captureClipboard)
         if ok then refresh() else alert_gateway(tostring(err),{color="warn"}) end
     end)
-    chooser:placeholderText("Telegram premium emoji... [cached; Cmd+S: save copied emoji]")
     chooser:hideCallback(function()save:delete()end)
     local ok,err=pcall(refresh)
     if not ok then save:delete();alert_gateway(tostring(err),{color="warn"});return end
