@@ -139,10 +139,16 @@ For login startup, create a user LaunchAgent invoking the Homebrew Zsh with
 not with KeepAlive: its child services have their own lifecycle. Capture logs.
 The profile leaves scheduled maintenance to a separate, deliberate setup.
 
-Hammerspoon's config needs Lua 5.4 rocks `penlight`, `luaposix` and
-`lrexlib-PCRE2`. Use the per-user rock tree and the matching Lua version. Link
+Hammerspoon's config needs Lua 5.4 rocks `penlight`, `luaposix`,
+`lrexlib-PCRE2` and `redis-lua` (which installs LuaSocket). Use the per-user
+rock tree and the matching Lua version. Link
 `~/.hammerspoon/init.lua` to `../scripts/hammerspoon/boot.lua`. Accessibility,
 Automation and input permissions are granted separately through macOS.
+After reloading, check that both `hyper_modality` and `hyper_toggler_1` exist
+and that `hammerspoonReloadHeldBy` is defined at the end of the configuration.
+The IPC channel can work even when an earlier missing module stopped startup.
+Finish with a physical Fn plus Hyper shortcut test; a successful HID map
+readback alone does not verify the shortcut.
 
 After cloning vcsh, audit tracked symlinks for paths into the source user's
 home. Back up conflicting files before checkout. Fetch updates from the same
@@ -161,3 +167,89 @@ Generate agent instructions with [agfi:agents-md-sync] and install the available
 skill links with [agfi:agent-skills-link]. Keep generated global instruction
 files managed by those helpers. Provider sign-ins and private skill/config
 repositories remain separate, deliberate migration steps.
+
+## Workflow postflight
+
+A working Hyper key still needs its tools' data. Install the emoji repository at
+`~/code/misc/unicode-emoji-json`, rebuild from the latest stable Unicode release
+and run its consistency tests. Reload the picker and test Hyper+A search/copy.
+Migrate `~/notes`, `~/base/dicts`, `~/.stardict` and `~/.sdcv_ordering` when required,
+preserving symlinks and destination changes. Check actual English, Persian and
+German lookups through the shell helpers after checksum verification.
+
+The GUI launcher [agfi:emc-launch-gui] uses the existing emacs-plus installation
+when available, then `/Applications/Emacs.app`. `NIGHT_EMACS_APP` can select an
+explicit executable. Verify this path without launching a second GUI instance.
+An absent Homebrew formula must never turn an empty cellar path into a root
+glob: checking automounted directories under `/` can stall a graphical launch.
+
+Emacs.app and Doom are separate installs. Bring over the pinned Doom base and
+configuration, initialize loaded submodules, install packages and native modules,
+and verify a real daemon plus GUI startup. Wait for the completed Doom startup
+and its server restart before evaluating through emacsclient, then require an
+artifact written by Emacs itself. An early socket and a zero client status can
+precede a dropped request during server restart. For mail follow `~/doom.d/docs/email.md`:
+private identity, destination Keychain password, notmuch/isync/msmtp/flock,
+LaunchAgent, completed server sync and inbox access. Never use an unsolicited
+outgoing test message as validation.
+
+Install AltTab and Maccy, copy the patched Homerow bundle, and migrate their
+preference domains after backing up destination settings. Adapt home paths and
+verify shortcuts and macOS permissions. Maccy's settings do not require copying
+clipboard history.
+
+Private startup can run [agfi:v2-on], private `xray-run` proxy sessions,
+[agfi:clipboard-remote-listen] and the html-reports `ctl-mem` loop. Install xray,
+gost and the Python/Go helpers before enabling them. Check live tmux panes,
+loopback listeners and repeat startup without duplicate services. Keep proxy
+URLs outside this public repository.
+
+Deploy the memory panel with its own device config and owner-only access,
+private Unix sockets, Caddy and Tailscale Serve. Check both its HTTPS page and
+health endpoint. Set launchd's PATH explicitly to the Python environment with
+PyYAML and TOML support; a successful interactive build does not verify launchd.
+Use the public-network pf installer with explicit `--tailscale --ipv6`, verify
+its active rules and persistence, then test Mosh through both pf and the macOS
+application firewall. See [tailscale-setup.md](tailscale-setup.md).
+
+
+## App data and keyboard postflight
+
+Install the requested desktop apps explicitly, including DeltaChat, NordVPN,
+Throne, Skim and Thunderbird when those workflows are needed. Homebrew can
+continue other casks after a package installer fails, so verify every bundle.
+For a privileged package use the required `sudo -kA /usr/sbin/installer` path
+and verify its signed app; do not infer success from a remote exit status.
+
+Thunderbird profile and credential migration requires explicit owner approval
+for each destination. With Thunderbird closed on both Macs, copy
+`~/Library/Thunderbird/` directly, excluding process locks and backing up target
+files privately. Check file hashes, configured profile paths, `key4.db`,
+`cert9.db` and `logins.json`; keep the encryption database and encrypted logins
+together. Adapt old absolute home paths. A Primary Password may still need to be
+entered locally. Do not send test mail or open a nonempty Outbox automatically.
+
+Handy's app bundle alone is insufficient: copy its settings store from
+`~/Library/Application Support/com.pais.handy/` and the selected model's actual
+cache. Custom GGUF models can live in the Hugging Face cache under
+`~/.cache/huggingface/hub/models--OWNER--MODEL/`; preserve both blobs and snapshot
+symlinks. Verify the selected file resolves after copying. Settings/models do
+not require transferring recordings or transcription history.
+
+On Touch Bar hardware, use `PresentationModeGlobal=functionKeys` in
+`com.apple.touchbar.agent` and `com.apple.keyboard.fnState=true` when permanent
+F1–F12 is wanted. Back up those keys, restart TouchBarServer and test the physical
+row together with the Fn-to-Hyper mapping.
+
+Enable the macOS application firewall and stealth mode alongside the pf filter,
+then verify the necessary app-specific allowances, especially Mosh. Do not
+select block-all when the intended workstation services need incoming access.
+For broken Settings search, reproduce a real typed query and check language,
+region and input-source registration before considering a disk-wide index
+rebuild. A preference-refresh workaround is an experiment until actual results
+appear; restore unsuccessful experiments and retain a precise open issue.
+
+Use direct resumable transfers for ordinary data with targeted destination
+backups. Consistency snapshots may be useful for live databases or images;
+keep them only through verified acceptance, then remove the owned snapshot.
+Retain small manifests and results, rather than permanent payload staging.

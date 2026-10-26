@@ -10,25 +10,25 @@ function emc-launch-gui {
         opts+='--debug-init'
     fi
 
-    local emacs_dir
-    emacs_dir="$(eval-memoi brew --cellar emacs-plus@29)"
-    if ! test -d "$emacs_dir" ; then
-        if true || isDeus ; then # doing deus will make the common case very slow, as =brew --cellar emacs-plus= keeps returning a non-existent directory
-            emacs_dir="$(eval-memoi brew --cellar emacs-plus@29)" # @hardcoded
-        else
-            reval-ec deus "$0" "$@"
-            return $?
+    local emacs_app="${NIGHT_EMACS_APP:-}"
+    if [[ -z "$emacs_app" ]] ; then
+        local emacs_dir
+        emacs_dir="$(eval-memoi brew --cellar emacs-plus@29 2>/dev/null)"
+        local candidates=()
+        #: An absent formula returns no path. Globbing it would search /* and
+        #: can hang on an automounted network directory during a GUI launch.
+        if [[ -n "$emacs_dir" && -d "$emacs_dir" ]] ; then
+            candidates=( "$emacs_dir"/*/Emacs.app/Contents/MacOS/Emacs(N) )
+        fi
+        if (( ${#candidates} > 0 )) ; then
+            emacs_app="${candidates[1]}"
+        elif [[ -x /Applications/Emacs.app/Contents/MacOS/Emacs ]] ; then
+            emacs_app=/Applications/Emacs.app/Contents/MacOS/Emacs
         fi
     fi
-
-    local emacs_app
-    emacs_app=( "$emacs_dir"/*/Emacs.app/Contents/MacOS/Emacs(N) )
-    if (( ${#emacs_app} == 0 )) ; then
-        ectrace_ret=127 ectrace "$0: No Emacs.app found; emacs_dir=${emacs_dir}"
+    if [[ -z "$emacs_app" || ! -x "$emacs_app" ]] ; then
+        ectrace_ret=127 ectrace "$0: No executable Emacs.app found; set NIGHT_EMACS_APP to its executable"
         return $?
-    elif (( ${#emacs_app} > 1 )) ; then
-        ecgray "$0: more than one Emacs.app found"
-        emacs_app="${emacs_app[1]}"
     fi
 
     retry ensure-redis @RET
