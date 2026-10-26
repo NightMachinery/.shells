@@ -2,6 +2,12 @@ function ensure-dep-pdftk {
     ensure-dep1 pdftk brew install pdftk-java || return $?
 }
 ##
+function ensure-dep-brightness {
+    #: nriley brightness: the IOKit backend for built-in panels, and the display
+    #: listing every blackout starts from. See [agfi:brightness-displays-internal].
+    ensure-dep1 brightness brew install brightness || return $?
+}
+##
 function ensure-dep-m1ddc {
     #: DDC/CI brightness for external displays; Apple Silicon only.
     #: See [agfi:brightness-displays-ddc].
