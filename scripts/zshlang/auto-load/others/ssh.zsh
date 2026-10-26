@@ -40,21 +40,33 @@ function firewall-allow-mosh-darwin() {
   #: SSH are unaffected. Normally macOS would ask, but mosh-server is spawned
   #: over ssh with no GUI session to ask in, so it defaults to deny.
   #:
-  #: The global off/on toggle is not superstition: ALF ignores --add and
-  #: --unblockapp while it is running.
-  #: https://github.com/mobile-shell/mosh/issues/898
+  #: No global off/on toggle around --add: the old advice that ALF ignores
+  #: --add and --unblockapp while running (mosh issue 898, 2017) did not hold
+  #: on Darwin 23 in 2026-10, where the plain sequence below fixed a live
+  #: failure. A toggle would also leave the firewall OFF if we died between
+  #: the two calls.
   #:
-  #: @warn RE-RUN AFTER EVERY `brew upgrade mosh`. We register the resolved
-  #: Cellar path, which is version-stamped (.../Cellar/mosh/<ver>/bin/mosh-server),
-  #: so an upgrade silently invalidates the registration and mosh starts hanging
-  #: again. `--check` is the cheap way to confirm.
+  #: @warn RE-RUN WHENEVER MOSH HANGS, and after every `brew upgrade mosh`.
+  #: We register the resolved Cellar path, which is version-stamped
+  #: (.../Cellar/mosh/<ver>/bin/mosh-server), so an upgrade invalidates the
+  #: registration. But an entry has also gone stale with no upgrade at all,
+  #: while ALF kept listing it as allowed.
+  #:
+  #: So `--check` is NOT proof: it reports only what ALF claims, and that
+  #: claim said "permitted" while every packet was being dropped. `--probe`
+  #: is the real test: it has a peer send UDP to a disposable mosh-server and
+  #: counts the bytes that arrive.
   #:
   #: This is only one of two layers. A peer reaching us over Tailscale also
   #: needs the pf anchor to pass 100.64.0.0/10; see
   #: [[NIGHTDIR:launchers/pf/install.org]].
   #:
-  #: @usage firewall-allow-mosh-darwin          #: register (needs root)
-  #: @usage firewall-allow-mosh-darwin --check  #: report only; no root, no changes
+  #: @usage firewall-allow-mosh-darwin                      #: register (needs root)
+  #: @usage firewall-allow-mosh-darwin --check              #: ALF's claim only; no root
+  #: @usage firewall-allow-mosh-darwin --probe PEER [IP]    #: real UDP test; no root
+  #:
+  #: PEER is an ssh host with `nc` (ncat or BSD) that can reach IP, which
+  #: defaults to our Tailscale IPv4. `--probe tealy`, for example.
   ##
   local fw='/usr/libexec/ApplicationFirewall/socketfilterfw'
   if ! test -x "$fw" ; then
@@ -69,6 +81,11 @@ function firewall-allow-mosh-darwin() {
   fi
   local mosh_abs
   mosh_abs="$(greadlink -f "$mosh_sym")" @TRET
+
+  if [[ "$1" == '--probe' ]] ; then
+    h-firewall-mosh-probe-darwin "$2" "$3"
+    return $?
+  fi
 
   #: Reads need no privileges, so --check stays usable from a non-interactive
   #: session and cannot prompt for anything.
@@ -89,7 +106,7 @@ function firewall-allow-mosh-darwin() {
     #: is expected, not a failure. socketfilterfw also exits 0 for an
     #: unregistered app, so the text is the only signal either way.
     if "$fw" --getappblocked "$mosh_abs" 2>/dev/null | grep -q -- 'is permitted' ; then
-      ec "$0: OK -- ${mosh_abs} may accept incoming connections."
+      ec "$0: ALF lists ${mosh_abs} as permitted. That is ALF's claim, not proof; \`--probe PEER\` tests real traffic."
       return 0
     else
       ecerr "$0: NOT ALLOWED -- ${mosh_abs}"
@@ -102,23 +119,67 @@ function firewall-allow-mosh-darwin() {
   #: no controlling terminal hangs rather than failing.
   local sudo_cmd=( ${(@f)"$(h-sudo-cmd)"} )
 
-  reval-ec "$sudo_cmd[@]" "$fw" --setglobalstate off
-
-  #: --remove first so a re-run after an upgrade cannot leave the stale entry
-  #: behind; --add on an already-present path is otherwise a no-op.
-  reval-ec "$sudo_cmd[@]" "$fw" --remove "$mosh_sym"
+  #: --remove first: a stale entry still lists as allowed, and --add on an
+  #: already-present path is a no-op, so only remove-then-add refreshes it.
+  #: Only the resolved path: ALF canonicalises symlinks on --add anyway.
   reval-ec "$sudo_cmd[@]" "$fw" --remove "$mosh_abs"
-
-  reval-ec "$sudo_cmd[@]" "$fw" --add "$mosh_sym"
-  reval-ec "$sudo_cmd[@]" "$fw" --unblockapp "$mosh_sym"
-
   reval-ec "$sudo_cmd[@]" "$fw" --add "$mosh_abs"
   reval-ec "$sudo_cmd[@]" "$fw" --unblockapp "$mosh_abs"
 
-  reval-ec "$sudo_cmd[@]" "$fw" --setglobalstate on
-
-  #: Verify rather than trusting the exit codes above.
   firewall-allow-mosh-darwin --check
+  ecgray "$0: for real proof, run \`$0 --probe PEER\` from here."
+}
+
+function h-firewall-mosh-probe-darwin() {
+  #: Start a disposable mosh-server, have PEER send it UDP over ssh, and count
+  #: the bytes that reach its socket. ALF drops before delivery, so a blocked
+  #: server shows 0 bytes in nettop. Returns 0 if packets arrived, 1 if none
+  #: did, 2 if the test itself could not run.
+  ##
+  local peer="$1" ip="$2"
+  assert-args peer @RET
+  if test -z "$ip" ; then
+    ip="$(command tailscale ip -4 2>/dev/null | command head -n 1)"
+  fi
+  if test -z "$ip" ; then
+    ecerr "$0: no IP given and no Tailscale IPv4 found"
+    return 2
+  fi
+
+  local port=$(( 60900 + RANDOM % 100 ))
+  #: mosh-server forks and its parent exits at once, so find the server by
+  #: its socket, then confirm the command line is ours before trusting it.
+  command mosh-server new -i "$ip" -p "$port" -- /bin/sleep 120 >/dev/null 2>&1
+  local pid
+  pid="$(command lsof -tnP -iUDP@"${ip}:${port}" 2>/dev/null | command head -n 1)"
+  if test -z "$pid" || ! command ps -o command= -p "$pid" | command grep -q -- "-p ${port} -- /bin/sleep 120" ; then
+    ecerr "$0: could not start a test mosh-server on ${ip}:${port}"
+    return 2
+  fi
+
+  {
+    #: ncat needs --send-only to exit after stdin ends; BSD nc rejects that
+    #: flag, so fall back to its -w1.
+    local remote="s() { printf probe | nc -u --send-only $ip $port 2>/dev/null || printf probe | nc -u -w1 $ip $port; }; s; s; s"
+    if ! command timeout 30 command ssh "$peer" "$remote" ; then
+      ecerr "$0: could not send from ${peer}"
+      return 2
+    fi
+    command sleep 1
+
+    local bytes
+    bytes="$(command nettop -m udp -L1 -x -p "$pid" 2>/dev/null | command awk -F, -v n="mosh-server.${pid}" '$2 == n { print $5 }')"
+    if (( ${bytes:-0} > 0 )) ; then
+      ec "$0: OK -- mosh-server on ${ip}:${port} received ${bytes} bytes from ${peer}."
+      return 0
+    else
+      ecerr "$0: BLOCKED -- mosh-server on ${ip}:${port} received nothing from ${peer}."
+      ecerr "$0: if a plain UDP listener does receive, re-register with \`firewall-allow-mosh-darwin\`."
+      return 1
+    fi
+  } always {
+    command kill "$pid" 2>/dev/null
+  }
 }
 ##
 function ash {

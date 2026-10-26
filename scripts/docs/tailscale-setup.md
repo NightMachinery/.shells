@@ -68,10 +68,12 @@ dropping rather than by reporting an error:
   because such binaries are spawned over ssh there is no GUI session to show the
   usual "allow incoming connections?" prompt, so it defaults to deny.
   `mosh-server` is the usual casualty. Register it with
-  [agfi:firewall-allow-mosh-darwin], and re-run that after every
-  `brew upgrade mosh`: it registers the version-stamped Cellar path, so an
-  upgrade quietly invalidates it. `firewall-allow-mosh-darwin --check` reports
-  the current state and needs no root.
+  [agfi:firewall-allow-mosh-darwin], and re-run that whenever mosh hangs and
+  after every `brew upgrade mosh`. An upgrade changes the version-stamped
+  Cellar path, and an entry has also gone stale with no upgrade while ALF kept
+  listing it as allowed. So `--check`, which only reports ALF's claim, is not
+  proof. `firewall-allow-mosh-darwin --probe PEER` is: it has an ssh peer send
+  UDP to a disposable mosh-server and counts the bytes that arrive.
 
 ## Android internet failures: separate DNS from connectivity
 

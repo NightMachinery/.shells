@@ -181,12 +181,16 @@ Two independent layers must both pass, and each fails the same silent way:
    and with stealth mode on its inbound UDP is dropped without a word. Register
    it with [agfi:firewall-allow-mosh-darwin].
 
-: firewall-allow-mosh-darwin           # register
-: firewall-allow-mosh-darwin --check   # report only; no root, no changes
+: firewall-allow-mosh-darwin                 # register
+: firewall-allow-mosh-darwin --check         # ALF's claim only; no root
+: firewall-allow-mosh-darwin --probe tealy   # real UDP test; no root
 
-*Re-run it after every =brew upgrade mosh=.* It registers the resolved Cellar
-path, which is version-stamped, so an upgrade silently invalidates the
-registration and mosh starts hanging again. =--check= is the cheap way to tell.
+*Re-run it whenever mosh hangs, and after every =brew upgrade mosh=.* It
+registers the resolved Cellar path, which is version-stamped, so an upgrade
+invalidates the registration. An entry has also gone stale with no upgrade,
+while ALF went on listing it as allowed, so =--check= is not proof. =--probe=
+is: it has an ssh peer send UDP to a disposable =mosh-server= and counts the
+bytes that arrive.
 
 Note ALF canonicalises symlinks on =--add=, so =--check= keeps reporting "The
 application is not part of the firewall" for =/opt/homebrew/bin/mosh-server=
