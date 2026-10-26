@@ -203,6 +203,21 @@ function date-germany-berlin {
 aliasfn date-germany date-germany-berlin
 aliasfn date-munich date-germany-berlin
 
+function dates {
+    #: Spain is omitted: mainland Spain always matches Germany.
+    local -a zones=(
+        Germany 'Europe/Berlin'
+        Iran 'Asia/Tehran'
+        Canada 'America/Toronto'
+        USA 'America/Los_Angeles'
+        AoE 'Etc/GMT+12'
+    )
+    local label tz
+    for label tz in "${zones[@]}" ; do
+        printf '%-8s %s\n' "${label}" "$(TZ="${tz}" command date +'%Y-%m-%d %a %H:%M  (UTC%z)')"
+    done
+}
+
 function date-italy {
     TZ='Europe/Rome' date +'%Y-%m-%d %A %H:%M:%S'
 }
