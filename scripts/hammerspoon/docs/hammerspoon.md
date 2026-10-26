@@ -2299,3 +2299,14 @@ Shared choosers support Alt+P (older query) and Alt+N (newer query). Query histo
 Recalled chooser queries leave the caret at the end, including Unicode text; query-history completion uses weak chooser references so closed temporary choosers can be collected.
 
 Chooser lifecycle bookkeeping compares native chooser identity across Lua wrappers and keeps a strong reference only while a chooser is visible.
+
+Shared choosers also page with Alt+Up and Alt+Down. While one is visible, the
+key is replaced by a native Page Up or Page Down, so the step is whatever
+`hs.chooser` pages by (ten rows here, even for a `rows(15)` chooser) and Page
+Up from the first row wraps to the last. Physical arrow keys
+carry the fn flag, so fn does not block paging; Shift, Cmd and Ctrl do. The key
+stays with its owner when an enabled Hammerspoon hotkey is bound to ⌥Up/⌥Down
+(`hs.hotkey.getHotkeys()`), when macOS assigns it system-wide
+(`hs.hotkey.systemAssigned`), or when the constructor passes `pageKeys=false`
+or `reservedPageKeys={up=true}` / `{down=true}`. Native checks on the emoji
+chooser, a remote chooser and a temporary ⌥Down hotkey passed on 2026-10-26.

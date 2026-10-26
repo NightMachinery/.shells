@@ -71,3 +71,21 @@ canonical:query('wrapper query');canonical.visible=false
 hs.chooser.globalCallback(wrapper,'didClose');canonical.done({text='chosen'})
 assert(not S.activeChoosers[canonical]and saved['chooser.queries.wrapper.v1'][1]=='wrapper query')
 print('Native-equivalent chooser wrappers retain visible state and release it after close')
+
+d:hide()
+local paging=S.remote(function()end,{historyId=false})
+local reserved=S.remote(function()end,{reservedPageKeys={down=true}})
+local keys,posted,system={}, {},false
+hs.hotkey={getHotkeys=function()return keys end,systemAssigned=function()return system end}
+hs.eventtap={keyStroke=function(mods,key)assert(#mods==0);posted[#posted+1]=key end}
+paging:show()
+assert(S.pageKey(125,{alt=true}) and posted[#posted]=='pagedown')
+assert(S.pageKey(126,{alt=true}) and posted[#posted]=='pageup')
+assert(S.pageKey(125,{alt=true,fn=true}) and posted[#posted]=='pagedown')
+assert(not S.pageKey(125,{alt=true,cmd=true}))
+keys={{idx='⌥DOWN'}};assert(not S.pageKey(125,{alt=true}));keys={}
+system={enabled=true};assert(not S.pageKey(126,{alt=true}));system=false
+paging:hide();reserved:show()
+assert(not S.pageKey(125,{alt=true}) and S.pageKey(126,{alt=true}))
+reserved:hide();assert(not S.pageKey(125,{alt=true}))
+print('Chooser Alt+arrows page only while visible and preserve hotkey, system and per-chooser conflicts')

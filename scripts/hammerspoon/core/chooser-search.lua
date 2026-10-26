@@ -5,7 +5,7 @@ if ChooserSearch then
         hs.chooser.globalCallback=ChooserSearch.previousGlobalCallback
     end
 end
-ChooserSearch = {version = "1.4.2"}
+ChooserSearch = {version = "1.5.1"}
 local S = ChooserSearch
 local states = setmetatable({}, {__mode="k"})
 S.activeChoosers={}
@@ -108,10 +108,32 @@ function S.historyKey(code,flags)
     end
     return false
 end
+-- Alt+Up/Down page through visible rows. Physical arrow keys carry the fn
+-- flag, so it is not a modifier here. An enabled Hammerspoon or system hotkey,
+-- pageKeys=false or reservedPageKeys={up=true} keeps the key for its owner.
+function S.pageKey(code,flags)
+    if not flags.alt or flags.cmd or flags.ctrl or flags.shift or (code~=125 and code~=126) then return false end
+    local direction=code==126 and "up" or "down"
+    for chooser,state in pairs(states) do
+        if chooser.isVisible and chooser:isVisible() then
+            if state.pageKeys==false or (state.reservedPageKeys and state.reservedPageKeys[direction]) then return false end
+            local index="⌥" .. direction:upper()
+            local getHotkeys=hs.hotkey and hs.hotkey.getHotkeys
+            for _,key in ipairs(getHotkeys and getHotkeys() or {}) do
+                if key.idx==index then return false end
+            end
+            local assigned=hs.hotkey and hs.hotkey.systemAssigned and hs.hotkey.systemAssigned({"alt"},direction)
+            if assigned and assigned.enabled then return false end
+            hs.eventtap.keyStroke({},direction=="up" and "pageup" or "pagedown",0)
+            return true
+        end
+    end
+    return false
+end
 local function ensureHistoryTap()
     if S.historyTap or not hs.eventtap then return end
     S.historyTap=hs.eventtap.new({hs.eventtap.event.types.keyDown},function(event)
-        return S.historyKey(event:getKeyCode(),event:getFlags())
+        return S.pageKey(event:getKeyCode(),event:getFlags()) or S.historyKey(event:getKeyCode(),event:getFlags())
     end):start()
 end
 local function create(completion,fields,options,remote)
@@ -119,7 +141,8 @@ local function create(completion,fields,options,remote)
     local caller=debug.getinfo(3,"Sl") or {}
     local historyId=options.historyId
     if historyId==nil then historyId=(caller.short_src or "chooser") .. ":" .. tostring(caller.currentline or 0) end
-    local state={choices={},fields=fields,limit=options.limit,historyId=historyId}
+    local state={choices={},fields=fields,limit=options.limit,historyId=historyId,
+        pageKeys=options.pageKeys,reservedPageKeys=options.reservedPageKeys}
     local reference=setmetatable({}, {__mode="v"})
     local chooser=hs.chooser.new(function(choice)
         local current=reference[1]
