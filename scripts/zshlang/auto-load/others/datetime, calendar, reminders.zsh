@@ -227,7 +227,9 @@ function h-tz-convert {
         return 1
     fi
     [[ "${t}" == *:* ]] || t="${t}:00"
-    TZ="${to}" command gdate --date="TZ=\"${from}\" ${t}" +'%H:%M %a (UTC%z)'
+    local fmt='%H:%M %a (UTC%z)'
+    ecgray "$(TZ="${from}" command gdate --date="${t}" +"${fmt}") ->"
+    TZ="${to}" command gdate --date="TZ=\"${from}\" ${t}" +"${fmt}"
 }
 
 function tehran2germany {
