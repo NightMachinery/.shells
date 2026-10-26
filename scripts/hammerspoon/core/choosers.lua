@@ -177,6 +177,58 @@ function emojiChooserAliases()
     return result
 end
 
+local emojiAliasIndexes = setmetatable({}, {__mode="k"})
+
+-- Keep the data on its canonical entry; fold presentation and gender variants
+-- here so Unicode rows and Telegram's raw alt text share the same vocabulary.
+function emojiChooserAliasesFor(aliases, emoji)
+    if type(emoji) ~= "string" then return {} end
+    local function presentation(text) return text:gsub(utf8.char(0xfe0f), "") end
+    local index = emojiAliasIndexes[aliases]
+    if not index then
+        index = {}
+        local keys = {}
+        for key in pairs(aliases) do keys[#keys+1] = key end
+        table.sort(keys)
+        for _,key in ipairs(keys) do
+            local canonical = presentation(key)
+            index[canonical] = index[canonical] or {}
+            index[canonical][#index[canonical]+1] = key
+        end
+        emojiAliasIndexes[aliases] = index
+    end
+    local result, seen = {}, {}
+    local function add(words)
+        for _,word in ipairs(words or {}) do
+            local key = word:lower()
+            if not seen[key] then seen[key] = true; result[#result+1] = word end
+        end
+    end
+    local function inherit(candidate)
+        add(aliases[candidate])
+        for _,key in ipairs(index[presentation(candidate)] or {}) do add(aliases[key]) end
+    end
+    inherit(emoji)
+    local codes = {}
+    for _,code in utf8.codes(emoji) do
+        if code ~= 0xfe0f and not (code >= 0x1f3fb and code <= 0x1f3ff) then
+            codes[#codes+1] = utf8.char(code)
+        end
+    end
+    local base = table.concat(codes)
+    inherit(base)
+    for _,gender in ipairs({"♀", "♂"}) do
+        local suffix = "‍" .. gender
+        if base:sub(-#suffix) == suffix then base = base:sub(1, -#suffix-1) end
+    end
+    inherit(base)
+    for _,person in ipairs({"👨", "👩"}) do
+        local prefix = person .. "‍"
+        if base:sub(1, #prefix) == prefix then inherit("🧑‍" .. base:sub(#prefix+1)) end
+    end
+    return result
+end
+
 function emojiChooserName(emoji)
     local info = emojiData[emoji] or emojiData[emoji .. "\239\184\143"]
     return info and info.name or emoji
@@ -378,7 +430,7 @@ function emojiChooser()
                          emoji = emoji,
                          name = info.name,
                          image = image,
-                         searchText = emoji .. " " .. (info.slug or "") .. " " .. table.concat(aliases[emoji] or {}, " "),
+                         searchText = emoji .. " " .. (info.slug or "") .. " " .. table.concat(emojiChooserAliasesFor(aliases, emoji), " "),
                          unicodeVersion = version,
         })
     end

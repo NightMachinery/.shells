@@ -181,7 +181,7 @@ function telegramEmojiChooser()
             local subtitle=entry.setTitle or ""
             if subtitle=="" then subtitle=entry.icon and "Telegram premium" or "Unicode preview; premium paste preserved" end
             rows[#rows+1]={text=entry.name,subText=subtitle,
-                           image=image,entry=entry,searchText=entry.emoji.." "..(entry.setTitle or "").." "..(entry.setShortName or "").." "..table.concat(entry.aliases or {}," ").." "..table.concat(aliases[entry.emoji] or {}," ")}
+                           image=image,entry=entry,searchText=entry.emoji.." "..(entry.setTitle or "").." "..(entry.setShortName or "").." "..table.concat(entry.aliases or {}," ").." "..table.concat(emojiChooserAliasesFor(aliases,entry.emoji)," ")}
         end
         ChooserSearch.setChoices(chooser,rows)
     end

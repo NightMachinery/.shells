@@ -106,6 +106,13 @@ That versioned file maps exact emoji strings to keyword arrays, is read whenever
 the chooser opens, and is separate from generated Unicode data. For example,
 `"😒": ["unimpressed", "eye", "meh"]`. Keywords are indexed without cluttering
 row labels. Add personal terms there and sync the emoji repository.
+Both pickers use `emojiChooserAliasesFor`: exact-entry keywords first, then base
+keywords, deduplicated without case distinctions. It ignores emoji presentation
+selectors and skin tones for lookup, removes a trailing gender sign and maps a
+leading man/woman in a joined profession to the neutral person. Thus `smh` finds
+both gendered facepalms, `coder` finds gendered/skin-tone professions, and Telegram's
+unqualified `❤` finds the aliases stored on `❤️`. Keep the words on their canonical
+data entries; do not copy them into every variant.
 
 ## Telegram premium emoji
 

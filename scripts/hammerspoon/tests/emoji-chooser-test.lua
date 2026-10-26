@@ -50,6 +50,18 @@ local env = setmetatable({
     },
 }, {__index=_G})
 assert(load(block,'emoji-chooser','t',env))()
+local variantAliases={['🤦']={'smh','ffs'},['🤦‍♀️']={'facepalm woman','SMH'},
+    ['🧑‍💻']={'coder','developer'},['👩‍💻']={'hacker'},['❤️']={'love'},['👍']={'yes'},['🧑']={'person'}}
+local function words(emoji)return table.concat(env.emojiChooserAliasesFor(variantAliases,emoji),'|') end
+assert(words('🤦‍♀️')=='facepalm woman|SMH|ffs','Keep own aliases first and deduplicate inherited terms')
+assert(words('🤦‍♂️')=='smh|ffs')
+assert(words('🤦🏽‍♀️')=='facepalm woman|SMH|ffs')
+assert(words('👩‍💻')=='hacker|coder|developer')
+assert(words('👨🏻‍💻')=='coder|developer')
+assert(words('🧑🏿‍💻')=='coder|developer')
+assert(words('❤')=='love' and words('❤️')=='love')
+assert(words('👍🏿')=='yes')
+assert(words('👩')=='' and words('🦀')=='','Do not invent unrelated person aliases')
 env.emojiChooser()
 assert(chooser.rows[1].emoji=='😀')
 assert(chooser.rows[1].text=='a recent' and chooser.rows[1].image,'Every row uses the large icon layout')
