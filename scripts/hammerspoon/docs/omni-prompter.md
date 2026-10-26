@@ -63,9 +63,16 @@ Unicode name, including older joined sequences such as 🙂‍↔️.
   per key-down, including repeated presses with Shift held. Shift+Tab and
   backslash also remove the last selection.
 - Enter pastes the selected Unicode text, or the highlighted emoji when empty.
-- Cmd+Enter builds a horizontal transparent PNG from the same cached artwork,
-  copies it to the clipboard and presses Cmd+V. With no multi-selection it uses
-  the highlighted emoji. Each cell is 128px; up to 128 emoji fit in one export.
+- Cmd+Enter builds a lossless transparent WebP from native 512px artwork, with
+  its longest side at 512px,
+  and pastes the actual file. Telegram needs the file URL to recognize a sticker.
+  The chooser selects its English “Send as a document” checkbox when available;
+  otherwise choose that option manually. It never presses Send.
+- Cmd+Shift+Enter copies and pastes a transparent PNG at 512px per emoji.
+  Telegram's photo mode flattens PNG transparency; send PNG as a document to
+  retain its original bytes.
+- Both image shortcuts use the multi-selection, or the highlighted emoji when
+  empty. Up to 128 emoji fit in one horizontal export.
 
 Install the emoji data repo, then run:
 
@@ -77,6 +84,21 @@ This caches all 1,923 official Noto previews, source metadata and licenses under
 `~/Library/Caches/night-emoji/noto-18.0` (about 12 MB). Country/subdivision flags
 use Noto's regional artwork, with aliases resolved and large originals resized.
 Downloads resume from valid cached files. No font installation is needed.
+WebP export needs `brew install webp` (`cwebp`). It runs asynchronously, preserves
+alpha losslessly and downloads native 512px Noto artwork on first use for the
+selected emoji into `~/Library/Caches/night-emoji/noto-18.0-512`. The 128px chooser
+previews are never enlarged for export. It keeps reusable files in `~/Library/Caches/night-emoji/exports`
+with content hashes, so an open Telegram attachment never changes underneath it.
+Temporary encoder inputs are deleted. Other apps also get PNG image data on the
+clipboard. Closing the chooser during encoding cancels the eventual paste.
+WebP clipboard data includes `org.nightmachinery.emoji-export` with UTF-8 JSON
+`{"version":1,"format":"webp","intent":"sticker","preserveAlpha":true}`,
+plus `org.webmproject.webp` bytes, `public.file-url` and PNG fallback data.
+Purple’s native marker handling requires its updated installed build; the
+document-checkbox step also supports older clients.
+Test decoded transparent pixels and a named-pasteboard round trip; an alpha
+channel alone does not prove that Telegram's photo path preserves transparency.
+
 Normal Unicode paste still depends on the receiving app's font support.
 
 Search includes official names and `~/code/misc/unicode-emoji-json/aliases.json`.

@@ -41,6 +41,7 @@ local env = setmetatable({
             return canvas
         end},
         hotkey={bind=function(mod,key,fn)
+            if type(mod)=='table' then mod=table.concat(mod,' ') end
             local hk={delete=function(self)self.deleted=true end}; keys[mod..':'..key]={fn=fn,hk=hk};return hk
         end},
         eventtap={event={types={keyDown=10}},new=function(_,fn)
@@ -77,9 +78,45 @@ env.emojiChooser()
 keys['shift:return'].fn()
 keys['shift:return'].fn()
 local beforePaste=pasted
-keys['cmd:return'].fn()
+keys['cmd shift:return'].fn()
 assert(clipboard['public.png']=='png-bytes' and pasted==beforePaste+1)
-assert(canvas.frame.w==256 and canvas.frame.h==128)
-assert(canvas.images[1].frame.x==0 and canvas.images[2].frame.x==128)
+assert(canvas.frame.w==1024 and canvas.frame.h==512)
+assert(canvas.images[1].frame.x==0 and canvas.images[2].frame.x==512)
 assert(canvas.deleted and not tap.running,'PNG export releases canvas and chooser listeners')
+local webpCallback
+env.emojiChooserWebp=function(emojis,callback)
+    assert(#emojis==1 and emojis[1]=='😀')
+    webpCallback=callback
+end
+local documentRequests=0
+local documentMode=env.emojiChooserTelegramDocument
+env.emojiChooserTelegramDocument=function()documentRequests=documentRequests+1 end
+env.emojiChooser()
+beforePaste=pasted
+keys['cmd:return'].fn()
+assert(pasted==beforePaste,'WebP must wait for encoding')
+webpCallback(nil,{['public.file-url']='file:///emoji.webp',['org.webmproject.webp']='webp-bytes'})
+assert(clipboard['public.file-url']=='file:///emoji.webp' and pasted==beforePaste+1)
+assert(documentRequests==1,'WebP should request Telegram document mode')
+env.emojiChooser()
+keys['cmd:return'].fn()
+beforePaste=pasted
+chooser.onHide()
+webpCallback(nil,{['public.file-url']='file:///cancelled.webp'})
+assert(pasted==beforePaste,'Cancelled chooser must not paste a late WebP result')
+local presses,timers=0,{}
+local checkbox={setTimeout=function()end,attributeValue=function(_,key)
+    return ({AXRole='AXCheckBox',AXTitle='Send as a document',AXValue=0})[key]
+end,performAction=function(_,action)assert(action=='AXPress');presses=presses+1 end}
+local window={setTimeout=function()end,attributeValue=function(_,key)
+    return ({AXRole='AXWindow',AXChildren={checkbox}})[key]
+end}
+env.hs.pasteboard.changeCount=function()return 7 end
+env.hs.application={frontmostApplication=function()return {bundleID=function()return 'org.telegram.desktop' end}end}
+env.hs.axuielement={applicationElement=function()return {attributeValue=function()return window end}end}
+env.hs.timer={doAfter=function(_,fn)timers[#timers+1]=fn end}
+documentMode();table.remove(timers,1)()
+assert(presses==1,'Only enable document checkbox; never press Send')
+documentMode();env.hs.pasteboard.changeCount=function()return 8 end;table.remove(timers,1)()
+assert(presses==1,'A newer clipboard must cancel late Telegram automation')
 print('EMOJI_CHOOSER_TESTS_PASSED')

@@ -136,18 +136,24 @@ loadEmojiData()
 local kEmojiAlertId = "emoji-chooser"
 local emojiPreviews = {}
 
-function emojiChooserImage(emoji)
-    if emojiPreviews[emoji] == nil then
+function emojiChooserImage(emoji, resolution)
+    resolution = resolution or 128
+    local key = emoji .. ":" .. resolution
+    if emojiPreviews[key] == nil then
         local codes = {}
         for _, code in utf8.codes(emoji) do
             if code ~= 0xfe0f then codes[#codes + 1] = string.format("%04x", code) end
         end
-        local path = os.getenv("HOME") .. "/Library/Caches/night-emoji/noto-18.0/emoji_u" ..
+        local suffix = resolution == 128 and "" or "-" .. resolution
+        local path = os.getenv("HOME") .. "/Library/Caches/night-emoji/noto-18.0" .. suffix .. "/emoji_u" ..
             table.concat(codes, "_") .. ".png"
-        emojiPreviews[emoji] = hs.fs.attributes(path, "mode") == "file" and
+        emojiPreviews[key] = hs.fs.attributes(path, "mode") == "file" and
             hs.image.imageFromPath(path) or false
     end
-    return emojiPreviews[emoji] or nil
+    -- A missing export image may become available after the asynchronous fetch.
+    local image = emojiPreviews[key]
+    if not image and resolution ~= 128 then emojiPreviews[key] = nil end
+    return image or nil
 end
 
 function emojiChooserAliases()
@@ -177,13 +183,13 @@ function emojiChooserName(emoji)
 end
 
 -- Offscreen canvas: no windows, screenshots or font substitution are involved.
-function emojiChooserPng(emojis)
+function emojiChooserPng(emojis, side, resolution)
     assert(#emojis > 0 and #emojis <= 128, "Choose between 1 and 128 emoji for a PNG")
-    local side = 128
+    side = side or 128
     local canvas = hs.canvas.new({x=0, y=0, w=side*#emojis, h=side})
     local ok, result = pcall(function()
         for i, emoji in ipairs(emojis) do
-            local image = assert(emojiChooserImage(emoji), "Missing cached emoji image; run emoji-images.py")
+            local image = assert(emojiChooserImage(emoji, resolution), "Missing cached emoji image; run emoji-images.py")
             canvas:insertElement({type="image", image=image, imageScaling="scaleProportionally",
                                   frame={x=(i-1)*side, y=0, w=side, h=side}})
         end
@@ -196,10 +202,116 @@ function emojiChooserPng(emojis)
     return result
 end
 
+local emojiExportTasks = {}
+
+function emojiChooserPrepareImages(emojis, callback)
+    local ready = true
+    for _,emoji in ipairs(emojis) do if not emojiChooserImage(emoji, 512) then ready = false; break end end
+    if ready then callback(); return end
+    local args = {os.getenv("HOME") .. "/scripts/hammerspoon/bin/emoji-images.py", "--size", "512"}
+    for _,emoji in ipairs(emojis) do args[#args+1] = "--emoji"; args[#args+1] = emoji end
+    local task
+    task = hs.task.new("/opt/homebrew/bin/python3", function(code, _, stderr)
+        emojiExportTasks[task] = nil
+        callback(code ~= 0 and ("High-resolution emoji download failed: " .. tostring(stderr)) or nil)
+    end, args)
+    assert(task and task:start(), "Cannot start high-resolution emoji download")
+    emojiExportTasks[task] = true
+end
+
+function emojiChooserTelegramDocument()
+    local clipboard = hs.pasteboard.changeCount()
+    local function attempt(remaining)
+        if hs.pasteboard.changeCount() ~= clipboard then return end
+        local app = hs.application.frontmostApplication()
+        local id = app and (app:bundleID() or ""):lower() or ""
+        if not (id:find("telegram", 1, true) or id:find("tdesktop", 1, true)) then return end
+        local root = hs.axuielement.applicationElement(app):attributeValue("AXFocusedWindow")
+        local found, count = nil, 0
+        local function walk(e, depth)
+            if not e or found or depth > 18 or count >= 400 then return end
+            count = count + 1
+            e:setTimeout(.01)
+            if e:attributeValue("AXRole") == "AXCheckBox" then
+                local label = e:attributeValue("AXTitle")
+                if not label or label == "" then label = e:attributeValue("AXDescription") end
+                if label == "Send as a document" or label == "Send as documents" then found = e; return end
+            end
+            if e:attributeValue("AXRole") == "AXMenuBar" then return end
+            for _,child in ipairs(e:attributeValue("AXChildren") or {}) do walk(child, depth+1) end
+        end
+        walk(root, 0)
+        if found then
+            local value = found:attributeValue("AXValue")
+            if value == 0 or value == false then found:performAction("AXPress") end
+        elseif remaining > 0 then
+            hs.timer.doAfter(.25, function() attempt(remaining-1) end)
+        else
+            alert_gateway("Telegram: choose Send as a document to keep the WebP sticker transparent", {color="warn"})
+        end
+    end
+    hs.timer.doAfter(.25, function() attempt(3) end)
+end
+
+-- Telegram consumes file URLs before image data. A WebP file keeps its sticker
+-- identity; pasting an NSImage instead takes Telegram's opaque photo path.
+local function encodeEmojiWebp(emojis, callback)
+    local png = emojiChooserPng(emojis, 512 / #emojis, 512)
+    local encoder = "/opt/homebrew/bin/cwebp"
+    assert(hs.fs.attributes(encoder, "mode") == "file", "Install Homebrew webp for cwebp")
+    local folder = os.getenv("HOME") .. "/Library/Caches/night-emoji/exports"
+    hs.fs.mkdir(folder)
+    assert(hs.fs.attributes(folder, "mode") == "directory", "Cannot create emoji export cache")
+    local output = folder .. "/emoji-" .. hs.hash.SHA256("webp-native512-lossless-v2:" .. png) .. ".webp"
+    local function complete()
+        local file = assert(io.open(output, "rb")); local webp = file:read("*a"); file:close()
+        assert(webp:sub(1, 4) == "RIFF" and webp:sub(9, 12) == "WEBP", "Invalid WebP export")
+        local url = "file://" .. output:gsub("[^A-Za-z0-9%-%._~/]", function(c)
+            return string.format("%%%02X", c:byte())
+        end)
+        callback(nil, {["public.file-url"]=url, ["org.webmproject.webp"]=webp, ["public.png"]=png,
+            ["org.nightmachinery.emoji-export"]='{"version":1,"format":"webp","intent":"sticker","preserveAlpha":true}'})
+    end
+    if hs.fs.attributes(output, "mode") == "file" then complete(); return end
+    local input = os.tmpname()
+    local encoded = os.tmpname()
+    local file = assert(io.open(input, "wb")); file:write(png); file:close()
+    local task
+    task = hs.task.new(encoder, function(code, _, stderr)
+        emojiExportTasks[task] = nil
+        os.remove(input)
+        if code ~= 0 then
+            os.remove(encoded)
+            callback("WebP encoder failed: " .. tostring(stderr))
+            return
+        end
+        local ok, err = pcall(function()
+            assert(os.rename(encoded, output))
+            complete()
+        end)
+        os.remove(encoded)
+        if not ok then callback(tostring(err)) end
+    end, {"-quiet", "-lossless", "-exact", input, "-o", encoded})
+    if not task or not task:start() then
+        os.remove(input)
+        os.remove(encoded)
+        error("Cannot start WebP encoder")
+    end
+    emojiExportTasks[task] = true
+end
+
+function emojiChooserWebp(emojis, callback)
+    emojiChooserPrepareImages(emojis, function(err)
+        if err then callback(err); return end
+        local ok, failure = pcall(encodeEmojiWebp, emojis, callback)
+        if not ok then callback(tostring(failure)) end
+    end)
+end
+
 function emojiChooser()
     local recent=ChooserSearch.recent("emoji")
     local selectedEmojis = {} -- Table to store selected emojis
-    local pendingPng
+    local pendingImage, exporting, closed
 
     local function updateAlert()
         if #selectedEmojis >= 1 then
@@ -238,8 +350,11 @@ function emojiChooser()
             -- =keyStrokes= cannot insert some emojis.
             ---
             recent.record(selectedEmojis)
-            if pendingPng then
-                if hs.pasteboard.writeAllData({["public.png"]=pendingPng}) then doPaste() end
+            if pendingImage then
+                if hs.pasteboard.writeAllData(pendingImage) then
+                    doPaste()
+                    if pendingImage["public.file-url"] then emojiChooserTelegramDocument() end
+                end
             else
                 copyToClipboard(emojiString)
                 doPaste()
@@ -313,25 +428,45 @@ function emojiChooser()
         end
     end
 
-    local function pastePng()
+    local function pasteImage(format)
+        if exporting or closed then return end
         local emojis = selectedEmojis
         if #emojis == 0 then
             local choice = chooser:selectedRowContents()
             if not choice then return end
             emojis = {choice.emoji}
         end
-        local ok, data = pcall(emojiChooserPng, emojis)
-        if not ok then
-            alert_gateway("Emoji PNG: " .. tostring(data), {color="warn"})
-            return
+        exporting = true
+        local function finish(err, data)
+            exporting = false
+            if closed then return end
+            if err then
+                alert_gateway("Emoji " .. format .. ": " .. tostring(err), {color="warn"})
+                return
+            end
+            pendingImage = data
+            chooser:select()
         end
-        pendingPng = data
-        chooser:select()
+        local ok, err = pcall(function()
+            if format == "WebP" then
+                emojiChooserWebp(emojis, finish)
+            else
+                emojiChooserPrepareImages(emojis, function(failure)
+                    if failure then finish(failure); return end
+                    local success, png = pcall(emojiChooserPng, emojis, 512, 512)
+                    if success then finish(nil, {["public.png"]=png}) else finish(png) end
+                end)
+            end
+        end)
+        if not ok then
+            finish(err)
+        end
     end
 
     local hotkeys = {
         shiftEnter = hs.hotkey.bind('shift', 'return', addCurrent),
-        png = hs.hotkey.bind('cmd', 'return', pastePng),
+        webp = hs.hotkey.bind('cmd', 'return', function() pasteImage("WebP") end),
+        png = hs.hotkey.bind({'cmd', 'shift'}, 'return', function() pasteImage("PNG") end),
         tab = hs.hotkey.bind('', 'tab', cycleSort),
         backslash = hs.hotkey.bind('', '\\', removeLast),
         shiftTab = hs.hotkey.bind('shift', 'tab', removeLast)
@@ -350,6 +485,7 @@ function emojiChooser()
     end):start()
 
     local function cleanup()
+        closed = true
         deleteTap:stop()
         -- hs.alert("emojiChooser: cleanup")
 
