@@ -594,7 +594,7 @@ function emojiChooser()
         clearAlert()
     end
 
-    chooser:hideCallback(cleanup)
+    ChooserSearch.onHide(chooser, cleanup)
 
     local function main()
         inputLangPush()

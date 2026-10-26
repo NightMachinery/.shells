@@ -2300,6 +2300,10 @@ Recalled chooser queries leave the caret at the end, including Unicode text; que
 
 Chooser lifecycle bookkeeping compares native chooser identity across Lua wrappers and keeps a strong reference only while a chooser is visible.
 
+`hs.chooser` calls a hide callback twice for one close (measured 8 ms apart,
+after the window is gone). Register cleanups that delete hotkeys through
+`ChooserSearch.onHide(chooser, fn)`, which runs `fn` once per opening.
+
 Shared choosers also page with Alt+Up and Alt+Down. While one is visible, the
 key is replaced by a native Page Up or Page Down, so the step is whatever
 `hs.chooser` pages by (ten rows here, even for a `rows(15)` chooser) and Page

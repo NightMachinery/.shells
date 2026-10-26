@@ -5,7 +5,7 @@ if ChooserSearch then
         hs.chooser.globalCallback=ChooserSearch.previousGlobalCallback
     end
 end
-ChooserSearch = {version = "1.5.1"}
+ChooserSearch = {version = "1.6.0"}
 local S = ChooserSearch
 local states = setmetatable({}, {__mode="k"})
 S.activeChoosers={}
@@ -162,6 +162,19 @@ local function create(completion,fields,options,remote)
     ensureHistoryTap()
     return chooser
 end
+-- hs.chooser runs a hide callback twice for one close (measured 8 ms apart,
+-- both after the window was gone), so a cleanup that deletes hotkeys failed on
+-- its second run. This runs the callback once per opening.
+function S.onHide(chooser,callback)
+    local state=assert(stateFor(chooser),"ChooserSearch must create the chooser")
+    state.hidden=false
+    chooser:hideCallback(function(...)
+        if state.hidden then return end
+        state.hidden=true
+        return callback(...)
+    end)
+    return chooser
+end
 function S.onQueryChanged(chooser,callback)
     assert(stateFor(chooser),"ChooserSearch must create the chooser").changed=callback
     chooser:queryChangedCallback(callback)
@@ -183,6 +196,7 @@ if hs and hs.chooser then
         local state,original=stateFor(chooser)
         if state then
             if event=="willOpen" then
+                state.hidden=false
                 S.activeChoosers[original]=true
                 state.cursor=nil;state.expected=nil;state.draft=nil;state.closedQuery=nil
             elseif event=="didClose" then

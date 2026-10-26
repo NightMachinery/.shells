@@ -32,6 +32,7 @@ local env = setmetatable({
             return chooser
         end,
         setChoices=function(c,rows)c.rows=rows end,
+        onHide=function(c,fn)c:hideCallback(fn) end,
     },
     hs={
         fs={attributes=function()return 'file' end},

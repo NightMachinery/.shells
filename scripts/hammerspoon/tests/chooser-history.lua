@@ -8,6 +8,7 @@ function hs.chooser.new(done)
  local c={value='',visible=false,done=done}
  function c:query(value)if value==nil then return self.value end;self.value=value;return self end
  function c:queryChangedCallback(fn)self.changed=fn;return self end
+ function c:hideCallback(fn)self.onHide=fn;return self end
  function c:choices(rows)self.rows=rows;return self end
  function c:isVisible()return self.visible end
  function c:show()self.visible=true;hs.chooser.globalCallback(self,'willOpen');return self end
@@ -89,3 +90,11 @@ paging:hide();reserved:show()
 assert(not S.pageKey(125,{alt=true}) and S.pageKey(126,{alt=true}))
 reserved:hide();assert(not S.pageKey(125,{alt=true}))
 print('Chooser Alt+arrows page only while visible and preserve hotkey, system and per-chooser conflicts')
+
+hs.eventtap=nil
+local closing=S.new(function()end,nil,{historyId=false})
+local cleanups=0;S.onHide(closing,function()cleanups=cleanups+1 end)
+closing:show();closing.onHide();closing.onHide();closing:hide()
+assert(cleanups==1,'A doubled native hide callback runs the cleanup once')
+closing:show();closing.onHide();assert(cleanups==2,'The next opening gets its own cleanup')
+print('A doubled native hide callback runs chooser cleanup once per opening')
