@@ -165,6 +165,30 @@ has been explicitly approved; do not copy an entire agent home to install a CLI.
 See [Paseo's server install](https://paseo.sh/docs.md) and
 [daemon lifecycle](https://paseo.sh/docs/cli.md).
 
+After installing the binaries, connect their portable configuration too. Back up
+existing files, then link both Claude seats' `settings.json` to
+`configFiles/claude-code/settings.json`, Codex's `~/.codex/hooks.json` to
+`configFiles/codex/hooks.json`, and Antigravity's `~/.gemini/config/hooks.json`
+to `configFiles/antigravity/hooks.json`. Link the personal/work Claude themes
+using [agfi:claude-themes-link]. Preserve installer-only Claude preferences,
+such as its update channel, in that seat's `settings.local.json`.
+
+Select portable Codex and Antigravity preferences explicitly: model/reasoning,
+editor, appearance, status line and notification command. Adapt paths and leave
+account credentials, project trust, hook approvals, MCP credentials and plugin
+installation state on their own host. Installing hook definitions does not
+establish that the provider trusts or has executed them. After owner sign-in,
+review the hooks through the provider's normal interface.
+
+The shared Claude settings use `/usr/local/libexec/claude-askpass`. Install
+`pinentry-mac`, and link that path to `configFiles/claude-code/askpass.py` with
+executable permissions. Its password dialog is an owner interaction; do not
+invoke it during unattended setup. Install the enabled official clangd plugin
+with `claude plugin install clangd-lsp --marketplace
+anthropics/claude-plugins-official --json`, and check the installed payload plus
+the `clangd` executable separately from account login. Keep the tracked settings
+link intact if an installer replaces it.
+
 For login startup, create a user LaunchAgent invoking the Homebrew Zsh with
 `-lc 'source "$HOME/scripts/launchers/various-darwin.zsh"'`. Run it once at login,
 not with KeepAlive: its child services have their own lifecycle. Capture logs.
