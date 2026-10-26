@@ -134,6 +134,22 @@ loadEmojiData()
 -- picked emoji in place, so there is nothing to close before showing the next
 -- one.
 local kEmojiAlertId = "emoji-chooser"
+local emojiPreviews = {}
+
+local function emojiPreview(emoji, version)
+    if version < 16 then return nil end
+    if emojiPreviews[emoji] == nil then
+        local codes = {}
+        for _, code in utf8.codes(emoji) do
+            if code ~= 0xfe0f then codes[#codes + 1] = string.format("%x", code) end
+        end
+        local path = os.getenv("HOME") .. "/Library/Caches/night-emoji/noto-18.0/emoji_u" ..
+            table.concat(codes, "_") .. ".png"
+        emojiPreviews[emoji] = hs.fs.attributes(path, "mode") == "file" and
+            hs.image.imageFromPath(path) or false
+    end
+    return emojiPreviews[emoji] or nil
+end
 
 function emojiChooser()
     local recent=ChooserSearch.recent("emoji")
@@ -167,7 +183,7 @@ function emojiChooser()
             end
 
             if #selectedEmojis == 0 then
-                table.insert(selectedEmojis, choice.text)
+                table.insert(selectedEmojis, choice.emoji)
             end
 
             local emojiString = table.concat(selectedEmojis)
@@ -184,33 +200,56 @@ function emojiChooser()
             clearAlert()
             return
     end)
-    chooser:placeholderText("Choose an emoji...")
+    local sortMode = "recent"
 
     local choices = {}
     for emoji, info in pairs(emojiData) do
+        local version = tonumber(info.unicode_version) or tonumber(info.emoji_version) or 0
+        local image = emojiPreview(emoji, version)
         table.insert(choices, {
-                         text = emoji,
-                         subText = info.name
-                         ---
-                         -- subText = emoji,
-                         -- text = info.name
-                         ---
-                         -- image property can be added here if you have images for emojis
+                         text = image and info.name or emoji,
+                         subText = image and ("Unicode " .. tostring(version)) or info.name,
+                         emoji = emoji,
+                         name = info.name,
+                         image = image,
+                         unicodeVersion = version,
         })
     end
 
-    recent.sort(choices,function(row)return row.text end, function(a,b)
-        if a.subText~=b.subText then return a.subText<b.subText end
-        return a.text<b.text
-    end)
+    local function alphabetical(a, b)
+        if a.name ~= b.name then return a.name < b.name end
+        return a.emoji < b.emoji
+    end
 
-    ChooserSearch.setChoices(chooser, choices)
+    local function refreshSort()
+        if sortMode == "recent" then
+            recent.sort(choices, function(row) return row.emoji end, alphabetical)
+        else
+            table.sort(choices, function(a, b)
+                if a.unicodeVersion ~= b.unicodeVersion then
+                    return a.unicodeVersion > b.unicodeVersion
+                end
+                return alphabetical(a, b)
+            end)
+        end
+        chooser:placeholderText("Choose an emoji... [" ..
+            (sortMode == "recent" and "recent usage" or "newest Unicode") .. "; Tab: sort]")
+        ChooserSearch.setChoices(chooser, choices)
+        chooser:selectedRow(1)
+    end
+
+    refreshSort()
+
+    local function cycleSort()
+        sortMode = sortMode == "recent" and "unicode" or "recent"
+        refreshSort()
+    end
 
     local function addCurrent()
         local choice = chooser:selectedRowContents()
 
         if choice then
-            table.insert(selectedEmojis, choice.text)
+            table.insert(selectedEmojis, choice.emoji)
             updateAlert()
         end
     end
@@ -224,16 +263,25 @@ function emojiChooser()
 
     local hotkeys = {
         shiftEnter = hs.hotkey.bind('shift', 'return', addCurrent),
-        tab = hs.hotkey.bind('', 'tab', addCurrent),
-        -- Distinct keys: cleanup deletes what this table holds, and a second
-        -- `backspace' used to overwrite the first, which left shift+delete
-        -- bound, globally, after the first emoji chooser.
-        backspace = hs.hotkey.bind('shift', 'delete', removeLast),
+        tab = hs.hotkey.bind('', 'tab', cycleSort),
         backslash = hs.hotkey.bind('', '\\', removeLast),
         shiftTab = hs.hotkey.bind('shift', 'tab', removeLast)
     }
 
+    -- Carbon hotkeys can latch Shift+Delete until the modifier is released.
+    -- Read each key-down directly so repeated presses with Shift held all work.
+    local deleteTap = hs.eventtap.new({ hs.eventtap.event.types.keyDown }, function(event)
+        local flags = event:getFlags()
+        if event:getKeyCode() == 51 and flags.shift and
+            not (flags.cmd or flags.alt or flags.ctrl) then
+            removeLast()
+            return true
+        end
+        return false
+    end):start()
+
     local function cleanup()
+        deleteTap:stop()
         -- hs.alert("emojiChooser: cleanup")
 
         for _, hk in pairs(hotkeys) do hk:delete() end

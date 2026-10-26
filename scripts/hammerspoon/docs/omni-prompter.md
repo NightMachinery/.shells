@@ -52,3 +52,18 @@ and manual catalog queries agree. Public builders such as IMDb recommendations
 now use the standard stdin helper. See the linked prompt-family corrections for
 pipeline, mode, code-fence and JSON fixes in the
 [prompt-family corrections](../../docs/prompt-family-review.md).
+
+Emoji picker controls: Tab alternates recent-usage order and newest Unicode
+introduction first. Shift+Enter adds the highlighted emoji; Shift+Backspace
+removes one per key-down, including repeated presses while Shift stays held.
+Shift+Tab and backslash also remove the last selection. The scoped key listener
+stops when the picker closes.
+
+For emoji that Apple's font does not yet draw, run
+`python3 hammerspoon/bin/emoji-images.py` after installing the emoji data repo.
+It caches official Noto previews for Unicode 16 and later, including Unicode 18,
+under `~/Library/Caches/night-emoji/noto-18.0`. The chooser uses the image and
+name when available; copying and recency still use the original Unicode emoji.
+Missing cached previews fall back to the normal system text rendering. The
+cache includes source/release metadata and the artwork licenses. This avoids
+relying on Noto's CBDT/CBLC color font support in macOS AppKit.
