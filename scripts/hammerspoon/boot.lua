@@ -97,6 +97,7 @@ local hammerspoonCoreFiles = {
     "core/system-keys.lua",
     "core/chooser-search.lua",
     "core/choosers.lua",
+    "core/telegram-emoji.lua",
     -- After alert/ and core/helpers.lua: it alerts through alert_gateway and
     -- times passes with hsAfter. Before core/app-hotkeys/main.lua, whose
     -- hyper+d calls notifDismissAll.

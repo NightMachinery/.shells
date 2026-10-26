@@ -85,3 +85,30 @@ the chooser opens, and is separate from generated Unicode data. For example,
 `"😒": ["unimpressed", "eye", "meh"]`. Keywords are indexed without cluttering
 row labels. Add personal terms there and sync the emoji repository.
 
+## Telegram premium emoji
+
+Hyper+Shift+A opens the cached premium library. The patched Purple client's
+opt-in export feature supplies exact first-frame PNGs and a catalog under
+`~/Library/Caches/Purple/emoji-export/`. Until that feature is installed and
+enabled, saved clipboard entries work with Unicode preview images. No socket
+or client automation is invoked by opening this chooser.
+
+The catalog contract is version 1 with an `entries` array. IDs are decimal
+strings; entries include `alt`, `setTitle`, `setShortName`, `recentRank` and an
+optional relative `png` path. Default icons are `png/<id>-128.png`. Client recent
+order comes first, then installed-set order. Search includes Unicode names,
+set titles, short names and aliases. `NIGHT_TELEGRAM_EMOJI_CATALOG` or the
+Hammerspoon setting `telegramEmoji.catalogPath` can select another export path.
+
+Copy one premium emoji from Telegram, open the picker and press Cmd+S to save
+it explicitly. The personal library is `~/.local/share/night-emoji/telegram.json`
+(mode 600 in a mode-700 directory); it is never committed. Each entry preserves
+its Qt rich clipboard tag, Unicode fallback, optional name and aliases. The
+picker does not inspect account/session stores or messages. Saved entries remain
+usable while Purple or its export feature is off.
+
+Choosing an entry in Telegram restores its rich clipboard types and presses
+Cmd+V without sending. The old clipboard is restored after the paste if no newer
+copy replaced it. Outside Telegram it copies the rich entry for a later manual
+paste. This does not create Telegram Premium entitlement; the target client and
+account still decide which custom emoji they can use.
