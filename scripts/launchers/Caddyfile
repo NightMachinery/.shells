@@ -201,3 +201,14 @@ cdn.lilf.ir {
         respond "Server under maintenance. Have some iced tea first!"
     }
 }
+
+# BEGIN ajayeb self_host.py
+http://ajayeb.lilf.ir {
+	redir https://ajayeb.lilf.ir{uri} permanent
+}
+
+https://ajayeb.lilf.ir {
+	encode zstd gzip
+	reverse_proxy localhost:38951
+}
+# END ajayeb self_host.py
