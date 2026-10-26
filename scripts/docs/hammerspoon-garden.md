@@ -143,7 +143,9 @@ Each of these has a counterpart in zsh, and both copies carry the same
   effect (`inputMuteToggle` in `core/window-media-bindings.lua`). The iPhone
   mic's soft mute is a redis state machine that stays in zsh.
 - hyper+d, dismiss notifications: Accessibility, in-process
-  (`notifDismissAll` in `core/notif-dismiss.lua`).
+  (`notifDismissAll` in `core/notif-dismiss.lua`). It finds explicit Close/Clear All
+  actions through bounded window traversal, since Accessibility wrapper depths
+  differ across macOS versions; it never activates a notification body.
 - hyper+g, anycomplete: Google's and DuckDuckGo's suggestions over `hs.http`
   (`anycompleteSuggest` in `core/choosers.lua`).
 - FIM completion: `hammerspoon/bin/fim-get.zsh`, which sources `fim.zsh`

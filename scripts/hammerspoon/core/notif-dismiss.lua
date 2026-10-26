@@ -39,21 +39,6 @@ local function notifAx(element)
     return element
 end
 
-local function notifFirstChild(element)
-    return element and notifAx((element:attributeValue("AXChildren") or {})[1])
-end
-
---- The notification groups, top to bottom; {} when none are on screen.
---- NotificationCenter's tree: window > group > scroll area > list > groups.
-local function notifGroups()
-    local app = hs.application.get("com.apple.notificationcenterui")
-    if not app then return {} end
-    local axApp = notifAx(hs.axuielement.applicationElement(app))
-    local list = axApp and notifAx((axApp:attributeValue("AXWindows") or {})[1])
-    for _ = 1, 3 do list = notifFirstChild(list) end
-    return list and list:attributeValue("AXChildren") or {}
-end
-
 --- The name of the action that dismisses a group, or nil. Custom actions are
 --- named "Name:Close\nTarget:0x0\nSelector:(null)"; reading the title from the
 --- name saves an actionDescription round trip per action.
@@ -65,6 +50,32 @@ local function notifCloseAction(group)
         if title == "Close" then close = name end
     end
     return close
+end
+
+--- Find dismissible groups without assuming a fixed Accessibility depth.
+--- macOS 27 inserts another wrapper above the scroll area. Search windows
+--- only, stop below a dismissible stack, and never press generic AXPress.
+local function notifGroups()
+    local app = hs.application.get("com.apple.notificationcenterui")
+    if not app then return {} end
+    local axApp = notifAx(hs.axuielement.applicationElement(app))
+    local groups, visited = {}, 0
+    local function walk(element, depth)
+        if not element or depth > 12 or visited >= 256 then return end
+        visited = visited + 1
+        element = notifAx(element)
+        if element:attributeValue("AXRole") == "AXGroup" and notifCloseAction(element) then
+            groups[#groups + 1] = element
+            return
+        end
+        for _, child in ipairs(element:attributeValue("AXChildren") or {}) do
+            walk(child, depth + 1)
+        end
+    end
+    for _, window in ipairs(axApp and axApp:attributeValue("AXWindows") or {}) do
+        walk(window, 0)
+    end
+    return groups
 end
 
 local function notifContains(elements, element)
