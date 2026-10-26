@@ -170,6 +170,12 @@ repositories remain separate, deliberate migration steps.
 
 ## Workflow postflight
 
+For native preference checks, use System Settings’ `View > Menu Bar` menu.
+It can reach the pane when a Settings deep link opens General or leaves a stale
+search visible. Read the pane’s controls after dialogs close, including menu
+visibility, Always/When Active choices and Battery percentage. Control Center
+placement is a separate check on macOS versions with the Control Gallery.
+
 Store-backed Brave extension payloads still need native activation. Open
 `brave://extensions/`, switch each requested extension on and handle any
 `Action Required` menu entry with `Enable Extension`. Scroll lower cards into
