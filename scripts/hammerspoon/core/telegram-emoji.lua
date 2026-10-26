@@ -109,6 +109,22 @@ function T.catalogEntry(raw, folder)
     return entry
 end
 
+local function nonempty(value)
+    return type(value)=="string" and value:match("^%s*(.-)%s*$")~=""
+end
+
+function T.packName(entry)
+    if nonempty(entry.setTitle) then return entry.setTitle end
+    if nonempty(entry.setShortName) then return entry.setShortName end
+    return "Unknown pack"
+end
+
+function T.mergeMetadata(entry, other)
+    for _,key in ipairs({"setTitle", "setShortName", "icon"}) do
+        if not nonempty(entry[key]) and nonempty(other[key]) then entry[key]=other[key] end
+    end
+end
+
 -- Export is maintained by an opt-in Purple setting. Never discover sockets,
 -- inspect encrypted account caches, or wake the client to open this chooser.
 function T.entries()
@@ -124,8 +140,9 @@ function T.entries()
             local folder=path:match("^(.*)/[^/]+$")
             for index,raw in ipairs(catalog.entries) do
                 local valid,entry=pcall(T.catalogEntry,raw,folder)
-                if valid and not seen[entry.id] then
-                    entry.order=index;entries[#entries+1]=entry;seen[entry.id]=entry
+                if valid then
+                    if seen[entry.id] then T.mergeMetadata(seen[entry.id],entry)
+                    else entry.order=index;entries[#entries+1]=entry;seen[entry.id]=entry end
                 end
             end
         end
@@ -135,6 +152,7 @@ function T.entries()
             entry.order=#entries+1;entries[#entries+1]=entry;seen[entry.id]=entry
         else
             seen[entry.id].aliases=entry.aliases
+            T.mergeMetadata(seen[entry.id],entry)
         end
     end
     table.sort(entries,function(a,b)
@@ -178,8 +196,7 @@ function telegramEmojiChooser()
         local aliases=emojiChooserAliases()
         for _,entry in ipairs(T.entries()) do
             local image=entry.icon and hs.image.imageFromPath(entry.icon) or emojiChooserImage(entry.emoji)
-            local subtitle=entry.setTitle or ""
-            if subtitle=="" then subtitle=entry.icon and "Telegram premium" or "Unicode preview; premium paste preserved" end
+            local subtitle=T.packName(entry)
             rows[#rows+1]={text=entry.name,subText=subtitle,
                            image=image,entry=entry,searchText=entry.emoji.." "..(entry.setTitle or "").." "..(entry.setShortName or "").." "..table.concat(entry.aliases or {}," ").." "..table.concat(emojiChooserAliasesFor(aliases,entry.emoji)," ")}
         end

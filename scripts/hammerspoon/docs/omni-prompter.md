@@ -116,7 +116,7 @@ data entries; do not copy them into every variant.
 
 ## Telegram premium emoji
 
-Hyper+Shift+A opens the cached premium library. The patched Purple client's
+Hyper+Shift+A opens the cached premium library. Each row shows its pack title, falling back to the pack short name. Clipboard-only entries show “Unknown pack” until catalog metadata is available. Duplicate recent/installed-set records enrich missing pack names instead of discarding them. The patched Purple client's
 opt-in export feature supplies exact first-frame PNGs and a catalog under
 `~/Library/Caches/Purple/emoji-export/`. Until that feature is installed and
 enabled, saved clipboard entries work with Unicode preview images. No socket

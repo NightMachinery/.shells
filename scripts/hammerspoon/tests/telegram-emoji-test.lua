@@ -23,4 +23,13 @@ assert(exported.icon=='/private/tmp/inert-export/png/1234567890123456789-128.png
 local unicodePayload=T.payload(exported)
 assert(T.parse(unicodePayload).emoji=='🙂‍↔️','Rich range covers UTF-16 units of a ZWJ emoji')
 assert(not pcall(T.catalogEntry,{id=12345,alt='😍'},'/private/tmp/inert-export'))
+assert(T.packName(exported)=='Inert test set')
+assert(T.packName({setTitle='',setShortName='ExamplePack'})=='ExamplePack')
+assert(T.packName({setTitle='  ',setShortName='ExamplePack'})=='ExamplePack')
+assert(T.packName({})=='Unknown pack')
+local recent={id='1',setTitle='',setShortName='',recentRank=1}
+T.mergeMetadata(recent,{setTitle='Installed pack',setShortName='InstalledPack',icon='/inert.png'})
+assert(T.packName(recent)=='Installed pack' and recent.icon=='/inert.png' and recent.recentRank==1)
+T.mergeMetadata(recent,{setTitle='Different pack'})
+assert(T.packName(recent)=='Installed pack','A duplicate must not overwrite known pack metadata')
 print('TELEGRAM_EMOJI_PAYLOAD_TESTS_PASSED')
