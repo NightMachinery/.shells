@@ -2,14 +2,18 @@
 local source = assert(io.open('hammerspoon/core/choosers.lua')):read('*a')
 local block = assert(source:match('(local emojiData = {}.-)\n%-%-%- %* Wi%-Fi Chooser'))
 local keys, tap, chooser, tally, clipboard, canvas, pasted = {}, nil, nil, nil, nil, nil, 0
+local aliasText, aliasDecodes = 'aliases', 0
 local data = {
     ['😀']={name='a recent', unicode_version='6.1'},
     ['🫪']={name='b newer', unicode_version='17.0'},
     ['🫫']={name='c newest', unicode_version='18.0'},
 }
 local env = setmetatable({
-    io={open=function(path) return {read=function() return path:find('aliases.json',1,true) and 'aliases' or '{}' end,close=function() end} end},
-    json={decode=function(text) return text=='aliases' and {['😀']={'unimpressed','eye'}} or data end},
+    io={open=function(path) return {read=function() return path:find('aliases.json',1,true) and aliasText or '{}' end,close=function() end} end},
+    json={decode=function(text)
+        if text:match('^aliases') then aliasDecodes=aliasDecodes+1;return {['😀']=text=='aliases' and {'unimpressed','eye'} or {'fresh keyword'}} end
+        return data
+    end},
     alert_gateway=function(text) tally=text end,
     alert_gateway_dismiss=function() tally=nil end,
     inputLangPush=function() end, inputLangPop=function() end, langSetEn=function() end,
@@ -131,4 +135,10 @@ documentMode();table.remove(timers,1)()
 assert(presses==1,'Only enable document checkbox; never press Send')
 documentMode();env.hs.pasteboard.changeCount=function()return 8 end;table.remove(timers,1)()
 assert(presses==1,'A newer clipboard must cancel late Telegram automation')
+local cachedAliases=env.emojiChooserAliases();local parsed=aliasDecodes
+assert(env.emojiChooserAliases()==cachedAliases and aliasDecodes==parsed,'Unchanged aliases should not be decoded again')
+env.emojiChooser();local cachedRow=chooser.rows[1];chooser.onHide()
+env.emojiChooser();assert(chooser.rows[1]==cachedRow,'Unchanged row metadata should be reused');chooser.onHide()
+aliasText='aliases2'
+env.emojiChooser();assert(chooser.rows[1]~=cachedRow and chooser.rows[1].searchText:find('fresh keyword',1,true),'Alias edits must invalidate rows on the next opening');chooser.onHide()
 print('EMOJI_CHOOSER_TESTS_PASSED')

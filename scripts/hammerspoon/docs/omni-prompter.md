@@ -113,6 +113,11 @@ leading man/woman in a joined profession to the neutral person. Thus `smh` finds
 both gendered facepalms, `coder` finds gendered/skin-tone professions, and Telegram's
 unqualified `❤` finds the aliases stored on `❤️`. Keep the words on their canonical
 data entries; do not copy them into every variant.
+For fast opening, the picker uses native JSON decoding, retains parsed aliases
+while the file bytes are unchanged, and reuses static row metadata. The small
+file is still read on every opening, so edits take effect immediately even if
+its timestamp and size stay the same. Each opening sorts a separate row array
+using current recency, so the cache never freezes usage order.
 
 ## Telegram premium emoji
 

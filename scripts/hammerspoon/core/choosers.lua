@@ -156,11 +156,15 @@ function emojiChooserImage(emoji, resolution)
     return image or nil
 end
 
+local emojiAliasContent, emojiAliasData
+
 function emojiChooserAliases()
     local file = io.open(os.getenv("HOME") .. "/code/misc/unicode-emoji-json/aliases.json", "r")
     if not file then return {} end
     local content = file:read("*a"); file:close()
-    local ok, data = pcall(json.decode, content)
+    if content == emojiAliasContent then return emojiAliasData end
+    local decoder = hs.json and hs.json.decode or json.decode
+    local ok, data = pcall(decoder, content)
     if not ok or type(data) ~= "table" then
         alert_gateway("Cannot read emoji aliases.json", {color="warn"})
         return {}
@@ -174,6 +178,7 @@ function emojiChooserAliases()
             end
         end
     end
+    emojiAliasContent, emojiAliasData = content, result
     return result
 end
 
@@ -360,6 +365,28 @@ function emojiChooserWebp(emojis, callback)
     end)
 end
 
+local emojiRowCache
+local function emojiRows(aliases)
+    if not emojiRowCache or emojiRowCache.data ~= emojiData or emojiRowCache.aliases ~= aliases then
+        local rows = {}
+        for emoji, info in pairs(emojiData) do
+            local version = tonumber(info.unicode_version) or tonumber(info.emoji_version) or 0
+            local image = emojiChooserImage(emoji)
+            rows[#rows+1] = {
+                text=image and info.name or emoji,
+                subText=image and ("Unicode " .. tostring(version)) or info.name,
+                emoji=emoji, name=info.name, image=image, unicodeVersion=version,
+                searchText=emoji .. " " .. (info.slug or "") .. " " .. table.concat(emojiChooserAliasesFor(aliases,emoji)," "),
+            }
+        end
+        emojiRowCache = {data=emojiData, aliases=aliases, rows=rows}
+    end
+    -- Sorting is per opening; cached row metadata never stores a stale MRU order.
+    local rows = {}
+    for i,row in ipairs(emojiRowCache.rows) do rows[i] = row end
+    return rows
+end
+
 function emojiChooser()
     local recent=ChooserSearch.recent("emoji")
     local selectedEmojis = {} -- Table to store selected emojis
@@ -419,21 +446,8 @@ function emojiChooser()
     end)
     local sortMode = "recent"
 
-    local choices = {}
     local aliases = emojiChooserAliases()
-    for emoji, info in pairs(emojiData) do
-        local version = tonumber(info.unicode_version) or tonumber(info.emoji_version) or 0
-        local image = emojiChooserImage(emoji)
-        table.insert(choices, {
-                         text = image and info.name or emoji,
-                         subText = image and ("Unicode " .. tostring(version)) or info.name,
-                         emoji = emoji,
-                         name = info.name,
-                         image = image,
-                         searchText = emoji .. " " .. (info.slug or "") .. " " .. table.concat(emojiChooserAliasesFor(aliases, emoji), " "),
-                         unicodeVersion = version,
-        })
-    end
+    local choices = emojiRows(aliases)
 
     local function alphabetical(a, b)
         if a.name ~= b.name then return a.name < b.name end
