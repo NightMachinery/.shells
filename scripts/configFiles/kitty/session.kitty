@@ -6,7 +6,9 @@
 ##
 cd ~/tmp
 # launch /usr/local/bin/bicon_zsh.dash
-launch /usr/local/bin/zsh -c 'ivy'
+#: Background services may already have a tmux server before ivy exists.
+#: Create ivy directly in that case; ivy's reuse prompt assumes it exists.
+launch /usr/local/bin/zsh -c 'if command tmux has-session -t "=ivy" 2>/dev/null; then ivy; else ivy-self; fi'
 
 new_tab
 cd ~/tmp

@@ -194,6 +194,24 @@ macOS has no `/bin/dash`. Compile Kitty's bundled `kitty.terminfo` into
 `~/.terminfo`, and verify `TERM=xterm-kitty infocmp` and an interactive login
 shell. Recheck the symlink targets before launching the GUI.
 
+Kitty also needs `~/.kitty_custom_1.conf` linked to
+`~/scripts/configFiles/kitty/me.conf`. That include selects `session.kitty`,
+with the ivy workspace and terminal Emacs among the tabs, and exports the
+terminal background hints. Without it, Kitty starts a plain shell. Session
+changes require a full Kitty restart, which can terminate direct child jobs;
+coordinate that restart rather than closing a user's terminal to test it.
+The first ivy tab creates its workspace when absent, even when background
+services already have a tmux server. Existing ivy workspaces keep the normal
+reuse path.
+
+The workstation include removes inherited `SSH_CLIENT`, `SSH_CONNECTION`,
+`SSH_TTY`, `PROMPT_PURE_SSH_CONNECTION` and `amSSH` from local Kitty children.
+An app opened through SSH can inherit these markers, causing Pure to show
+`user@host` in a local tab despite the prompt's stale-utmpx guard. Actual
+SSH/mosh sessions establish their own remote context. When bootstrapping an
+already-running tmux server over SSH, clear stale global transport markers
+there too before creating local sessions; preserve existing session state.
+
 Generate agent instructions with [agfi:agents-md-sync] and install the available
 skill links with [agfi:agent-skills-link]. Keep generated global instruction
 files managed by those helpers. Provider sign-ins and private skill/config
