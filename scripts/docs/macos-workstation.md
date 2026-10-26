@@ -130,9 +130,40 @@ export NIGHT_BRISH_WORKERS=8
 export NIGHT_WORKSTATION_OPEN_APPS=y
 ```
 
-Paseo Desktop manages its bundled daemon by default. A host deliberately using
-standalone mode may set `NIGHT_PASEO_STANDALONE=y`; disable Desktop daemon
-management in that case. Do not run both supervisors for the same home.
+Paseo Desktop manages its bundled daemon by default. For a standalone daemon,
+first install a CLI version matching Desktop into an independent npm prefix:
+
+```zsh
+npm install --global --prefix "$HOME/.local/share/paseo-cli" @getpaseo/cli@VERSION
+"$HOME/.local/share/paseo-cli/bin/paseo" --version
+```
+
+Use the version reported by the affected Desktop/daemon, rather than upgrading
+one side silently. This avoids altering a shared pnpm store. Check that `paseo`
+resolves to this independent installation, not Desktop's bundled launcher.
+Before takeover, confirm there are no active agents, back up Desktop settings,
+and quit Desktop. Set `settings.daemon.manageBuiltInDaemon` in Desktop's settings
+file to false, keeping
+all other settings, then start the standalone CLI with the existing `PASEO_HOME`.
+Preserve its config, server identity and pairing files. Start it after login
+initialization with the account's shell explicitly selected (`SHELL=/bin/zsh`),
+since helper initialization can change the inherited `SHELL`. Set
+`NIGHT_PASEO_STANDALONE=y` in `~/.startup..private..zsh` so this workstation's
+login launcher starts the CLI supervisor; the supervisor backgrounds itself.
+
+Verify `paseo daemon status --json` reports `desktopManaged: false`, a reachable
+daemon and the same server identity. Reopen and quit Desktop once and confirm
+the standalone supervisor stays alive. Repeat `paseo daemon start` and verify
+it reuses that supervisor. Test boot recovery separately after FileVault unlock.
+Do not run both supervisors for the same home.
+
+Install provider CLIs in the destination account and run
+`paseo provider diagnostic claude --json` (also `codex` and `antigravity`) against
+the actual daemon. A binary or provider marked available does not prove an
+account is signed in. Use fresh provider login flows unless credential migration
+has been explicitly approved; do not copy an entire agent home to install a CLI.
+See [Paseo's server install](https://paseo.sh/docs.md) and
+[daemon lifecycle](https://paseo.sh/docs/cli.md).
 
 For login startup, create a user LaunchAgent invoking the Homebrew Zsh with
 `-lc 'source "$HOME/scripts/launchers/various-darwin.zsh"'`. Run it once at login,
