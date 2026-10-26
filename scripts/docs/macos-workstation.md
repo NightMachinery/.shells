@@ -187,12 +187,32 @@ GitHub repository used by the source machine, even if the transport is HTTPS
 until the new host has its own GitHub authentication.
 
 Kitty's configuration uses Fira Code and Victor Mono, plus helper commands in
-`/usr/local/bin`. Install those fonts, link `bicon_zsh.dash`, `ffscrollback.sh`,
+`/usr/local/bin`. Doom additionally requires Fira Mono and Symbols Nerd Font Mono;
+Fira Code does not provide the Fira Mono family. Install those fonts, link `bicon_zsh.dash`, `ffscrollback.sh`,
 `emacs_scrollback.sh` and `wait4user.sh` from `zshlang/wrappers`, and expose the
 Homebrew Zsh as `/usr/local/bin/zsh`. The terminal wrapper uses `/bin/sh` because
 macOS has no `/bin/dash`. Compile Kitty's bundled `kitty.terminfo` into
 `~/.terminfo`, and verify `TERM=xterm-kitty infocmp` and an interactive login
 shell. Recheck the symlink targets before launching the GUI.
+
+Copy the configured font files directly into `~/Library/Fonts`, preserving
+changed destination files in a small backup. The current selection includes
+Fira Code, Fira Mono, Victor Mono, Symbols Nerd Font Mono and the legacy
+all-the-icons families. Copy actual font files rather than another account's
+absolute symlinks. A file in that directory is not proof it is registered.
+Build `setup/macOS/register-fonts.m` with Foundation and CoreText, then run it
+as the graphical user with the font paths. It registers at user scope and
+accepts an already-registered font; JSON output reports failures per file.
+When installing over SSH, run registration as a one-shot LaunchAgent in the
+`gui/<uid>` domain and remove that job afterward.
+
+A missing `Fira Mono` can interrupt Doom's `after-init-hook` before theme
+loading and finalization, so both the theme and Space leader can be absent
+while `night-loaded` is true. Treat that marker as configuration evaluation,
+not completed UI startup. After installing the font, repair an affected live
+instance with `doom-init-fonts-h`, `doom-init-theme-h` and, only when
+`doom-init-time` is nil, `doom-finalize`. This preserves buffers. Verify full
+startup and the intended interaction only within the owner's testing scope.
 
 Kitty also needs `~/.kitty_custom_1.conf` linked to
 `~/scripts/configFiles/kitty/me.conf`. That include selects `session.kitty`,
