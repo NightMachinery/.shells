@@ -16,6 +16,12 @@ Point it at an external monitor and it gives up:
     brightness: unable to get brightness of display 0x2
     display 0: main, active, awake, online, external, ID 0x2
 
+Install it with `ensure-dep-brightness` (`brew install brightness`, the same
+tool). A blackout runs that first, once, in its detached job; the listing itself
+never installs and fails with an assert when the tool is missing. Before
+2026-10-26 a fresh Mac had no step that installed it, so Hyper+Shift+F1 failed
+silently.
+
 External monitors are reached over DDC/CI instead, through `m1ddc` — a separate
 protocol spoken over the video link itself, and Apple Silicon only. Neither tool
 can do the other's job, so each display is driven by whichever one can reach it:
