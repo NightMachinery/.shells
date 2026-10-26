@@ -16,8 +16,10 @@ Point it at an external monitor and it gives up:
     brightness: unable to get brightness of display 0x2
     display 0: main, active, awake, online, external, ID 0x2
 
-Install it with `ensure-dep-brightness` (`brew install brightness`, the same
-tool). A blackout runs that first, once, in its detached job; the listing itself
+Install it with `ensure-dep-brightness` (`brew install --HEAD brightness`).
+HEAD matters: the 1.2 bottle predates nriley's Apple Silicon support, so on an
+M2 it lists the built-in panel but cannot read or set it, and a blackout leaves
+it lit. A blackout runs that install first, once, in its detached job; the listing itself
 never installs and fails with an assert when the tool is missing. Before
 2026-10-26 a fresh Mac had no step that installed it, so Hyper+Shift+F1 failed
 silently.

@@ -3,9 +3,12 @@ function ensure-dep-pdftk {
 }
 ##
 function ensure-dep-brightness {
-    #: nriley brightness: the IOKit backend for built-in panels, and the display
+    #: nriley brightness: the backend for built-in panels, and the display
     #: listing every blackout starts from. See [agfi:brightness-displays-internal].
-    ensure-dep1 brightness brew install brightness || return $?
+    #: HEAD, because the 1.2 bottle predates Apple Silicon support (nriley
+    #: 4270134, DisplayServices): on an M2 it lists the panel but cannot read or
+    #: set it (kIOReturnUnsupported), so a blackout leaves it lit.
+    ensure-dep1 brightness brew install --HEAD brightness || return $?
 }
 ##
 function ensure-dep-m1ddc {
