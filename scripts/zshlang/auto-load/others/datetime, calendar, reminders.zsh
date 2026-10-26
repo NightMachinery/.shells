@@ -200,6 +200,8 @@ function date-spain {
 function date-germany-berlin {
     TZ='Europe/Berlin' date +'%Y-%m-%d %A %H:%M:%S'
 }
+aliasfn date-germany date-germany-berlin
+aliasfn date-munich date-germany-berlin
 
 function date-italy {
     TZ='Europe/Rome' date +'%Y-%m-%d %A %H:%M:%S'
