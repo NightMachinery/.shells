@@ -136,12 +136,11 @@ loadEmojiData()
 local kEmojiAlertId = "emoji-chooser"
 local emojiPreviews = {}
 
-local function emojiPreview(emoji, version)
-    if version < 16 then return nil end
+function emojiChooserImage(emoji)
     if emojiPreviews[emoji] == nil then
         local codes = {}
         for _, code in utf8.codes(emoji) do
-            if code ~= 0xfe0f then codes[#codes + 1] = string.format("%x", code) end
+            if code ~= 0xfe0f then codes[#codes + 1] = string.format("%04x", code) end
         end
         local path = os.getenv("HOME") .. "/Library/Caches/night-emoji/noto-18.0/emoji_u" ..
             table.concat(codes, "_") .. ".png"
@@ -151,9 +150,56 @@ local function emojiPreview(emoji, version)
     return emojiPreviews[emoji] or nil
 end
 
+function emojiChooserAliases()
+    local file = io.open(os.getenv("HOME") .. "/code/misc/unicode-emoji-json/aliases.json", "r")
+    if not file then return {} end
+    local content = file:read("*a"); file:close()
+    local ok, data = pcall(json.decode, content)
+    if not ok or type(data) ~= "table" then
+        alert_gateway("Cannot read emoji aliases.json", {color="warn"})
+        return {}
+    end
+    local result = {}
+    for emoji, words in pairs(data) do
+        if type(words) == "table" then
+            result[emoji] = {}
+            for _, word in ipairs(words) do
+                if type(word) == "string" then result[emoji][#result[emoji]+1] = word end
+            end
+        end
+    end
+    return result
+end
+
+function emojiChooserName(emoji)
+    local info = emojiData[emoji] or emojiData[emoji .. "\239\184\143"]
+    return info and info.name or emoji
+end
+
+-- Offscreen canvas: no windows, screenshots or font substitution are involved.
+function emojiChooserPng(emojis)
+    assert(#emojis > 0 and #emojis <= 128, "Choose between 1 and 128 emoji for a PNG")
+    local side = 128
+    local canvas = hs.canvas.new({x=0, y=0, w=side*#emojis, h=side})
+    local ok, result = pcall(function()
+        for i, emoji in ipairs(emojis) do
+            local image = assert(emojiChooserImage(emoji), "Missing cached emoji image; run emoji-images.py")
+            canvas:insertElement({type="image", image=image, imageScaling="scaleProportionally",
+                                  frame={x=(i-1)*side, y=0, w=side, h=side}})
+        end
+        local image = assert(canvas:imageFromCanvas())
+        local data = assert(image:encodeAsURLString(true, "PNG"):match("^data:image/png;base64,(.*)$"))
+        return assert(hs.base64.decode(data))
+    end)
+    canvas:delete()
+    if not ok then error(result) end
+    return result
+end
+
 function emojiChooser()
     local recent=ChooserSearch.recent("emoji")
     local selectedEmojis = {} -- Table to store selected emojis
+    local pendingPng
 
     local function updateAlert()
         if #selectedEmojis >= 1 then
@@ -192,8 +238,12 @@ function emojiChooser()
             -- =keyStrokes= cannot insert some emojis.
             ---
             recent.record(selectedEmojis)
-            copyToClipboard(emojiString)
-            doPaste()
+            if pendingPng then
+                if hs.pasteboard.writeAllData({["public.png"]=pendingPng}) then doPaste() end
+            else
+                copyToClipboard(emojiString)
+                doPaste()
+            end
             ---
 
             selectedEmojis = {}
@@ -203,15 +253,17 @@ function emojiChooser()
     local sortMode = "recent"
 
     local choices = {}
+    local aliases = emojiChooserAliases()
     for emoji, info in pairs(emojiData) do
         local version = tonumber(info.unicode_version) or tonumber(info.emoji_version) or 0
-        local image = emojiPreview(emoji, version)
+        local image = emojiChooserImage(emoji)
         table.insert(choices, {
                          text = image and info.name or emoji,
                          subText = image and ("Unicode " .. tostring(version)) or info.name,
                          emoji = emoji,
                          name = info.name,
                          image = image,
+                         searchText = emoji .. " " .. (info.slug or "") .. " " .. table.concat(aliases[emoji] or {}, " "),
                          unicodeVersion = version,
         })
     end
@@ -261,8 +313,25 @@ function emojiChooser()
         end
     end
 
+    local function pastePng()
+        local emojis = selectedEmojis
+        if #emojis == 0 then
+            local choice = chooser:selectedRowContents()
+            if not choice then return end
+            emojis = {choice.emoji}
+        end
+        local ok, data = pcall(emojiChooserPng, emojis)
+        if not ok then
+            alert_gateway("Emoji PNG: " .. tostring(data), {color="warn"})
+            return
+        end
+        pendingPng = data
+        chooser:select()
+    end
+
     local hotkeys = {
         shiftEnter = hs.hotkey.bind('shift', 'return', addCurrent),
+        png = hs.hotkey.bind('cmd', 'return', pastePng),
         tab = hs.hotkey.bind('', 'tab', cycleSort),
         backslash = hs.hotkey.bind('', '\\', removeLast),
         shiftTab = hs.hotkey.bind('shift', 'tab', removeLast)

@@ -53,17 +53,35 @@ now use the standard stdin helper. See the linked prompt-family corrections for
 pipeline, mode, code-fence and JSON fixes in the
 [prompt-family corrections](../../docs/prompt-family-review.md).
 
-Emoji picker controls: Tab alternates recent-usage order and newest Unicode
-introduction first. Shift+Enter adds the highlighted emoji; Shift+Backspace
-removes one per key-down, including repeated presses while Shift stays held.
-Shift+Tab and backslash also remove the last selection. The scoped key listener
-stops when the picker closes.
+## Emoji picker
 
-For emoji that Apple's font does not yet draw, run
-`python3 hammerspoon/bin/emoji-images.py` after installing the emoji data repo.
-It caches official Noto previews for Unicode 16 and later, including Unicode 18,
-under `~/Library/Caches/night-emoji/noto-18.0`. The chooser uses the image and
-name when available; copying and recency still use the original Unicode emoji.
-Missing cached previews fall back to the normal system text rendering. The
-cache includes source/release metadata and the artwork licenses. This avoids
-relying on Noto's CBDT/CBLC color font support in macOS AppKit.
+Hyper+A opens the emoji picker. Every row uses a large Noto image and the
+Unicode name, including older joined sequences such as 🙂‍↔️.
+
+- Tab alternates recent usage and newest Unicode introduction first.
+- Shift+Enter adds the highlighted emoji. Shift+Backspace removes one selection
+  per key-down, including repeated presses with Shift held. Shift+Tab and
+  backslash also remove the last selection.
+- Enter pastes the selected Unicode text, or the highlighted emoji when empty.
+- Cmd+Enter builds a horizontal transparent PNG from the same cached artwork,
+  copies it to the clipboard and presses Cmd+V. With no multi-selection it uses
+  the highlighted emoji. Each cell is 128px; up to 128 emoji fit in one export.
+
+Install the emoji data repo, then run:
+
+```sh
+python3 hammerspoon/bin/emoji-images.py
+```
+
+This caches all 1,923 official Noto previews, source metadata and licenses under
+`~/Library/Caches/night-emoji/noto-18.0` (about 12 MB). Country/subdivision flags
+use Noto's regional artwork, with aliases resolved and large originals resized.
+Downloads resume from valid cached files. No font installation is needed.
+Normal Unicode paste still depends on the receiving app's font support.
+
+Search includes official names and `~/code/misc/unicode-emoji-json/aliases.json`.
+That versioned file maps exact emoji strings to keyword arrays, is read whenever
+the chooser opens, and is separate from generated Unicode data. For example,
+`"😒": ["unimpressed", "eye", "meh"]`. Keywords are indexed without cluttering
+row labels. Add personal terms there and sync the emoji repository.
+
