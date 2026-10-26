@@ -3,6 +3,7 @@ local source = assert(io.open('hammerspoon/core/choosers.lua')):read('*a')
 local block = assert(source:match('(local emojiData = {}.-)\n%-%-%- %* Wi%-Fi Chooser'))
 local keys, tap, chooser, tally, clipboard, canvas, pasted = {}, nil, nil, nil, nil, nil, 0
 local aliasText, aliasDecodes = 'aliases', 0
+local imageLoads, prewarmTimers = 0, {}
 local data = {
     ['😀']={name='a recent', unicode_version='6.1'},
     ['🫪']={name='b newer', unicode_version='17.0'},
@@ -34,7 +35,8 @@ local env = setmetatable({
     },
     hs={
         fs={attributes=function()return 'file' end},
-        image={imageFromPath=function(path)return path end},
+        image={imageFromPath=function(path)imageLoads=imageLoads+1;return path end},
+        timer={doAfter=function(delay,fn)prewarmTimers[#prewarmTimers+1]={delay=delay,fn=fn};return {stop=function()end} end},
         base64={decode=function(value)assert(value=='PNG');return 'png-bytes' end},
         pasteboard={writeAllData=function(value)clipboard=value;return true end},
         canvas={new=function(frame)
@@ -52,8 +54,15 @@ local env = setmetatable({
             tap={callback=fn,start=function(self)self.running=true;return self end,stop=function(self)self.running=false end};return tap
         end},
     },
+    emojiChooserPrewarmBatch=2,
 }, {__index=_G})
 assert(load(block,'emoji-chooser','t',env))()
+assert(#prewarmTimers==1 and prewarmTimers[1].delay==5 and imageLoads==0 and aliasDecodes==0,'Loading only schedules the prewarm')
+local prewarmed=false
+env.emojiChooserPrewarm(function()prewarmed=true end)
+local steps=0
+while not prewarmed do steps=steps+1;table.remove(prewarmTimers).fn() end
+assert(steps==3 and imageLoads==3 and aliasDecodes==1,'Prewarm loads images in chunks, then aliases and rows once')
 local variantAliases={['🤦']={'smh','ffs'},['🤦‍♀️']={'facepalm woman','SMH'},
     ['🧑‍💻']={'coder','developer'},['👩‍💻']={'hacker'},['❤️']={'love'},['👍']={'yes'},['🧑']={'person'}}
 local function words(emoji)return table.concat(env.emojiChooserAliasesFor(variantAliases,emoji),'|') end
@@ -67,6 +76,7 @@ assert(words('❤')=='love' and words('❤️')=='love')
 assert(words('👍🏿')=='yes')
 assert(words('👩')=='' and words('🦀')=='','Do not invent unrelated person aliases')
 env.emojiChooser()
+assert(imageLoads==3 and aliasDecodes==1,'The first opening after prewarm reuses every cache')
 assert(chooser.rows[1].emoji=='😀')
 assert(chooser.rows[1].text=='a recent' and chooser.rows[1].image,'Every row uses the large icon layout')
 assert(chooser.rows[1].searchText:find('unimpressed',1,true))

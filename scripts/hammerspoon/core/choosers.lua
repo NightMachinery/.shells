@@ -387,6 +387,38 @@ local function emojiRows(aliases)
     return rows
 end
 
+-- The caches above die with the Lua state, so warm them after each load: a cold
+-- first Hyper+A took about 1 s, 0.7 s of it loading previews. Images load in
+-- chunks of about 25 ms; decoding aliases and building rows take one tick
+-- each. Set emojiChooserPrewarmDelay=false to disable.
+-- The timer handle is global because a local one is collected and never fires.
+emojiChooserPrewarmDelay = emojiChooserPrewarmDelay == nil and 5 or emojiChooserPrewarmDelay
+emojiChooserPrewarmBatch = emojiChooserPrewarmBatch or 64
+function emojiChooserPrewarm(done)
+    if emojiChooserPrewarmTimer then emojiChooserPrewarmTimer:stop() end
+    local pending, index = {}, 0
+    for emoji in pairs(emojiData) do pending[#pending+1] = emoji end
+    local function step()
+        emojiChooserPrewarmTimer = nil
+        for _ = 1, emojiChooserPrewarmBatch do
+            index = index + 1
+            if index > #pending then
+                -- Separate ticks, so no single stall holds both large steps.
+                emojiChooserAliases()
+                emojiChooserPrewarmTimer = hs.timer.doAfter(0.05, function()
+                    emojiChooserPrewarmTimer = nil
+                    emojiRows(emojiChooserAliases())
+                    if done then done() end
+                end)
+                return
+            end
+            emojiChooserImage(pending[index])
+        end
+        emojiChooserPrewarmTimer = hs.timer.doAfter(0.05, step)
+    end
+    emojiChooserPrewarmTimer = hs.timer.doAfter(emojiChooserPrewarmDelay or 0, step)
+end
+
 function emojiChooser()
     local recent=ChooserSearch.recent("emoji")
     local selectedEmojis = {} -- Table to store selected emojis
@@ -590,6 +622,7 @@ function emojiChooser()
     -- local _ = defer(cleanup)
 end
 hyper_bind_v2{mods={}, key="a", pressedfn=emojiChooser}
+if emojiChooserPrewarmDelay then emojiChooserPrewarm() end
 --- * Wi-Fi Chooser
 -- One id for the whole connect flow, so "Connecting" is replaced by its own
 -- outcome rather than leaving two bands stacked.

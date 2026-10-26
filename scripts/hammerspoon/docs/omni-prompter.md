@@ -118,6 +118,12 @@ while the file bytes are unchanged, and reuses static row metadata. The small
 file is still read on every opening, so edits take effect immediately even if
 its timestamp and size stay the same. Each opening sorts a separate row array
 using current recency, so the cache never freezes usage order.
+These caches live in the Lua state, so each reload starts cold. Five seconds
+after loading, Hammerspoon prewarms them on idle timers: previews in batches of
+64 (about 25 ms each), then the aliases, then the rows. Measured on 2026-10-26,
+the first opening after a reload took 99–113 ms instead of about 1 s. The
+longest stall was about 0.19 s, the alias JSON decode, which cannot be split.
+Set `emojiChooserPrewarmDelay=false` before loading to turn it off.
 
 ## Telegram premium emoji
 
