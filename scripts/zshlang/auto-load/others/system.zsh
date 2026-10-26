@@ -647,10 +647,10 @@ Output (TSV): index, main|-, built-in|external, CGDirectDisplayID (decimal)"
     # @darwinOnly
     ##
     assert isDarwin @MRET
-    #: Like [agfi:brightness-displays-ddc], no auto-install on this hot path; a
-    #: missing tool used to look like a listing with no displays. Blackouts
-    #: install it first ([agfi:h-display-black-loop]); otherwise run
-    #: [agfi:ensure-dep-brightness].
+    #: Like [agfi:brightness-displays-ddc], no auto-install on this hot path. A
+    #: missing tool used to fail only inside the detached blackout job, whose
+    #: output nobody sees. Blackouts install it first
+    #: ([agfi:h-display-black-loop]); otherwise run [agfi:ensure-dep-brightness].
     assert isdefined-cmd brightness @MRET
 
     #: `brightness` exits 0 even when it cannot read a display, and writes that
