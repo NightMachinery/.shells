@@ -87,30 +87,67 @@ function firewall-allow-mosh-darwin() {
     return $?
   fi
 
+  if [[ "$1" == '--check' ]] ; then
+    if h-firewall-allow-app-darwin --check "$0" "$mosh_sym" "$mosh_abs" ; then
+      ec "$0: That is ALF's claim, not proof; \`--probe PEER\` tests real traffic."
+      return 0
+    else
+      ecerr "$0: run \`${0}\` to register it (mosh will hang on UDP until you do)."
+      return 1
+    fi
+  fi
+
+  h-firewall-allow-app-darwin "$0" "$mosh_sym" "$mosh_abs" @RET
+
+  firewall-allow-mosh-darwin --check
+  ecgray "$0: for real proof, run \`$0 --probe PEER\` from here."
+}
+
+function h-firewall-allow-app-darwin() {
+  #: Register an ad-hoc signed binary with the macOS Application Firewall (ALF),
+  #: or with --check report what ALF claims about it. Shared by
+  #: [agfi:firewall-allow-mosh-darwin] and [agfi:tailscale-firewall-allow-darwin];
+  #: the former explains why such binaries need this.
+  #:
+  #: @usage h-firewall-allow-app-darwin [--check] CALLER SYMLINK_PATH RESOLVED_PATH
+  ##
+  local check_p=n
+  if [[ "$1" == '--check' ]] ; then
+    check_p=y
+    shift
+  fi
+  local caller="$1" sym="$2" abs="$3"
+  assert-args caller sym abs @RET
+
+  local fw='/usr/libexec/ApplicationFirewall/socketfilterfw'
+  if ! test -x "$fw" ; then
+    ecerr "${caller}: no socketfilterfw at ${fw} (not macOS?)"
+    return 1
+  fi
+
   #: Reads need no privileges, so --check stays usable from a non-interactive
   #: session and cannot prompt for anything.
-  if [[ "$1" == '--check' ]] ; then
+  if bool "${check_p}" ; then
     reval-ec "$fw" --getglobalstate
     reval-ec "$fw" --getstealthmode
 
     local p
-    for p in "$mosh_sym" "$mosh_abs" ; do
+    for p in "$sym" "$abs" ; do
       reval-ec "$fw" --getappblocked "$p"
     done
 
-    reval-ec "$fw" --listapps | grep -i -- mosh
+    reval-ec "$fw" --listapps | grep -F -- "${abs:t}"
 
     #: The RESOLVED path is the one that decides it; ALF canonicalises symlinks
     #: on --add and stores the real binary, so the SYMLINK line above keeps
     #: reporting "not part of the firewall" even after a successful run. That
     #: is expected, not a failure. socketfilterfw also exits 0 for an
     #: unregistered app, so the text is the only signal either way.
-    if "$fw" --getappblocked "$mosh_abs" 2>/dev/null | grep -q -- 'is permitted' ; then
-      ec "$0: ALF lists ${mosh_abs} as permitted. That is ALF's claim, not proof; \`--probe PEER\` tests real traffic."
+    if "$fw" --getappblocked "$abs" 2>/dev/null | grep -q -- 'is permitted' ; then
+      ec "${caller}: ALF lists ${abs} as permitted."
       return 0
     else
-      ecerr "$0: NOT ALLOWED -- ${mosh_abs}"
-      ecerr "$0: run \`${0}\` to register it (mosh will hang on UDP until you do)."
+      ecerr "${caller}: NOT ALLOWED -- ${abs}"
       return 1
     fi
   fi
@@ -122,12 +159,9 @@ function firewall-allow-mosh-darwin() {
   #: --remove first: a stale entry still lists as allowed, and --add on an
   #: already-present path is a no-op, so only remove-then-add refreshes it.
   #: Only the resolved path: ALF canonicalises symlinks on --add anyway.
-  reval-ec "$sudo_cmd[@]" "$fw" --remove "$mosh_abs"
-  reval-ec "$sudo_cmd[@]" "$fw" --add "$mosh_abs"
-  reval-ec "$sudo_cmd[@]" "$fw" --unblockapp "$mosh_abs"
-
-  firewall-allow-mosh-darwin --check
-  ecgray "$0: for real proof, run \`$0 --probe PEER\` from here."
+  reval-ec "$sudo_cmd[@]" "$fw" --remove "$abs"
+  reval-ec "$sudo_cmd[@]" "$fw" --add "$abs" @RET
+  reval-ec "$sudo_cmd[@]" "$fw" --unblockapp "$abs" @RET
 }
 
 function h-firewall-mosh-probe-darwin() {

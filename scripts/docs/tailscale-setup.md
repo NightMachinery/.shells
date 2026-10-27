@@ -75,6 +75,15 @@ dropping rather than by reporting an error:
   proof. `firewall-allow-mosh-darwin --probe PEER` is: it has an ssh peer send
   UDP to a disposable mosh-server and counts the bytes that arrive.
 
+  Homebrew's `tailscaled` is another casualty, and a quieter one: nothing
+  fails, Tailscale just relays every connection through DERP. Two Macs on the
+  same LAN moved data at about 2.7 MB/s that way. Register it with
+  [agfi:tailscale-firewall-allow-darwin], again after every
+  `brew upgrade tailscale`, and confirm with
+  `tailscale-firewall-allow-darwin --probe PEER`, which passes only when
+  `tailscale ping` finds a direct path. The Developer ID signed Tailscale.app
+  does not need this.
+
 ## Android internet failures: separate DNS from connectivity
 
 An SSH connection into Termux over Tailscale can keep working while Android's
