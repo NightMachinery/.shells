@@ -345,24 +345,72 @@ function h-sudo-cmd {
 }
 ##
 function sudo-patch-touchid-darwin {
-    if [[ "$(uname)" == 'Darwin' ]] ; then
-        local dir=''
-        if isAppleSilicon ; then
-            dir='/opt/homebrew/lib/pam/'
-        fi
-
-        #: @warn These corrupted /etc/pam.d/sudo on Aeirya's computer. Add the lines manually and keep the editor open. It's not trivial to fix a broken PAM file. (https://superuser.com/questions/1368246/accidentally-added-a-character-outside-of-a-comment-in-sudo-file-on-mac-sudo-no)
-        #: The problem likely was that one of the added modules was not installed.
-        if ! command grep 'pam_tid.so' /etc/pam.d/sudo --silent; then
-            # Enables touch ID for sudo:
-            command sudo sed -i -e '1s;^;auth       sufficient     pam_tid.so\n;' /etc/pam.d/sudo
-        fi
-        if ! command grep 'pam_reattach.so' /etc/pam.d/sudo --silent; then
-            # needs https://github.com/fabianishere/pam_reattach
-            # Reattach to the user's GUI session on macOS during authentication (for Touch ID support in tmux)
-            command sudo sed -i -e '1s;^;auth     optional     '"${dir}"'pam_reattach.so\n;' /etc/pam.d/sudo
-        fi
+    : "Enable Touch ID for sudo, including inside tmux, through /etc/pam.d/sudo_local."
+    #: sudo_local (macOS 14+) is included by /etc/pam.d/sudo and survives OS
+    #: updates, which reset /etc/pam.d/sudo itself. pam_reattach
+    #: (https://github.com/fabianishere/pam_reattach) lets pam_tid reach the GUI
+    #: session from tmux; `ignore_ssh` skips it over SSH, where Touch ID cannot work.
+    #:
+    #: @warn A PAM line naming a missing module can break sudo entirely, and a
+    #: broken PAM file is hard to repair without sudo
+    #: (https://superuser.com/questions/1368246). That is what happened when an
+    #: older version of this function sed-edited /etc/pam.d/sudo; BSD sed also
+    #: inserted a literal `n` for `\n`. So the module is installed and checked
+    #: first, and the file is written whole. Keep this sudo session open until
+    #: `sudo -k ; sudo -v` works in another terminal.
+    ##
+    if ! isDarwin ; then
+        ecerr "$0: macOS only"
+        return 1
     fi
+
+    local pam_d=/etc/pam.d
+    if command grep -q '^auth[[:space:]].*pam_tid\.so' "${pam_d}/sudo" ; then
+        ec "$0: ${pam_d}/sudo already enables pam_tid (set up by hand or by an older version); leaving it alone"
+        return 0
+    fi
+    if ! command grep -q '^auth[[:space:]]*include[[:space:]]*sudo_local' "${pam_d}/sudo" ; then
+        ecerr "$0: ${pam_d}/sudo does not include sudo_local (macOS older than 14?); add the lines to it by hand"
+        return 1
+    fi
+
+    if ! brew list --formula pam-reattach &>/dev/null ; then
+        reval-ec brew install pam-reattach @RET
+    fi
+    local reattach
+    reattach="$(brew --prefix)/lib/pam/pam_reattach.so" @TRET
+    if ! test -e "${reattach}" ; then
+        ecerr "$0: pam_reattach is not at ${reattach}; refusing to reference a missing module"
+        return 1
+    fi
+
+    local content="auth       optional       ${reattach} ignore_ssh
+auth       sufficient     pam_tid.so
+"
+    local dest="${pam_d}/sudo_local"
+    if test -e "${dest}" ; then
+        if [[ "$(<"${dest}")"$'\n' == "${content}" ]] ; then
+            ec "$0: ${dest} is already set up"
+            return 0
+        fi
+        ecerr "$0: ${dest} exists with other content; merge these lines into it by hand, pam_reattach first:"
+        ecerr "${content}"
+        return 1
+    fi
+
+    local sudo_cmd=( ${(@f)"$(h-sudo-cmd)"} )
+    local tmp
+    tmp="$(command mktemp)" @TRET
+    {
+        print -rn -- "${content}" > "${tmp}" @RET
+        #: /usr/bin/install, not `install': sudo runs a binary, and the shell's
+        #: own `install' may be something else entirely.
+        reval-ec "${sudo_cmd[@]}" /usr/bin/install -m 444 -o root -g wheel "${tmp}" "${dest}" @RET
+    } always {
+        command rm -f -- "${tmp}"
+    }
+    command cat -- "${dest}"
+    ecgray "$0: test it with \`sudo -k ; sudo -v\` in ANOTHER terminal before closing this one."
 }
 
 # function sudo() {
