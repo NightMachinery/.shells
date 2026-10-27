@@ -487,9 +487,24 @@ function mu-rsp-to {
     remote_rsync="${remote_rsync##*$'\n'}"
     assert test -n "${remote_rsync}" @RET
 
+    #: Prefer a LAN both machines share: Tailscale may relay through DERP at a
+    #: few MB/s even on one LAN. See [agfi:h-rsp-lan-pull] for the tradeoff
+    #: (unencrypted on the LAN while it runs); =mu_rsp_to_lan=n= opts out.
+    local -a lan=()
+    if bool "${mu_rsp_to_lan:-y}" ; then
+        lan=(${=$(h-rsp-lan-route "${host}")})
+    fi
+    if (( ${#lan} == 2 )) ; then
+        ecgray "$0: pulling over the shared LAN, ${lan[1]} -> ${lan[2]}"
+    fi
+
     local rel
     for rel in "${rels[@]}" ; do
-        reval-ec rsp-safe --links --rsync-path="${remote_rsync}" "$@" "${HOME}/${rel}/" "${host}:${rel}/" @RET
+        if (( ${#lan} == 2 )) ; then
+            h-rsp-lan-pull "${host}" "${lan[1]}" "${lan[2]}" "${remote_rsync}" "${HOME}/${rel}" "${rel}" "$@" @RET
+        else
+            reval-ec rsp-safe --links --rsync-path="${remote_rsync}" "$@" "${HOME}/${rel}/" "${host}:${rel}/" @RET
+        fi
     done
 
     #: Absolute links into this home (=~mu/Telegram Desktop=) would point at a missing

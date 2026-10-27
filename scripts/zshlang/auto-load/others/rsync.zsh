@@ -69,6 +69,94 @@ aliasfn rspm rsp --crtimes
 aliasfn rspb rsp --backup --backup-dir=.rsync-backup
 aliasfn rspbm rspb --crtimes
 ##
+function h-ip4-int {
+    local -a o=(${(s:.:)1})
+    print -r -- $(( (o[1] << 24) + (o[2] << 16) + (o[3] << 8) + o[4] ))
+}
+
+function h-rsp-lan-route {
+    : "Usage: h-rsp-lan-route HOST"
+    : "Print 'LOCAL_IP REMOTE_IP' for a private IPv4 subnet this machine shares with HOST; fail if none."
+    #: Two Macs on one LAN can still talk over a Tailscale DERP relay, at a few
+    #: MB/s, when Tailscale's direct path is blocked (see
+    #: [agfi:tailscale-firewall-allow-darwin]). This finds the LAN they share.
+    local host="$1"
+    assert-args host @RET
+
+    local remote_out
+    remote_out="$(command ssh "${host}" 'ifconfig 2>/dev/null || ip -4 -o addr show' 2>/dev/null)" @TRET
+    local -a remote_ips=(${(f)"$(print -r -- "${remote_out}" | command grep -oE 'inet [0-9.]+' | command awk '{print $2}')"})
+
+    local line lip mask rip private='(10.*|192.168.*|172.(1[6-9]|2[0-9]|3[01]).*)'
+    local -a w
+    for line in ${(f)"$(command ifconfig | command grep -E '^[[:space:]]+inet [0-9.]+ netmask 0x')"} ; do
+        w=(${=line})
+        lip="${w[2]}" mask="${w[4]}"
+        [[ "${lip}" == ${~private} ]] || continue
+        for rip in "${remote_ips[@]}" ; do
+            [[ "${rip}" == ${~private} && "${rip}" != "${lip}" ]] || continue
+            if (( ($(h-ip4-int "${lip}") & mask) == ($(h-ip4-int "${rip}") & mask) )) ; then
+                print -r -- "${lip} ${rip}"
+                return 0
+            fi
+        done
+    done
+    return 1
+}
+
+function h-rsp-lan-pull {
+    : "Usage: h-rsp-lan-pull HOST LOCAL_IP REMOTE_IP REMOTE_RSYNC SRC_DIR DEST_REL [rsync-option ...]"
+    : "Serve SRC_DIR read-only from a short-lived rsync daemon on LOCAL_IP, open to REMOTE_IP only, and have HOST pull it into ~/DEST_REL/ with rsp-safe's options."
+    #: Pulling, because a Mac's firewall drops inbound connections to ad-hoc
+    #: signed Homebrew binaries such as rsync unless they are registered, while
+    #: outbound connections always pass.
+    #:
+    #: @warn The rsync protocol is not encrypted. The data is protected only by
+    #: the link itself (e.g. WPA on a hotspot) while the daemon runs, and any
+    #: device that can spoof REMOTE_IP on that LAN could read SRC_DIR meanwhile.
+    ##
+    local host="$1" lip="$2" rip="$3" remote_rsync="$4" src="$5" dest="$6"
+    assert-args host lip rip remote_rsync src dest @RET
+    shift 6
+
+    local dir pid='' port=$(( 20000 + RANDOM % 20000 ))
+    dir="$(command mktemp -d)" @TRET
+    #: `use chroot` needs root; `munge symlinks` would rewrite every symlink
+    #: target it sends.
+    print -r -- "use chroot = no
+[src]
+    path = ${src}
+    read only = yes
+    list = no
+    munge symlinks = no
+    hosts allow = ${rip}
+    hosts deny = *" > "${dir}/rsyncd.conf" @RET
+
+    {
+        command rsync --daemon --no-detach --address="${lip}" --port="${port}" \
+            --config="${dir}/rsyncd.conf" --log-file="${dir}/rsyncd.log" &!
+        pid=$!
+        sleep 1
+        if ! kill -0 "${pid}" 2>/dev/null ; then
+            ecerr "$0: the rsync daemon did not start:"
+            command cat -- "${dir}/rsyncd.log" >&2
+            return 1
+        fi
+
+        local remote_cmd=(
+            "${remote_rsync}" --verbose --checksum --protect-args --human-readable
+            --times --info=progress2 --partial-dir=.rsync-partial -r --fuzzy --links
+            "$@" "rsync://${lip}:${port}/src/" "${dest}/"
+        )
+        reval-ec command ssh "${host}" "${(j: :)${(q)remote_cmd[@]}}"
+    } always {
+        if [[ -n "${pid}" ]] ; then
+            kill "${pid}" 2>/dev/null
+        fi
+        command rm -rf -- "${dir}"
+    }
+}
+##
 function h-tealy-mv-media {
     : "usage: h-tealy-mv-media ROOT [DESTINATION]
 Pick remote entries, show their destinations, and confirm before moving them."
