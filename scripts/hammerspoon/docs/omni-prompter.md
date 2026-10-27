@@ -143,8 +143,11 @@ are `png/<id>-128.png`. Emoji you picked recently in this chooser come first,
 then client recent order, then installed sets, then packs marked
 `installed: false`, each in catalog order. The placeholder shows the row count
 and whether the catalog is missing, unreadable or more than a day old. The
-catalog is decoded again only when its bytes change, and pack PNGs are cached
-until their mtime changes. Search includes Unicode names,
+catalog, merged entries and searchable rows are reused until catalog, saved
+library or alias bytes change. Pack PNGs are cached until their mtime changes;
+usage order is refreshed on each opening. Rich clipboard tags are built only
+for the entries actually pasted. Idle prewarming loads pack icons in batches
+after a reload (`telegramEmojiPrewarmDelay=false` disables it). Search includes Unicode names,
 set titles, short names and aliases. `NIGHT_TELEGRAM_EMOJI_CATALOG` or the
 Hammerspoon setting `telegramEmoji.catalogPath` can select another export path.
 

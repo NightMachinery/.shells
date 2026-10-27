@@ -77,10 +77,28 @@ function T.captureClipboard(label)
     return T.remember(hs.pasteboard.readAllData(),label)
 end
 
+-- The rich clipboard of one custom emoji, as tdesktop writes it.
+function T.richPayload(id, alt)
+    local chars={}
+    for c in ("custom-emoji://"..id.."?1"):gmatch(".") do chars[#chars+1]=string.pack(">I2",c:byte()) end
+    local wide=table.concat(chars)
+    local units=0
+    for _,code in utf8.codes(alt) do units=units+(code>0xffff and 2 or 1) end
+    return {[tagsType]=string.pack(">i4i4i4I4",1,0,units,#wide)..wide,[textType]=alt,["public.utf8-plain-text"]=alt}
+end
+
+-- Saved entries carry their captured clipboard; catalog entries build theirs
+-- here, at paste time, so opening the chooser never packs thousands of them.
+-- Either way the payload is parsed back and must name the entry's own ID.
 function T.payload(entry)
-    local data={}
-    for _,key in ipairs({tagsType,textType,"public.utf8-plain-text"}) do
-        data[key]=assert(hs.base64.decode(assert(entry.clipboard[key])))
+    local data
+    if entry.clipboard then
+        data={}
+        for _,key in ipairs({tagsType,textType,"public.utf8-plain-text"}) do
+            data[key]=assert(hs.base64.decode(assert(entry.clipboard[key])))
+        end
+    else
+        data=T.richPayload(entry.id,entry.emoji)
     end
     assert(T.parse(data).id==entry.id,"Saved custom emoji ID does not match its rich payload")
     return data
@@ -113,25 +131,18 @@ end
 
 function T.catalogEntry(raw, folder)
     assert(type(raw.id)=="string" and raw.id:match("^%d+$"),"Catalog IDs must be decimal strings")
-    assert(type(raw.alt)=="string" and #raw.alt>0,"Catalog emoji needs fallback text")
-    local tag="custom-emoji://"..raw.id.."?1"
-    local chars={}
-    for c in tag:gmatch(".") do chars[#chars+1]=string.pack(">I2",c:byte()) end
-    local wide=table.concat(chars)
-    local units=0
-    for _,code in utf8.codes(raw.alt) do units=units+(code>0xffff and 2 or 1) end
-    local packed=string.pack(">i4i4i4I4",1,0,units,#wide)..wide
-    local entry=T.parse({[tagsType]=packed,[textType]=raw.alt})
+    assert(type(raw.alt)=="string" and #raw.alt>0 and #raw.alt<=256 and utf8.len(raw.alt),
+           "Catalog emoji needs fallback text")
+    local entry={id=raw.id,emoji=raw.alt}
     entry.name=emojiChooserName(raw.alt)
     entry.setTitle=raw.setTitle or ""
     entry.setShortName=raw.setShortName or ""
     entry.recentRank=tonumber(raw.recentRank)
     if raw.installed==false then entry.installed=false end
     local png=raw.png or ("png/"..raw.id.."-128.png")
-    if type(png)=="string" and png:match("^png/%d+%-%d+[%w%-]*%.png$") then
-        local path=folder.."/"..png
-        if hs.fs.attributes(path,"mode")=="file" then entry.icon=path end
-    end
+    -- Existence is checked by T.icon on each opening, so a PNG written after
+    -- the catalog still shows up.
+    if type(png)=="string" and png:match("^png/%d+%-%d+[%w%-]*%.png$") then entry.icon=folder.."/"..png end
     return entry
 end
 
@@ -153,46 +164,35 @@ end
 
 -- Export is maintained by an opt-in Purple setting. Never discover sockets,
 -- inspect encrypted account caches, or wake the client to open this chooser.
-local catalogContent,catalogData
+-- Built catalog entries are kept while the catalog bytes are unchanged, and
+-- the merged list while the saved library bytes are unchanged too. Both files
+-- are still read on every opening, so edits take effect at once.
+local catalogCache,libraryCache,entriesCache
 
--- The second result describes the catalog for the placeholder: state is
--- "ok", "missing" or "invalid", and modified is its mtime when present.
-function T.entries()
-    local path=os.getenv("NIGHT_TELEGRAM_EMOJI_CATALOG") or
-        hs.settings.get("telegramEmoji.catalogPath") or
-        (os.getenv("HOME").."/Library/Caches/Purple/emoji-export/catalog.json")
-    local entries,seen={},{}
-    local status={state="missing",modified=hs.fs.attributes(path,"modification")}
+local function readFile(path)
     local f=io.open(path,"r")
-    if f then
-        local content=f:read("*a");f:close()
-        -- A catalog can hold thousands of entries; decode it only when it changes.
-        local ok,catalog=true,catalogData
-        if content~=catalogContent then
-            ok,catalog=pcall(hs.json.decode,content)
-            catalogContent,catalogData=ok and content or nil,ok and catalog or nil
-        end
-        status.state="invalid"
-        if ok and type(catalog)=="table" and catalog.version==1 and type(catalog.entries)=="table" then
-            status.state="ok"
-            local folder=path:match("^(.*)/[^/]+$")
-            for index,raw in ipairs(catalog.entries) do
-                local valid,entry=pcall(T.catalogEntry,raw,folder)
-                if valid then
-                    if seen[entry.id] then T.mergeMetadata(seen[entry.id],entry)
-                    else entry.order=index;entries[#entries+1]=entry;seen[entry.id]=entry end
-                end
-            end
+    if not f then return nil end
+    local content=f:read("*a");f:close()
+    return content
+end
+
+local function buildCatalog(content,folder)
+    local ok,catalog=pcall(hs.json.decode,content)
+    if not (ok and type(catalog)=="table" and catalog.version==1 and type(catalog.entries)=="table") then
+        return {content=content,state="invalid",entries={}}
+    end
+    local entries,seen={},{}
+    for index,raw in ipairs(catalog.entries) do
+        local valid,entry=pcall(T.catalogEntry,raw,folder)
+        if valid then
+            if seen[entry.id] then T.mergeMetadata(seen[entry.id],entry)
+            else entry.order=index;entries[#entries+1]=entry;seen[entry.id]=entry end
         end
     end
-    for _,entry in ipairs(T.load().entries) do
-        if not seen[entry.id] then
-            entry.order=#entries+1;entries[#entries+1]=entry;seen[entry.id]=entry
-        else
-            seen[entry.id].aliases=entry.aliases
-            T.mergeMetadata(seen[entry.id],entry)
-        end
-    end
+    return {content=content,state="ok",entries=entries}
+end
+
+local function sortEntries(entries)
     table.sort(entries,function(a,b)
         local ar,br=a.recentRank,b.recentRank
         if ar and ar<=0 then ar=nil end
@@ -209,6 +209,48 @@ function T.entries()
         return a.order<b.order
     end)
     for rank,entry in ipairs(entries) do entry.rank=rank end
+end
+
+-- The second result describes the catalog for the placeholder: state is
+-- "ok", "missing" or "invalid", and modified is its mtime when present.
+-- Unchanged inputs return the same table, which callers may use as a cache key.
+function T.entries()
+    local path=os.getenv("NIGHT_TELEGRAM_EMOJI_CATALOG") or
+        hs.settings.get("telegramEmoji.catalogPath") or
+        (os.getenv("HOME").."/Library/Caches/Purple/emoji-export/catalog.json")
+    local status={state="missing",modified=hs.fs.attributes(path,"modification")}
+    local content=readFile(path)
+    if not (catalogCache and catalogCache.path==path and catalogCache.content==content) then
+        catalogCache=content and buildCatalog(content,path:match("^(.*)/[^/]+$")) or
+            {content=nil,state="missing",entries={}}
+        catalogCache.path=path
+    end
+    local catalog=catalogCache
+    status.state=catalog.state
+    local library=readFile(libraryPath) or ""
+    if not (libraryCache and libraryCache.content==library) then
+        libraryCache={content=library,entries=T.load().entries}
+    end
+    if entriesCache and entriesCache.catalog==catalog and entriesCache.library==libraryCache then
+        return entriesCache.entries,status
+    end
+    -- Copies, so merging the library never changes the cached catalog entries.
+    local entries,seen={},{}
+    for _,base in ipairs(catalog.entries) do
+        local entry={}
+        for k,v in pairs(base) do entry[k]=v end
+        entries[#entries+1]=entry;seen[entry.id]=entry
+    end
+    for _,entry in ipairs(libraryCache.entries) do
+        if not seen[entry.id] then
+            entry.order=#entries+1;entries[#entries+1]=entry;seen[entry.id]=entry
+        else
+            seen[entry.id].aliases=entry.aliases
+            T.mergeMetadata(seen[entry.id],entry)
+        end
+    end
+    sortEntries(entries)
+    entriesCache={catalog=catalog,library=libraryCache,entries=entries}
     return entries,status
 end
 
@@ -222,6 +264,62 @@ function T.icon(path)
         icons[path]=cached
     end
     return cached.image
+end
+
+-- Rows keep their search text while entries and aliases are unchanged. Images
+-- are refreshed on every opening, and each opening sorts a fresh array by
+-- current recency, so the cache never freezes usage order.
+local rowCache
+function T.rows(recent)
+    local aliases=emojiChooserAliases()
+    local entries,status=T.entries()
+    if not (rowCache and rowCache.entries==entries and rowCache.aliases==aliases) then
+        local built={}
+        for _,entry in ipairs(entries) do
+            built[#built+1]={text=entry.name,subText=T.packName(entry),entry=entry,
+                searchText=entry.emoji.." "..(entry.setTitle or "").." "..(entry.setShortName or "").." "..
+                    table.concat(entry.aliases or {}," ").." "..table.concat(emojiChooserAliasesFor(aliases,entry.emoji)," ")}
+        end
+        rowCache={entries=entries,aliases=aliases,rows=built}
+    end
+    local rows={}
+    for i,row in ipairs(rowCache.rows) do
+        row.image=row.entry.icon and T.icon(row.entry.icon) or emojiChooserImage(row.entry.emoji)
+        rows[i]=row
+    end
+    if recent then
+        -- Your own picks first, then Telegram's recent order, then the catalog.
+        recent.sort(rows,function(row)return row.entry.id end,function(a,b)return a.entry.rank<b.entry.rank end)
+    end
+    return rows,status
+end
+
+-- Warm the caches after each load, as Hyper+A does: entries in one step, pack
+-- images in batches on idle timers, then rows. Set telegramEmojiPrewarmDelay=false
+-- to disable. The timer handle is global because a local one is collected.
+telegramEmojiPrewarmDelay = telegramEmojiPrewarmDelay == nil and 8 or telegramEmojiPrewarmDelay
+function T.prewarm(done)
+    if telegramEmojiPrewarmTimer then telegramEmojiPrewarmTimer:stop() end
+    local entries,index
+    local function step()
+        telegramEmojiPrewarmTimer=nil
+        if not entries then
+            entries=T.entries();index=0
+        else
+            for _=1,64 do
+                index=index+1
+                local entry=entries[index]
+                if not entry then
+                    T.rows(nil)
+                    if done then done() end
+                    return
+                end
+                if entry.icon then T.icon(entry.icon) end
+            end
+        end
+        telegramEmojiPrewarmTimer=hs.timer.doAfter(0.05,step)
+    end
+    telegramEmojiPrewarmTimer=hs.timer.doAfter(telegramEmojiPrewarmDelay or 0,step)
 end
 
 function T.placeholder(count,status,now)
@@ -276,19 +374,9 @@ function telegramEmojiChooser()
         if not ok then alert_gateway(tostring(err),{color="warn"}) end
     end)
     local function refresh()
-        local rows={}
-        local aliases=emojiChooserAliases()
-        local entries,status=T.entries()
-        for _,entry in ipairs(entries) do
-            local image=entry.icon and T.icon(entry.icon) or emojiChooserImage(entry.emoji)
-            local subtitle=T.packName(entry)
-            rows[#rows+1]={text=entry.name,subText=subtitle,
-                           image=image,entry=entry,searchText=entry.emoji.." "..(entry.setTitle or "").." "..(entry.setShortName or "").." "..table.concat(entry.aliases or {}," ").." "..table.concat(emojiChooserAliasesFor(aliases,entry.emoji)," ")}
-        end
-        -- Your own picks first, then Telegram's recent order, then the catalog.
-        recent.sort(rows,function(row)return row.entry.id end,function(a,b)return a.entry.rank<b.entry.rank end)
+        local rows,status=T.rows(recent)
         chooser:placeholderText(T.placeholder(#rows,status))
-        ChooserSearch.setChoices(chooser,rows)
+        ChooserSearch.setChoices(chooser,rows,{stable=true})
     end
     local function addCurrent()
         local choice=chooser:selectedRowContents()
@@ -329,3 +417,4 @@ function telegramEmojiChooser()
     chooser:show()
 end
 hyper_bind_v2{mods={"shift"},key="a",pressedfn=telegramEmojiChooser}
+if telegramEmojiPrewarmDelay then T.prewarm() end

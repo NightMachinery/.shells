@@ -56,3 +56,15 @@ for _,w in ipairs({800,1280,1920,3440,5120}) do
  assert(width<=75 and width*w/100<=1800.01)
 end
 print('Recent order caches preferences and adaptive chooser width fits small and large screens')
+
+local conversions=0
+local stableRow={text=setmetatable({}, {__tostring=function()conversions=conversions+1;return 'Stable premium entry' end})}
+local first=ChooserSearch.new(function()end)
+ChooserSearch.setChoices(first,{stableRow},{stable=true})
+local afterFirst=conversions
+local second=ChooserSearch.new(function()end)
+ChooserSearch.setChoices(second,{stableRow},{stable=true})
+assert(afterFirst>0 and conversions==afterFirst,'Stable row indexes survive separate chooser openings')
+ChooserSearch.setChoices(second,{{text='Replacement'}},{stable=true})
+callback('replacement');assert(#shown==1 and shown[1].text=='Replacement','New rows get a fresh index')
+print('Stable chooser rows reuse their search index across openings')

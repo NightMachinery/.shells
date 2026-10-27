@@ -5,7 +5,7 @@ if ChooserSearch then
         hs.chooser.globalCallback=ChooserSearch.previousGlobalCallback
     end
 end
-ChooserSearch = {version = "1.6.0"}
+ChooserSearch = {version = "1.7.0"}
 local S = ChooserSearch
 local states = setmetatable({}, {__mode="k"})
 S.activeChoosers={}
@@ -209,11 +209,22 @@ if hs and hs.chooser then
     hs.chooser.globalCallback=S.historyGlobalCallback
 end
 
-function S.setChoices(chooser, choices)
+-- options.stable promises that each row's search fields never change once
+-- built, so its search text is kept across openings (keyed weakly by row).
+local stableIndex=setmetatable({}, {__mode="k"})
+function S.setChoices(chooser, choices, options)
     local state = assert(stateFor(chooser), "ChooserSearch.new must create the chooser")
     state.choices = choices or {}
     state.index={}
-    for i,choice in ipairs(state.choices) do state.index[i]=searchable(choice,state.fields) end
+    local stable=options and options.stable
+    for i,choice in ipairs(state.choices) do
+        local cached=stable and stableIndex[choice]
+        if not (cached and cached.fields==state.fields) then
+            cached={fields=state.fields,text=searchable(choice,state.fields)}
+            if stable then stableIndex[choice]=cached end
+        end
+        state.index[i]=cached.text
+    end
     chooser:choices(S.filter(state.choices, chooser:query(), state.fields,state.index,state.limit))
     return chooser
 end

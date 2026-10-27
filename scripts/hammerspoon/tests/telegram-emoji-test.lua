@@ -1,5 +1,5 @@
 -- Inert IDs and data; never reads a real clipboard, session or personal library.
-local env=setmetatable({hs={base64={encode=function(x)return x end,decode=function(x)return x end},fs={attributes=function()return 'file' end}},emojiChooserName=function()return 'heart eyes' end,hyper_bind_v2=function()end},{__index=_G})
+local env=setmetatable({telegramEmojiPrewarmDelay=false,hs={base64={encode=function(x)return x end,decode=function(x)return x end},fs={attributes=function()return 'file' end}},emojiChooserName=function()return 'heart eyes' end,hyper_bind_v2=function()end},{__index=_G})
 assert(loadfile('hammerspoon/core/telegram-emoji.lua','t',env))()
 local T=env.TelegramEmoji
 local tag='custom-emoji://1234567890123456789?6'
@@ -150,4 +150,27 @@ for _,binding in pairs(keys) do assert(binding.hk.deleted) end
 keys={};env.telegramEmojiChooser();chooser.selected=2
 chooser.complete(chooser.rows[2])
 assert(clip['public.utf8-plain-text']=='🙂' and select(1,string.unpack('>i4',clip[key]))==1,'Without a selection Enter pastes the highlight alone')
+-- Cached rows retain their search index while mutable usage order stays live.
+local aliasTable,aliasBuilds={},0
+local catalogBytes,libraryBytes="cache-a",nil
+local catalogRows={version=1,entries={{id="901",alt="😍",setTitle="One"},{id="902",alt="🙂",setTitle="Two"}}}
+local saved={version=1,entries={}}
+env.io.open=function(path)
+    local bytes=path=='/inert/catalog.json' and catalogBytes or libraryBytes
+    if bytes then return {read=function()return bytes end,close=function()end} end
+end
+env.hs.json.decode=function(bytes)return bytes==libraryBytes and saved or catalogRows end
+env.emojiChooserAliases=function()return aliasTable end
+env.emojiChooserAliasesFor=function()aliasBuilds=aliasBuilds+1;return {"cached"} end
+local a=T.rows(nil);local b=T.rows(nil)
+assert(a~=b and a[1]==b[1] and aliasBuilds==2,'Warm openings reuse immutable row/search data')
+assert(not a[1].entry.clipboard and T.parse(T.payload(a[1].entry)).id=="901",'Catalog rich payloads are built only on paste')
+aliasTable={};local c=T.rows(nil)
+assert(c[1]~=a[1] and aliasBuilds==4,'Alias replacement invalidates search rows')
+libraryBytes='library-a';saved={version=1,entries={{id="901",aliases={"personal"}}}}
+local d=T.rows(nil)
+assert(d[1]~=c[1] and d[1].searchText:find('personal',1,true),'Saved-library edits invalidate merged entries and search rows')
+catalogBytes='cache-b';catalogRows.entries[1].setTitle='Changed pack'
+local e=T.rows(nil)
+assert(e[1].subText=='Changed pack' and e[1]~=d[1],'Catalog edits invalidate built entries and metadata')
 print('TELEGRAM_EMOJI_PAYLOAD_TESTS_PASSED')
