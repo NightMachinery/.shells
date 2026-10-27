@@ -15,6 +15,58 @@ function tsend-retry {
     retry tsend "$@"
 }
 ###
+function tsend-live {
+    : "usage: [tsend_live_alert_p=y] tsend-live NAME DEST MARKDOWN
+Keeps one live rich message per NAME in DEST, for a status that changes: edits it in place, which does not notify. With tsend_live_alert_p=y, or when the edit fails, sends a fresh message, which notifies, and removes the old one."
+    local alert_p="${tsend_live_alert_p:-n}"
+    local name="${1}" dest="${2}" markdown="${3}"
+    assert-args name dest markdown @RET
+    if ! [[ "${name}" =~ '^[[:alnum:]._-]+$' ]] ; then
+        ecerr "$0: NAME names a state file, so only letters, digits, '.', '_' and '-': ${name}"
+        return 1
+    fi
+    local state_dir="${XDG_STATE_HOME:-${HOME}/.local/state}/tsend-live"
+    local state_file="${state_dir}/${name}.tsv"
+
+    local old_dest='' old_id=''
+    if test -s "${state_file}" ; then
+        IFS=$'\t' read -r old_dest old_id < "${state_file}"
+    fi
+    if [[ "${old_dest}" != "${dest}" ]] ; then
+        old_id=''
+    fi
+
+    if test -n "${old_id}" && ! bool "${alert_p}" ; then
+        if tsend edit --parse-mode=rich -- "${dest}" "${old_id}" "${markdown}" ; then
+            return 0
+        fi
+        #: Someone deleted it, or it cannot be edited: a fresh message follows,
+        #: and the old one is cleared away below, if it still exists.
+    fi
+
+    local out new_id
+    local -a ids
+    out="$(tsend --print-ids --parse-mode=rich -- "${dest}" "${markdown}")" @TRET
+    #: Into an array first: a nested expansion with one element is a string,
+    #: and [1] would then take its first character.
+    ids=( "${(@M)${(@f)out}:#<->}" )
+    new_id="${ids[1]}"
+    if test -z "${new_id}" ; then
+        ecerr "$0: tsend printed no message ID; the next update will be a new message"
+        return 1
+    fi
+    assert mkdir -p "${state_dir}" @RET
+    ec "${dest}"$'\t'"${new_id}" > "${state_file}" @RET
+
+    if test -n "${old_id}" ; then
+        #: Bots cannot delete messages older than 48 hours; such a message is
+        #: shrunk to a pointer instead, so only one full copy remains.
+        tsend delete -- "${dest}" "${old_id}" ||
+            tsend edit --parse-mode=rich -- "${dest}" "${old_id}" "_Replaced by a newer message, below._" ||
+            true
+    fi
+}
+###
 function tnotif() {
     # @alt notif
     ##
