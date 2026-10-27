@@ -456,6 +456,61 @@ function hear-start-server {
     #: We do not want to resume music files.
 }
 ##
+function mu-rsp-to {
+    : "Usage: mu-rsp-to [host] [rsync-option ...]"
+    : "Copy ~mu and the greencase music to the same home-relative paths on HOST."
+    : "HOST defaults to \$mu_rsp_to_host; keep that in private config."
+    #: [agfi:rsp-safe] never deletes destination-only files; pass =--delete-after= to mirror.
+    #: =--links= keeps symlinks as symlinks: =-r= alone skips them, and dereferencing
+    #: =~mu/Telegram Desktop= would copy the whole Downloads folder.
+    local host="${1:-${mu_rsp_to_host}}"
+    if (( $# )) ; then
+        shift
+    fi
+    if [[ -z "${host}" ]] ; then
+        ecerr "$0: no host given and mu_rsp_to_host is unset"
+        return 1
+    fi
+
+    local src rels=()
+    for src in "${music_dir}" "${GREENCASE_DIR}" ; do
+        if [[ "${src}" != "${HOME}"/* ]] || ! test -d "${src}" ; then
+            ecerr "$0: not a directory under HOME: ${src}"
+            return 1
+        fi
+        rels+=("${src#${HOME}/}")
+    done
+
+    #: A non-interactive SSH command on macOS gets /usr/bin/rsync (openrsync), which lacks options rsp-safe uses.
+    local remote_rsync
+    remote_rsync="$(command ssh "${host}" "mkdir -p -- ${(j: :)${(q)rels[@]}} && for r in /opt/homebrew/bin/rsync /usr/local/bin/rsync rsync ; do command -v \"\$r\" && break ; done")" @TRET
+    remote_rsync="${remote_rsync##*$'\n'}"
+    assert test -n "${remote_rsync}" @RET
+
+    local rel
+    for rel in "${rels[@]}" ; do
+        reval-ec rsp-safe --links --rsync-path="${remote_rsync}" "$@" "${HOME}/${rel}/" "${host}:${rel}/" @RET
+    done
+
+    #: Absolute links into this home (=~mu/Telegram Desktop=) would point at a missing
+    #: account there. Repoint them at the destination's home; rsync restores the
+    #: source's target on every run, so this runs every time. Other links are left alone.
+    command ssh "${host}" "sh -s -- ${(q)HOME} ${(j: :)${(q)rels[@]}}" <<'EOF'
+old="$1"
+shift
+for d in "$@" ; do
+    find "$HOME/$d" -type l | while IFS= read -r l ; do
+        t="$(readlink "$l")"
+        case "$t" in
+            "$old"/*)
+                ln -sfn "$HOME/${t#"$old"/}" "$l" && printf 'relinked: %s\n' "$l"
+                ;;
+        esac
+    done
+done
+EOF
+}
+##
 function sdlg {
     ecerr "@broken due to breaking changes to spotdl, but now spotdl itself has a better API and sdl is pretty much unnecessary" ; return 1
 
