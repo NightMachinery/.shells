@@ -5,7 +5,7 @@ if ChooserSearch then
         hs.chooser.globalCallback=ChooserSearch.previousGlobalCallback
     end
 end
-ChooserSearch = {version = "1.7.0"}
+ChooserSearch = {version = "1.7.1"}
 local S = ChooserSearch
 local states = setmetatable({}, {__mode="k"})
 S.activeChoosers={}
@@ -78,10 +78,15 @@ function S.recordQuery(chooser)
     local state,original=stateFor(chooser)
     if state then recordQuery(state,original:query()) end
 end
+-- A deleted hs.chooser can stay a key in states with its metatable gone, and
+-- indexing it throws. Test doubles are plain tables.
+local function visible(chooser)
+    return (type(chooser)=="table" or getmetatable(chooser)) and chooser.isVisible and chooser:isVisible()
+end
 function S.historyKey(code,flags)
     if not flags.alt or flags.cmd or flags.ctrl or flags.shift or flags.fn or (code~=35 and code~=45) then return false end
     for chooser,state in pairs(states) do
-        if (type(chooser)=="table" or getmetatable(chooser)) and chooser.isVisible and chooser:isVisible() and state.historyId~=false then
+        if visible(chooser) and state.historyId~=false then
             local rows=history(state)
             local query=chooser:query()
             if query~=state.expected or not state.cursor then state.cursor=0;state.draft=query end
@@ -115,7 +120,7 @@ function S.pageKey(code,flags)
     if not flags.alt or flags.cmd or flags.ctrl or flags.shift or (code~=125 and code~=126) then return false end
     local direction=code==126 and "up" or "down"
     for chooser,state in pairs(states) do
-        if chooser.isVisible and chooser:isVisible() then
+        if visible(chooser) then
             if state.pageKeys==false or (state.reservedPageKeys and state.reservedPageKeys[direction]) then return false end
             local index="⌥" .. direction:upper()
             local getHotkeys=hs.hotkey and hs.hotkey.getHotkeys
@@ -132,8 +137,14 @@ function S.pageKey(code,flags)
 end
 local function ensureHistoryTap()
     if S.historyTap or not hs.eventtap then return end
+    -- This tap sees every keystroke in every app, and a callback that throws
+    -- drops the key, so an error here passes it through instead.
     S.historyTap=hs.eventtap.new({hs.eventtap.event.types.keyDown},function(event)
-        return S.pageKey(event:getKeyCode(),event:getFlags()) or S.historyKey(event:getKeyCode(),event:getFlags())
+        local ok,consumed=pcall(function()
+            return S.pageKey(event:getKeyCode(),event:getFlags()) or S.historyKey(event:getKeyCode(),event:getFlags())
+        end)
+        if not ok then print("ChooserSearch key tap: " .. tostring(consumed)) end
+        return ok and consumed
     end):start()
 end
 local function create(completion,fields,options,remote)

@@ -2314,3 +2314,10 @@ stays with its owner when an enabled Hammerspoon hotkey is bound to ⌥Up/⌥Dow
 (`hs.hotkey.systemAssigned`), or when the constructor passes `pageKeys=false`
 or `reservedPageKeys={up=true}` / `{down=true}`. Native checks on the emoji
 chooser, a remote chooser and a temporary ⌥Down hotkey passed on 2026-10-26.
+
+The tap behind this sees every keystroke in every app, so it must never throw:
+a callback that raises drops the key. Until 1.7.1, a deleted chooser (still a
+key in the chooser table, but with no metatable) made every ⌥Up/⌥Down raise
+there, so Emacs never received `M-<up>`/`M-<down>` (`org-metaup`/`org-metadown`).
+Both key handlers now skip such choosers, and the tap wraps them in `pcall` so
+that any later error lets the key through.

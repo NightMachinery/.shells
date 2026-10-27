@@ -91,6 +91,14 @@ assert(not S.pageKey(125,{alt=true}) and S.pageKey(126,{alt=true}))
 reserved:hide();assert(not S.pageKey(125,{alt=true}))
 print('Chooser Alt+arrows page only while visible and preserve hotkey, system and per-chooser conflicts')
 
+-- A deleted hs.chooser stays a key with no metatable; a coroutine indexes the same way.
+local states;for i=1,20 do local n,v=debug.getupvalue(S.pageKey,i);if n=='states' then states=v;break end end
+local dead=coroutine.create(function()end);states[dead]={historyId='test'}
+assert(not S.pageKey(126,{alt=true,fn=true}) and not S.historyKey(35,{alt=true}))
+paging:show();assert(S.pageKey(126,{alt=true}) and posted[#posted]=='pageup');paging:hide()
+states[dead]=nil
+print('Deleted choosers leave Alt+arrows to the focused app')
+
 hs.eventtap=nil
 local closing=S.new(function()end,nil,{historyId=false})
 local cleanups=0;S.onHide(closing,function()cleanups=cleanups+1 end)
