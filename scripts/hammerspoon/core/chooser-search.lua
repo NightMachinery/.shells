@@ -5,7 +5,7 @@ if ChooserSearch then
         hs.chooser.globalCallback=ChooserSearch.previousGlobalCallback
     end
 end
-ChooserSearch = {version = "1.7.1"}
+ChooserSearch = {version = "1.7.2"}
 local S = ChooserSearch
 local states = setmetatable({}, {__mode="k"})
 S.activeChoosers={}
@@ -78,10 +78,13 @@ function S.recordQuery(chooser)
     local state,original=stateFor(chooser)
     if state then recordQuery(state,original:query()) end
 end
--- A deleted hs.chooser can stay a key in states with its metatable gone, and
--- indexing it throws. Test doubles are plain tables.
+-- hs.chooser strips its metatable on delete() and in its finalizer, and
+-- indexing it then throws. The weak key outlives both: until the caller drops
+-- its reference, or for one more GC cycle. Prune such keys on sight; clearing
+-- the current key is safe inside pairs(). Test doubles are plain tables.
 local function visible(chooser)
-    return (type(chooser)=="table" or getmetatable(chooser)) and chooser.isVisible and chooser:isVisible()
+    if type(chooser)~="table" and not getmetatable(chooser) then states[chooser]=nil;return false end
+    return chooser.isVisible and chooser:isVisible()
 end
 function S.historyKey(code,flags)
     if not flags.alt or flags.cmd or flags.ctrl or flags.shift or flags.fn or (code~=35 and code~=45) then return false end

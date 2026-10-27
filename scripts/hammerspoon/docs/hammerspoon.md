@@ -2321,3 +2321,10 @@ key in the chooser table, but with no metatable) made every ⌥Up/⌥Down raise
 there, so Emacs never received `M-<up>`/`M-<down>` (`org-metaup`/`org-metadown`).
 Both key handlers now skip such choosers, and the tap wraps them in `pcall` so
 that any later error lets the key through.
+
+`hs.chooser` strips its metatable both in `delete()` and in its finalizer, but
+the weak key survives: after a `delete()` until the caller drops its reference
+(`brave/omni-prompt.lua` keeps `O.chooser`), after garbage collection for one
+more GC cycle (Lua 5.4 clears weak keys of finalized objects a cycle late;
+measured live: 5/1 live/dead after one `collectgarbage()`, 5/0 after two). Since
+1.7.2 the key handlers drop such keys from the table when they meet them.
