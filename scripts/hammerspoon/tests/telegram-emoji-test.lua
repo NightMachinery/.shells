@@ -139,8 +139,9 @@ assert(alertText=='😍🙂🙂')
 local shiftDelete={getKeyCode=function()return 51 end,getFlags=function()return {shift=true} end}
 assert(tap.callback(shiftDelete) and alertText=='😍🙂','Shift+Backspace removes the last pick')
 assert(not tap.callback({getKeyCode=function()return 51 end,getFlags=function()return {} end}))
+chooser.onHide() -- Native chooser can hide before delivering the selection.
 chooser.complete(chooser.rows[1])
-assert(clip['public.utf8-plain-text']=='😍🙂' and pasted==1,'Enter pastes the whole selection, not the highlight')
+assert(clip['public.utf8-plain-text']=='😍🙂' and pasted==1,'Hide-before-completion must preserve the whole selection, not just the highlight')
 assert(select(1,string.unpack('>i4',clip[key]))==2 and recorded[1]=='111' and recorded[2]=='222')
 chooser.onHide()
 assert(not tap.running and alertText==nil,'Closing releases the tap and the tally')

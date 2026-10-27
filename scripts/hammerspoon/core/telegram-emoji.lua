@@ -252,12 +252,12 @@ function telegramEmojiChooser()
         alert_gateway(table.concat(text),{id=kAlertId,seconds=math.huge,screens="typing"})
     end
     local chooser=ChooserSearch.new(function(choice)
+        -- hs.chooser may hide (and run cleanup) before delivering this choice.
+        -- Only completion clears the tally, so cleanup cannot lose selections.
         local entries=selected
-        if #entries==0 then
-            if not choice then return end
-            entries={choice.entry}
-        elseif not choice then return end
         selected={}
+        if not choice then return end
+        if #entries==0 then entries={choice.entry} end
         local ok,err=pcall(function()
             local data=#entries==1 and T.payload(entries[1]) or T.combine(entries)
             local previous=paste and hs.pasteboard.readAllData() or nil
@@ -317,7 +317,6 @@ function telegramEmojiChooser()
     local function cleanup()
         deleteTap:stop()
         for _,hotkey in pairs(hotkeys) do hotkey:delete() end
-        selected={}
         alert_gateway_dismiss(kAlertId)
         inputLangPop()
     end
