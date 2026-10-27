@@ -23,6 +23,23 @@ function tailscale-firewall-allow-darwin {
     #: Its UDP socket predates the registration and stays blocked: the daemon kept
     #: logging "netcheck: UDP is blocked" until restarted, then reported udp=true.
     #:
+    #: Homebrew ships tailscaled only *linker*-signed (`Identifier=a.out`, flags
+    #: adhoc,linker-signed), unlike mosh-server's full ad-hoc signature. On one
+    #: Mac (2026-10) registering and restarting that binary changed nothing: ALF
+    #: listed it as permitted, netcheck still said UDP was blocked. Re-signing it
+    #: ad-hoc with a real identifier, then registering and restarting, fixed it.
+    #: Another Mac receives UDP with the linker signature, so it is not always
+    #: fatal; but the re-sign is cheap and harmless, so we do it whenever the
+    #: binary is linker-signed. An upgrade brings the linker signature back.
+    #:
+    #: This does not help when one Mac is the Internet Sharing hotspot for the
+    #: other: that host's tailscaled binds its UDP socket to the default-route
+    #: interface (the uplink), so its packets to the peer's 192.168.2.x address
+    #: leave through the uplink and are lost. The path stays on DERP, with no
+    #: supported knob to change it (`TS_BIND_TO_INTERFACE_BY_ROUTE` skips the
+    #: listening socket). Use a direct route for bulk data there; see
+    #: [agfi:h-rsp-lan-route].
+    #:
     #: @usage tailscale-firewall-allow-darwin                #: register (needs root)
     #: @usage tailscale-firewall-allow-darwin --check        #: ALF's claim only; no root
     #: @usage tailscale-firewall-allow-darwin --probe PEER   #: real test: is the path to PEER direct?
@@ -46,6 +63,9 @@ function tailscale-firewall-allow-darwin {
     ts_abs="$(greadlink -f "$ts_sym")" @TRET
 
     if [[ "$1" == '--check' ]] ; then
+        if command codesign -dv "$ts_abs" 2>&1 | command grep -q -- 'linker-signed' ; then
+            ecgray "$0: ${ts_abs} is still only linker-signed; registering re-signs it first."
+        fi
         if h-firewall-allow-app-darwin --check "$0" "$ts_sym" "$ts_abs" ; then
             ec "$0: That is ALF's claim, not proof; \`--probe PEER\` tests the actual path."
             return 0
@@ -53,6 +73,11 @@ function tailscale-firewall-allow-darwin {
             ecerr "$0: run \`${0}\` to register it (peers will relay through DERP until you do)."
             return 1
         fi
+    fi
+
+    if command codesign -dv "$ts_abs" 2>&1 | command grep -q -- 'linker-signed' ; then
+        local sudo_cmd=( ${(@f)"$(h-sudo-cmd)"} )
+        reval-ec "$sudo_cmd[@]" /usr/bin/codesign --force --sign - --identifier com.tailscale.tailscaled "$ts_abs" @RET
     fi
 
     h-firewall-allow-app-darwin "$0" "$ts_sym" "$ts_abs" @RET

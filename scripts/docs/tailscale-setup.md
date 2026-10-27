@@ -86,6 +86,21 @@ dropping rather than by reporting an error:
   `tailscale ping` finds a direct path. The Developer ID signed Tailscale.app
   does not need this.
 
+  Homebrew's `tailscaled` is only linker-signed (`Identifier=a.out`). On one
+  Mac, registering and restarting it changed nothing until it was re-signed
+  ad-hoc with a real identifier, so the function now does that first whenever
+  it finds the linker signature.
+
+  One topology stays relayed regardless. When one Mac is the Internet Sharing
+  hotspot for the other, the hotspot's `tailscaled` binds its UDP socket to
+  the default-route interface, so its packets to the peer's `192.168.2.x`
+  address leave through the uplink and are lost. A packet capture showed the
+  peer's replies arriving over the hotspot bridge while every packet back went
+  out the uplink. Tailscale has no supported setting for this:
+  `TS_BIND_TO_INTERFACE_BY_ROUTE` does not apply to the listening socket. For
+  bulk copies there, [agfi:mu-rsp-to] finds the LAN route itself (see
+  [agfi:h-rsp-lan-route]).
+
 ## Android internet failures: separate DNS from connectivity
 
 An SSH connection into Termux over Tailscale can keep working while Android's
