@@ -114,6 +114,62 @@ other specialist runtime installs against the intended workflows; keep them expl
 command depends on them. A current Homebrew Ruby does not require running the
 old RVM/Rails installer too.
 
+## Full workstation CLI profile
+
+The baseline above is not enough for daily use: media, OCR, document and macOS
+control commands (`nightlight`, `brightness`, `blueutil`, `tesseract`,
+`ocrmypdf`, `mpv`, ...) are called from shortcuts and helpers and fail only when
+used. `setup/macOS/workstation-tools.json` is the profile: the formulae to
+install, and the command names that must resolve afterwards, grouped by use.
+`setup/macOS/workstation-tools.py` audits it, and with `--apply` installs what
+is missing, writing one log per formula and an `audit.json` under
+`~/.local/state/mac-bootstrap/`:
+
+```zsh
+~/scripts/setup/macOS/workstation-tools.py           #: audit only
+~/scripts/setup/macOS/workstation-tools.py --apply   #: install, then audit
+```
+
+It exits non-zero while any formula or command is missing. It does not install
+GUI apps, provider logins, or the native helpers (`pbv`, `input_lang_get_objc`,
+the legacy `xml2` family); their recipes are in the profile's
+`native_helpers`, and the command audit reports them until they are built.
+
+Three traps it handles, all seen on a fresh Mac:
+
+- The shared `.gitconfig` rewrites `https://github.com/` to SSH. Before the new
+  machine's key is registered on GitHub, and before it knows GitHub's host keys,
+  every `brew tap` fails with "Host key verification failed". Homebrew strips
+  `GIT_CONFIG_GLOBAL` from git's environment, so it cannot be switched off from
+  outside. The helper therefore clones public taps itself over HTTPS with the
+  global config disabled, and appends GitHub's published host keys (from
+  `https://api.github.com/meta`) to `~/.ssh/known_hosts`. `brew update` on those
+  taps still goes over SSH, so it works only after the key is registered.
+- `nightlight` comes from the `smudge/smudge` tap and builds from source; it
+  pulls in Homebrew's `rust` as a build dependency next to rustup. rustup's
+  `~/.cargo/bin` stays first on `PATH`, as on the source Mac.
+- `brightness` must be built `--HEAD` for Apple Silicon built-in panels.
+
+Formulae left out deliberately: `gerbil-scheme` (conflicts with ghostscript over
+`gsc`, and nothing calls it), `chezscheme` (unused), and `sshfs` (Linux-only in
+Homebrew core; macOS needs macFUSE).
+
+After installing, check behaviour, not just presence, on synthetic inputs: OCR a
+rendered text image with `tesseract` and `ocrmypdf`, then read it back with
+`pdftotext`; encode a tone and a short video with `ffmpeg` and inspect them with
+`ffprobe`/`mediainfo`; play the tone with `mpv --ao=null`. For macOS controls,
+only read status (`nightlight status`, `brightness -l`, `SwitchAudioSource -c`,
+`displayplacer list`); toggling them changes the owner's display. `blueutil -p`
+hung over SSH on a new Mac (cause unconfirmed; macOS gates Bluetooth access behind
+a privacy approval, and no TCC request was logged), so check it from a GUI
+terminal instead.
+
+Tesseract cannot read images through a symlinked directory such as `/tmp`
+([tesseract#4333](https://github.com/tesseract-ocr/tesseract/issues/4333)),
+which makes `ocrmypdf` fail in SSH sessions, where `TMPDIR` is unset and Python
+falls back to `/tmp`. `~/.shared.sh` sets `TMPDIR` from
+`getconf DARWIN_USER_TEMP_DIR` when it is missing.
+
 ## Services and login startup
 
 Redis must run before a full shell load. Use a user LaunchAgent, loopback bind,
