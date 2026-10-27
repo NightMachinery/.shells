@@ -2,6 +2,12 @@ if isDarwin ; then
     eval "$(/usr/bin/env /usr/libexec/path_helper -s)"
     #: adds system's default paths (`/etc/paths`) to $PATH
     #: [[id:65c502a2-125f-470e-ac22-5d185a0be0fe][macos - Executables in /bin and /usr/bin are not found in path]]
+
+    if test -z "$TMPDIR" ; then
+        #: SSH and mosh sessions do not get launchd's per-user TMPDIR, so tools fall back to /tmp, a symlink to /private/tmp. Tesseract cannot read images through that symlink, which breaks ocrmypdf:
+        #: https://github.com/tesseract-ocr/tesseract/issues/4333
+        TMPDIR="$(command getconf DARWIN_USER_TEMP_DIR 2>/dev/null)" && test -n "$TMPDIR" && export TMPDIR || unset TMPDIR
+    fi
 fi
 
 ### set max open files, etc
