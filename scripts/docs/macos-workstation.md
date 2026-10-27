@@ -258,6 +258,23 @@ SSH/mosh sessions establish their own remote context. When bootstrapping an
 already-running tmux server over SSH, clear stale global transport markers
 there too before creating local sessions; preserve existing session state.
 
+Audit the complete link setup rather than assuming a dotfiles checkout creates
+its untracked links. `python3 setup/macOS/link-workstation.py` prints the current
+state; add `--apply` to back up conflicts and install user links. Run its separate
+`--system --home /path/to/user --apply` phase with privileges for `/usr/local`
+wrappers. The helper covers the relevant `setup/setup_links` files without
+running its old install steps, creating dangling legacy binaries or depending
+on an account-name test. It preserves an existing Kitty theme selection.
+
+In particular, link `~/.gitconfig` to `symlinkme/local/.gitconfig`, copy the
+owner's `~/.gitignore_global`, and install `git-lfs` for the required Git filter.
+Compare source and destination newline settings before calling copied notes
+modified: `core.autocrlf=input` and `core.eol=lf` can remove CRLF-only status
+noise without changing the files. Keep credentials and signing keys separate;
+a config link does not authenticate GitHub or supply its signing key. The MPV
+config link needs its own repository at `~/code/lua/mpv`; do not create it when
+that directory is absent.
+
 Generate agent instructions with [agfi:agents-md-sync] and install the available
 skill links with [agfi:agent-skills-link]. Keep generated global instruction
 files managed by those helpers. Provider sign-ins and private skill/config
