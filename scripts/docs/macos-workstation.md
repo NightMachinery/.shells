@@ -159,10 +159,10 @@ rendered text image with `tesseract` and `ocrmypdf`, then read it back with
 `pdftotext`; encode a tone and a short video with `ffmpeg` and inspect them with
 `ffprobe`/`mediainfo`; play the tone with `mpv --ao=null`. For macOS controls,
 only read status (`nightlight status`, `brightness -l`, `SwitchAudioSource -c`,
-`displayplacer list`); toggling them changes the owner's display. `blueutil -p`
-hung over SSH on a new Mac (cause unconfirmed; macOS gates Bluetooth access behind
-a privacy approval, and no TCC request was logged), so check it from a GUI
-terminal instead.
+`displayplacer list`); toggling them changes the owner's display. `blueutil`
+needs a Bluetooth privacy approval that macOS asks for in the GUI session. Over
+SSH it hangs, without an error, until someone approves the prompt on the Mac's
+screen; after that it works over SSH too.
 
 Tesseract cannot read images through a symlinked directory such as `/tmp`
 ([tesseract#4333](https://github.com/tesseract-ocr/tesseract/issues/4333)),
