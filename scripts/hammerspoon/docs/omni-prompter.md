@@ -129,7 +129,8 @@ Set `emojiChooserPrewarmDelay=false` before loading to turn it off.
 
 ## Telegram premium emoji
 
-Hyper+Shift+A opens the cached premium library. Each row shows its pack title, falling back to the pack short name. Clipboard-only entries show “Unknown pack” until catalog metadata is available. Duplicate recent/installed-set records enrich missing pack names instead of discarding them. The patched Purple client's
+Hyper+Shift+A opens the cached premium library. Like Hyper+A, it switches the
+input source to English while open and restores the previous one on close. Each row shows its pack title, falling back to the pack short name. Clipboard-only entries show “Unknown pack” until catalog metadata is available. Duplicate recent/installed-set records enrich missing pack names instead of discarding them. The patched Purple client's
 opt-in export feature supplies exact first-frame PNGs and a catalog under
 `~/Library/Caches/Purple/emoji-export/`. Until that feature is installed and
 enabled, saved clipboard entries work with Unicode preview images. No socket

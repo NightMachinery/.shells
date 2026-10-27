@@ -319,10 +319,14 @@ function telegramEmojiChooser()
         for _,hotkey in pairs(hotkeys) do hotkey:delete() end
         selected={}
         alert_gateway_dismiss(kAlertId)
+        inputLangPop()
     end
     ChooserSearch.onHide(chooser,cleanup)
     local ok,err=pcall(refresh)
     if not ok then cleanup();alert_gateway(tostring(err),{color="warn"});return end
+    -- Type the search in English, as Hyper+A does; closing restores the source.
+    inputLangPush()
+    langSetEn()
     chooser:show()
 end
 hyper_bind_v2{mods={"shift"},key="a",pressedfn=telegramEmojiChooser}

@@ -127,8 +127,13 @@ end}
 env.hs.eventtap={event={types={keyDown=10}},new=function(_,fn)
     tap={callback=fn,start=function(self)self.running=true;return self end,stop=function(self)self.running=false end};return tap
 end}
+local language,pushed='Persian',nil
+env.inputLangPush=function()pushed=language end
+env.langSetEn=function()language='English' end
+env.inputLangPop=function()if pushed then language=pushed;pushed=nil end end
 env.telegramEmojiChooser()
 assert(chooser.visible and chooser.placeholder:find('2 emoji',1,true))
+assert(language=='English','The search is typed in English, as in Hyper+A')
 keys['shift:return'].fn();chooser.selected=2;keys['shift:return'].fn();keys['shift:return'].fn()
 assert(alertText=='😍🙂🙂')
 local shiftDelete={getKeyCode=function()return 51 end,getFlags=function()return {shift=true} end}
@@ -139,6 +144,7 @@ assert(clip['public.utf8-plain-text']=='😍🙂' and pasted==1,'Enter pastes th
 assert(select(1,string.unpack('>i4',clip[key]))==2 and recorded[1]=='111' and recorded[2]=='222')
 chooser.onHide()
 assert(not tap.running and alertText==nil,'Closing releases the tap and the tally')
+assert(language=='Persian','Closing restores the previous input source')
 for _,binding in pairs(keys) do assert(binding.hk.deleted) end
 keys={};env.telegramEmojiChooser();chooser.selected=2
 chooser.complete(chooser.rows[2])
