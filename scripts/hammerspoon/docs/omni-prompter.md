@@ -66,8 +66,10 @@ Unicode name, including older joined sequences such as 🙂‍↔️.
 - Cmd+Enter builds a lossless transparent WebP from native 512px artwork, with
   its longest side at 512px,
   and pastes the actual file. Telegram needs the file URL to recognize a sticker.
-  The chooser selects its English “Send as a document” checkbox when available;
-  otherwise choose that option manually. It never presses Send.
+  Purple reads the export marker and sends a transparent sticker whichever
+  compression option is chosen. For older clients the chooser still ticks an
+  English “Send as a document” checkbox when one appears, and says nothing when
+  none does. It never presses Send.
 - Cmd+Shift+Enter copies and pastes a transparent PNG at 512px per emoji.
   Telegram's photo mode flattens PNG transparency; send PNG as a document to
   retain its original bytes.
@@ -94,8 +96,8 @@ clipboard. Closing the chooser during encoding cancels the eventual paste.
 WebP clipboard data includes `org.nightmachinery.emoji-export` with UTF-8 JSON
 `{"version":1,"format":"webp","intent":"sticker","preserveAlpha":true}`,
 plus `org.webmproject.webp` bytes, `public.file-url` and PNG fallback data.
-Purple’s native marker handling requires its updated installed build; the
-document-checkbox step also supports older clients.
+Purple has handled the marker since its 2026-10-27 build; the quiet
+document-checkbox step remains only for older clients.
 Test decoded transparent pixels and a named-pasteboard round trip; an alpha
 channel alone does not prove that Telegram's photo path preserves transparency.
 

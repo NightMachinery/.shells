@@ -303,9 +303,10 @@ function emojiChooserTelegramDocument()
             if value == 0 or value == false then found:performAction("AXPress") end
         elseif remaining > 0 then
             hs.timer.doAfter(.25, function() attempt(remaining-1) end)
-        else
-            alert_gateway("Telegram: choose Send as a document to keep the WebP sticker transparent", {color="warn"})
         end
+        -- No checkbox is not a problem worth a warning: Purple reads the
+        -- org.nightmachinery.emoji-export marker and sends a sticker whichever
+        -- compression option is chosen. Ticking it only helps older clients.
     end
     hs.timer.doAfter(.25, function() attempt(3) end)
 end

@@ -146,6 +146,15 @@ documentMode();table.remove(timers,1)()
 assert(presses==1,'Only enable document checkbox; never press Send')
 documentMode();env.hs.pasteboard.changeCount=function()return 8 end;table.remove(timers,1)()
 assert(presses==1,'A newer clipboard must cancel late Telegram automation')
+-- Purple honours the WebP marker in either compression mode, so a window with
+-- no checkbox (Purple's own dialog, or none yet) must not raise a warning.
+env.hs.pasteboard.changeCount=function()return 9 end
+window.attributeValue=function(_,key)return ({AXRole='AXWindow',AXChildren={}})[key] end
+tally=nil;local before=#timers
+documentMode()
+while #timers>before do table.remove(timers,before+1)() end
+assert(tally==nil,'A missing Send as a document checkbox must not warn')
+assert(presses==1,'Nothing is pressed when no checkbox exists')
 local cachedAliases=env.emojiChooserAliases();local parsed=aliasDecodes
 assert(env.emojiChooserAliases()==cachedAliases and aliasDecodes==parsed,'Unchanged aliases should not be decoded again')
 env.emojiChooser();local cachedRow=chooser.rows[1];chooser.onHide()
