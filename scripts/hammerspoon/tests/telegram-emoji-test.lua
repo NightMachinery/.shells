@@ -106,6 +106,7 @@ env.ChooserSearch={
         function chooser:selectedRowContents()return self.rows[self.selected] end
         function chooser:hideCallback(fn)self.onHide=fn end
         function chooser:show()self.visible=true end
+        function chooser:select()self.onHide();self.complete(self:selectedRowContents())end
         return chooser
     end,
     setChoices=function(c,rows)c.rows=rows end,
@@ -173,4 +174,34 @@ assert(d[1]~=c[1] and d[1].searchText:find('personal',1,true),'Saved-library edi
 catalogBytes='cache-b';catalogRows.entries[1].setTitle='Changed pack'
 local e=T.rows(nil)
 assert(e[1].subText=='Changed pack' and e[1]~=d[1],'Catalog edits invalidate built entries and metadata')
+-- Image shortcuts use the exact cached previews, including native hide order.
+local rendered,webpCallback
+T.icon=function(path)return path end
+env.emojiChooserImage=function(emoji)return "unicode:"..emoji end
+env.emojiChooserImagesPng=function(images,side)
+    rendered={images=images,side=side};return "native-alpha-png"
+end
+env.emojiChooserWebpPng=function(png,callback)
+    assert(png=="native-alpha-png");webpCallback=callback
+end
+keys={};env.telegramEmojiChooser()
+keys['shift:return'].fn();chooser.selected=2;keys['shift:return'].fn()
+local beforePaste=pasted
+keys['cmd shift:return'].fn()
+assert(clip['public.png']=='native-alpha-png' and pasted==beforePaste+1,'Cmd+Shift+Enter pastes a PNG after hide cleanup')
+assert(rendered.side==128 and #rendered.images==2 and rendered.images[1]:find('901%-128.png') and rendered.images[2]:find('902%-128.png'),'PNG stacks exact native custom previews in selection order')
+keys={};env.telegramEmojiChooser();chooser.selected=2
+beforePaste=pasted;keys['cmd:return'].fn()
+assert(pasted==beforePaste and rendered.side==128 and #rendered.images==1,'WebP encoding is asynchronous and never upscales')
+webpCallback(nil,{['public.file-url']='file:///inert.webp',['org.webmproject.webp']='webp',['public.png']='png',['org.nightmachinery.emoji-export']='marker'})
+assert(pasted==beforePaste+1 and clip['org.webmproject.webp']=='webp','Cmd+Enter pastes the encoded WebP payload')
+keys={};env.telegramEmojiChooser();keys['cmd:return'].fn()
+local beforeCancel=clip
+chooser.onHide();chooser.complete(nil)
+webpCallback(nil,{['public.png']='late result'})
+assert(clip==beforeCancel,'A cancelled chooser cannot publish a late image export')
+local five={}
+for i=1,5 do five[i]={emoji='😍',icon='exact-preview-'..i} end
+T.exportPng(five,'webp')
+assert(rendered.side==512/5 and #rendered.images==5,'Long WebP stacks shrink to the sticker cap instead of upscaling')
 print('TELEGRAM_EMOJI_PAYLOAD_TESTS_PASSED')

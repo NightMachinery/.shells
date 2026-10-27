@@ -151,6 +151,14 @@ after a reload (`telegramEmojiPrewarmDelay=false` disables it). Search includes 
 set titles, short names and aliases. `NIGHT_TELEGRAM_EMOJI_CATALOG` or the
 Hammerspoon setting `telegramEmoji.catalogPath` can select another export path.
 
+Cmd+Enter pastes a transparent WebP and Cmd+Shift+Enter pastes a transparent
+PNG of the selected previews, stacked horizontally in selection order. With no
+selection they use the highlighted entry. These exports use the actual cached
+128px custom artwork, without upscaling; long WebP stacks shrink to a longest
+side of 512px. No large-render requests or client automation are made. Missing
+custom icons use the same Unicode preview shown in the row. Normal Enter keeps
+pasting the original rich premium-emoji tags. Esc cancels a pending image export.
+
 Copy one premium emoji from Telegram, open the picker and press Cmd+S to save
 it explicitly. The personal library is `~/.local/share/night-emoji/telegram.json`
 (mode 600 in a mode-700 directory); it is never committed. Each entry preserves

@@ -240,13 +240,12 @@ function emojiChooserName(emoji)
 end
 
 -- Offscreen canvas: no windows, screenshots or font substitution are involved.
-function emojiChooserPng(emojis, side, resolution)
-    assert(#emojis > 0 and #emojis <= 128, "Choose between 1 and 128 emoji for a PNG")
+function emojiChooserImagesPng(images, side)
+    assert(#images > 0 and #images <= 128, "Choose between 1 and 128 emoji for a PNG")
     side = side or 128
-    local canvas = hs.canvas.new({x=0, y=0, w=side*#emojis, h=side})
+    local canvas = hs.canvas.new({x=0, y=0, w=side*#images, h=side})
     local ok, result = pcall(function()
-        for i, emoji in ipairs(emojis) do
-            local image = assert(emojiChooserImage(emoji, resolution), "Missing cached emoji image; run emoji-images.py")
+        for i, image in ipairs(images) do
             canvas:insertElement({type="image", image=image, imageScaling="scaleProportionally",
                                   frame={x=(i-1)*side, y=0, w=side, h=side}})
         end
@@ -257,6 +256,14 @@ function emojiChooserPng(emojis, side, resolution)
     canvas:delete()
     if not ok then error(result) end
     return result
+end
+
+function emojiChooserPng(emojis, side, resolution)
+    local images={}
+    for i,emoji in ipairs(emojis) do
+        images[i]=assert(emojiChooserImage(emoji,resolution), "Missing cached emoji image; run emoji-images.py")
+    end
+    return emojiChooserImagesPng(images,side)
 end
 
 local emojiExportTasks = {}
@@ -313,8 +320,7 @@ end
 
 -- Telegram consumes file URLs before image data. A WebP file keeps its sticker
 -- identity; pasting an NSImage instead takes Telegram's opaque photo path.
-local function encodeEmojiWebp(emojis, callback)
-    local png = emojiChooserPng(emojis, 512 / #emojis, 512)
+function emojiChooserWebpPng(png, callback)
     local encoder = "/opt/homebrew/bin/cwebp"
     assert(hs.fs.attributes(encoder, "mode") == "file", "Install Homebrew webp for cwebp")
     local folder = os.getenv("HOME") .. "/Library/Caches/night-emoji/exports"
@@ -361,7 +367,9 @@ end
 function emojiChooserWebp(emojis, callback)
     emojiChooserPrepareImages(emojis, function(err)
         if err then callback(err); return end
-        local ok, failure = pcall(encodeEmojiWebp, emojis, callback)
+        local ok, failure = pcall(function()
+            emojiChooserWebpPng(emojiChooserPng(emojis,512/#emojis,512),callback)
+        end)
         if not ok then callback(tostring(failure)) end
     end)
 end

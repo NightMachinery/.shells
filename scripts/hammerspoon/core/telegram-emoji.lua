@@ -334,6 +334,19 @@ function T.placeholder(count,status,now)
     return table.concat(parts," · ")
 end
 
+-- Export the existing preview artwork at native resolution. This never asks
+-- Purple to render, writes requests, or upscales the 128px catalog previews.
+function T.exportPng(entries,format)
+    assert(#entries>0 and #entries<=128,"Choose between 1 and 128 emoji")
+    local images={}
+    for i,entry in ipairs(entries) do
+        images[i]=assert((entry.icon and T.icon(entry.icon)) or emojiChooserImage(entry.emoji),
+                         "No cached preview image for this premium emoji")
+    end
+    local side=format=="webp" and math.min(128,512/#entries) or 128
+    return emojiChooserImagesPng(images,side)
+end
+
 local kAlertId="telegram-emoji-chooser"
 
 function telegramEmojiChooser()
@@ -343,6 +356,7 @@ function telegramEmojiChooser()
     local recent=ChooserSearch.recent("telegram-emoji")
     -- Shift+Enter collects several emoji for one rich paste, as in Hyper+A.
     local selected={}
+    local pendingImage,closed,generation=nil,false,0
     local function updateAlert()
         if #selected==0 then alert_gateway_dismiss(kAlertId);return end
         local text={}
@@ -356,19 +370,24 @@ function telegramEmojiChooser()
         selected={}
         if not choice then return end
         if #entries==0 then entries={choice.entry} end
+        local imageData=pendingImage
+        pendingImage=nil
         local ok,err=pcall(function()
-            local data=#entries==1 and T.payload(entries[1]) or T.combine(entries)
-            local previous=paste and hs.pasteboard.readAllData() or nil
+            local data=imageData or (#entries==1 and T.payload(entries[1]) or T.combine(entries))
+            local restore=paste and not imageData
+            local previous=restore and hs.pasteboard.readAllData() or nil
             assert(hs.pasteboard.writeAllData(data),"Clipboard write failed")
             local written=hs.pasteboard.changeCount()
             local ids={}
             for i,entry in ipairs(entries) do ids[i]=entry.id end
             recent.record(ids)
-            if paste then
+            if paste or imageData then
                 doPaste()
-                hs.timer.doAfter(0.5,function()
-                    if hs.pasteboard.changeCount()==written then hs.pasteboard.writeAllData(previous) end
-                end)
+                if restore then
+                    hs.timer.doAfter(0.5,function()
+                        if hs.pasteboard.changeCount()==written then hs.pasteboard.writeAllData(previous) end
+                    end)
+                end
             else alert_gateway("Premium emoji copied. Paste it into Telegram.") end
         end)
         if not ok then alert_gateway(tostring(err),{color="warn"}) end
@@ -379,13 +398,37 @@ function telegramEmojiChooser()
         ChooserSearch.setChoices(chooser,rows,{stable=true})
     end
     local function addCurrent()
+        generation=generation+1
         local choice=chooser:selectedRowContents()
         if choice and choice.entry then selected[#selected+1]=choice.entry;updateAlert() end
     end
     local function removeLast()
+        generation=generation+1
         if #selected>0 then table.remove(selected);updateAlert() end
     end
+    local function exportImage(format)
+        local choice=chooser:selectedRowContents()
+        if not choice then return end
+        local entries=#selected>0 and selected or {choice.entry}
+        generation=generation+1
+        local current=generation
+        local ok,err=pcall(function()
+            local png=T.exportPng(entries,format)
+            if format=="png" then
+                pendingImage={["public.png"]=png};chooser:select()
+            else
+                emojiChooserWebpPng(png,function(failure,data)
+                    if closed or current~=generation then return end
+                    if failure then alert_gateway(tostring(failure),{color="warn"});return end
+                    pendingImage=data;chooser:select()
+                end)
+            end
+        end)
+        if not ok then alert_gateway(tostring(err),{color="warn"}) end
+    end
     local hotkeys={
+        webp=hs.hotkey.bind("cmd","return",function()exportImage("webp")end),
+        png=hs.hotkey.bind({"cmd","shift"},"return",function()exportImage("png")end),
         save=hs.hotkey.bind("cmd","s",function()
             local ok,err=pcall(T.captureClipboard)
             if ok then refresh() else alert_gateway(tostring(err),{color="warn"}) end
@@ -403,6 +446,7 @@ function telegramEmojiChooser()
         return false
     end):start()
     local function cleanup()
+        closed=true;generation=generation+1
         deleteTap:stop()
         for _,hotkey in pairs(hotkeys) do hotkey:delete() end
         alert_gateway_dismiss(kAlertId)
