@@ -76,20 +76,32 @@ print('Native-equivalent chooser wrappers retain visible state and release it af
 d:hide()
 local paging=S.remote(function()end,{historyId=false})
 local reserved=S.remote(function()end,{reservedPageKeys={down=true}})
-local keys,posted,system={}, {},false
-hs.hotkey={getHotkeys=function()return keys end,systemAssigned=function()return system end}
-hs.eventtap={keyStroke=function(mods,key)assert(#mods==0);posted[#posted+1]=key end}
-paging:show()
-assert(S.pageKey(125,{alt=true}) and posted[#posted]=='pagedown')
-assert(S.pageKey(126,{alt=true}) and posted[#posted]=='pageup')
+local keys,posted,system,bound={}, {},false,{}
+local function boundKeys()local r={}for k in pairs(bound)do r[#r+1]=k end;table.sort(r);return table.concat(r,',')end
+hs.hotkey={getHotkeys=function()return keys end,systemAssigned=function()return system end,
+ bind=function(mods,key,pressed,released,repeated)
+  assert(#mods==1 and mods[1]=='alt' and repeated==pressed and not bound[key])
+  bound[key]=pressed;return {delete=function()bound[key]=nil end}
+ end}
+hs.eventtap={keyStroke=function(mods,key)posted[#posted+1]=(#mods>0 and table.concat(mods,'+')..'+' or '')..key end}
+paging:show();assert(boundKeys()=='down,up','historyId=false leaves Alt+P/N unbound')
+bound.down();assert(posted[#posted]=='pagedown')
+bound.up();assert(posted[#posted]=='pageup')
 assert(S.pageKey(125,{alt=true,fn=true}) and posted[#posted]=='pagedown')
 assert(not S.pageKey(125,{alt=true,cmd=true}))
-keys={{idx='⌥DOWN'}};assert(not S.pageKey(125,{alt=true}));keys={}
-system={enabled=true};assert(not S.pageKey(126,{alt=true}));system=false
-paging:hide();reserved:show()
-assert(not S.pageKey(125,{alt=true}) and S.pageKey(126,{alt=true}))
-reserved:hide();assert(not S.pageKey(125,{alt=true}))
-print('Chooser Alt+arrows page only while visible and preserve hotkey, system and per-chooser conflicts')
+paging:hide();assert(boundKeys()=='')
+keys={{idx='⌥DOWN'}};paging:show();assert(boundKeys()=='up');paging:hide();keys={}
+system={enabled=true};paging:show();assert(boundKeys()=='');paging:hide();system=false
+reserved:show();assert(boundKeys()=='n,p,up')
+local sent=#posted;bound.p();assert(#posted==sent)
+reserved:hide();assert(boundKeys()=='' and not S.pageKey(125,{alt=true}))
+print('Chooser Alt keys are hotkeys bound only while open, around hotkey, system and per-chooser conflicts')
+
+paging:show();reserved:show();reserved:hide();assert(boundKeys()=='down,up','Closing one rebinds for the other');paging:hide()
+paging:show();local up=bound.up;paging.visible=false
+up();assert(boundKeys()=='' and posted[#posted]=='alt+up')
+paging.visible=true;paging:hide()
+print('A hotkey left bound by a missed close hands its key back')
 
 -- A deleted hs.chooser stays a key with no metatable; a coroutine indexes the same way.
 local states;for i=1,20 do local n,v=debug.getupvalue(S.pageKey,i);if n=='states' then states=v;break end end

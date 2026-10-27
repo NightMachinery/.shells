@@ -1,11 +1,13 @@
 -- Shared local chooser policy. Remote query providers keep their own callbacks.
 if ChooserSearch then
+    -- Versions before 1.8.0 ran a global key tap instead of hotkeys.
     if ChooserSearch.historyTap then ChooserSearch.historyTap:stop() end
+    for _,hotkey in ipairs(ChooserSearch.keyHotkeys or {}) do hotkey:delete() end
     if hs and hs.chooser and hs.chooser.globalCallback==ChooserSearch.historyGlobalCallback then
         hs.chooser.globalCallback=ChooserSearch.previousGlobalCallback
     end
 end
-ChooserSearch = {version = "1.7.2"}
+ChooserSearch = {version = "1.8.0"}
 local S = ChooserSearch
 local states = setmetatable({}, {__mode="k"})
 S.activeChoosers={}
@@ -117,38 +119,72 @@ function S.historyKey(code,flags)
     return false
 end
 -- Alt+Up/Down page through visible rows. Physical arrow keys carry the fn
--- flag, so it is not a modifier here. An enabled Hammerspoon or system hotkey,
--- pageKeys=false or reservedPageKeys={up=true} keeps the key for its owner.
+-- flag, so it is not a modifier here. pageKeys=false or
+-- reservedPageKeys={up=true} keeps the key for the chooser's own binding.
 function S.pageKey(code,flags)
     if not flags.alt or flags.cmd or flags.ctrl or flags.shift or (code~=125 and code~=126) then return false end
     local direction=code==126 and "up" or "down"
     for chooser,state in pairs(states) do
         if visible(chooser) then
             if state.pageKeys==false or (state.reservedPageKeys and state.reservedPageKeys[direction]) then return false end
-            local index="⌥" .. direction:upper()
-            local getHotkeys=hs.hotkey and hs.hotkey.getHotkeys
-            for _,key in ipairs(getHotkeys and getHotkeys() or {}) do
-                if key.idx==index then return false end
-            end
-            local assigned=hs.hotkey and hs.hotkey.systemAssigned and hs.hotkey.systemAssigned({"alt"},direction)
-            if assigned and assigned.enabled then return false end
             hs.eventtap.keyStroke({},direction=="up" and "pageup" or "pagedown",0)
             return true
         end
     end
     return false
 end
-local function ensureHistoryTap()
-    if S.historyTap or not hs.eventtap then return end
-    -- This tap sees every keystroke in every app, and a callback that throws
-    -- drops the key, so an error here passes it through instead.
-    S.historyTap=hs.eventtap.new({hs.eventtap.event.types.keyDown},function(event)
-        local ok,consumed=pcall(function()
-            return S.pageKey(event:getKeyCode(),event:getFlags()) or S.historyKey(event:getKeyCode(),event:getFlags())
-        end)
-        if not ok then print("ChooserSearch key tap: " .. tostring(consumed)) end
-        return ok and consumed
-    end):start()
+
+-- The Alt keys above are hotkeys bound only while a chooser is open, like the
+-- Tab bindings in choosers.lua, so no other keystroke ever passes through
+-- Hammerspoon for them. A key that an enabled Hammerspoon hotkey or macOS
+-- already owns is left unbound.
+local chooserKeys={
+    {key="up",code=126,page="up"},{key="down",code=125,page="down"},
+    {key="p",code=35},{key="n",code=45},
+}
+S.keyHotkeys={}
+local function unbindKeys()
+    for _,hotkey in ipairs(S.keyHotkeys) do hotkey:delete() end
+    S.keyHotkeys={}
+end
+local function owned(key)
+    local index="⌥" .. key:upper()
+    for _,hotkey in ipairs(hs.hotkey.getHotkeys()) do
+        if hotkey.idx==index then return true end
+    end
+    local assigned=hs.hotkey.systemAssigned({"alt"},key)
+    return assigned and assigned.enabled
+end
+local function anyVisible()
+    for chooser in pairs(states) do
+        if visible(chooser) then return true end
+    end
+    return false
+end
+local function bindKeys(state)
+    unbindKeys()
+    if not (state and hs.hotkey and hs.hotkey.bind) then return end
+    for _,spec in ipairs(chooserKeys) do
+        local wanted
+        if spec.page then
+            wanted=state.pageKeys~=false and not (state.reservedPageKeys and state.reservedPageKeys[spec.page])
+        else
+            wanted=state.historyId~=false
+        end
+        if wanted and not owned(spec.key) then
+            local function fire()
+                local ok,err=pcall(S[spec.page and "pageKey" or "historyKey"],spec.code,{alt=true})
+                if not ok then print("ChooserSearch ⌥" .. spec.key .. ": " .. tostring(err)) end
+                -- A close the lifecycle hook never saw left this bound: unbind
+                -- and give the key to the focused app, or it is lost everywhere.
+                if not anyVisible() then
+                    unbindKeys()
+                    hs.eventtap.keyStroke({"alt"},spec.key,0)
+                end
+            end
+            S.keyHotkeys[#S.keyHotkeys+1]=hs.hotkey.bind({"alt"},spec.key,fire,nil,fire)
+        end
+    end
 end
 local function create(completion,fields,options,remote)
     options=options or {}
@@ -173,7 +209,6 @@ local function create(completion,fields,options,remote)
             if current then current:choices(S.filter(state.choices,query,state.fields,state.index,state.limit)) end
         end)
     end
-    ensureHistoryTap()
     return chooser
 end
 -- hs.chooser runs a hide callback twice for one close (measured 8 ms apart,
@@ -213,9 +248,12 @@ if hs and hs.chooser then
                 state.hidden=false
                 S.activeChoosers[original]=true
                 state.cursor=nil;state.expected=nil;state.draft=nil;state.closedQuery=nil
+                bindKeys(state)
             elseif event=="didClose" then
                 state.closedQuery=original:query()
                 S.activeChoosers[original]=nil
+                local other=next(S.activeChoosers)
+                if other then bindKeys(states[other]) else unbindKeys() end
             end
         end
         if S.previousGlobalCallback then S.previousGlobalCallback(chooser,event) end

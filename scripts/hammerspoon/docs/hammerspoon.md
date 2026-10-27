@@ -2307,24 +2307,28 @@ after the window is gone). Register cleanups that delete hotkeys through
 Shared choosers also page with Alt+Up and Alt+Down. While one is visible, the
 key is replaced by a native Page Up or Page Down, so the step is whatever
 `hs.chooser` pages by (ten rows here, even for a `rows(15)` chooser) and Page
-Up from the first row wraps to the last. Physical arrow keys
-carry the fn flag, so fn does not block paging; Shift, Cmd and Ctrl do. The key
-stays with its owner when an enabled Hammerspoon hotkey is bound to ⌥Up/⌥Down
-(`hs.hotkey.getHotkeys()`), when macOS assigns it system-wide
-(`hs.hotkey.systemAssigned`), or when the constructor passes `pageKeys=false`
-or `reservedPageKeys={up=true}` / `{down=true}`. Native checks on the emoji
-chooser, a remote chooser and a temporary ⌥Down hotkey passed on 2026-10-26.
+Up from the first row wraps to the last. A key stays with its owner when an
+enabled Hammerspoon hotkey is bound to it (`hs.hotkey.getHotkeys()`), when
+macOS assigns it system-wide (`hs.hotkey.systemAssigned`), or when the
+constructor passes `pageKeys=false` or `reservedPageKeys={up=true}` /
+`{down=true}`. Native checks on the emoji chooser, a remote chooser and a
+temporary ⌥Down hotkey passed on 2026-10-26.
 
-The tap behind this sees every keystroke in every app, so it must never throw:
-a callback that raises drops the key. Until 1.7.1, a deleted chooser (still a
-key in the chooser table, but with no metatable) made every ⌥Up/⌥Down raise
-there, so Emacs never received `M-<up>`/`M-<down>` (`org-metaup`/`org-metadown`).
-Both key handlers now skip such choosers, and the tap wraps them in `pcall` so
-that any later error lets the key through.
+Since 1.8.0, ⌥Up, ⌥Down, ⌥P and ⌥N are `hs.hotkey`s that the lifecycle hook
+binds when a shared chooser opens and deletes when the last one closes, the
+same pattern as the Tab bindings in `core/choosers.lua`. The conflict checks
+above run at bind time. Before that, a keyboard eventtap ran permanently, so
+every keystroke in every app waited on Hammerspoon's main thread, and a
+callback that threw dropped the key. Until 1.7.1 one did: a deleted chooser
+made every ⌥Up/⌥Down raise there, so Emacs never received `M-<up>`
+(`org-metaup`). A hotkey has the mirror-image risk: one left bound by a missed
+close would swallow its key everywhere. So a hotkey that fires while no shared
+chooser is visible unbinds them all and re-sends its key to the focused app.
 
 `hs.chooser` strips its metatable both in `delete()` and in its finalizer, but
-the weak key survives: after a `delete()` until the caller drops its reference
-(`brave/omni-prompt.lua` keeps `O.chooser`), after garbage collection for one
-more GC cycle (Lua 5.4 clears weak keys of finalized objects a cycle late;
-measured live: 5/1 live/dead after one `collectgarbage()`, 5/0 after two). Since
-1.7.2 the key handlers drop such keys from the table when they meet them.
+the weak key in the chooser table survives: after a `delete()` until the
+caller drops its reference (`brave/omni-prompt.lua` keeps `O.chooser`), after
+garbage collection for one more GC cycle (Lua 5.4 clears weak keys of
+finalized objects a cycle late; measured live: 5/1 live/dead after one
+`collectgarbage()`, 5/0 after two). Indexing such a key throws, so the key
+handlers skip it and drop it from the table.
