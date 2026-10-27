@@ -265,6 +265,10 @@ state; add `--apply` to back up conflicts and install user links. Run its separa
 wrappers. The helper covers the relevant `setup/setup_links` files without
 running its old install steps, creating dangling legacy binaries or depending
 on an account-name test. It preserves an existing Kitty theme selection.
+Tracked links inside the repository must also be relative, including Zopen's
+launcher resource. A relative link to an optional generated compilation database
+can remain unresolved until that project is built; do not point it at another
+user's build directory.
 
 In particular, link `~/.gitconfig` to `symlinkme/local/.gitconfig`, copy the
 owner's `~/.gitignore_global`, and install `git-lfs` for the required Git filter.
