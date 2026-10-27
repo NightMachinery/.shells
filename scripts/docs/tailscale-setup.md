@@ -79,7 +79,9 @@ dropping rather than by reporting an error:
   fails, Tailscale just relays every connection through DERP. Two Macs on the
   same LAN moved data at about 2.7 MB/s that way. Register it with
   [agfi:tailscale-firewall-allow-darwin], again after every
-  `brew upgrade tailscale`, and confirm with
+  `brew upgrade tailscale`. Then restart the daemon
+  (`sudo brew services restart tailscale`): its old socket stays blocked, and
+  its log keeps saying "netcheck: UDP is blocked" until then. Confirm with
   `tailscale-firewall-allow-darwin --probe PEER`, which passes only when
   `tailscale ping` finds a direct path. The Developer ID signed Tailscale.app
   does not need this.

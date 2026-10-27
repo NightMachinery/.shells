@@ -19,6 +19,10 @@ function tailscale-firewall-allow-darwin {
     #: @warn Re-run after every `brew upgrade tailscale`: the registered path is
     #: the version-stamped Cellar binary.
     #:
+    #: @warn Restart tailscaled afterwards (`sudo brew services restart tailscale`).
+    #: Its UDP socket predates the registration and stays blocked: the daemon kept
+    #: logging "netcheck: UDP is blocked" until restarted, then reported udp=true.
+    #:
     #: @usage tailscale-firewall-allow-darwin                #: register (needs root)
     #: @usage tailscale-firewall-allow-darwin --check        #: ALF's claim only; no root
     #: @usage tailscale-firewall-allow-darwin --probe PEER   #: real test: is the path to PEER direct?
@@ -54,6 +58,7 @@ function tailscale-firewall-allow-darwin {
     h-firewall-allow-app-darwin "$0" "$ts_sym" "$ts_abs" @RET
 
     tailscale-firewall-allow-darwin --check
+    ecgray "$0: now restart tailscaled (\`sudo brew services restart tailscale\`); its existing socket stays blocked until then."
     ecgray "$0: for real proof, run \`$0 --probe PEER\` with a peer on the same network."
 }
 ##
