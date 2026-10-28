@@ -332,9 +332,19 @@ The default providers remain Claude Code and Codex. To include Antigravity:
 ```zsh
 agent_status_agents=(claude codex agy)
 agent-status
+agent-status claude codex agy      # the same, for one call
 ```
 
-The array also sets section order. Collection runs concurrently through
+The array, or the arguments, also set section order.
+
+`agent-status --json [AGENT...]` prints the same accounts as one JSON document
+instead, for programs: `{generated_at, providers: [{agent, title, error,
+accounts}]}`. Each account has `name`, `state`, `tier`, `source`, `email`,
+`error`, `login`, `windows` (`family`, `window`, `used_percent`, `resets_at` in
+Unix seconds or null) in display order, and `notes` (`severity`: `alarm`,
+`warning` or `info`; `text`). The terminal layout is drawn from this same
+model (`account_model` in `python/agy_status_render.py`), so the two cannot
+disagree. Collection runs concurrently through
 `parallelm --keep-order` in BrishGarden. Workers return compact JSON envelopes;
 the local renderer formats each section as it arrives and sends it through
 `pager-if-overflow-streaming`. Fetching and machine-readable provider commands

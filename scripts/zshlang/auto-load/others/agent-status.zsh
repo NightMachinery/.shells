@@ -94,7 +94,16 @@ function h-agent-status-one {
 
 function agent-status {
     #: Collect concurrently in the garden; format beside the user's terminal.
+    #: Usage: agent-status [--json] [AGENT...]
+    #: AGENTs (claude, codex, agy) override [agfi:agent_status_agents]. =--json=
+    #: prints the same accounts as one JSON document instead, for programs such
+    #: as the agent-status web panel; see =docs/agent-usage-armed.md=.
     bella_zsh_disable1
+    local format=text
+    if [[ "${1}" == --json ]] ; then
+        format=json
+        shift
+    fi
     local color=never columns="${agent_status_columns:-${COLUMNS:-80}}"
     [[ "${columns}" == <1-> ]] || columns=80
     if [[ -t 1 && ! -v NO_COLOR ]] && h-color-mode-p "${agent_status_color:-auto}" ; then
@@ -102,12 +111,21 @@ function agent-status {
     fi
     ensure-cmd python3 jq @RET
     ensure-array agent_status_agents
-    local agents=("${agent_status_agents[@]}")
+    local agents=("$@")
+    if (( ${#agents} == 0 )) ; then
+        agents=("${agent_status_agents[@]}")
+    fi
     if (( ${#agents} == 0 )) ; then
         agents=( claude codex )
     fi
+    local render="${NIGHTDIR:-${HOME}/scripts}/python/agent_status_render.py"
+    if [[ "${format}" == json ]] ; then
+        parallel_halt=never parallelm --keep-order h-agent-status-collect '{}' ::: "${agents[@]}" |
+            command python3 "${render}" --format json
+        return $?
+    fi
     parallel_halt=never parallelm --keep-order h-agent-status-collect '{}' ::: "${agents[@]}" |
-        command python3 "${NIGHTDIR:-${HOME}/scripts}/python/agent_status_render.py" \
+        command python3 "${render}" \
             --columns "${columns}" --color "${color}" --absolute "${agent_status_absolute_p:-auto}" |
         pager-if-overflow-streaming
 }

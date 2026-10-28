@@ -87,6 +87,29 @@ class AgentStatusTest(unittest.TestCase):
         self.assertLess(result.stdout.index('Unknown provider'), result.stdout.index('Codex'))
         self.assertIn('Reset credits', result.stdout)
 
+    def test_json_is_the_same_accounts_as_data(self):
+        script = str(Path(__file__).with_name('agent_status_render.py'))
+        payload = json.dumps(claude()) + '\ninvalid\n' + json.dumps(codex()) + '\n'
+        result = subprocess.run([sys.executable, script, '--format', 'json'],
+                                input=payload, text=True, capture_output=True)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        document = json.loads(result.stdout)
+        self.assertIsInstance(document['generated_at'], float)
+        claude_section, bad, codex_section = document['providers']
+        self.assertEqual((claude_section['agent'], claude_section['title'], claude_section['error']),
+                         ('claude', 'Claude Code', None))
+        self.assertEqual(bad['error'], 'Unknown provider')
+        default, work = claude_section['accounts']
+        self.assertEqual([(w['family'], w['window'], w['used_percent'], w['resets_at'])
+                          for w in default['windows']],
+                         [('Claude', '5h', 52.0, NOW + 3600 + 25 * 60), ('Fable', 'weekly', 90.0, NOW + 4 * 86400 + 7 * 3600)])
+        self.assertEqual((default['tier'], work['error']), ('max', 'Login required'))
+        self.assertTrue(default['source'].startswith('cache '))
+        notes = {(n['severity'], n['text'].split(':')[0]) for n in codex_section['accounts'][0]['notes']}
+        self.assertLessEqual({('alarm', 'Allowance blocked'), ('info', 'Reset credits')}, notes)
+        self.assertNotIn('credentials', result.stdout)
+        self.assertNotIn('_display', result.stdout)
+
 
 if __name__ == '__main__':
     unittest.main()

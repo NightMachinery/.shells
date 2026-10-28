@@ -68,4 +68,11 @@ assert all(width(line) <= 80 for line in text.splitlines())
 assert '\x1b' not in text
 PYTEST
 h-agent-status-collect agy | command jq --exit-status --arg file "${test_tmp}/cache.json" '.agent == "agy" and .cache_files.m == $file and .report[0].buckets[0].remaining_percent == 75' >/dev/null
-print -r -- 'ok: provider JSON fanout, stable order, partial failures, cache context and local compact rendering'
+#: Arguments override the configured list; --json is one document, never paged.
+function pager-if-overflow-streaming { fail 'JSON went through the pager' }
+agent-status --json agy claude 2> "${test_tmp}/errors" | command jq --exit-status '
+    [.providers[].agent] == ["agy", "claude"]
+    and .providers[0].accounts[0].windows[0].used_percent == 25
+    and .providers[1].accounts[1].error == "Login required"' >/dev/null || fail 'agent-status --json'
+[[ ! -s "${test_tmp}/errors" ]] || fail 'diagnostics escaped the JSON'
+print -r -- 'ok: provider JSON fanout, stable order, partial failures, cache context, local compact rendering and --json'

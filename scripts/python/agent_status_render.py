@@ -7,7 +7,7 @@ import os
 import sys
 import time
 
-from agy_status_render import clean, clip, duration, render, width
+from agy_status_render import account_model, clean, clip, duration, render, width
 from libs.codex_rate_limits import get_codex_limit
 
 
@@ -138,6 +138,36 @@ def codex_accounts(report, now):
     return accounts
 
 
+#: What a malformed envelope or report raises, which costs only its own section.
+BAD_REPORT = (ValueError, TypeError, KeyError, AttributeError)
+
+
+def section_accounts(envelope, now):
+    """The provider's accounts, in the shape agy_status_render reads; raises BAD_REPORT."""
+    agent = envelope.get("agent", "unknown")
+    report = envelope.get("report")
+    if agent not in TITLES:
+        raise ValueError("Unknown provider")
+    if not isinstance(report, (dict, list)) or not report:
+        raise ValueError(f"Status lookup failed (exit {envelope.get('exit', '?')})")
+    if agent == "claude":
+        return claude_accounts(report, now)
+    if agent == "codex":
+        return codex_accounts(report, now)
+    return [dict(row, _display_cache_file=envelope.get("cache_files", {}).get(row.get("account"), "")) for row in report]
+
+
+def section_model(envelope, now):
+    """One provider as data, for --format json: its accounts, or why there are none."""
+    agent = envelope.get("agent", "unknown")
+    model = {"agent": clean(agent), "title": TITLES.get(agent, clean(agent)), "error": None, "accounts": []}
+    try:
+        model["accounts"] = [account_model(account, now) for account in section_accounts(envelope, now)]
+    except BAD_REPORT as error:
+        model["error"] = clean(str(error)) or "Invalid status response"
+    return model
+
+
 def render_section(envelope, columns=80, color=False, absolute="auto", now=None):
     now = time.time() if now is None else now
     agent = envelope.get("agent", "unknown")
@@ -145,20 +175,9 @@ def render_section(envelope, columns=80, color=False, absolute="auto", now=None)
     head = clip(title, columns)
     rule = "─" * max(0, columns - width(head) - 2)
     heading = f"\033[1;34m{head}\033[0m  \033[2m{rule}\033[0m" if color else head + "  " + rule
-    report = envelope.get("report")
     try:
-        if agent not in TITLES:
-            raise ValueError("Unknown provider")
-        if not isinstance(report, (dict, list)) or not report:
-            raise ValueError(f"Status lookup failed (exit {envelope.get('exit', '?')})")
-        if agent == "claude":
-            accounts = claude_accounts(report, now)
-        elif agent == "codex":
-            accounts = codex_accounts(report, now)
-        else:
-            accounts = [dict(row, _display_cache_file=envelope.get("cache_files", {}).get(row.get("account"), "")) for row in report]
-        body = render(accounts, columns, color, absolute, now)
-    except (ValueError, TypeError, KeyError, AttributeError) as error:
+        body = render(section_accounts(envelope, now), columns, color, absolute, now)
+    except BAD_REPORT as error:
         message = "  ! " + clip(str(error) or "Invalid status response", columns - 4)
         body = ("\033[31m" + message + "\033[0m" if color else message) + "\n"
     return heading.rstrip() + "\n\n" + body.rstrip() + "\n\n"
@@ -169,8 +188,11 @@ def main():
     parser.add_argument("--columns", type=int, default=80)
     parser.add_argument("--color", choices=("auto", "always", "never"), default="auto")
     parser.add_argument("--absolute", choices=("auto", "y", "n"), default="auto")
+    parser.add_argument("--format", choices=("text", "json"), default="text",
+                        help="json: one document, {generated_at, providers: [{agent, title, error, accounts}]}")
     args = parser.parse_args()
     color = "NO_COLOR" not in os.environ and (args.color == "always" or (args.color == "auto" and sys.stdout.isatty()))
+    now, providers = time.time(), []
     for line in sys.stdin:
         if not line.strip():
             continue
@@ -180,7 +202,13 @@ def main():
                 raise ValueError()
         except ValueError:
             envelope = {"agent": "Status", "report": None}
-        print(render_section(envelope, max(40, args.columns), color, args.absolute), end="", flush=True)
+        if args.format == "json":
+            providers.append(section_model(envelope, now))
+        else:
+            print(render_section(envelope, max(40, args.columns), color, args.absolute), end="", flush=True)
+    if args.format == "json":
+        json.dump({"generated_at": now, "providers": providers}, sys.stdout, ensure_ascii=False)
+        print()
 
 
 if __name__ == "__main__":
