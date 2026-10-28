@@ -130,6 +130,46 @@ def provenance(account, now):
     return " + ".join(parts) or "source unknown"
 
 
+def window_order(window):
+    family, name = window["family"], window["window"]
+    return (0 if family == "Gemini" else 1 if family.lower().startswith("gemini") else
+            2 if family == "Claude/GPT" else 3, family.casefold(), 0 if name == "5h" else 1, name)
+
+
+def account_model(account, now):
+    """One account as plain data, windows in display order, before any layout.
+
+    The terminal layout in render() and `agent-status --json` both read this, so the
+    web panel and the terminal cannot disagree about an account. Note severities are
+    alarm, warning and info.
+    """
+    windows = []
+    for bucket in account.get("buckets", []):
+        family, window = bucket_names(bucket)
+        used = bucket.get("used_percent", 100 - bucket.get("remaining_percent", 100))
+        reset = bucket.get("resets_at")
+        known = isinstance(reset, (float, int)) and math.isfinite(reset) and reset > 0
+        windows.append({"family": family, "window": window, "used_percent": max(0, min(100, float(used))),
+                        "resets_at": reset if known else None})
+    windows.sort(key=window_order)
+    label = clean(account.get("label") or account.get("account"))
+    state = ("not signed in" if account.get("signed_in") is False else
+             "signed in" if account.get("signed_in") is True else "auth stored")
+    return {
+        "account": clean(account.get("account")),
+        "name": label if label == account.get("account") else f"{label} [{clean(account.get('account'))}]",
+        "state": clean(account.get("_display_state") or state),
+        "tier": clean(account.get("tier")),
+        "source": provenance(account, now),
+        "email": clean(account.get("email")),
+        "error": clean(account.get("error")) or None,
+        "login": f"agy-acc-login {account['account']}" if account.get("signed_in") is False else None,
+        "windows": windows,
+        "notes": [{"severity": "info" if severity == "dim" else severity, "text": clean(note)}
+                  for severity, note in account.get("_display_notes", [])],
+    }
+
+
 def render(accounts, columns=80, color=False, absolute="auto", now=None):
     now = time.time() if now is None else now
     columns = max(40, columns)
@@ -142,20 +182,10 @@ def render(accounts, columns=80, color=False, absolute="auto", now=None):
 
     rows = []
     prepared = []
-    for account in accounts:
-        entries = []
-        for bucket in account.get("buckets", []):
-            family, window = bucket_names(bucket)
-            used = bucket.get("used_percent", 100 - bucket.get("remaining_percent", 100))
-            used = max(0, min(100, float(used)))
-            relative, stamp = reset_text(bucket.get("resets_at"), now)
-            entry = (family, window, used, relative, stamp)
-            entries.append(entry)
-            rows.append(entry)
-        entries.sort(key=lambda row: (0 if row[0] == "Gemini" else
-                                     1 if row[0].lower().startswith("gemini") else
-                                     2 if row[0] == "Claude/GPT" else 3,
-                                     row[0].casefold(), 0 if row[1] == "5h" else 1, row[1]))
+    for account in [account_model(account, now) for account in accounts]:
+        entries = [(w["family"], w["window"], w["used_percent"], *reset_text(w["resets_at"], now))
+                   for w in account["windows"]]
+        rows += entries
         prepared.append((account, entries))
 
     window_width = min(8, max([6] + [width(r[1]) for r in rows]))
@@ -169,17 +199,7 @@ def render(accounts, columns=80, color=False, absolute="auto", now=None):
     if absolute == "auto":
         show_absolute = show_absolute and columns >= 100
 
-    headers = []
-    for account, _ in prepared:
-        label = clean(account.get("label") or account.get("account"))
-        name = label if label == account.get("account") else f"{label} [{clean(account.get('account'))}]"
-        state = ("not signed in" if account.get("signed_in") is False else
-                 "signed in" if account.get("signed_in") is True else "auth stored")
-        state = clean(account.get("_display_state") or state)
-        tier = clean(account.get("tier"))
-        source = provenance(account, now)
-        email = clean(account.get("email"))
-        headers.append((name, state, tier, source, email))
+    headers = [(a["name"], a["state"], a["tier"], a["source"], a["email"]) for a, _ in prepared]
 
     # Header fields have their own shared columns. Allocate display cells
     # before styling, reserving room for email on compact terminals.
@@ -209,10 +229,10 @@ def render(accounts, columns=80, color=False, absolute="auto", now=None):
         if fields[4] and email_width:
             header += "  " + dim + clip(fields[4], email_width) + off
         output.append(header.rstrip())
-        if account.get("error"):
+        if account["error"]:
             output.append(paint("  ! " + clip(account["error"], columns - 4), 31))
-        if account.get("signed_in") is False:
-            output.append("  " + clip(f"agy-acc-login {account['account']}", columns - 2))
+        if account["login"]:
+            output.append("  " + clip(account["login"], columns - 2))
         for family, window, used, relative, stamp in entries:
             level = 31 if used >= 90 else 33 if used >= 70 else 32
             filled = min(bar_width, int(used * bar_width / 100 + 0.5))
@@ -224,9 +244,9 @@ def render(accounts, columns=80, color=False, absolute="auto", now=None):
             if show_absolute and stamp:
                 line += f"   {dim}{stamp}{off}"
             output.append(line.rstrip())
-        for severity, note in account.get("_display_notes", []):
-            code = 31 if severity == "alarm" else 33 if severity == "warning" else 2
-            output.append(paint("  " + clip(note, columns - 2), code))
+        for note in account["notes"]:
+            code = 31 if note["severity"] == "alarm" else 33 if note["severity"] == "warning" else 2
+            output.append(paint("  " + clip(note["text"], columns - 2), code))
     return "\n".join(output) + "\n"
 
 
