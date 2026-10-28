@@ -7,6 +7,22 @@ if ! command redis-cli ping >/dev/null 2>&1 ; then
     return 1
 fi
 
+#: The services below run in tmux, and a tmux server keeps the macOS privacy
+#: grants (TCC) of whatever started it; every session made in it later shares
+#: them. Started from this LaunchAgent it has none, so omni-history cannot read
+#: Brave's history. Started by Kitty's ivy tab it inherits Kitty's Full Disk
+#: Access. So let Kitty create the server first, and only then fall back.
+if (( ${NIGHT_WORKSTATION_IVY_WAIT:-120} > 0 )) ; then
+    integer ivy_deadline=$(( SECONDS + ${NIGHT_WORKSTATION_IVY_WAIT:-120} ))
+    until command tmux has-session -t '=ivy' 2>/dev/null ; do
+        if (( SECONDS >= ivy_deadline )) ; then
+            print -ru2 -- "workstation startup: no ivy tmux session after ${NIGHT_WORKSTATION_IVY_WAIT:-120}s; starting tmux here, without Kitty's privacy grants."
+            break
+        fi
+        sleep 2
+    done
+fi
+
 brishgarden-boot "${NIGHT_BRISH_WORKERS:-8}" || return $?
 omni-history-boot || return $?
 

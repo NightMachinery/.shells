@@ -306,6 +306,15 @@ The first ivy tab creates its workspace when absent, even when background
 services already have a tmux server. Existing ivy workspaces keep the normal
 reuse path.
 
+The startup profile waits up to `NIGHT_WORKSTATION_IVY_WAIT` seconds (default
+120, `0` disables) for that ivy session before starting its tmux services. A
+tmux server keeps the macOS privacy grants of whatever started it, and every
+later session shares them. If the LaunchAgent starts it, `omni-history` gets
+"Operation not permitted" on Brave's history and serves nothing. If Kitty's ivy
+tab starts it, it inherits Kitty's Full Disk Access. Grant Kitty Full Disk
+Access in System Settings for this to matter. When no ivy session appears in
+time, startup continues and logs that tmux lacks Kitty's grants.
+
 The workstation include removes inherited `SSH_CLIENT`, `SSH_CONNECTION`,
 `SSH_TTY`, `PROMPT_PURE_SSH_CONNECTION` and `amSSH` from local Kitty children.
 An app opened through SSH can inherit these markers, causing Pure to show
