@@ -113,10 +113,24 @@ function codex {
     agent_launch_sync_p=n h-agent-launch codex codex "$@"
 }
 
+function codex-config-sync {
+    : "[--check] merges the tracked Codex settings into ~/.codex/config.toml"
+    #: Codex rewrites config.toml with machine state (trusted projects,
+    #: notices, hook hashes, plugin and MCP paths), so only its stable settings
+    #: are tracked, in configFiles/codex/config.base.toml. Tracked values win;
+    #: everything else is left as Codex wrote it. Silent when nothing changes.
+    #: See docs/codex-config.md.
+    ##
+    command uv run --quiet --no-project --with tomlkit python3 \
+        "${NIGHTDIR}/python/codex_config_sync.py" \
+        --base "${NIGHTDIR}/configFiles/codex/config.base.toml" "$@"
+}
+
 function codex-m {
     #: Keeps ~/.codex/AGENTS.md current with its sources; asks before
     #: launching with stale instructions.
     h-agents-md-sync-ask @RET
+    codex-config-sync || ecerr "$0: codex-config-sync failed; launching with the current config.toml"
 
     memoi_expire=$(( 3600*24*1 )) reval-memoi codex-install
     #: run codex-install every once in a while

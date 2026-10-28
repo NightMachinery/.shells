@@ -1,0 +1,28 @@
+# Stable Codex settings, merged into ~/.codex/config.toml by [agfi:codex-config-sync].
+# Values here win; every key Codex keeps for itself (trusted projects, notices,
+# hook hashes, plugins, MCP servers, desktop preferences) is left alone.
+# Keep machine paths and project names out of this file: it is public.
+
+model = "gpt-6.1-sol"
+model_reasoning_effort = "high"
+plan_mode_reasoning_effort = "high"
+personality = "pragmatic"
+approvals_reviewer = "auto_review"
+web_search = "cached"
+service_tier = "default"
+project_root_markers = [".git", ".agent-root", "pyproject.toml", "package.json"]
+notify = ["zsh", "-fc", "exec \"${BRISHZGO_BIN:-$HOME/go/bin/brishzgo}\" -- h-codex-notify \"--pane=$TMUX_PANE\" \"--node=${TMUX_SUBAGENT_NODE:+1}\" \"--paseo=$PASEO_AGENT_ID\" \"$1\"", "codex-notify"]
+
+[agents]
+max_concurrent_threads_per_session = 64
+
+[features]
+apps = false
+unified_exec = true
+steer = true
+multi_agent = true
+js_repl = false
+
+[tui]
+status_line = ["model-with-reasoning", "current-dir", "context-used", "five-hour-limit", "weekly-limit"]
+session_picker_view = "dense"
