@@ -344,7 +344,9 @@ accounts}]}`. Each account has `name`, `state`, `tier`, `source`, `email`,
 Unix seconds or null) in display order, and `notes` (`severity`: `alarm`,
 `warning` or `info`; `text`). The terminal layout is drawn from this same
 model (`account_model` in `python/agy_status_render.py`), so the two cannot
-disagree. Collection runs concurrently through
+disagree. A private phone panel reads this document through BrishGarden's
+client (`brishzgo -- agent-status --json claude codex agy`), so renaming or
+dropping a field breaks it; adding one does not. Collection runs concurrently through
 `parallelm --keep-order` in BrishGarden. Workers return compact JSON envelopes;
 the local renderer formats each section as it arrives and sends it through
 `pager-if-overflow-streaming`. Fetching and machine-readable provider commands
