@@ -88,12 +88,14 @@ export codedir="$HOME/code"
 
 export chat_logs_dir="${BASE_DIR}/documents/chat_logs"
 ##
-export bigWalletDir="${BASE_DIR}/documents/big_wallet"
-
 export nightNotesN="${HOME}/notes"
 export nightNotes="${nightNotesN}/"
 # export nightNotes="$cellar/notes/"
 #: Keep the trailing '/', it is important when removing prefixes. =nightNotesN= is useful for =aliasdir=.
+
+#: Outside the notes git repos (it sits beside them, not in one). The old
+#: =${BASE_DIR}/documents/big_wallet= is left as a symlink here.
+export bigWalletDir="${nightNotesN}/big_wallet"
 
 export nightNotesPrivate="${nightNotes}/private"
 export nightNotesPublic="${nightNotes}/public"
