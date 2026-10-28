@@ -1,45 +1,42 @@
 # One `uv tool install` argument list per line; see [agfi:ins-uv-tools].
+-e ~/code/misc/kitty-theme-changer --with psutil
+-e ~/code/python/BrishGarden --with-editable ~/code/python/brish --with-editable ~/code/uni/PyNight
+-e ~/code/python/ebook_chunker --with ipython --with-editable ~/code/uni/PyNight --with-editable ~/code/python/brish
+-e ~/code/python/gemini_tts
+-e ~/code/python/get_the_nini --with-editable ~/code/uni/PyNight --with-editable ~/code/python/brish
+-e ~/code/python/gost-trier
+-e ~/code/python/jalali-calendar-cli
 amzqr
 arxiv-latex-cleaner
 asitop
--e ~/code/python/BrishGarden --with-editable ~/code/python/brish --with-editable ~/code/uni/PyNight
 catsql
-git+https://github.com/NightMachinery/cis-applications2org.git
 copyparty
 csvkit
 ddgr
--e ~/code/python/ebook_chunker --with ipython --with-editable ~/code/uni/PyNight --with-editable ~/code/python/brish
 edir
 epr-reader
 fanficfare
-git+https://github.com/NightMachinery/fdroid_downloader.git
 fichub-cli
 gallery-dl
 gcalcli
--e ~/code/python/gemini_tts
--e ~/code/python/get_the_nini --with-editable ~/code/uni/PyNight --with-editable ~/code/python/brish
+git+https://github.com/NightMachinery/cis-applications2org.git
+git+https://github.com/NightMachinery/fdroid_downloader.git
 glances
 google-images-download
--e ~/code/python/gost-trier
 hachoir
 httpie
 instaloader
 iredis
--e ~/code/python/jalali-calendar-cli
 jill
 khal
--e ~/code/misc/kitty-theme-changer --with psutil
 libgen-py
 lightnovel-crawler
 llm --with llm-gemini --with llm-anthropic --with llm-groq --with llm-openrouter --with llm-vertex --with llm-openai-via-codex
 magic-wormhole
 mcp-proxy --with 'mcp<2'
 nbdime
-openai-whisper
-overleaf-sync
 pdfcropmargins
 piep
-pix2tex
 pixcat
 poetry
 py-spy
