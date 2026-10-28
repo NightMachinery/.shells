@@ -101,6 +101,18 @@ dropping rather than by reporting an error:
   bulk copies there, [agfi:mu-rsp-to] finds the LAN route itself (see
   [agfi:h-rsp-lan-route]).
 
+## Tailscale SSH sessions run throttled on macOS
+
+Homebrew's `tailscaled` LaunchDaemon sets no `ProcessType`, so launchd gives
+the job light CPU and I/O limits, and every Tailscale SSH session inherits them
+as a child of `tailscaled` (mosh-server started that way too). Between two Macs
+a CPU loop ran 5x slower over Tailscale SSH than locally, and an interactive zsh
+took 20 s to start instead of 4.8 s, which looks like `ssh HOST -t zsh` hanging.
+[agfi:tailscale-fix-process-priority] sets `ProcessType` to `Interactive` and
+reloads the daemon, detached so it survives being run over Tailscale SSH.
+Re-run it after `brew services restart tailscale` or an upgrade, which rewrite
+the plist; `--check` shows the state.
+
 ## Android internet failures: separate DNS from connectivity
 
 An SSH connection into Termux over Tailscale can keep working while Android's

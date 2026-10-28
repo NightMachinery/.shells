@@ -1,6 +1,74 @@
 ##
 aliasfn tailscale-status tailscale status
 ##
+function tailscale-fix-process-priority {
+    #: Make Homebrew's tailscaled an Interactive launchd job, so the shells it
+    #: starts for Tailscale SSH run at full speed.
+    #:
+    #: WHY: the formula's LaunchDaemon sets no ProcessType, and launchd then
+    #: applies light CPU and I/O limits to the job (see launchd.plist(5)). Every
+    #: Tailscale SSH session is a child of tailscaled and inherits them, and so
+    #: does a mosh-server started through it. Measured 2026-10 between two Macs:
+    #: a CPU loop ran 5x slower over Tailscale SSH (2.93s against 0.59s
+    #: locally), and an interactive zsh took 20s to start instead of 4.8s, which
+    #: looked like `ssh HOST -t zsh' hanging.
+    #:
+    #: Applying it restarts tailscaled, dropping every tailnet connection for a
+    #: few seconds, including a Tailscale SSH session you run this from. So the
+    #: unload and reload run detached, in their own session, and the reload is
+    #: retried: a Mac left with tailscaled unloaded would be off the tailnet.
+    #:
+    #: @warn Homebrew rewrites the plist on `brew services restart tailscale'
+    #: and on upgrades, dropping the setting. Re-run this afterwards.
+    #:
+    #: @usage tailscale-fix-process-priority          #: set and reload (needs root)
+    #: @usage tailscale-fix-process-priority --check  #: report only; no root
+    ##
+    local plist=( /Library/LaunchDaemons/{sh.brew,homebrew.mxcl}.tailscale.plist(N) )
+    if (( ${#plist} != 1 )) ; then
+        ecerr "$0: expected one Homebrew tailscale LaunchDaemon, found ${#plist}: ${plist[*]}"
+        return 1
+    fi
+    plist="${plist[1]}"
+    local label="${${plist:t}%.plist}"
+    local pb=/usr/libexec/PlistBuddy current
+    current="$("$pb" -c 'Print :ProcessType' "$plist" 2>/dev/null)"
+
+    if [[ "$1" == '--check' ]] ; then
+        ec "$0: ${plist}: ProcessType=${current:-<unset>}"
+        #: The plist can say Interactive while launchd still runs the job it
+        #: loaded before the edit; this line shows what is actually loaded.
+        command launchctl print "system/${label}" 2>/dev/null | command grep -E 'spawn type'
+        [[ "$current" == Interactive ]]
+        return $?
+    fi
+
+    local sudo_cmd=( ${(@f)"$(h-sudo-cmd)"} )
+    if [[ "$current" != Interactive ]] ; then
+        if test -n "$current" ; then
+            reval-ec "$sudo_cmd[@]" "$pb" -c 'Set :ProcessType Interactive' "$plist" @RET
+        else
+            reval-ec "$sudo_cmd[@]" "$pb" -c 'Add :ProcessType string Interactive' "$plist" @RET
+        fi
+    fi
+
+    #: Fork, setsid, then exec: the parent returns at once, and the child is
+    #: outside this (possibly Tailscale SSH) session when tailscaled goes down.
+    local log=/tmp/tailscale-fix-process-priority.log
+    reval-ec "$sudo_cmd[@]" /usr/bin/perl -MPOSIX -e 'exit 0 if fork; POSIX::setsid(); exec @ARGV or die' -- \
+        /bin/sh -c 'exec >"$3" 2>&1 < /dev/null
+            sleep 1
+            /bin/launchctl bootout "system/$1"
+            for i in 1 2 3 4 5 6 7 8 9 10 ; do
+                /bin/launchctl bootstrap system "$2" && exit 0
+                sleep 2
+            done
+            exit 1' sh "$label" "$plist" "$log" @RET
+
+    ecgray "$0: tailscaled is restarting; tailnet connections drop for a few seconds (log: ${log})."
+    ecgray "$0: then confirm with \`$0 --check'."
+}
+
 function tailscale-firewall-allow-darwin {
     #: Register Homebrew's tailscaled with the macOS Application Firewall (ALF).
     #:
