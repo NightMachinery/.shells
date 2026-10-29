@@ -453,7 +453,9 @@ def meter(low, high, color):
 
 
 def render(report, color=False):
-    hosts, devices = report["hosts"], report["devices"]
+    hosts = [host for host in report["hosts"]
+             if host.get("platform", "").lower() != "ios" or host.get("batteries")]
+    devices = report["devices"]
     columns = max(50, min(shutil.get_terminal_size((100, 24)).columns, 110))
     label_width = max(16, min(32, columns - 48))
     available = sum(host["status"] in ("ok", "partial") for host in hosts)

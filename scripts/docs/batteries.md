@@ -41,8 +41,10 @@ Headphone queries never use `--auto-connect`.
 Nothing polls after the command exits. `--watch` gives fresh readings at the cost
 of recurring network and battery queries. Its interval is the pause after each
 completed round, at least five seconds. It cannot be combined with `--json`.
-Offline peers remain visible unless `--online` is used. If discovery fails,
-local readings remain available and `--host` can still select SSH targets.
+Offline peers remain visible unless `--online` is used. iPhones appear in the
+terminal dashboard only after a battery upload; JSON retains their status.
+If discovery fails, local readings remain available and `--host` can still
+select SSH targets.
 Partial or failed queries return exit status 1. Devices already known to be
 offline or unsupported do not count as query failures.
 
