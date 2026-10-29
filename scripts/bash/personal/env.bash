@@ -1,6 +1,7 @@
 export NNN_USE_EDITOR=1
 # export BROWSER="lynx"
 ##
+export HOMEBREW_NO_ANALYTICS=1
 export HOMEBREW_AUTO_UPDATE_SECS=$((3600*24*7))
 export HOMEBREW_NO_AUTO_UPDATE=y # since the other option doesn't seem to work reliably. Use cron to update brew manually.
 ##
