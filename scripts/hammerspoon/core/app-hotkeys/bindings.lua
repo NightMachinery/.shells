@@ -7,6 +7,7 @@
 appHotkey{
     key='/',
     appName={
+        -- 'company.thebrowser.dia',
         'com.brave.Browser',
         'company.thebrowser.Browser',
         'com.vivaldi.Vivaldi',
@@ -33,6 +34,8 @@ appHotkey{
     key='.',
     -- mods={'shift'},
     appName={
+        -- 'com.brave.Browser',
+        'company.thebrowser.dia',
         'com.google.Chrome',
         'com.apple.Safari',
     }
