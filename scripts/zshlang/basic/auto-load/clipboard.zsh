@@ -436,7 +436,7 @@ function pbcopy-img {
     fi
 }
 
-function pbpaste-plus() {
+function pbpaste-plus {
     # GLOBAL out: paste
     unset paste
     paste=( "$(pbpaste)" ) || {
