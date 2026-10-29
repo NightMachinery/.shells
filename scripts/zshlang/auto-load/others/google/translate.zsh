@@ -50,7 +50,8 @@ function gcp-translate {
         -H 'Content-Type: application/json' \
         'https://translation.googleapis.com/language/translate/v2' \
         --data "$body" \
-        | jq -r '.data.translations[0].translatedText'
+        | command jq -r '.data.translations[0].translatedText' |
+        cat-copy-if-tty
 }
 
 function 2en-gcp { gcp-translate en "$@" }
