@@ -71,3 +71,5 @@
 [credential "https://gist.github.com"]
 	helper = 
 	helper = !/opt/homebrew/bin/gh auth git-credential
+[include] # machine-local overrides, e.g. SSH signing on a Mac without the GPG key; ignored when absent
+	path = ~/.gitconfig.local
