@@ -1149,6 +1149,7 @@ function agy-status {
     fi
     return "${ret}"
 }
+aliasfn ags agy-status
 aliasfn agys agy-status
 
 #: Named implementations, so a caller can demand one without knowing the knob.

@@ -125,11 +125,11 @@ function aga {
     # agm "$@" "$NIGHTDIR"/**/*alias*(.)
     builtin alias|agm "$@"
 }
-function ags {
+function ag-nightdir {
     agm "$@" ~/.zshenv ~/.zshrc "$NIGHTDIR"/**/*(.) ~/.bashrc ~/.profile ~/.bashrc ~/.bash_profile
 }
 function agf {
-    ags "$@"'\s*\(\)'
+    ag-nightdir "$@"'\s*\(\)'
 }
 function agi {
     doc ag internals of zsh
