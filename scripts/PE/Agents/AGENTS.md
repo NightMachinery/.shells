@@ -437,10 +437,10 @@ Inside Paseo (`PASEO_AGENT_ID` is set), pick the Paseo skill by job:
   by sending it `/compact` through Paseo. A long-running agent compacts
   itself with it at a natural endpoint, after writing its critical state to
   disk, and only once its context reaches the floor in `~/.compaction.yaml`
-  (default 128k tokens).
+  (default 128k tokens). You need to proactively use this skill.
 - `paseo-cache-warmer`: keep a long-lived agent's prompt cache warm with
-  keepalive heartbeats while work runs, and decide when that pays; it
-  compacts with `paseo-compact` first.
+  keepalive heartbeats while work runs, and decide when that pays. It
+  can compact with `paseo-compact` first. When you know you are going to be idle for a few hours, it is critical that either a cache warming heartbeat is set up or you compact yourself and relevant idle subagents.
 
 Inside Paseo, Paseo is the backend for every agent you launch that is not an
 in-process subagent: another provider such as Codex, another Claude account, or
@@ -464,6 +464,7 @@ model and account.
   `quota-management` to check headroom and arrange monitoring. Stop monitoring
   when the run becomes idle. If unavailable, use verified usage readers when
   available; treat missing data as unknown and checkpoint before exhaustion.
+- Coordinators should always pay attention to development velocity, and proactively offer suggestions to streamline and improve the coordination workflow to the user or their parent coordinators.
 
 # Token Efficiency
 
