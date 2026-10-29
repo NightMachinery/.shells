@@ -26,6 +26,34 @@ Install BrishGarden as an isolated uv tool as described in
 [python-envs.md](python-envs.md). The old `setup.basic` and `setup_macOS.zsh`
 include large optional and obsolete installs; review them before running.
 
+## SSH aliases and workstation identity
+
+Reconcile `~/.ssh/config` separately from the shared shell repository. Tailnet
+discovery supplies device names, but SSH aliases can also specify a different
+login name, a nonstandard port, a jump host or a dedicated identity. A missing
+alias can therefore break remote tools even when the peer is online.
+
+Preserve the destination's existing routes and use its own default SSH identity.
+Adapt source-machine home paths and the `self` login to the destination. Keep
+dedicated account keys distinct; restoring an alias does not register a new
+machine's key with its server. Regenerate cloud host includes locally when the
+cloud tooling is configured. Keep global Include directives before the first
+Host block, so they do not inherit a host-specific condition. Create the
+configured control-socket directory.
+
+Check network-relative proxy commands too: another Mac's default gateway may
+be a different device. A LAN-first route can use a short connection timeout and
+fall back to the peer's tailnet address when the local LAN route is unavailable.
+
+Place specific host settings before catch-all defaults: SSH takes the first
+value for most options, while `IdentityFile` entries accumulate. Back up the
+current configuration and validate every restored literal alias with `ssh -G`
+before replacing it. Compare effective `hostname`, `user`, `port`, `proxyjump`
+and `identityfile` settings. Verify host trust against an already trusted host
+key, then perform a batch-mode connection from the new Mac itself. Successful
+access from the original Mac does not validate the new Mac's configuration or
+authentication.
+
 ## Development environment
 
 A working shell does not verify the development environment. Track runtimes,
