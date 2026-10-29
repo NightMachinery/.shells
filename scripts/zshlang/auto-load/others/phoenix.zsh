@@ -1,6 +1,6 @@
 typeset -g PHOENIX_CONF=~/.phoenix.js
 ##
-function phoenix-reload() {
+function phoenix-reload {
     if test -e "$PHOENIX_CONF" ; then
         touch "$PHOENIX_CONF"
     else

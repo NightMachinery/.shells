@@ -203,7 +203,7 @@ function ivy {
     tty-title "${tty_title}"
     ###
     ## ivy acts as the terminal emulator's startup hook, as well
-    phoenix-reload
+    # phoenix-reload
     ##
     if ! whitespace-is "$(pgrep tmux)" ; then
         #: The one moment you are sure to be at kitty, able to restart a server
@@ -253,22 +253,18 @@ function ivy-self {
 function ivy-convenience {
     local i
 
-    # for i in {1..3} ; do
-    #     tmuxnewsh2 "zii$i" mosh zii@51.178.215.202 -- /home/linuxbrew/.linuxbrew/bin/zsh
+    # for i in {1..2} ; do
+    #     tmuxnewsh2 "eva$i" mosh ${lilf_user}@82.102.11.148 -- zsh
     # done
 
-    for i in {1..2} ; do
-        tmuxnewsh2 "eva$i" mosh ${lilf_user}@82.102.11.148 -- zsh
-    done
-
-    for i in {1..1} ; do
-        tmuxnew "julia_repl$i" env TERM="$TERM" PATH="$PATH" julia
-    done
+    # for i in {1..1} ; do
+    #     tmuxnew "julia_repl$i" env TERM="$TERM" PATH="$PATH" julia
+    # done
 
 
-    for i in {1..1} ; do
-        tmuxnew "ipython_repl$i" ipython
-    done
+    # for i in {1..1} ; do
+    #     tmuxnew "ipython_repl$i" ipython
+    # done
     ##
     # tmuxnew ipython_p310 conda run --no-capture-output --live-stream -n p310 ipython
     ##

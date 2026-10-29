@@ -6,7 +6,7 @@ function ot-enabled-p {
    return 1
   fi
 
-  bool "${OVERTONE_ENABLED:-y}"
+  bool "${OVERTONE_ENABLED:-n}"
 }
 
 function in-ot {
