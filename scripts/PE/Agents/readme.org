@@ -43,6 +43,8 @@ Git-tracked, here:
   source as a nested project memory and loaded the tier twice, on macOS only.
 - =hosts/<hostname>.md= --- every agent, one host. Not created by the
   bootstrap: an empty one committed by accident is worse than none.
+  =<hostname>= is zsh's =$HOST=, which on macOS may or may not end in
+  =.local=; check it on the machine before naming the file.
 - =disabled/= --- parked, assembled into nothing. =VPS.md= lives here.
 
 Git-tracked, private, in =${nightNotesPrivate}/configs/agents/=: the same
