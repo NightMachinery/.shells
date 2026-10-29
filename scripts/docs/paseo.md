@@ -83,6 +83,21 @@ can otherwise overwrite a manual edit.
 
 See the official [daemon lifecycle reference](https://paseo.sh/docs/cli.md#daemon-management).
 
+## Back up schedules
+
+The daemon keeps each schedule and heartbeat as one file in
+`~/.paseo/schedules/`, with its definition and its whole run history. Nothing
+else backs them up. [agfi:paseo-schedules-export] writes the definitions only,
+by default to `configs/paseo/schedules/<host>/` in the private notes repository:
+`<id>.json` (name, status, cadence, target, dates) and `<id>.prompt.md` (the
+prompt, so an edit shows as a readable diff). Run history and next and last run
+times are left out, because they change on every run. A schedule deleted in
+Paseo loses its files there, and git history keeps the old version.
+
+The daily notes commit schedule runs the export on each Mac before committing,
+so every prompt change is versioned within a day. To restore a schedule,
+recreate it from those two files with `paseo schedule create`.
+
 ## Official agent skills
 
 The upstream [`paseo` skill](https://github.com/getpaseo/paseo/tree/main/skills/paseo)
