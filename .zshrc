@@ -533,6 +533,7 @@ function nightsh-load-zshrc() {
   }
   # zstyle ':fzf-tab:*' print-query alt-enter # this is the default
   zstyle ':fzf-tab:*' fzf-command fztab
+  zstyle ':fzf-tab:*' use-fzf-default-opts yes # fzf-tab since 2024 hides FZF_DEFAULT_OPTS (our shift-up/down select bindings) unless asked
   # zstyle ':fzf-tab:*' fzf-command fzf
   zstyle ':completion:*' format '[%d]' # enables groups
   zstyle ':fzf-tab:*' switch-group ',' '.'
