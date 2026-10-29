@@ -79,11 +79,21 @@ appHotkey{ key='l',
            }
 }
 
-appHotkey{ key='\\', appName='com.anthropic.claudefordesktop' }
+appHotkey{ key='\\', appName={
+               'moe.Throne.macosx',
+               'com.anthropic.claudefordesktop',
+               'com.claudecode.context',
+                             }
+}
 appHotkey{
     mods={'shift'},
     key='\\',
-    appName='com.claudecode.context' }
+    appName={
+        'com.anthropic.claudefordesktop',
+        'com.claudecode.context',
+        'moe.Throne.macosx',
+    }
+}
 -- appHotkey{ key='\\', appName='moe.Throne.macosx' }
 -- appHotkey{ key='\\', appName='com.apple.iCal' }
 
