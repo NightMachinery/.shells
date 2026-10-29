@@ -34,6 +34,9 @@ This split works because both tools print the same battery JSON:
 
 ## Commands
 
+For one combined listing of laptop and connected peripheral batteries, use
+[`batteries`](batteries.md).
+
     sony-battery                    # current levels, for a human
     sony-battery-alert-low          # alert iff something is low; else silent
     bose-battery
