@@ -840,3 +840,20 @@ function git-commit-to-branch {
     fi
 }
 ##
+function git-push-in {
+  local repos=("$@")
+
+  local d retcode=0
+  for d in "${repos[@]}"; do
+    ecgray
+
+    #: `-C`: Run as if git was started in <path> instead of the current working directory.
+    reval-ec git -C "${d}" push || {
+      retcode=$?
+      ecgray "$0: git push failed in ${d} (retcode: ${retcode})"
+    }
+  done
+
+  return ${retcode}
+}
+##

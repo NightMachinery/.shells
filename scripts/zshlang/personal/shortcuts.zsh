@@ -162,6 +162,10 @@ function cellp {
     #: to pull the new changes
 }
 
+function notes-push {
+    git-push-in ~nt/*(/N)
+}
+
 function h-rem-sync {
     #: Use =fnswap brishzr true= to disable this:
     brishzr-repeat
