@@ -4,11 +4,12 @@
     python3 ~/scripts/setup/macOS/zopen-install.py
 
 Copies the tracked app to /Applications (a copy, as Launch Services prefers), points its
-launcher at this account's zopen.bash, registers it, and applies Zopen.duti. A row whose
-extension has no declared type, such as .jl or .toml, cannot be set through `duti` (error
--50), so it is written to the Launch Services handler list by extension, the way Finder's
-"Open With > Change All" stores it, after a backup; lsd then rereads the list. Safe to
-rerun. Prints each extension's default app at the end.
+launcher at this account's zopen.bash, registers it, and applies Zopen.duti. Some rows
+cannot be set through `duti` (error -50): an extension with no declared type, such as .jl
+or .toml, and on macOS 27 the catch-all type public.data, for any app. Those are written to
+the Launch Services handler list directly, the way Finder's "Open With > Change All" stores
+them, after a backup; lsd then rereads the list, and accepts them. Safe to rerun. Prints
+each extension's default app at the end.
 """
 import plistlib
 import shutil
@@ -37,23 +38,31 @@ def main():
     subprocess.run([LSREGISTER, '-f', str(APP)], check=True)
 
     rows = [line.split('\t') for line in DUTI.read_text().splitlines() if line and not line.startswith('#')]
-    by_extension = [(bid, what[1:], role) for bid, what, role in rows if what.startswith('.')]
+    direct = [(bid, what, role) for bid, what, role in rows if what.startswith('.')]
     for bid, what, role in rows:
-        if not what.startswith('.'):
-            subprocess.run(['duti', '-s', bid, what, role], capture_output=True)
+        if not what.startswith('.') and subprocess.run(['duti', '-s', bid, what, role], capture_output=True).returncode != 0:
+            direct.append((bid, what, role))
 
-    if by_extension:
+    if direct:
         backup = HOME / f'.local/state/mac-bootstrap/launchservices-before-zopen-{time.strftime("%Y%m%dT%H%M%S")}.plist'
         backup.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(HANDLERS, backup)
         backup.chmod(0o600)
         d = plistlib.loads(HANDLERS.read_bytes())
-        exts = {ext for _, ext, _ in by_extension}
-        handlers = [h for h in d.get('LSHandlers', []) if not (h.get('LSHandlerContentTagClass') == 'public.filename-extension'
-                                                               and h.get('LSHandlerContentTag') in exts)]
-        for bid, ext, role in by_extension:
-            handlers.append({'LSHandlerContentTag': ext, 'LSHandlerContentTagClass': 'public.filename-extension',
-                             ROLES[role]: bid.lower(), 'LSHandlerPreferredVersions': {ROLES[role]: '-'}})
+        def key(what):
+            return ('ext', what[1:]) if what.startswith('.') else ('type', what)
+
+        def handler_key(h):
+            if h.get('LSHandlerContentTagClass') == 'public.filename-extension':
+                return ('ext', h.get('LSHandlerContentTag'))
+            return ('type', h.get('LSHandlerContentType'))
+
+        replaced = {key(what) for _, what, _ in direct}
+        handlers = [h for h in d.get('LSHandlers', []) if handler_key(h) not in replaced]
+        for bid, what, role in direct:
+            where = ({'LSHandlerContentTag': what[1:], 'LSHandlerContentTagClass': 'public.filename-extension'}
+                     if what.startswith('.') else {'LSHandlerContentType': what})
+            handlers.append({**where, ROLES[role]: bid.lower(), 'LSHandlerPreferredVersions': {ROLES[role]: '-'}})
         d['LSHandlers'] = handlers
         HANDLERS.write_bytes(plistlib.dumps(d, fmt=plistlib.FMT_BINARY))
         subprocess.run(['killall', 'lsd'], capture_output=True)
