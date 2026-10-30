@@ -32,6 +32,11 @@ go install . ./cmd/org-paper-metadata-updater
   metadata drawer cannot describe several papers unambiguously.
 - Source/example/quote blocks, drawers, COMMENT subtrees, and archived subtrees
   do not contribute candidate headings.
+- A heading whose title carries the at-tag `@noAutoUpdate` is never updated,
+  and neither is anything under it. Tag a paper whose metadata keeps failing to
+  fetch, or one whose drawer you keep by hand; tag a parent heading to exempt a
+  whole section. Such papers are skipped silently, so they no longer count as
+  failures. Remove the tag to resume updates.
 - `metadataFetchedAt`, an RFC3339 UTC property on each paper heading, controls
   freshness of remote metadata. Local arXiv drawer-URL normalization and removal
   of old fabricated BibTeX still run on recent entries without fetching metadata

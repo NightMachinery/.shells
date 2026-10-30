@@ -84,6 +84,14 @@ func TestLooseLinksAndProtectedHeadingsIgnored(t *testing.T) {
 		t.Fatal(out)
 	}
 }
+func TestNoAutoUpdateTagExemptsSubtree(t *testing.T) {
+	text := "* [[" + page + "][Stuck]] @noAutoUpdate\n* Hand-kept papers @noAutoUpdate\n** [[" + page + "][child]]\n* [[" + page + "][Not a tag]] @noAutoUpdates\n"
+	d, _ := Parse(text)
+	targets, err := d.Targets()
+	if err != nil || len(targets) != 1 || !strings.Contains(d.Lines[targets[0].Heading.Start], "Not a tag") {
+		t.Fatal(targets, err)
+	}
+}
 func TestNewDrawersAndNestedPaperHeadings(t *testing.T) {
 	text := "* [[" + page + "][Parent]]\n** [[" + page + "][Child]]"
 	out := transform(t, text)

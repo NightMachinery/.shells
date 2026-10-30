@@ -44,6 +44,10 @@ var urlRE = regexp.MustCompile(`https?://[^\s\[\]<>]+`)
 var citationTagRE = regexp.MustCompile(`^@citations/\d+$`)
 var dateTagRE = regexp.MustCompile(`^@\d{4}(?:/[A-Za-z]+)?$`)
 
+// noAutoUpdateRE matches the at-tag that exempts a heading and its subtree from updates,
+// for papers whose metadata keeps failing to fetch or should stay as written.
+var noAutoUpdateRE = regexp.MustCompile(`(?i)(?:^|\s)@noAutoUpdate(?:$|[\s.,;:])`)
+
 func Parse(text string) (Document, error) {
 	if !utf8.ValidString(text) {
 		return Document{}, errors.New("file is not UTF-8; leaving it unchanged")
@@ -94,7 +98,8 @@ func Parse(text string) (Document, error) {
 			continue
 		}
 		if match := headingRE.FindStringSubmatch(line); match != nil {
-			ignored := strings.HasPrefix(match[2], "COMMENT ") || match[2] == "COMMENT" || strings.Contains(match[2], ":ARCHIVE:")
+			ignored := strings.HasPrefix(match[2], "COMMENT ") || match[2] == "COMMENT" || strings.Contains(match[2], ":ARCHIVE:") ||
+				noAutoUpdateRE.MatchString(match[2])
 			d.Headings = append(d.Headings, Heading{Start: i, End: len(d.Lines), Level: len(match[1]), Ignored: ignored})
 		}
 	}
