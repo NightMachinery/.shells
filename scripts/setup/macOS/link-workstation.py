@@ -16,6 +16,8 @@ def plan(home, night, system=False):
         for n in ['brishz.dash', 'brishz2.dash', 'brishz_para.dash', 'brishzrb.dash', 'brishzq.zsh', 'bsh.dash']:
             pairs.append((Path('/usr/local/bin') / n, night / 'zshlang/wrappers/brishz' / n))
         pairs += [(Path('/usr/local/bin/zsh'), Path('/opt/homebrew/bin/zsh')),
+                  # The shared ~/.gnupg/gpg-agent.conf names this path.
+                  (Path('/usr/local/bin/pinentry-mac'), Path('/opt/homebrew/bin/pinentry-mac')),
                   (Path('/usr/local/libexec/claude-askpass'), night / 'configFiles/claude-code/askpass.py')]
         return pairs
     pairs = [
