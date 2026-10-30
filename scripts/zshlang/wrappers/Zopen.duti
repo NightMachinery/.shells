@@ -1,0 +1,30 @@
+# Default apps for Zopen.app (org.evar.Zopen): apply with `duti <this file>`.
+# Columns: bundle id, UTI or .extension, role. Taken from mb2 on 2026-10-30.
+org.evar.Zopen	public.plain-text	editor
+org.evar.Zopen	public.text	editor
+org.evar.Zopen	public.yaml	editor
+org.evar.Zopen	public.data	editor
+org.evar.Zopen	public.python-script	editor
+org.evar.Zopen	public.shell-script	editor
+org.evar.Zopen	public.script	editor
+org.evar.Zopen	public.source-code	editor
+org.evar.Zopen	.jl	editor
+org.evar.Zopen	org.tug.lua	editor
+org.evar.Zopen	net.daringfireball.markdown	editor
+org.evar.Zopen	org.orgmode.org	editor
+org.evar.Zopen	public.markdown	editor
+org.evar.Zopen	.toml	editor
+org.evar.Zopen	com.microsoft.waveform-audio	all
+org.evar.Zopen	com.adobe.pdf	all
+org.evar.Zopen	public.mp3	all
+org.evar.Zopen	public.mp2	all
+org.evar.Zopen	org.videolan.ogg-audio	all
+org.evar.Zopen	public.au-audio	all
+org.evar.Zopen	org.xiph.flac	all
+org.evar.Zopen	com.apple.m4a-audio	all
+org.evar.Zopen	public.mpeg-4-audio	all
+org.evar.Zopen	public.audio	all
+org.evar.Zopen	org.idpf.epub-container	all
+org.evar.Zopen	.mobi	all
+org.evar.Zopen	.azw3	all
+org.evar.Zopen	.azw	all
