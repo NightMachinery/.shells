@@ -28,3 +28,4 @@ org.evar.Zopen	org.idpf.epub-container	all
 org.evar.Zopen	.mobi	all
 org.evar.Zopen	.azw3	all
 org.evar.Zopen	.azw	all
+org.evar.Zopen	org.xiph.ogg-audio	all
