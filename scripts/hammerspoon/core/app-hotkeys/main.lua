@@ -883,10 +883,13 @@ end
 --- the last must also have a window: hear's background mpv, on scion
 --- (mpv 0.41, 2026-10-31), sometimes runs as a regular app with no window at
 --- all, and hyper+m kept switching to it instead of moving on to Paseo.
+--- A fullscreen window in another Space can be absent from allWindows()
+--- even while focusedWindow() and mainWindow() find it. Check those first.
 function appHotkeyCandidate(appNames)
     for i = 1, #appNames do
         local app = getApp(appNames[i])
-        if app and (i == #appNames or #app:allWindows() > 0) then
+        if app and (i == #appNames or app:focusedWindow() or app:mainWindow()
+                    or #app:allWindows() > 0) then
             return app
         end
     end

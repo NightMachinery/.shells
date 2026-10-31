@@ -61,9 +61,17 @@ order:
 Boolean knobs end in `_p`, after the Lisp convention.
 
 `appHotkey` accepts either one app name/bundle ID or a dense ordered array of
-them. On each press it uses `getApp` to try the candidates in order and toggles
-the first one already running: frontmost apps hide, while other running apps
-activate. If none are running, the key does nothing and never launches one.
+them. On each press it uses `getApp` to try the candidates in order. Candidates
+before the last must have a focused window, main window, or enumerated window;
+the last only needs to be running. This skips background mpv processes without
+windows while keeping a final fallback available. A focused or main window is
+sufficient because `allWindows()` can omit a fullscreen window in another Space.
+Measured on 2026-10-31, Brave returned no enumerated windows but did return both
+its focused and main window, which made Hyper+/ silently skip it before this
+check was corrected.
+
+The selected app toggles: frontmost apps hide, while other running apps activate.
+If no candidate qualifies, the key does nothing and never launches one.
 Bundle IDs keep `getApp`'s direct `applicationsForBundleID` lookup, avoiding a
 walk through every running process. The Telegram binding prefers Purple
 Telegram and falls back to standard Telegram.
