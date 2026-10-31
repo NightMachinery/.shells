@@ -879,6 +879,20 @@ function toggleFocus(appName)
     end
 end
 
+--- The first running app of an ordered candidate list. Every candidate but
+--- the last must also have a window: hear's background mpv, on scion
+--- (mpv 0.41, 2026-10-31), sometimes runs as a regular app with no window at
+--- all, and hyper+m kept switching to it instead of moving on to Paseo.
+function appHotkeyCandidate(appNames)
+    for i = 1, #appNames do
+        local app = getApp(appNames[i])
+        if app and (i == #appNames or #app:allWindows() > 0) then
+            return app
+        end
+    end
+    return nil
+end
+
 function appHotkey(o)
     -- Specialise once when the binding is registered so scalar hotkeys retain
     -- their direct path. Only an ordered candidate list pays for the search.
@@ -886,13 +900,8 @@ function appHotkey(o)
     if type(o.appName) == "table" then
         local appNames = o.appName
         pressedfn = function()
-            for i = 1, #appNames do
-                local app = getApp(appNames[i])
-                if app then
-                    toggleFocusApp(app)
-                    return
-                end
-            end
+            local app = appHotkeyCandidate(appNames)
+            if app then toggleFocusApp(app) end
         end
     else
         local appName = o.appName
