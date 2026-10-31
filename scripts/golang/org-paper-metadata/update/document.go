@@ -422,6 +422,15 @@ func legacyCitationTail(lines []string) bool {
 	return paper.IsBibTeX(content) && !strings.Contains(strings.ToUpper(content), end)
 }
 
+// blankTail counts the whitespace-only lines at the end of lines.
+func blankTail(lines []string) int {
+	n := 0
+	for n < len(lines) && strings.TrimSpace(lines[len(lines)-1-n]) == "" {
+		n++
+	}
+	return n
+}
+
 func (d Document) Apply(edits []Edit) (string, error) {
 	// Combine insertions at one boundary, placing properties first and deeper
 	// abstract sections before an enclosing paper's abstract section.
@@ -459,6 +468,11 @@ func (d Document) Apply(edits []Edit) (string, error) {
 		newLines = append(newLines, lines[e.End:]...)
 		lines = newLines
 		boundary = e.Start
+	}
+	// A section inserted at the end of the file brings its trailing separator
+	// line along; drop blank lines the file did not already end with.
+	for blankTail(lines) > blankTail(d.Lines) {
+		lines = lines[:len(lines)-1]
 	}
 	text := strings.Join(lines, d.Newline)
 	if d.FinalNewline {

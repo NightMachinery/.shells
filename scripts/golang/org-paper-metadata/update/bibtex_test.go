@@ -52,6 +52,17 @@ func TestGeneratedBibTeXRefreshPlacementAndRemoval(t *testing.T) {
 		t.Fatal(out)
 	}
 }
+func TestLegacyCitationAtEndOfFileAddsNoBlankLine(t *testing.T) {
+	citation := "#+BEGIN_EXAMPLE bibtex\n@article{my_key,\n title={Saved citation}, year={2024}\n}\n#+END_EXAMPLE"
+	text := "* [[" + page + "][Old]]\n** @abstract\n#+BEGIN_QUOTE\nOld abstract.\n#+END_QUOTE\n\n" + citation + "\n"
+	out := withBibOptions(t, text, false)
+	if !strings.Contains(out, "** @bibtex") || !strings.HasSuffix(out, "#+END_EXAMPLE\n") {
+		t.Fatalf("%q", out)
+	}
+	if again := withBibOptions(t, text+"\n", false); !strings.HasSuffix(again, "#+END_EXAMPLE\n\n") {
+		t.Fatalf("a blank line the file already ended with was dropped: %q", again)
+	}
+}
 func TestLegacyCitationMovesIntactAndStaysUnmarked(t *testing.T) {
 	for _, kind := range []string{"EXAMPLE bibtex", "SRC bibtex"} {
 		end := strings.Fields(kind)[0]
