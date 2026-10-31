@@ -423,7 +423,8 @@ clipboard history.
 
 Private startup can run [agfi:v2-on], private `xray-run` proxy sessions,
 [agfi:clipboard-remote-listen] and the html-reports `ctl-mem` loop. Install xray,
-gost and the Python/Go helpers before enabling them. Check live tmux panes,
+gost and the Python/Go helpers before enabling them. The workstation profile itself
+starts [agfi:clipboard-record], which keeps the clipboard history that `cl` reads. Check live tmux panes,
 loopback listeners and repeat startup without duplicate services. Keep proxy
 URLs outside this public repository.
 

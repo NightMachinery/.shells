@@ -25,6 +25,8 @@ fi
 
 brishgarden-boot "${NIGHT_BRISH_WORKERS:-8}" || return $?
 omni-history-boot || return $?
+#: Clipboard history for `cl`.
+tmuxnewsh2 clipboard-record clipboard-record
 
 # Desktop manages its bundled daemon by default. A host may explicitly choose
 # the independently supervised CLI instead, with Desktop management disabled.
