@@ -122,6 +122,7 @@ appHotkey{ key='f', appName='com.apple.finder' }
 appHotkey{
     key='m',
     appName={
+        'mpv',
         'io.mpv',
         'com.openai.codex',
         'sh.paseo.desktop'
