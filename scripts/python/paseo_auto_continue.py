@@ -144,6 +144,54 @@ def quota_failure(record):
     return digest([error, record.get('lastUserMessageAt'), record.get('attentionTimestamp')])
 
 
+def claude_limit_failure(record, binding, tail_bytes=1 << 20):
+    """A Claude limit stop that Paseo records as an ordinary finished turn.
+
+    Claude Code ends such a turn with a synthetic assistant message flagged
+    isApiErrorMessage and error "rate_limit", so Paseo shows the agent idle
+    with no lastError. Read the end of the session transcript instead: the
+    stop counts only while that message is still the last conversation entry.
+    """
+    persistence = record.get('persistence') or {}
+    try:
+        session = str(uuid.UUID(str(persistence.get('sessionId'))))
+    except ValueError:
+        return None
+    matches = list((Path(binding['native_home']) / 'projects').glob('*/' + session + '.jsonl'))
+    if len(matches) != 1:
+        return None
+    with open(matches[0], 'rb') as stream:
+        stream.seek(0, os.SEEK_END)
+        stream.seek(max(0, stream.tell() - tail_bytes))
+        lines = stream.read().splitlines()
+    for raw in reversed(lines):
+        try:
+            entry = json.loads(raw)
+        except ValueError:
+            continue  # the first line of the tail is usually cut in half
+        if not isinstance(entry, dict) or entry.get('type') not in ('user', 'assistant'):
+            continue  # queue, mode and summary bookkeeping is not a turn
+        if entry['type'] != 'assistant' or entry.get('isApiErrorMessage') is not True:
+            return None
+        content = (entry.get('message') or {}).get('content')
+        text = ' '.join(part.get('text', '') for part in content if isinstance(part, dict)) \
+            if isinstance(content, list) else str(content or '')
+        if entry.get('error') != 'rate_limit' and not QUOTA_ERROR.search(text):
+            return None
+        return digest(['claude-limit', session, entry.get('uuid'), text])
+    return None
+
+
+def failure_of(snapshot, record, state, transcript_fn):
+    """The current failed turn's identity, or None when nothing should resume."""
+    if snapshot.get('Status') == 'error':
+        return quota_failure(record)
+    if snapshot.get('Status') == 'idle' and state['binding']['agent'] == 'claude' \
+            and not record.get('archivedAt'):
+        return transcript_fn(record, state['binding'])
+    return None
+
+
 def model_family(snapshot):
     model = snapshot.get('Model') or ''
     return model.removeprefix('claude-').split('-')[0].lower()
@@ -203,7 +251,8 @@ def quota(state, snapshot):
     return quota_usable(payload, identity['agent'], model_family(snapshot))
 
 
-def tick(path, *, inspect_fn=inspect, stored_fn=stored_agent, quota_fn=quota, send_fn=command):
+def tick(path, *, inspect_fn=inspect, stored_fn=stored_agent, quota_fn=quota, send_fn=command,
+         transcript_fn=claude_limit_failure):
     """Return one status; record a claim before sending to prevent ambiguous retries."""
     with locked(path.with_suffix('.lock')):
         state = read_json(path)
@@ -217,8 +266,8 @@ def tick(path, *, inspect_fn=inspect, stored_fn=stored_agent, quota_fn=quota, se
             state.update(enabled=False, status='provider changed; re-arm explicitly')
         else:
             record = stored_fn(state['agent_id'], home)
-            failure = quota_failure(record)
-            if snapshot.get('Status') != 'error' or snapshot.get('PendingPermissions'):
+            failure = failure_of(snapshot, record, state, transcript_fn)
+            if snapshot.get('PendingPermissions') or (failure is None and snapshot.get('Status') != 'error'):
                 state['status'] = 'waiting for a quota-failed turn'
             elif not failure or failure == state.get('claimed_failure'):
                 state['status'] = 'waiting for a new quota-failed turn'
@@ -230,9 +279,9 @@ def tick(path, *, inspect_fn=inspect, stored_fn=stored_agent, quota_fn=quota, se
                 fresh = inspect_fn(state['agent_id'], home)
                 current = stored_fn(state['agent_id'], home)
                 if (fresh.get('Id') != state['agent_id'] or fresh.get('Archived')
-                    or fresh.get('Status') != 'error' or fresh.get('PendingPermissions')
+                    or fresh.get('Status') != snapshot.get('Status') or fresh.get('PendingPermissions')
                     or binding(fresh, home) != state['binding']
-                    or quota_failure(current) != failure):
+                    or failure_of(fresh, current, state, transcript_fn) != failure):
                     state['status'] = 'agent changed during quota check; skipped'
                 else:
                     state.update(claimed_failure=failure, status='sending continuation')

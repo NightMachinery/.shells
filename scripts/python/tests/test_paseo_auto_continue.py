@@ -250,5 +250,108 @@ class PaseoAutoContinueTests(unittest.TestCase):
             mod.private_dir(link)
 
 
+class ClaudeLimitTests(unittest.TestCase):
+    """Claude limit stops: Paseo shows the agent idle, the transcript shows the limit."""
+    session = '00000000-0000-4000-8000-0000000000aa'
+
+    def setUp(self):
+        self.temp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temp.cleanup)
+        root = Path(self.temp.name)
+        self.home = root / 'daemon'
+        self.home.mkdir()
+        self.native = root / 'claude-home'
+        self.transcript = self.native / 'projects' / '-tmp-project' / (self.session + '.jsonl')
+        self.transcript.parent.mkdir(parents=True)
+        self.snapshot = {'Id': 'agent-id', 'Provider': 'claude', 'Cwd': '/tmp/project',
+                         'Status': 'idle', 'Archived': False, 'PendingPermissions': []}
+        self.record = {'id': 'agent-id', 'lastStatus': 'idle', 'lastError': None,
+                       'persistence': {'provider': 'claude', 'sessionId': self.session}}
+        self.state = {'enabled': True, 'agent_id': 'agent-id', 'home': str(self.home),
+                      'binding': mod.binding(self.snapshot, self.home), 'poll': 300}
+        self.path = root / 'state.json'
+        mod.atomic_write(self.path, self.state)
+        self.sent = []
+
+    def write(self, *entries):
+        self.transcript.write_text(''.join(json.dumps(e) + '\n' for e in entries))
+
+    def limit(self, uid='limit-1'):
+        return {'type': 'assistant', 'uuid': uid, 'isApiErrorMessage': True, 'error': 'rate_limit',
+                'message': {'model': '<synthetic>', 'content': [
+                    {'type': 'text', 'text': "You've hit your session limit · resets 3am"}]}}
+
+    def failure(self):
+        return mod.claude_limit_failure(self.record, {'native_home': str(self.native)})
+
+    def tick(self, transcript_fn=None):
+        return mod.tick(self.path, inspect_fn=lambda *_: self.snapshot,
+                        stored_fn=lambda *_: self.record, quota_fn=lambda *_: True,
+                        send_fn=self.sent.append,
+                        transcript_fn=transcript_fn or (lambda *_: self.failure()))
+
+    def test_limit_as_last_entry_is_a_failure(self):
+        self.write({'type': 'user', 'message': {'content': 'go'}}, self.limit(),
+                   {'type': 'queue-operation'}, {'type': 'last-prompt'})
+        self.assertTrue(self.failure())
+
+    def test_later_user_turn_clears_it(self):
+        self.write(self.limit(), {'type': 'user', 'message': {'content': 'Continue'}})
+        self.assertIsNone(self.failure())
+
+    def test_ordinary_finished_turn_is_not_a_failure(self):
+        self.write({'type': 'assistant', 'message': {'content': [{'type': 'text', 'text': 'Done.'}]}})
+        self.assertIsNone(self.failure())
+
+    def test_other_api_errors_are_not_quota(self):
+        other = dict(self.limit(), error='server_error',
+                     message={'content': [{'type': 'text', 'text': 'API Error: 500'}]})
+        self.write(other)
+        self.assertIsNone(self.failure())
+
+    def test_truncated_tail_line_is_skipped(self):
+        self.write({'type': 'user', 'message': {'content': 'x' * 5000}}, self.limit())
+        self.assertTrue(mod.claude_limit_failure(self.record, {'native_home': str(self.native)},
+                                                 tail_bytes=600))
+
+    def test_missing_or_malformed_session_is_none(self):
+        self.record['persistence'] = {'sessionId': '../escape'}
+        self.assertIsNone(self.failure())
+        self.record['persistence'] = {'sessionId': '00000000-0000-4000-8000-0000000000bb'}
+        self.assertIsNone(self.failure())
+
+    def test_idle_claude_agent_after_limit_continues_once(self):
+        self.write(self.limit())
+        self.assertIn('sent', self.tick())
+        self.tick()
+        self.assertEqual(len(self.sent), 1)
+        self.assertEqual(self.sent[0][:3], ['paseo', 'send', 'agent-id'])
+
+    def test_second_limit_stop_continues_again(self):
+        self.write(self.limit('limit-1'))
+        self.tick()
+        self.write(self.limit('limit-1'), {'type': 'user', 'message': {'content': 'Continue'}},
+                   self.limit('limit-2'))
+        self.tick()
+        self.assertEqual(len(self.sent), 2)
+
+    def test_idle_codex_agent_never_reads_transcripts(self):
+        config = {'agents': {'providers': {'codex-x': {'extends': 'codex'}}}}
+        (self.home / 'config.json').write_text(json.dumps(config))
+        self.snapshot['Provider'] = 'codex-x'
+        self.state['binding'] = mod.binding(self.snapshot, self.home)
+        mod.atomic_write(self.path, self.state)
+        def boom(*_):
+            raise AssertionError('transcript read for a Codex agent')
+        self.assertEqual(self.tick(transcript_fn=boom), 'waiting for a quota-failed turn')
+        self.assertFalse(self.sent)
+
+    def test_running_claude_agent_never_continues(self):
+        self.write(self.limit())
+        self.snapshot['Status'] = 'running'
+        self.tick()
+        self.assertFalse(self.sent)
+
+
 if __name__ == '__main__':
     unittest.main()
