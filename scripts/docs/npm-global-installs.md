@@ -151,6 +151,30 @@ dependency's postinstall script unless the package is named there, and
 claude-code's `install.cjs` postinstall is what puts the native binary in
 place.
 
+Pass one `--allow-build=<pkg>` per package. pnpm does not split
+`--allow-build=a,b,c`; it records `a,b,c` as a single package name under
+`allowBuilds` in the global `pnpm-workspace.yaml`, so none of them may build.
+
+## pnpm `ERR_PNPM_UNEXPECTED_VIRTUAL_STORE` after a pnpm upgrade
+
+@Opus5.5/medium (2026-11-01). A global dir installed by pnpm 10.32.1 records
+`virtualStoreDir: ".pnpm"` in `global/5/node_modules/.modules.yaml`, meaning
+`global/5/.pnpm`. pnpm 10.33 reads that path relative to `node_modules`, so
+every `pnpm add -g` fails, claiming the store moved from
+`node_modules/.pnpm` to `global/5/.pnpm`. `--virtual-store-dir` is refused in
+global mode, and a plain `pnpm install` in the dir relinks to
+`node_modules/.pnpm`, which global mode then rejects the same way. What fixed
+it was relinking to the store global mode wants, so that 10.33 rewrites the
+record as `../.pnpm`:
+
+```zsh
+cd ~/.local/share/pnpm/global/5
+pnpm install --frozen-lockfile --virtual-store-dir=.pnpm --config.confirmModulesPurge=false
+```
+
+This reinstalls the locked versions from the local content store and changes
+no package versions.
+
 ## Upstream
 
 The proper fixes are upstream. pnpm should re-wrap the received bytes as a
