@@ -6,10 +6,25 @@ function paseo-install {
     local package='@getpaseo/cli'
     (( $# <= 1 )) || { ecerr "$0: expected at most one version"; return 64; }
     [[ -n "${1:-}" ]] && package+="@${1}"
-    local -a npm_install_pnpm_opts=(--allow-build=esbuild,msgpackr-extract,node-pty)
+    #: One flag per package: pnpm does not split a comma list, and records
+    #: \`esbuild,msgpackr-extract,node-pty' as a single package name.
+    local -a npm_install_pnpm_opts=(--allow-build=esbuild --allow-build=msgpackr-extract --allow-build=node-pty)
     npm-install "${package}" @RET
     h-npm-install-report paseo
     #: An upgrade is when Paseo could change the records paseo-ls reads.
+    #: The check needs a running daemon; paseo-cli-update runs it after starting one.
+    if [[ "${paseo_install_ls_check_p:-y}" == y ]] ; then
+        paseo-ls-check >/dev/null || ecerr "$0: paseo-ls no longer matches \`paseo ls'; run paseo-ls-check"
+    fi
+}
+
+function paseo-cli-update {
+    : "usage: paseo-cli-update [version]"
+    : "Install the latest (or given) Paseo CLI, then start the local daemon on it."
+    : "A daemon that is already running keeps its old version; restart it with \`paseo daemon restart'."
+    local paseo_install_ls_check_p=n
+    paseo-install "$@" @RET
+    command paseo daemon start @RET
     paseo-ls-check >/dev/null || ecerr "$0: paseo-ls no longer matches \`paseo ls'; run paseo-ls-check"
 }
 
