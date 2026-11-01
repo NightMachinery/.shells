@@ -171,7 +171,7 @@ control, by default into the private notes repository. See =docs/paseo.md=."
     ##
     local home out
     home="$(h-paseo-home)" @RET
-    out="${1:-${nightNotesPrivate}/configs/paseo/schedules/$(command hostname -s)}"
+    out="${1:-${nightNotesPrivate}/configs/paseo-config/schedules/$(command hostname -s)}"
     [[ -n "${nightNotesPrivate}" || -n "${1:-}" ]] || { ecerr "$0: nightNotesPrivate is unset; pass an output directory"; return 1; }
     command python3 "${NIGHTDIR}/python/paseo_schedules_export.py" --src "${home}/schedules" --out "${out}"
 }

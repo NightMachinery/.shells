@@ -92,7 +92,7 @@ See the official [daemon lifecycle reference](https://paseo.sh/docs/cli.md#daemo
 The daemon keeps each schedule and heartbeat as one file in
 `~/.paseo/schedules/`, with its definition and its whole run history. Nothing
 else backs them up. [agfi:paseo-schedules-export] writes the definitions only,
-by default to `configs/paseo/schedules/<host>/` in the private notes repository:
+by default to `configs/paseo-config/schedules/<host>/` in the private notes repository:
 `<id>.json` (name, status, cadence, target, dates) and `<id>.prompt.md` (the
 prompt, so an edit shows as a readable diff). Run history and next and last run
 times are left out, because they change on every run. A schedule deleted in
