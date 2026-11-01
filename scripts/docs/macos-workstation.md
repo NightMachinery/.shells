@@ -1,15 +1,12 @@
 # A new macOS workstation
 
-The `workstation` startup profile runs BrishGarden and the shared history index
-on a new Mac without depending on the older machines' host predicates. Enable it
-in the host-local `~/.nightsh_private_first`:
+Every Mac runs the same startup launcher, `launchers/various-darwin.zsh`, which
+[agfi:ivy] calls from Kitty. Machine-specific choices sit behind host predicates
+in it ([agfi:isMB2], [agfi:isScion]); add one for a new Mac. Only private
+services and settings belong in `~/.startup..private..zsh`.
 
-```zsh
-export NIGHT_DARWIN_PROFILE=workstation
-return 0
-```
-
-Keep `return 1` there while installing dependencies. It defers the full shell;
+Keep `return 1` in the host-local `~/.nightsh_private_first` while installing
+dependencies. It defers the full shell;
 `nsh` loads it explicitly for a bounded smoke test. Use the destination account's
 home directory. Do not copy another user's absolute `/Users/...` paths.
 Restart BrishGarden after enabling full shell loading: workers started while
@@ -206,13 +203,8 @@ data and log paths under the user's Library. Verify authenticated `PING` and
 rejection of an unauthenticated request before enabling startup. Never print the
 password in diagnostics. Keep the service independent of shell initialization.
 
-The profile reads `~/.startup..private..zsh` before starting services. Suggested
-host-local settings:
-
-```zsh
-export NIGHT_BRISH_WORKERS=8
-export NIGHT_WORKSTATION_OPEN_APPS=y
-```
+The launcher sources `~/.startup..private..zsh` once, after the shared services.
+Keep only private services and settings there, such as proxy configurations.
 
 Paseo Desktop manages its bundled daemon by default. For a standalone daemon,
 first install a CLI version matching Desktop into an independent npm prefix:
@@ -231,9 +223,9 @@ file to false, keeping
 all other settings, then start the standalone CLI with the existing `PASEO_HOME`.
 Preserve its config, server identity and pairing files. Start it after login
 initialization with the account's shell explicitly selected (`SHELL=/bin/zsh`),
-since helper initialization can change the inherited `SHELL`. Set
-`NIGHT_PASEO_STANDALONE=y` in `~/.startup..private..zsh` so this workstation's
-login launcher starts the CLI supervisor; the supervisor backgrounds itself.
+since helper initialization can change the inherited `SHELL`. Let the
+launcher run `paseo daemon start` on this host (it skips hosts whose Desktop
+supervises the daemon); the supervisor backgrounds itself.
 
 Verify `paseo daemon status --json` reports `desktopManaged: false`, a reachable
 daemon and the same server identity. Reopen and quit Desktop once and confirm
@@ -275,10 +267,10 @@ anthropics/claude-plugins-official --json`, and check the installed payload plus
 the `clangd` executable separately from account login. Keep the tracked settings
 link intact if an installer replaces it.
 
-For login startup, create a user LaunchAgent invoking the Homebrew Zsh with
-`-lc 'source "$HOME/scripts/launchers/various-darwin.zsh"'`. Run it once at login,
-not with KeepAlive: its child services have their own lifecycle. Capture logs.
-The profile leaves scheduled maintenance to a separate, deliberate setup.
+Startup runs from Kitty: its ivy tab calls the launcher. Do not add a login
+LaunchAgent for it, because a tmux server started by launchd has none of Kitty's
+privacy grants (see below). Scheduled maintenance ([agfi:chronic-all]) runs only
+on hosts the launcher does not exclude.
 
 Hammerspoon's config needs Lua 5.4 rocks `penlight`, `luaposix`,
 `lrexlib-PCRE2` and `redis-lua` (which installs LuaSocket). Use the per-user
@@ -334,14 +326,11 @@ The first ivy tab creates its workspace when absent, even when background
 services already have a tmux server. Existing ivy workspaces keep the normal
 reuse path.
 
-The startup profile waits up to `NIGHT_WORKSTATION_IVY_WAIT` seconds (default
-120, `0` disables) for that ivy session before starting its tmux services. A
-tmux server keeps the macOS privacy grants of whatever started it, and every
-later session shares them. If the LaunchAgent starts it, `omni-history` gets
-"Operation not permitted" on Brave's history and serves nothing. If Kitty's ivy
-tab starts it, it inherits Kitty's Full Disk Access. Grant Kitty Full Disk
-Access in System Settings for this to matter. When no ivy session appears in
-time, startup continues and logs that tmux lacks Kitty's grants.
+A tmux server keeps the macOS privacy grants of whatever started it, and every
+later session shares them. Started by Kitty's ivy tab, it inherits Kitty's Full
+Disk Access. Started by a LaunchAgent, it has none, so `omni-history` gets
+"Operation not permitted" on Brave's history and serves nothing. Grant Kitty
+Full Disk Access in System Settings.
 
 The workstation include removes inherited `SSH_CLIENT`, `SSH_CONNECTION`,
 `SSH_TTY`, `PROMPT_PURE_SSH_CONNECTION` and `amSSH` from local Kitty children.
@@ -423,8 +412,8 @@ clipboard history.
 
 Private startup can run [agfi:v2-on], private `xray-run` proxy sessions,
 [agfi:clipboard-remote-listen] and the html-reports `ctl-mem` loop. Install xray,
-gost and the Python/Go helpers before enabling them. The workstation profile itself
-starts [agfi:clipboard-record], which keeps the clipboard history that `cl` reads. Check live tmux panes,
+gost and the Python/Go helpers before enabling them. The launcher starts
+[agfi:clipboard-record] on every Mac; it keeps the clipboard history that `cl` reads. Check live tmux panes,
 loopback listeners and repeat startup without duplicate services. Keep proxy
 URLs outside this public repository.
 

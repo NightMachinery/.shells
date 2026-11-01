@@ -72,6 +72,15 @@ function isMB2 {
     [[ "$host" == 'mb2.local' ]]
 }
 
+function isScion {
+    local host="$HOST"
+    if test -z "$host"; then # for bash
+        host="$(hostname)"
+    fi
+
+    [[ "$host" == 'sciona' || "$host" == 'sciona.local' ]]
+}
+
 function isGrayfur {
     local host="$HOST"
     if test -z "$host"; then # for bash

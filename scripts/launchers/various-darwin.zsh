@@ -1,11 +1,8 @@
 #!/usr/bin/env zsh
-
-# Opt in through ~/.nightsh_private_first, without adding hostnames here.
-if [[ "${NIGHT_DARWIN_PROFILE:-}" == workstation ]] ; then
-    psource "$HOME/.startup..private..zsh"
-    source "$NIGHTDIR/launchers/darwin-workstation.zsh"
-    return $?
-fi
+#: Run by [agfi:ivy] from Kitty on every Mac. The tmux server started here keeps
+#: Kitty's privacy grants (TCC), which a LaunchAgent would not have; see
+#: docs/tmux-kitty-tcc.md. Machine-specific choices go behind host predicates
+#: here; only private ones belong in ~/.startup..private..zsh.
 
 ##
 nightshift_auto_enabled_setnx 1
@@ -13,21 +10,40 @@ nightshift_auto_enabled_setnx 1
 powersaving_status_del
 # wireguard_enabled_del
 ##
-darwin-dns-set 8.8.8.8 1.1.1.1 # 127.0.0.1
+if ! isScion ; then
+    darwin-dns-set 8.8.8.8 1.1.1.1 # 127.0.0.1
+fi
 ##
 if test -n "${MDNS_NAME}" ; then
     # mdns-init-darwin
 fi
 ##
-tmuxnew neru neru launch
+if isdefined-cmd neru ; then
+    tmuxnew neru neru launch
+fi
 ##
 
-brishgarden-boot 64
+if isScion ; then
+    brishgarden-boot 8
+else
+    brishgarden-boot 64
+fi
 omni-history-boot
 
-if isdefined-cmd paseo ; then
+if isdefined-cmd paseo && ! isScion ; then
     #: The CLI backgrounds its supervisor; disable Desktop's built-in daemon management.
+    #: On scion, Paseo Desktop supervises its bundled daemon.
     command paseo daemon start
+fi
+
+if isScion ; then
+    #: Emacs's native compilation needs this; GUI apps get it through launchd.
+    command launchctl setenv MACOSX_DEPLOYMENT_TARGET 15.0
+    command open -g -a Hammerspoon
+    command open -g -a Paseo
+    command open -gj -a AltTab
+    command open -gj -a Homerow
+    command open -gj -a Maccy
 fi
 
 if isMB2 ; then
@@ -137,4 +153,6 @@ psource ~/.startup..private..zsh
 ##
 emc-launch-gui
 ##
-chronic-all
+if ! isScion ; then
+    chronic-all
+fi
