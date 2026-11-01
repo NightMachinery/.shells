@@ -6,11 +6,11 @@ Install or update the CLI with [agfi:paseo-install]:
 paseo-install
 paseo-install 0.10.2                 # optionally choose a version
 npm-install @getpaseo/cli            # uses pnpm when available
-paseo-cli-update                     # paseo-install, then `paseo daemon start`
+paseo-cli-update                     # same as paseo-install
 ```
 
-[agfi:paseo-cli-update] starts the daemon only when it is stopped. A daemon
-that was already running keeps its old version until `paseo daemon restart`.
+Neither function touches the daemon. A running daemon keeps its old version
+until `paseo daemon restart`; start a stopped one with `paseo daemon start`.
 
 The installer uses [agfi:npm-install], which selects pnpm when available and
 npm otherwise. It allows the native dependency builds for `esbuild`,

@@ -12,20 +12,18 @@ function paseo-install {
     npm-install "${package}" @RET
     h-npm-install-report paseo
     #: An upgrade is when Paseo could change the records paseo-ls reads.
-    #: The check needs a running daemon; paseo-cli-update runs it after starting one.
-    if [[ "${paseo_install_ls_check_p:-y}" == y ]] ; then
+    #: The check needs a running daemon, so it is skipped while the daemon is stopped.
+    if command paseo daemon status 2>/dev/null | command grep -q '^localDaemon: running' ; then
         paseo-ls-check >/dev/null || ecerr "$0: paseo-ls no longer matches \`paseo ls'; run paseo-ls-check"
+    else
+        ecerr "$0: daemon stopped; run paseo-ls-check after \`paseo daemon start'"
     fi
 }
 
 function paseo-cli-update {
     : "usage: paseo-cli-update [version]"
-    : "Install the latest (or given) Paseo CLI, then start the local daemon on it."
-    : "A daemon that is already running keeps its old version; restart it with \`paseo daemon restart'."
-    local paseo_install_ls_check_p=n
-    paseo-install "$@" @RET
-    command paseo daemon start @RET
-    paseo-ls-check >/dev/null || ecerr "$0: paseo-ls no longer matches \`paseo ls'; run paseo-ls-check"
+    : "Install the latest (or given) Paseo CLI. It neither starts nor restarts the daemon."
+    paseo-install "$@"
 }
 
 function 2paseo {
