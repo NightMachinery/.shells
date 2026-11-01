@@ -87,6 +87,50 @@ can otherwise overwrite a manual edit.
 
 See the official [daemon lifecycle reference](https://paseo.sh/docs/cli.md#daemon-management).
 
+## Tailnet HTTPS on port 6767
+
+Keep the daemon listening on `127.0.0.1:6767` and use Tailscale Serve to
+provide HTTPS on tailnet port `6767`. Serve manages the certificate and forwards
+HTTP and WebSocket traffic to the local daemon. This keeps local CLI connections
+working without restarting Paseo or managing certificate files yourself.
+
+Inspect the existing routes first, then add the proxy:
+
+```zsh
+tailscale serve status
+tailscale serve --bg --https=6767 http://127.0.0.1:6767
+```
+
+If an existing route serves a file or Unix socket, Tailscale may require root
+even when updating another port. Use `sudo -kA tailscale serve ...` with the
+configured askpass helper. For a password entered in an attached tmux terminal,
+use `command sudo -k tailscale serve ...` so sudo reads from that terminal.
+
+Ensure the machine's full Tailscale DNS name is allowed by `daemon.hostnames`
+in `~/.paseo/config.json`, preserving the existing entries. In Paseo's direct
+connection settings, enter that DNS name, port `6767`, enable **Use SSL**, and
+supply the daemon password if configured.
+
+Verify from another tailnet device, using the machine's actual DNS name:
+
+```zsh
+curl --fail https://HOST.TAILNET.ts.net:6767/api/health
+```
+
+A successful response reports `status: ok`; leave certificate validation enabled.
+When migrating an existing HTTPS route from port `8443`, verify `6767` first,
+update the saved client connections, then remove only the old route:
+
+```zsh
+tailscale serve --https=8443 off
+tailscale serve status
+```
+
+Keep unrelated routes, such as port `443`. `--bg` persists the proxy across
+Tailscale restarts; the Paseo daemon must also be running. See
+[Tailscale Serve](https://tailscale.com/docs/reference/tailscale-cli/serve) and
+[Paseo connectivity](https://paseo.sh/docs/connectivity.md).
+
 ## Back up schedules
 
 The daemon keeps each schedule and heartbeat as one file in

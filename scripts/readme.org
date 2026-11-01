@@ -145,7 +145,8 @@ Ambiguous ownership saves the report but refuses automatic termination;
 session, =! 2paseo= transfers the saved conversation to the local Paseo daemon
 and attaches its output in tmux. See [[NIGHTDIR:docs/paseo.md][Paseo handoff]] for
 process checks, terminal-proxy handling, profiles, and manual-exit controls.
-That guide also covers running a CLI-managed daemon independently of Desktop;
+That guide also covers HTTPS over Tailscale on port =6767= and running a
+CLI-managed daemon independently of Desktop;
 changing ownership requires a supervisor stop/start at a suitable stopping point.
 =launchers/various-darwin.zsh= starts it through the CLI on legacy hosts. The
 opt-in workstation profile uses Desktop management by default.
