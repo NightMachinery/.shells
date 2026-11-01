@@ -30,9 +30,8 @@ else
 fi
 omni-history-boot
 
-if isdefined-cmd paseo && ! isScion ; then
+if isdefined-cmd paseo ; then
     #: The CLI backgrounds its supervisor; disable Desktop's built-in daemon management.
-    #: On scion, Paseo Desktop supervises its bundled daemon.
     command paseo daemon start
 fi
 

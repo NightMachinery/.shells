@@ -223,9 +223,8 @@ file to false, keeping
 all other settings, then start the standalone CLI with the existing `PASEO_HOME`.
 Preserve its config, server identity and pairing files. Start it after login
 initialization with the account's shell explicitly selected (`SHELL=/bin/zsh`),
-since helper initialization can change the inherited `SHELL`. Let the
-launcher run `paseo daemon start` on this host (it skips hosts whose Desktop
-supervises the daemon); the supervisor backgrounds itself.
+since helper initialization can change the inherited `SHELL`. The launcher
+runs `paseo daemon start` on every Mac; the supervisor backgrounds itself.
 
 Verify `paseo daemon status --json` reports `desktopManaged: false`, a reachable
 daemon and the same server identity. Reopen and quit Desktop once and confirm
