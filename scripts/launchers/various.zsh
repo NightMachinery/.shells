@@ -47,7 +47,8 @@ tmuxnew vless-reality xray -config ~/vless_reality_server.json
 borgdir=~/code/betterborg/
 borg_python="$(realpath2 python3)"
 # tmuxnewsh2 juliaX borg_brish_count=0 python stdborg.py # for testing iterations quickly
-tmuxnew julia "dash -c 'cd $(gq $borgdir) && $(gq "$borg_python") $(gq $borgdir/start_server.py)'"
+#: Only julia logs to the alicization channel; the other bots log to the first admin they resolve.
+tmuxnew julia "dash -c 'cd $(gq $borgdir) && borg_log_chat=-1001179162919 $(gq "$borg_python") $(gq $borgdir/start_server.py)'"
 tmuxnew julia_papersonegai "dash -c 'cd $(gq $borgdir) && borg_session=session_papersonegai borg_plugin_path=papersonegai_plugins borg_brish_count=1 $(gq "$borg_python") $(gq $borgdir/stdborg.py)'"
 tmuxnew julia_jlib "dash -c 'cd $(gq $borgdir) && borg_session=session_jlib borg_plugin_path=jlib_plugins borg_brish_count=10 $(gq "$borg_python") $(gq $borgdir/stdborg.py)'"
 #: Gemini proxy disabled: eva reaches Google's Gemini and Vertex APIs directly (2026-10-12), and nothing
