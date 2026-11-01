@@ -104,8 +104,14 @@ function browser-recordings-process-watch() {
 function browser-current-html {
     assert isDarwin @RET
 
-    chrome-cli source |
-        command jq -re . |
+    local src
+    src="$(chrome-cli source)" @TRET
+    #: Older chrome-cli printed the source as a JSON string; 1.8 prints the raw HTML.
+    if [[ "$src" == '"'* ]] ; then
+        src="$(print -r -- "$src" | command jq -re .)" @TRET
+    fi
+
+    print -r -- "$src" |
         html-links-absolutify "$(browser-current-url)" |
         cat-copy-if-tty
 }
