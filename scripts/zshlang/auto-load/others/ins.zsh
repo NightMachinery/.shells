@@ -101,10 +101,12 @@ function uvtadd {
 noglobfn uvtadd
 ##
 function go-install-local {
+    : "usage: go-install-local DIR [PACKAGE...]
+Run \`go install' in DIR, for its main package or the given ones."
     local d="${1:?}"
     pushf "$d" && {
         ecbold "$0: $d"
-        go install
+        go install "${@:2}"
     } always { popf }
 }
 

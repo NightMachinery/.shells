@@ -15,7 +15,9 @@ loading was deferred also need the full shell. Verify an actual `brishzgo` call.
 Install Homebrew's core GNU tools, Zsh, vcsh, Redis, Go, uv, Python and tmux.
 Resolve the GNU parallel/moreutils conflict with the link order in `setup_misc`.
 Compile `setup/terminfo-24bit.src` with `tic -x -o ~/.terminfo`, then run
-`setup/setup_go` in the loaded Night shell. Build `golang/omni-history` too. Install the
+`setup/setup_go` in the loaded Night shell; it builds every local Go program. A
+missing one shows up as "permission denied", because every directory under
+`~/scripts` is on `PATH` and zsh finds its source directory instead. Install the
 Go command `github.com/NightMachinary/prefixer` as well, since shell error
 formatting uses it. Record the source binary's module version with `go version -m`
 when matching an existing installation.
@@ -71,6 +73,10 @@ with stable Rust. The current shell uses [agfi:input-lang-get-icon]; do not
 install another toolchain solely for the unused legacy binary.
 Beyond the local programs in `setup/setup_go`, the shell uses `ntagcolor`,
 `jalalicli`, `ntom`, `possiblycat` and `prefixer` from `setup/ins_go`.
+
+Install Homebrew's `perl`, then run `setup/setup_perl.zsh`. It installs the Perl
+modules the shell uses, including `ansifold`, which the pagers use to wrap text,
+and links `ansifold` into `~/bin`. Apple's Perl would need root for them.
 
 Follow [python-envs.md](python-envs.md) for libraries in Miniforge's `py314`
 environment and commands in isolated uv tool environments. Download the native

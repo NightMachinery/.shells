@@ -1,4 +1,7 @@
 ##
+#: Every local Go program the shell uses. A missing one fails confusingly: every
+#: directory under ~/scripts is on PATH, so zsh finds its source directory
+#: instead and reports "permission denied".
 go-install-local "${NIGHTDIR}/golang/goremind"
 
 go-install-local "${NIGHTDIR}/golang/tcp_to_process"
@@ -6,4 +9,20 @@ go-install-local "${NIGHTDIR}/golang/tcp_to_process"
 go-install-local "${NIGHTDIR}/golang/agent_session"
 
 go-install-local "${NIGHTDIR}/golang/brishzgo"
+
+go-install-local "${NIGHTDIR}/golang/night_hold"
+
+go-install-local "${NIGHTDIR}/golang/omni-history"
+
+go-install-local "${NIGHTDIR}/golang/gpu-status"
+
+go-install-local "${NIGHTDIR}/golang/gcp-gpu-advice"
+
+go-install-local "${NIGHTDIR}/golang/gcp-log-read"
+
+go-install-local "${NIGHTDIR}/golang/llm_complete"
+
+go-install-local "${NIGHTDIR}/golang/org-paper-metadata" . ./cmd/org-paper-metadata-updater
+
+go-install-local "${NIGHTDIR}/golang/wifi-login-site"
 ##
