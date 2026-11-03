@@ -123,3 +123,63 @@ function gh-visibility {
     reval-ecgray gh repo view --json visibility
 }
 ##
+##
+function gh-add-read-only-access-to {
+    : "usage: gh-add-read-only-access-to GH-USER REPO...
+Invites GH-USER as a read-only (pull) collaborator on each REPO, given as
+OWNER/NAME or as a NAME under your own account. GH-USER has to accept each
+invitation (https://github.com/notifications while logged in as GH-USER).
+Audit the result with [agfi:gh-list-all-access]."
+    local user="${1-}"
+    (( $# )) && shift
+    if [[ -z "$user" ]] || (( $# == 0 )) ; then
+        ecerr "usage: $0 GH-USER REPO..."
+        return 2
+    fi
+
+    local me repo
+    me="$(command gh api user -q .login)" @RET
+    for repo in "$@" ; do
+        [[ "$repo" == */* ]] || repo="${me}/${repo}"
+        #: 201 with an invitation, or 204 when GH-USER already has access.
+        reval-ec command gh api --silent -X PUT "repos/${repo}/collaborators/${user}" -f permission=pull @RET
+    done
+}
+
+function gh-list-all-access {
+    : "usage: gh-list-all-access
+Lists everyone and everything besides you that can reach the repositories you
+own: collaborators with their permission, pending invitations, and deploy keys.
+Tab separated: repo, visibility, kind, who, access. For auditing what
+[agfi:gh-add-read-only-access-to] and others granted."
+    local me
+    me="$(command gh api user -q .login)" @RET
+
+    command gh api graphql --paginate -f query='
+query($endCursor: String) {
+  viewer {
+    repositories(first: 50, after: $endCursor, ownerAffiliations: OWNER) {
+      pageInfo { hasNextPage endCursor }
+      nodes {
+        nameWithOwner isPrivate
+        collaborators(affiliation: DIRECT, first: 100) { edges { permission node { login } } }
+        deployKeys(first: 100) { nodes { title readOnly } }
+      }
+    }
+  }
+}' | command jq -r --arg me "$me" '
+  .data.viewer.repositories.nodes[]
+  | (if .isPrivate then "private" else "public" end) as $vis
+  | .nameWithOwner as $repo
+  | ((.collaborators.edges // [])[] | select(.node.login != $me)
+       | [$repo, $vis, "collaborator", .node.login, .permission]),
+    ((.deployKeys.nodes // [])[]
+       | [$repo, $vis, "deploy-key", .title, (if .readOnly then "READ" else "WRITE" end)])
+  | @tsv' @RET
+
+    #: Pending invitations are not in the GraphQL schema; one REST call per repo.
+    command gh repo list "$me" --limit 10000 --json nameWithOwner,isPrivate \
+        -q '.[] | "\(.nameWithOwner)\t\(if .isPrivate then "private" else "public" end)"' |
+        command gxargs -P 8 -L 1 sh -c '
+            command gh api "repos/$0/invitations" -q ".[] | [\"$0\", \"$1\", \"invited\", .invitee.login, .permissions] | @tsv"'
+}
