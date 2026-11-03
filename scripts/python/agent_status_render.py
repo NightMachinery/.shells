@@ -30,6 +30,20 @@ def add_window(account, family, window, used, reset):
                                "_display_family": family, "_display_window": window})
 
 
+def cloud_credit_note(credit, now):
+    """claude_code_usage.py's normalized `cloud_credit`, shown only while money is left."""
+    note = f"Cloud credit: ${credit['remaining_dollars']:,.2f}"
+    if isinstance(credit.get("limit_dollars"), (int, float)):
+        note += f" of ${credit['limit_dollars']:,.2f}"
+    note += " left"
+    expires = credit.get("expires_at")
+    if isinstance(expires, (int, float)):
+        note += f", expires in {duration(expires - now)} ({time.strftime('%a %-d %b %H:%M', time.localtime(expires))})"
+    if credit.get("locked_reason"):
+        note += f" (locked: {credit['locked_reason']})"
+    return note
+
+
 def claude_accounts(report, now):
     accounts = []
     for row in report if isinstance(report, list) else [report]:
@@ -59,6 +73,9 @@ def claude_accounts(report, now):
         if isinstance(extra, dict) and (extra.get("is_enabled") or extra.get("used_credits") or extra.get("spend_limit_reached")):
             detail = ", ".join(f"{key.replace('_', ' ')}: {value}" for key, value in extra.items() if value is not None)
             account["_display_notes"].append(("warning" if extra.get("spend_limit_reached") else "dim", "Extra usage: " + detail))
+        credit = row.get("cloud_credit")
+        if isinstance(credit, dict) and credit.get("available") and (credit.get("remaining_dollars") or 0) > 0:
+            account["_display_notes"].append(("dim", cloud_credit_note(credit, now)))
         if not account["buckets"] and not account["error"]:
             account["_display_notes"].append(("warning", "No usage windows reported"))
         accounts.append(account)

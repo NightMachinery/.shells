@@ -360,7 +360,9 @@ styling. Green means below 70% used, yellow means 70 through 89%, and red means
 90% or more. Error rows remain inside the relevant account/provider, without
 hiding other sections. Missing usage is shown as unavailable, never as 0%.
 
-Claude cache age, stale warnings and extra-usage information remain visible.
+Claude cache age, stale warnings and extra-usage information remain visible,
+and a cloud-session credit is noted while money is left on it (see
+`docs/claude_code_usage.md`).
 Codex reset credits, credit balances, reserve capacity, applicable model limits,
 blocked reasons and multi-account summaries remain visible too. Reserve rows
 include the model needed to use that allowance. For example (illustrative

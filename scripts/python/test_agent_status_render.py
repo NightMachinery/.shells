@@ -66,6 +66,17 @@ class AgentStatusTest(unittest.TestCase):
                          "Average usage: weekly 61%", "First reset: 研究 in 1h"):
             self.assertIn(expected, text)
 
+    def test_cloud_credit_only_while_money_is_left(self):
+        credit = {"limit_dollars": 250.0, "remaining_dollars": 248.03, "expires_at": NOW + 86400 + 7200,
+                  "locked_reason": None, "available": True}
+        envelope = claude()
+        envelope['report'][0]['cloud_credit'] = credit
+        text = render_section(envelope, now=NOW)
+        self.assertIn('Cloud credit: $248.03 of $250.00 left, expires in 1d 2h', text)
+        for hidden in (dict(credit, remaining_dollars=0.0, available=False), dict(credit, available=False), None):
+            envelope['report'][0]['cloud_credit'] = hidden
+            self.assertNotIn('Cloud credit', render_section(envelope, now=NOW))
+
     def test_missing_usage_is_unknown_not_zero(self):
         envelope = claude()
         envelope['report'][0]['windows'][0]['utilization_percent'] = None
