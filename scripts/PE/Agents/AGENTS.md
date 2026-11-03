@@ -3,6 +3,7 @@
 - Root commands must be run as `sudo -kA <command>`. Never run bare `sudo`: there is no TTY, so it will hang until the tool times out.
 
 - Your running shell is Zsh. Use proper Zsh. Quote everything conservatively, to avoid Zsh glob patterns etc. on literal strings.
+  - Always use full syntax for variables, e.g., `${...}`. Zsh treats `sth` in `$variable_name:sth` as modifier flags.
 
 - Keep `./docs/` updated as you investigate or make changes.
   - If a `readme.org` (or `readme.md`) file exists, keep it updated AND streamlined: README files are meant for humans. These files should be concise and let humans know why this project might provide value for them and teach how to try it out quickly, with links to other docs for more details.
