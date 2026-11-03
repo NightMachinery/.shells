@@ -352,7 +352,7 @@ function llm-m {
         fi
 
         log+=", Project: ${VERTEX_PROJECT_ID}"
-        if [[ "${VERTEX_PROJECT_ID}" == "${gcp_pa_project}" ]] ; then
+        if [[ "${VERTEX_PROJECT_ID}" == "${gcp_pa_project}" && "${VERTEX_PROJECT_ID}" != purple-aura ]] ; then
             log+=" (purple-aura)"
         fi
         log+=", Location: ${VERTEX_LOCATION:-global}"
