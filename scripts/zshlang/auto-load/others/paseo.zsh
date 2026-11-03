@@ -26,6 +26,40 @@ function paseo-cli-update {
     paseo-install "$@"
 }
 
+function h-paseo-daemon-env {
+    : "usage: h-paseo-daemon-env cmd... ; run cmd without any agent session's environment"
+    #: Agents inherit the daemon's environment, and a provider that sets no
+    #: CLAUDE_CONFIG_DIR (the personal one) takes the daemon's. A daemon
+    #: started from a work-profile session thus ran personal agents on the work
+    #: account (2026-11-03). Drop every CLAUDE* and PASEO_AGENT* variable.
+    local -a unset_opts=()
+    local name
+    for name in ${(k)parameters[(I)CLAUDE*]} ${(k)parameters[(I)PASEO_AGENT*]} ; do
+        unset_opts+=(-u "${name}")
+    done
+    #: Agents get the account's login shell: helper initialization can change SHELL.
+    local login_shell="${SHELL}"
+    if isDarwin ; then
+        login_shell="$(command dscl . -read "$HOME" UserShell | command awk '{print $2}')"
+    fi
+    SHELL="${login_shell}" command env "${unset_opts[@]}" "$@"
+}
+
+function paseo-start {
+    : "usage: paseo-start [paseo daemon start options]"
+    h-paseo-daemon-env paseo daemon start "$@"
+}
+
+function paseo-restart {
+    : "usage: paseo-restart [paseo daemon start options]"
+    : "Stop the daemon and its supervisor, then start both from a clean environment."
+    : "It kills every agent turn, including the caller's: from an agent, run it detached,"
+    : "e.g. tmux-job-start paseo-restart zsh -ic paseo-restart"
+    #: \`paseo daemon restart' keeps the supervisor, whose environment the new worker inherits.
+    command paseo daemon stop @RET
+    paseo-start "$@"
+}
+
 function 2paseo {
     : "usage: 2paseo [--wait-exit] [--no-switch] [--to <claude-config-dir> [--skip-subagents]] [--max-import-mb <n>]
 --to moves a Claude session to another account's config directory, e.g. --to ~/.claude.

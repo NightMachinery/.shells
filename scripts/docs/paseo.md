@@ -85,6 +85,14 @@ On macOS, Desktop persists the setting as
 settings control: Desktop caches the file, and its legacy-settings migration
 can otherwise overwrite a manual edit.
 
+Start and restart the daemon with `paseo-start` and `paseo-restart`. Agents
+inherit the daemon's environment, and the personal Claude provider sets no
+`CLAUDE_CONFIG_DIR`, so a daemon started from inside a work-profile session ran
+every personal agent on the work account (2026-11-03). Both functions drop all
+`CLAUDE*` and `PASEO_AGENT*` variables first. `paseo-restart` stops the
+supervisor too, since `daemon restart` keeps its environment; it ends every
+agent turn, including the caller's, so run it detached from an agent.
+
 See the official [daemon lifecycle reference](https://paseo.sh/docs/cli.md#daemon-management).
 
 ## Tailnet HTTPS on port 6767

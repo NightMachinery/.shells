@@ -32,9 +32,7 @@ omni-history-boot
 
 if isdefined-cmd paseo ; then
     #: The CLI backgrounds its supervisor; disable Desktop's built-in daemon management.
-    #: Agents get the account's login shell: helper initialization can change SHELL.
-    SHELL="$(command dscl . -read "$HOME" UserShell | command awk '{print $2}')" \
-        command paseo daemon start
+    paseo-start
 fi
 
 if isScion ; then
