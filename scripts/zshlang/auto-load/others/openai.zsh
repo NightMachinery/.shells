@@ -38,9 +38,7 @@ function openai-cost-by-tokens {
             [gpt-4-turbo]=0.01
             [gpt-4o]=0.005
 
-            [${claude_3_5_sonnet_model_name}]=0.003
             [claude-3-opus]=0.015
-            [${claude_3_opus_model}]=0.015
         )
     elif [[ "${mode}" == output ]] ; then
         model_costs=(
@@ -53,9 +51,7 @@ function openai-cost-by-tokens {
             [gpt-4-turbo]=0.03
             [gpt-4o]=0.015
 
-            [${claude_3_5_sonnet_model_name}]=0.015
             [claude-3-opus]=0.075
-            [${claude_3_opus_model}]=0.075
         )
     else
         # ecerr "$0: unknown mode: $mode"
@@ -237,10 +233,6 @@ function openai-chatgpt {
 function openai-token-count {
     local model="${token_count_model:-gpt-4}"
 
-    if [[ "${model}" == "${claude_3_5_sonnet_model_name}" ]] ; then
-        # model=''
-    fi
-
     # in-or-args "$@" |
     cat-paste-if-tty "$@" |
         # $proxyenv reval-ec ttok -m "${model}"
@@ -349,6 +341,16 @@ function llm-m {
 
     opts+=(-m "${model}")
     log+="LLM Model: ${model}"
+
+    if [[ "${model}" == vertex-* ]] ; then
+        #: llm-vertex-genai reads the project from the environment and
+        #: authenticates with `gcloud auth application-default login`.
+        local -x VERTEX_PROJECT_ID="${VERTEX_PROJECT_ID:-${gcp_pa_project}}"
+        if test -z "${VERTEX_PROJECT_ID}" ; then
+            ecerr "$0: set VERTEX_PROJECT_ID, or gcp_pa_project in ${gcp_conf_file}"
+            return 1
+        fi
+    fi
 
     if test -n "$temp" ; then
         opts+=(-o temperature "$temp")
@@ -573,272 +575,77 @@ function define-llm-model-v2 {
     define-llm-model "$model_name"
 }
 ## * Models
-## ** Google Gemini
-# typeset -A vertex_gemini_31_pro_obj=(
-#     model_name "vertex-gemini-3.1-pro-preview"
-#     long_name 'vertex_gemini_31_pro'
-#     short_name 'vertex-g31'
-#     reval_to_aliases 'rvg31 vg31'
-#     send_aliases 'lvg31'
-# )
-# define-llm-model-v2 vertex_gemini_31_pro_obj
-
-# typeset -A vertex_gemini_flash_latest_obj=(
-#     # model_name 'vertex-gemini-flash-latest'  #: @unsupported
-#     #: `llm models -q vertex`
-#     model_name "vertex-gemini-3-flash-preview"
-#     long_name 'vertex_gemini_flash_latest'
-#     short_name 'vertex-flash'
-#     reval_to_aliases 'rvflash vfl'
-#     send_aliases 'lvflash'
-# )
-# define-llm-model-v2 vertex_gemini_flash_latest_obj
-
-typeset -A gemini_flash_latest_obj=(
-    model_name 'gemini-flash-latest'
-    long_name 'gemini_flash_latest'
+#: Each model gets `with-<short>`, `llm-<short>`, `llm-<short>-chat` and
+#: `reval-to-<short>`, plus the listed aliases. See `define-llm-model`.
+## ** Google Gemini on Vertex AI
+#: Through [[https://github.com/NightMachinery/llm-vertex-genai][llm-vertex-genai]], billed to the purple-aura project; see `llm-m`.
+typeset -gA gemini_flash_obj=(
+    model_name 'vertex-gemini-3.8-flash'
+    long_name 'gemini_flash'
     short_name 'flash'
     reval_to_aliases 'rflash fl'
     send_aliases 'lflash'
 )
-define-llm-model-v2 gemini_flash_latest_obj
+define-llm-model-v2 gemini_flash_obj
 
-typeset -A gemini_flash_lite_latest_obj=(
-    model_name 'gemini-flash-lite-latest'
-    long_name 'gemini_flash_lite_latest'
-    short_name 'flite'
-    reval_to_aliases 'rflite'
-    send_aliases 'lflite'
+typeset -gA gemini_argon_obj=(
+    model_name 'vertex-gemini-4-argon'
+    long_name 'gemini_argon'
+    short_name 'argon'
+    reval_to_aliases 'rargon'
+    send_aliases 'largon'
 )
-define-llm-model-v2 gemini_flash_lite_latest_obj
-## **** Google Gemini 2.5
-typeset -gA gemini25_obj=(
-    ##
-    model_name 'gemini-2.5-pro'
-    ##
-    long_name 'gemini_2_5_pro'
-    short_name 'g25'
-    reval_to_aliases 'g25'
-    send_aliases 'lg25'
+define-llm-model-v2 gemini_argon_obj
+## ** OpenAI via the Codex subscription
+#: `codex-models-ls` lists what the subscription offers.
+typeset -gA gpt_luna_obj=(
+    model_name 'openai-codex/gpt-6-luna'
+    long_name 'gpt_luna'
+    short_name 'luna'
+    reval_to_aliases 'rluna'
+    send_aliases 'lluna'
 )
-define-llm-model-v2 gemini25_obj
+define-llm-model-v2 gpt_luna_obj
 
-
-#: Gemini 3 Flash
-# gemini-3-flash-preview
-typeset -A gemini3_flash_obj=(
-    model_name 'gemini-3-flash-preview'
-    long_name 'gemini_3_flash'
-    short_name 'g3f'
-    reval_to_aliases 'rg3f g3f'
-    send_aliases 'lg3f'
+typeset -gA gpt_terra_obj=(
+    model_name 'openai-codex/gpt-6.1-terra'
+    long_name 'gpt_terra'
+    short_name 'terra'
+    reval_to_aliases 'rterra'
+    send_aliases 'lterra'
 )
-define-llm-model-v2 gemini3_flash_obj
+define-llm-model-v2 gpt_terra_obj
 
-#: Gemini 2.5 Flash
-typeset -A gemini25_flash_obj=(
-    model_name 'gemini-2.5-flash'
-    # model_name 'gemini-2.5-flash-preview-04-17'
-    long_name 'gemini_flash_2_5'
-    short_name 'flash25'
-    reval_to_aliases 'rflash25 f25'
-    send_aliases 'lflash25'
+typeset -gA gpt_sol_obj=(
+    model_name 'openai-codex/gpt-6.1-sol'
+    long_name 'gpt_sol'
+    short_name 'sol'
+    reval_to_aliases 'rsol'
+    send_aliases 'lsol'
 )
-define-llm-model-v2 gemini25_flash_obj
-## **** Google Gemini Old Models
-#: Gemini 2.0 Flash
-# typeset -A gemini2_flash_obj=(
-#     model_name 'gemini-2.0-flash'
-#     # model_name 'gemini-2.0-flash-exp'
-#     long_name 'gemini_flash_2_0'
-#     short_name 'flash2'
-#     reval_to_aliases 'rflash2 fl2'
-#     send_aliases 'lflash2'
-# )
-# define-llm-model-v2 gemini2_flash_obj
+define-llm-model-v2 gpt_sol_obj
 
-# typeset -A or_gemini2_flash_obj=(
-#     model_name 'openrouter/google/gemini-2.0-flash-001'
-#     long_name 'or_gemini_flash_2_0'
-#     short_name 'or_flash2'
-#     reval_to_aliases 'r-or-flash2 or-fl2'
-#     send_aliases 'l-or-flash2'
-# )
-# define-llm-model-v2 or_gemini2_flash_obj
-
-# typeset -A gemini2_flash_thinking_obj=(
-#     # model_name 'gemini-2.0-flash-thinking-exp-1219'
-#     model_name 'gemini-2.0-flash-thinking-exp-01-21'
-#     long_name 'gemini_flash_thinking_2_0'
-#     short_name 'flash2t'
-#     reval_to_aliases 'rflash2t fl2t'
-#     send_aliases 'lflash2t'
-# )
-# define-llm-model-v2 gemini2_flash_thinking_obj
-##
-# typeset -gA gemini15_obj=(
-#     model_name 'gemini-1.5-pro-latest'
-#     long_name 'gemini_1_5_pro'
-#     short_name 'g15'
-#     reval_to_aliases 'g15'
-#     send_aliases 'lg15'
-# )
-# define-llm-model-v2 gemini15_obj
-##
-# typeset -A gemini_flash_8b_obj=(
-#     model_name 'gemini-1.5-flash-8b-latest'
-#     long_name 'gemini_flash_8b_1_5'
-#     short_name 'flash-8b'
-#     reval_to_aliases 'rflash_8b fl8'
-#     send_aliases 'lflash_8b'
-# )
-# define-llm-model-v2 gemini_flash_8b_obj
-## *** OpenRouter: Google Gemini
-# OpenRouter Gemini Flash 8B
-# typeset -A openrouter_gemini_flash_8b_obj=(
-#     model_name 'openrouter/google/gemini-flash-1.5-8b'
-#     long_name 'openrouter_gemini_flash_8b'
-#     short_name 'or-flash-8b'
-#     reval_to_aliases 'or_rflash_8b orfl8'
-#     send_aliases 'or_lflash_8b'
-# )
-# define-llm-model-v2 openrouter_gemini_flash_8b_obj
-
-# OpenRouter Gemini Flash 8B Experimental
-# typeset -A openrouter_gemini_flash_8b_exp_obj=(
-#     model_name 'openrouter/google/gemini-flash-1.5-8b-exp'
-#     long_name 'openrouter_gemini_flash_8b_exp'
-#     short_name 'or-flash-8b-exp'
-#     reval_to_aliases 'or_rflash_8b_exp orfl8e'
-#     send_aliases 'or_lflash_8b_exp'
-# )
-# define-llm-model-v2 openrouter_gemini_flash_8b_exp_obj
-
-# OpenRouter Gemini 1.5
-# typeset -A openrouter_gemini_15_obj=(
-#     model_name 'openrouter/google/gemini-pro-1.5'
-#     long_name 'openrouter_gemini_15'
-#     short_name 'or-g15'
-#     reval_to_aliases 'or_rg15 org15'
-#     send_aliases 'or_lg15'
-# )
-# define-llm-model-v2 openrouter_gemini_15_obj
-
-# OpenRouter Gemini 1.5 Experimental
-# typeset -A openrouter_gemini_15_exp_obj=(
-#     model_name 'openrouter/google/gemini-pro-1.5-exp'
-#     long_name 'openrouter_gemini_15_exp'
-#     short_name 'or-g15-exp'
-#     reval_to_aliases 'or_rg15_exp org15e'
-#     send_aliases 'or_lg15_exp'
-# )
-
-## ** Misc Models
-typeset -gA gpt35t16k_obj=(
-    model_name 'gpt-3.5-turbo-16k'
-    long_name 'gpt_3_5_16k'
-    short_name '3t'
-    reval_to_aliases 'r3t'
-    send_aliases '3t'
+typeset -gA gpt_astra_obj=(
+    model_name 'openai-codex/gpt-6-astra'
+    long_name 'gpt_astra'
+    short_name 'astra'
+    reval_to_aliases 'rastra'
+    send_aliases 'lastra'
 )
-define-llm-model-v2 gpt35t16k_obj
-
-typeset -gA gpt5_obj=(
-    model_name 'openai-codex/gpt-5.5'
-    long_name 'gpt_5'
-    short_name '5'
-    reval_to_aliases 'rl5'
-    send_aliases 'l5'
+define-llm-model-v2 gpt_astra_obj
+## ** Anthropic via OpenRouter
+#: OpenRouter, as the Anthropic API key has no credit and Vertex has no Claude quota.
+typeset -gA claude_opus_obj=(
+    model_name 'openrouter/anthropic/claude-opus-5.5'
+    long_name 'claude_opus'
+    short_name 'opus'
+    reval_to_aliases 'ropus'
+    send_aliases 'lopus'
 )
-define-llm-model-v2 gpt5_obj
-
-typeset -gA gpt4_obj=(
-    model_name 'gpt-4'
-    long_name 'gpt_4'
-    short_name '4'
-    reval_to_aliases 'rl4'
-    send_aliases 'l4'
-)
-define-llm-model-v2 gpt4_obj
-
-typeset -gA gpt4turbo_obj=(
-    model_name 'gpt-4-turbo'
-    long_name 'gpt_4_turbo'
-    short_name '4t'
-    reval_to_aliases 'rl4t 4t'
-    send_aliases 'l4t'
-)
-define-llm-model-v2 gpt4turbo_obj
-
-typeset -gA gpt4o_obj=(
-    model_name 'gpt-4o'
-    long_name 'gpt_4o'
-    short_name '4o'
-    reval_to_aliases 'rl4o 4o'
-    send_aliases 'l4o'
-)
-define-llm-model-v2 gpt4o_obj
-
-typeset -gA gpt4o_audio_obj=(
-    model_name 'gpt-4o-audio-preview'
-    long_name 'gpt_4o_audio'
-    short_name '4o-audio'
-    # short_name '4o-audio'
-    # reval_to_aliases 'rl4o 4o'
-    # send_aliases 'l4o'
-)
-define-llm-model-v2 gpt4o_audio_obj
-
-typeset -gA gpt4omini_obj=(
-    model_name 'gpt-4o-mini'
-    long_name 'gpt_4o_mini'
-    short_name '4om'
-    reval_to_aliases 'rl4om 4om'
-    send_aliases 'l4om'
-)
-define-llm-model-v2 gpt4omini_obj
-
-typeset -gA claude35sonnet_obj=(
-    model_name 'or:c35s'
-    long_name 'claude_3_5_sonnet'
-    short_name 's3'
-    reval_to_aliases 'rs3'
-    send_aliases 's3'
-)
-define-llm-model-v2 claude35sonnet_obj
-typeset -g claude_3_5_sonnet_model_name="${claude_3_5_sonnet_model}" #: @backcompat
-
-typeset -gA claude3o_obj=(
-    model_name 'or:c3o'
-    long_name 'claude_3_opus'
-    short_name 'c3o'
-    reval_to_aliases 'rc3o'
-    send_aliases 'c3o'
-)
-define-llm-model-v2 claude3o_obj
-
-typeset -gA claude3haiku_obj=(
-    model_name 'claude-3-haiku'
-    long_name 'claude_3_haiku'
-    short_name 'c3h'
-    reval_to_aliases 'rc3h'
-    send_aliases 'c3h'
-)
-define-llm-model-v2 claude3haiku_obj
-
-typeset -gA llama3_obj=(
-    model_name 'gq-llama3'
-    long_name 'llama3'
-    short_name 'l3'
-    reval_to_aliases 'rl3'
-    send_aliases 'l3'
-)
-define-llm-model-v2 llama3_obj
+define-llm-model-v2 claude_opus_obj
 ##
 ## * Default Models
-typeset -g llm_default_model="${gemini_flash_latest_model}"
-# typeset -g llm_default_model="${gpt_5_model}"
-# typeset -g llm_default_model="${gemini_2_5_pro_model}"
+typeset -g llm_default_model="${gemini_flash_model}"
 
 aliassafe xx='\noglob llm-send'
 aliassafe llm-run='\noglob reval-to-llm'
