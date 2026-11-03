@@ -156,5 +156,25 @@ function notif {
 function notif-casual() {
     notif_tlg="${notif_tlg:-y}" fnswap tnotif tnotif-casual notif "$@"
 }
+
+function notif-tlg {
+    : "usage: notif-tlg DEST MESSAGE...
+Sends MESSAGE as plain text to the Telegram chat DEST. When DEST is empty or
+sending fails, shows it with [agfi:notif] on this machine instead."
+    local dest="${1-}"
+    (( $# )) && shift
+    local msg="$*"
+
+    if test -n "$dest" && tsend --parse-mode=none -- "$dest" "$msg" ; then
+        return 0
+    fi
+    notif_tlg=n notif "$msg"
+}
+
+function notif-tlg-heart {
+    : "usage: notif-tlg-heart MESSAGE...
+[agfi:notif-tlg] to the chat in tlg_heart."
+    notif-tlg "${tlg_heart-}" "$@"
+}
 aliasfn notifc notif-casual
 ##
