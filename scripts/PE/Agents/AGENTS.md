@@ -49,7 +49,10 @@ Edit these sources, not installed skill links.
 Not every host has every source: the private and standalone repositories are
 only where they have been cloned. So a skill these instructions name may be
 missing. When it is, follow the short rule given alongside the instruction,
-and say that the skill was unavailable rather than silently improvising.
+and say that the skill was unavailable rather than silently improvising. A
+skill absent from your session's skill list is not proof that it is missing: the
+list can shrink after compaction. Invoke it, or check your agent's skills
+directory, before calling it unavailable.
 
 ## Skill Evolution
 
