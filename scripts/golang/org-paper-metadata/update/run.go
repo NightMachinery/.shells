@@ -231,7 +231,7 @@ func Run(ctx context.Context, root string, o Options, fetch FetchFunc, now time.
 			if r.err != nil {
 				stats.Failed++
 				failures = append(failures, r.err)
-				fmt.Fprintf(log, "%s:%d: %v\n", path, target.Heading.Start+1, r.err)
+				fmt.Fprintf(log, "%s:%d: %s: %v\n", path, target.Heading.Start+1, target.URL, r.err)
 				applyLocal(target)
 				continue
 			}

@@ -171,6 +171,8 @@ URL normalization, cleanup of old fabricated citations, or explicitly requested
 removal of managed BibTeX can still change that entry. Successful
 papers can still be refreshed; the command exits nonzero when any retrieval or file edit
 fails, and prints a summary of updates, recent entries, failures, and locks.
+Each failed paper gets a line `<file>:<line>: <paper URL>: <error>`; the URL
+identifies the paper across runs, when edits elsewhere have moved its line.
 
 Writes use a synced temporary file in the destination directory followed by
 an atomic rename. The tool preserves permissions and line endings, checks the
