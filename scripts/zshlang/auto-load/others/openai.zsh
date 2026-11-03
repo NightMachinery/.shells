@@ -351,11 +351,7 @@ function llm-m {
             return 1
         fi
 
-        log+=", Project: ${VERTEX_PROJECT_ID}"
-        if [[ "${VERTEX_PROJECT_ID}" == "${gcp_pa_project}" && "${VERTEX_PROJECT_ID}" != purple-aura ]] ; then
-            log+=" (purple-aura)"
-        fi
-        log+=", Location: ${VERTEX_LOCATION:-global}"
+        log+=", Project: ${VERTEX_PROJECT_ID}, Location: ${VERTEX_LOCATION:-global}"
     fi
 
     #: `llm_effort` overrides the model's default from `llm_models_effort`;
