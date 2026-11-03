@@ -129,7 +129,11 @@ function gh-add-read-only-access-to {
 Invites GH-USER as a read-only (pull) collaborator on each REPO, given as
 OWNER/NAME or as a NAME under your own account. GH-USER has to accept each
 invitation (https://github.com/notifications while logged in as GH-USER).
-Audit the result with [agfi:gh-list-all-access]."
+Audit the result with [agfi:gh-list-all-access].
+
+Organization repositories only: a personal account's repository has a single
+collaborator level, which can push, so GitHub refuses permission=pull there.
+For read-only access to a personal repository, use a read-only deploy key."
     local user="${1-}"
     (( $# )) && shift
     if [[ -z "$user" ]] || (( $# == 0 )) ; then
@@ -137,10 +141,15 @@ Audit the result with [agfi:gh-list-all-access]."
         return 2
     fi
 
-    local me repo
+    local me repo owner_type
     me="$(command gh api user -q .login)" @RET
     for repo in "$@" ; do
         [[ "$repo" == */* ]] || repo="${me}/${repo}"
+        owner_type="$(command gh api "repos/${repo}" -q .owner.type)" @RET
+        if [[ "$owner_type" != Organization ]] ; then
+            ecerr "$0: ${repo} belongs to a personal account, whose collaborators can always push; use a read-only deploy key instead"
+            return 1
+        fi
         #: 201 with an invitation, or 204 when GH-USER already has access.
         reval-ec command gh api --silent -X PUT "repos/${repo}/collaborators/${user}" -f permission=pull @RET
     done
