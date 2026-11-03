@@ -9,9 +9,11 @@ The models are defined in `zshlang/auto-load/others/openai.zsh` (`## * Models`).
 
 ## Effort
 
-Set `llm_effort` to choose how hard a model thinks: `llm_effort=low with-flash 2en '...'`. `llm-m` sends it as `thinking_level` to Vertex (`minimal`, `low`, `medium`, `high`) and as `reasoning_effort` to Codex (`low` to `xhigh`, plus `max`) and OpenRouter. Unset, nothing is sent and the provider's default applies: `medium` for Codex; for Opus, effort `high` with extended thinking off; for Gemini, roughly `high` on Flash, while Argon decides for itself. Unsupported values are passed through and rejected by the plugin, never clamped.
+Set `llm_effort` to choose how hard a model thinks: `llm_effort=low with-flash 2en '...'`. `llm-m` sends it as `thinking_level` to Vertex (`low`, `medium`, `high`; Flash 3.8 and Argon reject `minimal`) and as `reasoning_effort` to Codex (`low` to `xhigh`, plus `max`) and OpenRouter. Unset, nothing is sent and the provider's default applies: `medium` for Codex; for Opus, effort `high` with extended thinking off; for Gemini, roughly `high` on Flash, while Argon decides for itself. Unsupported values are passed through and rejected by the plugin, never clamped.
 
 A model's `effort` field overrides the provider default, and an explicit `llm_effort` overrides that. `sol` and `argon` default to `high`. Its `effort_variants` add shortcuts: `with-luna-high`, `with-luna-max`, `with-sol-low`, `with-astra-low`. A variant sets `llm_effort` itself, so its name wins: `llm_effort=max with-luna-high` sends `high`.
+
+For any model, `with-minimal`, `with-low`, `with-medium`, `with-high`, `with-xhigh` and `with-max` set `llm_effort` (`with-high with-luna xz ...`), and each `-maybe` form (`with-high-maybe`) sets it only when it is unset.
 
 Codex's `max` needs [llm-openai-via-codex#6](https://github.com/simonw/llm-openai-via-codex/pull/6). Until it merges, install the fork: `llm install https://github.com/NightMachinery/llm-openai-via-codex/archive/refs/heads/reasoning-effort-max.zip`.
 

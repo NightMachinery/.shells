@@ -536,6 +536,17 @@ typeset -gA llm_models_proxy_p
 #: and one for each model's default `llm_effort`:
 typeset -gA llm_models_effort
 
+#: `with-high xz ...` sets `llm_effort` for any model; `with-high-maybe` only
+#: when it is unset. A model's own variant (`with-luna-max`) still wins.
+function h-define-llm-effort-aliases {
+    local effort_
+    for effort_ in minimal low medium high xhigh max ; do
+        aliassafe "with-${effort_}=llm_effort=${effort_} " @RET
+        aliassafe "with-${effort_}-maybe=llm_effort=\"\${llm_effort:-${effort_}}\" " @RET
+    done
+}
+h-define-llm-effort-aliases
+
 function define-llm-model {
     local model_name="$1"
     local long_name="${long_name}"
