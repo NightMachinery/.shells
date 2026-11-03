@@ -795,6 +795,18 @@ aliasfn claude-code-status claude-code-usage-all
 alias ccu='claude-code-usage-all'
 alias ccs='claude-code-usage-all'
 
+function claude-code-usage-cloud {
+    #: Every profile's cloud-session credit, one line each: what is left of the
+    #: prepaid dollar balance for Claude Code sessions in the cloud, and when it
+    #: expires. Profiles without one print nothing. [agfi:claude-code-usage-all]
+    #: and the agent-status page mention it only while money is left.
+    #: See =docs/claude_code_usage.md=.
+    ##
+    claude-code-usage-all --cloud-credit "$@"
+}
+alias ccu-cloud='claude-code-usage-cloud'
+alias ccs-cloud='claude-code-usage-cloud'
+
 function h-claude-code-usage-gauges {
     : "prints every profile's usage windows, one per line, tab separated:
 <profile>.<window> (5h, 7d, model7d), percent used, reset epoch or -"

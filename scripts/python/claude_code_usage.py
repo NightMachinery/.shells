@@ -91,6 +91,11 @@ WINDOW_LABELS = {
     "seven_day_sonnet": "7d Sonnet",
 }
 WINDOW_ORDER = tuple(WINDOW_LABELS)
+#: Where the payload has been seen to carry the cloud-session credit: a prepaid
+#: dollar balance with an expiry, for Claude Code sessions in the cloud. The
+#: name is internal and arbitrary, so extract_cloud_credit() also finds the
+#: entry by its shape.
+CLOUD_CREDIT_KEY = "iguana_necktie"
 
 LIMIT_KIND_LABELS = {
     "session": "5h session",
@@ -1222,13 +1227,111 @@ def extract_windows(payload: dict) -> list[UsageWindow]:
             windows.append(build_window(key, value))
 
     for key in sorted(payload):
-        if key in WINDOW_ORDER or key == "extra_usage":
-            continue
         value = payload.get(key)
+        if key in WINDOW_ORDER or key == "extra_usage" or looks_like_credit(value):
+            continue
         if looks_like_window(value):
             windows.append(build_window(key, value))
 
     return windows
+
+
+def is_number(value: object) -> bool:
+    return isinstance(value, (int, float)) and not isinstance(value, bool)
+
+
+def looks_like_credit(value: object) -> bool:
+    # The usage windows carry the same dollar fields, set to null, so only
+    # numbers in both mark a credit.
+    return (
+        isinstance(value, dict)
+        and is_number(value.get("limit_dollars"))
+        and is_number(value.get("remaining_dollars"))
+    )
+
+
+def extract_cloud_credit(payload: dict, *, now: float | None = None) -> dict | None:
+    """The cloud-session credit, normalized; None when the account has none.
+
+    `available` means there is money left and it has not expired: what decides
+    whether the everyday reports mention it at all.
+    """
+    key = CLOUD_CREDIT_KEY
+    raw = payload.get(key)
+    if not looks_like_credit(raw):
+        key, raw = next(
+            ((k, v) for k, v in sorted(payload.items()) if looks_like_credit(v)),
+            (None, None),
+        )
+        if raw is None:
+            return None
+
+    now = time.time() if now is None else now
+    used = raw.get("used_dollars")
+    remaining = float(raw["remaining_dollars"])
+    expires_at = parse_resets_at(raw.get("resets_at"))
+    locked_reason = raw.get("locked_reason")
+    return {
+        "key": key,
+        "limit_dollars": float(raw["limit_dollars"]),
+        "used_dollars": float(used) if is_number(used) else None,
+        "remaining_dollars": remaining,
+        "expires_at": expires_at,
+        "expires_at_iso": (
+            datetime.fromtimestamp(expires_at).astimezone().isoformat()
+            if expires_at is not None
+            else None
+        ),
+        "locked_reason": locked_reason if locked_reason else None,
+        "available": remaining > 0 and (expires_at is None or expires_at > now),
+    }
+
+
+def render_cloud_credit(
+    style: Style, credit: dict | None, *, always: bool = False
+) -> str | None:
+    """The one-line summary, or None when there is nothing worth showing.
+
+    With `always`, a spent or expired credit is still described; the everyday
+    reports leave it out.
+    """
+    if credit is None or not (always or credit["available"]):
+        return None
+
+    text = (
+        f"{style.bold('Cloud credit')}: ${credit['remaining_dollars']:,.2f} "
+        f"of ${credit['limit_dollars']:,.2f} left"
+    )
+    expires_at = credit["expires_at"]
+    if expires_at is None:
+        text += ", " + style.dim("expiry unknown")
+    else:
+        verb = "expired" if expires_at <= time.time() else "expires"
+        text += (
+            f", {verb} {format_relative(expires_at)} "
+            f"({format_timestamp(expires_at)})"
+        )
+    if credit["locked_reason"]:
+        text += " " + style.red(f"[locked: {credit['locked_reason']}]")
+    return text
+
+
+def render_cloud_only(style: Style, report: ProfileReport) -> str | None:
+    """`--cloud-credit`: the profile's credit line alone, or its error."""
+    prefix = f"[{report.profile.label}] " if report.profile.label else ""
+    if report.error is not None:
+        return prefix + style.red(report.error)
+
+    result = report.result
+    assert result is not None
+    line = render_cloud_credit(
+        style, extract_cloud_credit(result.payload), always=True
+    )
+    if line is None:
+        return None
+    if result.stale_reason is not None:
+        line += " " + style.yellow(f"[stale: {result.stale_reason}]")
+    return prefix + line
 
 
 def render_window(style: Style, window: UsageWindow) -> str:
@@ -1335,6 +1438,10 @@ def render_human(style: Style, report: ProfileReport) -> str:
     if extra_line is not None:
         lines.append(extra_line)
 
+    cloud_line = render_cloud_credit(style, extract_cloud_credit(result.payload))
+    if cloud_line is not None:
+        lines.append(cloud_line)
+
     lines.extend(style.yellow(warning) for warning in warnings or ())
 
     fetched = f"Fetched: {format_timestamp(result.fetched_at_s)}"
@@ -1432,6 +1539,7 @@ def build_json(report: ProfileReport, *, keychain: dict | None = None) -> dict:
         "relogin": report.relogin,
         "windows": windows,
         "extra_usage": result.payload.get("extra_usage"),
+        "cloud_credit": extract_cloud_credit(result.payload),
         "cache": {
             "from_cache": result.from_cache,
             "stale_reason": result.stale_reason,
@@ -1476,6 +1584,16 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         action=argparse.BooleanOptionalAction,
         default=False,
         help="Output JSON instead of human-readable text (default: %(default)s).",
+    )
+    parser.add_argument(
+        "--cloud-credit",
+        action=argparse.BooleanOptionalAction,
+        default=False,
+        help=(
+            "Text output: only each profile's cloud-session credit line, "
+            "spent or expired ones included; profiles without one print "
+            "nothing (default: %(default)s)."
+        ),
     )
     parser.add_argument(
         "--timeout",
@@ -1710,6 +1828,9 @@ def main(argv: list[str] | None = None) -> int:
         # An array only for --all: a single report stays a bare object, which is
         # what every existing caller parses.
         print(json.dumps(objects if args.all else objects[0], indent=2))
+    elif args.cloud_credit:
+        lines = [line for report in reports if (line := render_cloud_only(style, report))]
+        print("\n".join(lines) if lines else style.dim("No cloud credit."))
     else:
         print("\n\n".join(render_human(style, report) for report in reports))
 

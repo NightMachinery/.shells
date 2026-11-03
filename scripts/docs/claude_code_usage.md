@@ -27,6 +27,26 @@ script prefers it and falls back to the legacy `five_hour` / `seven_day` /
 rendered generically rather than dropped. An `extra_usage` line is shown only
 when extra usage is enabled or credits have been spent.
 
+### Cloud credit
+
+Some accounts get a prepaid dollar balance for Claude Code sessions in the
+cloud, which expires. The payload carries it as an entry with numeric
+`limit_dollars`, `used_dollars`, `remaining_dollars` and a `resets_at` that is
+really the expiry; the usage windows carry the same dollar fields set to null.
+Its key is an internal code name (`iguana_necktie` as of 2026-11), so the
+script looks for that key first and otherwise takes the first entry of that
+shape. Accounts without the credit have no such entry.
+
+The everyday report adds a `Cloud credit: $X of $Y left, expires ...` line only
+while the credit is *available* (money left and not yet expired). `--json`
+always carries it as `cloud_credit` (null when absent): `limit_dollars`,
+`used_dollars`, `remaining_dollars`, `expires_at` (epoch), `expires_at_iso`,
+`locked_reason`, `available`, and the payload `key` it came from.
+`--cloud-credit` prints only that line, per profile, spent or expired ones
+included; [agfi:claude-code-usage-cloud] (aliases `ccu-cloud`, `ccs-cloud`)
+runs it for every profile. The agent-status report and page show it as a
+note under the account, again only while available.
+
 ## Profiles
 
 Claude Code supports several logged-in accounts side by side, selected with
@@ -611,6 +631,8 @@ Each entry is the flag, then the environment variables it falls back to, then
 the default.
 
 - `--json` — no env fallback; off.
+- `--cloud-credit` — no env fallback; off. Text output is only each profile's
+  cloud credit line; see Cloud credit above.
 - `--timeout` — `claude_code_usage_timeout_s` / `CLAUDE_CODE_USAGE_TIMEOUT_S`; 10.
 - `--keychain-timeout` — `claude_code_usage_keychain_timeout_s` /
   `CLAUDE_CODE_USAGE_KEYCHAIN_TIMEOUT_S`; 30. Separate from `--timeout` because
@@ -650,7 +672,7 @@ the default.
   warm cache would otherwise turn the flag into a silent no-op.
 
 `--json` output contains normalized `windows` (percent, epoch and ISO reset
-times, severity, is_active) plus the `raw` payload for forward compatibility. It
+times, severity, is_active), `cloud_credit`, plus the `raw` payload for forward compatibility. It
 also reports `profile`, `error`, the data `source` (`api`, `api-cache` or
 `config-cache`), the `keychain` service and account used, and any `warnings`.
 With `--all` it is an array of those objects, one per profile, in the order the
