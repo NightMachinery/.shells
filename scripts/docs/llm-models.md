@@ -7,6 +7,14 @@ The models are defined in `zshlang/auto-load/others/openai.zsh` (`## * Models`).
 - `luna`, `terra`, `sol`, `astra`: GPT-6 Luna, 6.1 Terra, 6.1 Sol and 6 Astra through the Codex subscription (`llm-openai-via-codex`). `codex-models-ls` lists what it offers.
 - `opus`: Claude Opus 5.5 through OpenRouter, billed per token.
 
+## Effort
+
+Set `llm_effort` to choose how hard a model thinks: `llm_effort=low with-flash 2en '...'`. `llm-m` sends it as `thinking_level` to Vertex (`minimal`, `low`, `medium`, `high`) and as `reasoning_effort` to Codex (`low` to `xhigh`, plus `max`) and OpenRouter. Unset, nothing is sent and the provider's default applies: `medium` for Codex; for Opus, effort `high` with extended thinking off; for Gemini, roughly `high` on Flash, while Argon decides for itself. Unsupported values are passed through and rejected by the plugin, never clamped.
+
+A model's `effort` field overrides the provider default, and an explicit `llm_effort` overrides that. `sol` and `argon` default to `high`. Its `effort_variants` add shortcuts: `with-luna-high`, `with-luna-max`, `with-sol-low`, `with-astra-low`.
+
+Codex's `max` needs [llm-openai-via-codex#6](https://github.com/simonw/llm-openai-via-codex/pull/6). Until it merges, install the fork: `llm install https://github.com/NightMachinery/llm-openai-via-codex/archive/refs/heads/reasoning-effort-max.zip`.
+
 ## Vertex
 
 The Vertex models use [llm-vertex-genai](https://github.com/NightMachinery/llm-vertex-genai), our fork of `llm-vertex` that adds attachments (images for `xzz`, audio for STT), conversation history and any model id. Install it with:

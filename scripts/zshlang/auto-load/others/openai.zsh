@@ -352,6 +352,22 @@ function llm-m {
         fi
     fi
 
+    #: `llm_effort` overrides the model's default from `llm_models_effort`;
+    #: with neither set, nothing is sent and the provider default applies.
+    #: Values pass through unchecked, so the plugin rejects unsupported ones.
+    local effort="${llm_effort:-${llm_models_effort[${model}]}}"
+    if test -n "${effort}" ; then
+        case "${model}" in
+            vertex-*) opts+=(-o thinking_level "${effort}") ;;
+            openai-codex/*|openrouter/*) opts+=(-o reasoning_effort "${effort}") ;;
+            *)
+                ecerr "$0: llm_effort is not supported for ${model}"
+                return 1
+                ;;
+        esac
+        log+=", Effort: ${effort}"
+    fi
+
     if test -n "$temp" ; then
         opts+=(-o temperature "$temp")
         log+=", Temperature: ${temp}"
@@ -517,6 +533,8 @@ aliasfn llm-chat llm-m chat
 
 #: define a dict for keeping `proxy_p` per model:
 typeset -gA llm_models_proxy_p
+#: and one for each model's default `llm_effort`:
+typeset -gA llm_models_effort
 
 function define-llm-model {
     local model_name="$1"
@@ -524,9 +542,10 @@ function define-llm-model {
     local short_name="${short_name:-${long_name}}"
     assert-args model_name long_name short_name @RET
 
-    ensure-array reval_to_aliases send_aliases
+    ensure-array reval_to_aliases send_aliases effort_variants
     local reval_to_aliases=("${reval_to_aliases[@]}")
     local send_aliases=("${send_aliases[@]}")
+    local effort_variants=("${effort_variants[@]}")
 
     local model_var_name="${long_name}_model"
     revaldbg typeset -g "${model_var_name}=${model_name}" @RET
@@ -536,11 +555,21 @@ function define-llm-model {
         llm_models_proxy_p[${model_name}]="${proxy_p}"
     fi
 
+    local effort="${effort}"
+    if test -n "${effort}" ; then
+        llm_models_effort[${model_name}]="${effort}"
+    fi
+
     local with_alias_name="with-${short_name}"
     revaldbg aliassafe "${with_alias_name}=llm_model=\"\${${model_var_name}}\" " @RET
 
     local with_maybe_alias_name="with-${short_name}-maybe"
     revaldbg aliassafe "${with_maybe_alias_name}=llm_model=\"\${llm_model:-\${${model_var_name}}}\" " @RET
+
+    local effort_
+    for effort_ in "${effort_variants[@]}"; do
+        revaldbg aliassafe "${with_alias_name}-${effort_}=llm_model=\"\${${model_var_name}}\" llm_effort=${effort_} " @RET
+    done
 
     local llm_function_name="llm-${short_name}"
     revaldbg aliasfn-ng "${llm_function_name}" "${with_alias_name}" llm-send @RET
@@ -569,6 +598,8 @@ function define-llm-model-v2 {
     local long_name="${${(P)map_name}[long_name]}"
     local short_name="${${(P)map_name}[short_name]}"
     local proxy_p="${${(P)map_name}[proxy_p]}"
+    local effort="${${(P)map_name}[effort]}"
+    local effort_variants=(${(s: :)${(P)map_name}[effort_variants]})
     local reval_to_aliases=(${(s: :)${(P)map_name}[reval_to_aliases]})
     local send_aliases=(${(s: :)${(P)map_name}[send_aliases]})
 
@@ -576,7 +607,9 @@ function define-llm-model-v2 {
 }
 ## * Models
 #: Each model gets `with-<short>`, `llm-<short>`, `llm-<short>-chat` and
-#: `reval-to-<short>`, plus the listed aliases. See `define-llm-model`.
+#: `reval-to-<short>`, plus the listed aliases. `effort` is the model's default
+#: `llm_effort`, and each of `effort_variants` adds `with-<short>-<effort>`.
+#: See `define-llm-model`.
 ## ** Google Gemini on Vertex AI
 #: Through [[https://github.com/NightMachinery/llm-vertex-genai][llm-vertex-genai]], billed to the purple-aura project; see `llm-m`.
 typeset -gA gemini_flash_obj=(
@@ -592,16 +625,19 @@ typeset -gA gemini_argon_obj=(
     model_name 'vertex-gemini-4-argon'
     long_name 'gemini_argon'
     short_name 'argon'
+    effort 'high'
     reval_to_aliases 'rargon'
     send_aliases 'largon'
 )
 define-llm-model-v2 gemini_argon_obj
 ## ** OpenAI via the Codex subscription
-#: `codex-models-ls` lists what the subscription offers.
+#: `codex-models-ls` lists what the subscription offers. Effort `max` needs
+#: [[https://github.com/simonw/llm-openai-via-codex/pull/6][llm-openai-via-codex#6]]; until it merges, install from the fork (see docs/llm-models.md).
 typeset -gA gpt_luna_obj=(
     model_name 'openai-codex/gpt-6-luna'
     long_name 'gpt_luna'
     short_name 'luna'
+    effort_variants 'high max'
     reval_to_aliases 'rluna'
     send_aliases 'lluna'
 )
@@ -620,6 +656,8 @@ typeset -gA gpt_sol_obj=(
     model_name 'openai-codex/gpt-6.1-sol'
     long_name 'gpt_sol'
     short_name 'sol'
+    effort 'high'
+    effort_variants 'low'
     reval_to_aliases 'rsol'
     send_aliases 'lsol'
 )
@@ -629,6 +667,7 @@ typeset -gA gpt_astra_obj=(
     model_name 'openai-codex/gpt-6-astra'
     long_name 'gpt_astra'
     short_name 'astra'
+    effort_variants 'low'
     reval_to_aliases 'rastra'
     send_aliases 'lastra'
 )
