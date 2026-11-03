@@ -103,7 +103,9 @@ function h-agent-skills-sources {
     local -a roots=("${agent_skills_src_dir}" "${notes_dir}" "${agent_skills_extra_roots[@]}") sources=()
     for repo_root in "${agent_skills_repo_roots[@]}" ; do
         test -n "${repo_root}" || continue
-        roots+=( "${repo_root}"/*/skills(N/) )
+        #: A repo holds its skills under skills/<name>/, or is itself one
+        #: skill with SKILL.md at its top; the repo directory is then the name.
+        roots+=( "${repo_root}" "${repo_root}"/*/skills(N/) )
     done
     local -A seen=()
     for root in "${roots[@]}" ; do

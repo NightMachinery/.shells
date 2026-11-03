@@ -172,6 +172,30 @@ command ln -s -- "${expected_path}" "${legacy}/note/SKILL.md"
 agent-skills-prune-legacy-codex
 [[ ! -e ${legacy}/note ]] || agent-skills-test-fail "private legacy link should be pruned"
 
+# A standalone repo root holds repos laid out as skills/<name>/SKILL.md, and
+# repos that are one skill with SKILL.md at their top, named after the repo.
+typeset repo_root="${agent_skills_test_tmp}/standalone"
+command mkdir -p -- "${repo_root}/multi/skills/nested" "${repo_root}/single/scripts" \
+    "${repo_root}/not-a-skill"
+command cp -- "${agent_skills_src_dir}/clean/SKILL.md" "${repo_root}/multi/skills/nested/SKILL.md"
+command cp -- "${agent_skills_src_dir}/clean/SKILL.md" "${repo_root}/single/SKILL.md"
+agent_skills_repo_roots=( "${repo_root}" )
+agent-skills-link
+for name in nested single ; do
+    if [[ ${name} == nested ]] ; then
+        expected_path="${repo_root}/multi/skills/nested"
+    else
+        expected_path="${repo_root}/single"
+    fi
+    for linked_path in "${agent_skills_codex_dir}/${name}" "${agent_skills_test_tmp}/claude/skills/${name}" ; do
+        [[ -L ${linked_path} && ${linked_path:A} == ${expected_path:A} ]] || \
+            agent-skills-test-fail "${linked_path} should link the standalone skill ${name}"
+    done
+done
+[[ ! -e ${agent_skills_codex_dir}/not-a-skill && ! -e ${agent_skills_codex_dir}/multi ]] || \
+    agent-skills-test-fail "repos without a top-level SKILL.md should not be linked themselves"
+agent_skills_repo_roots=()
+
 # The Claude seat refuses a target it does not own, exactly as Codex does above.
 # Each case gets its own profile directory, so a refusal cannot be a leftover
 # from the assertions before it.
