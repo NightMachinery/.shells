@@ -4,7 +4,7 @@ function stt-recordings-get {
 }
 
 function stt-recordings-rerun {
-    stt-recordings-get | fz | inargsf rgeval-env with-g25-maybe llm-stt-file
+    stt-recordings-get | fz | inargsf rgeval-env with-argon-maybe llm-stt-file
 }
 ##
 function llm-focus-p {

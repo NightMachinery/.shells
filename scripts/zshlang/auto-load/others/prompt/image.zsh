@@ -40,7 +40,7 @@ function run-prompt-image-ocr-latex {
         llm-run prompt-image-ocr-latex "$@" |
         cat-rtl-streaming-if-tty
 }
-aliasfn 4o-run-prompt-image-ocr-latex with-4o run-prompt-image-ocr-latex
+aliasfn luna-run-prompt-image-ocr-latex with-luna run-prompt-image-ocr-latex
 
 function prompt-image-ocr-IR-Shaba {
     local prompt
@@ -103,7 +103,7 @@ function run-prompt-image-ocr {
         llm-run prompt-image-ocr "$@" |
         cat-rtl-streaming-if-tty
 }
-aliasfn g25-run-prompt-image-ocr with-g25 run-prompt-image-ocr
+aliasfn argon-run-prompt-image-ocr with-argon run-prompt-image-ocr
 
 function jocr {
     # jej

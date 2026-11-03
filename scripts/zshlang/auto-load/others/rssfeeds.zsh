@@ -76,7 +76,7 @@ function summarize-text {
         local prompt_code_block_p=y
         ec "$input" |
             prompt-summarize-text |
-            reval-ec-env llm_max_tokens=12000 llm_token_limit_strategy=truncate llm-3t
+            reval-ec-env llm_max_tokens=12000 llm_token_limit_strategy=truncate llm-luna
             # openai_truncation_length=3400 openai-complete-with-prompt prompt-summarize-text
     elif [[ "$mode" == 'sumy' ]] ; then
         ec "$input" |

@@ -140,11 +140,10 @@ function llm-stt-file {
 aliasfn llm-transcribe-audio-file llm-stt-file
 
 aliasfn flash-stt-file with-flash llm-stt-file
-aliasfn flash25-stt-file with-flash25 llm-stt-file
-aliasfn g25-stt-file with-g25 llm-stt-file
+aliasfn argon-stt-file with-argon llm-stt-file
 
 aliasfn stt-file with-flash-maybe llm-stt-file
-# aliasfn stt-file with-g25-maybe llm-stt-file
+# aliasfn stt-file with-argon-maybe llm-stt-file
 
 function hs-whisper-stt-last {
   stt_last_dir=~[hs_whisper]/ h-stt-last "$@"
