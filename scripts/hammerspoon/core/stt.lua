@@ -200,7 +200,7 @@ function processRecording(wavFile, language, backend)
     -- backend = backend or "with-g25"
     -- backend = backend or "with-flash-8b"
     -- backend = backend or "with-flash2"
-    backend = backend or "with-flash25"
+    backend = backend or "with-flash"
 
     whisper.state = "processing"
     updateIndicator()
