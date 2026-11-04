@@ -60,6 +60,38 @@ hm="$(TZ="$tz" date -d "@$alarm_epoch" +"%-H %-M" 2>/dev/null)" || {
 }
 h="${hm% *}" ; m="${hm#* }"
 
+#: SET_ALARM drops the date. Check on the phone, in its actual timezone and
+#: against its current clock, before launching any activity. Later dates use
+#: the weekday extra, which makes the alarm repeat weekly and needs a warning.
+now="$(command date +%s)" || exit 2
+today="$(TZ="$tz" command date --date="@$now" +%F)" || exit 2
+next_epoch="$(TZ="$tz" command date --date="$today $h:$m" +%s)" || exit 2
+if [ "$next_epoch" -le "$now" ] ; then
+    tomorrow="$(TZ="$tz" command date --date="$today +1 day" +%F)" || exit 2
+    next_epoch="$(TZ="$tz" command date --date="$tomorrow $h:$m" +%s)" || exit 2
+fi
+alarm_day=""
+if [ "$((alarm_epoch / 60))" -ne "$((next_epoch / 60))" ] ; then
+    requested="$(TZ="$tz" command date --date="@$alarm_epoch" +"%F %H:%M")" || exit 2
+    weekday="$(TZ="$tz" command date --date="@$alarm_epoch" +%w)" || exit 2
+    today_weekday="$(TZ="$tz" command date --date="@$now" +%w)" || exit 2
+    days="$(((weekday - today_weekday + 7) % 7))"
+    repeat_date="$(TZ="$tz" command date --date="$today +$days day" +%F)" || exit 2
+    repeat_epoch="$(TZ="$tz" command date --date="$repeat_date $h:$m" +%s)" || exit 2
+    if [ "$repeat_epoch" -le "$now" ] ; then
+        days="$((days + 7))"
+        repeat_date="$(TZ="$tz" command date --date="$today +$days day" +%F)" || exit 2
+        repeat_epoch="$(TZ="$tz" command date --date="$repeat_date $h:$m" +%s)" || exit 2
+    fi
+    if [ "$((alarm_epoch / 60))" -ne "$((repeat_epoch / 60))" ] ; then
+        printf "%s\n" "termux-alarm: refusing requested $requested ($tz): neither a one-time nor a weekly alarm would first ring then. No alarm sent." >&2
+        exit 2
+    fi
+    #: Android Calendar weekdays start at Sunday=1, date uses Sunday=0.
+    alarm_day="$((weekday + 1))"
+    printf "%s\n" "termux-alarm: WARNING: requested $requested ($tz) requires a WEEKLY REPEATING alarm. Disable or delete it in the Clock app after use; it will ring again every week." >&2
+fi
+
 #: termux-am hands the intent to the already-running Termux app over a socket.
 #: Plain am spawns app_process and loads am.apk, which measured ~706ms of the
 #: ~1000ms an alarm takes, against ~7ms for the dispatch itself. The socket only
@@ -86,6 +118,7 @@ set -- "$@" -a android.intent.action.SET_ALARM \
     --ez android.intent.extra.alarm.SKIP_UI "$alarm_skip_ui" \
     --ez android.intent.extra.alarm.VIBRATE "$alarm_vibrate"
 [ -n "$alarm_msg" ] && set -- "$@" --es android.intent.extra.alarm.MESSAGE "$alarm_msg"
+[ -n "$alarm_day" ] && set -- "$@" --eial android.intent.extra.alarm.DAYS "$alarm_day"
 
 out="$($AM start "$@" 2>&1)" ; rc=$?
 if [ "$rc" -ne 0 ] ; then
@@ -151,8 +184,10 @@ aborted with ctrl-c. Set termux_alarm_dryrun=y to stop there and send nothing,
 which is how to check a spec without leaving an alarm behind: alarms cannot be
 removed programmatically.
 
-SET_ALARM carries only an hour and a minute, so Android schedules the next
-occurrence; a time already past today rolls over to tomorrow by itself.
+The next occurrence uses a one-time alarm. Later dates use a weekly repeating
+alarm on that weekday, with a warning to disable it after use. Dates that
+cannot be the first ring of either alarm are rejected. Dry runs check parsing
+only: the final date and repetition check requires the phone.
 
 Set termux_alarm_component to pin the receiving activity, which must be the one
 declaring the SET_ALARM filter: pinning a launcher activity instead succeeds and
@@ -181,7 +216,7 @@ phone's default clock app."
         expect_hm="$(gdate -d "@${epoch}" +'%-H:%-M')" @RET
     fi
 
-    local label="alarm @ ${host}"
+    local label="requested alarm @ ${host}"
     if [[ -n "$tz" ]] ; then
         #: name the zone, since it is then not this machine's
         label+=" [${tz}]"

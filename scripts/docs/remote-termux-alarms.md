@@ -37,10 +37,31 @@ chrono understands only part of the input, and an **invented hour**, since a
 spec like `next friday` names no time of day and chrono fills in noon. Write
 `next friday 9am`.
 
-`SET_ALARM` carries only an hour and a minute, so Android schedules the next
-occurrence and a time already past today rolls over by itself. Repeating alarms
-would need the `android.intent.extra.alarm.DAYS` extra via `am`'s `--eial`;
-untested, not implemented.
+`SET_ALARM` carries only an hour and a minute, so a one-time alarm schedules the
+next occurrence. For a later date, the helper selects the requested weekday
+using a **weekly repeating alarm** and prints a warning. For example,
+`tealy-alarm 'tomorrow 1pm'` before 13:00 today selects tomorrow's weekday.
+**Disable or delete that alarm in the Clock app after use, or it will ring
+again every week.** After 13:00 today, the same command creates a one-time
+alarm for tomorrow, with no repetition warning.
+
+The requested time must be the first occurrence of either the one-time or
+weekly alarm. Past dates and dates that would first ring earlier than requested
+(for example, several weeks away) are rejected with exit 2 before an intent is
+sent. Use an explicit `tomorrow` when a bare clock time parses as today but has
+already passed.
+
+The check runs on the phone against its current clock and rendering timezone,
+rather than relying on the local preview before the SSH connection. Seconds
+are discarded as usual.
+
+The standard API has no one-time date field. The helper uses its
+[`android.intent.extra.alarm.DAYS`](https://developer.android.com/reference/android/provider/AlarmClock#EXTRA_DAYS)
+field for the repeating fallback (`am --eial` carries an integer ArrayList,
+Sunday=1 through Saturday=7). Arbitrary future one-time dates need a date-aware
+alarm app or an Android companion that schedules an exact alarm. Deferring the
+SSH command on the laptop instead would require both machines to be available
+later.
 
 ## Timezones
 
@@ -62,19 +83,22 @@ rely on it.
 One line, before the intent is sent, so a misparse can be aborted with ctrl-c:
 
 ```
-alarm @ tealy: 08:00
+requested alarm @ tealy: 08:00
 ```
 
 The date is shown only when the alarm is not today. Seconds are dropped because
 `SET_ALARM` carries only an hour and a minute. With `alarm_tz` the zone is named
 and the time rendered in it, since it is then not this machine's.
 
-`termux_alarm_dryrun=y` stops there and sends nothing. Use it to check a spec:
+`termux_alarm_dryrun=y` stops there and sends nothing. Use it to check parsing:
 alarms cannot be removed programmatically, so a careless test leaves something
-that will ring.
+that will ring. A dry run does not contact the phone or validate that Android
+can represent the requested date. The printed time is the request, not a
+confirmation that an alarm was created.
 
-The phone stays silent on success and speaks only when its own rendering
-disagrees, which means the two machines disagree about the timezone:
+The phone prints the weekly repetition warning when needed. It also reports
+when its own rendering disagrees with the local preview, which means the two
+machines disagree about the timezone:
 
 ```
 termux-alarm: phone set 6:15 (Some/Zone), not 4:45 as shown locally
@@ -205,3 +229,9 @@ All user-supplied text crosses as environment variables rather than being
 interpolated into the remote shell program, so a message containing quotes,
 backticks or `$(...)` is inert. Host arguments that are empty, begin with `-`,
 or contain whitespace are rejected so they cannot be read as SSH options.
+
+## Development checks
+
+Run `python3 python/tests/test_termux_alarm.py -v` from the scripts directory.
+The checks execute the phone-side program with a frozen clock and mocked
+Android commands. They do not connect to a phone or create alarms.
