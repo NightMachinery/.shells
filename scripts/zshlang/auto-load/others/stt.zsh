@@ -7,24 +7,38 @@ function stt-recordings-rerun {
     stt-recordings-get | fz | inargsf rgeval-env with-argon-maybe llm-stt-file
 }
 ##
-function llm-focus-p {
-    #: @keywords stt-p
-    {
-        # kitty-tab-codex-p
-        ##
-        kitty-is-focused && ! kitty-emacs-focused-p
-        #: Since knowing when Codex is active behind tmux and SSH is difficult, let us whitelist when we don't want the STT tag instead! It's pretty much only in emacs.
-    } ||
-        {
-            local front_app_cached
-            front_app_cached="$(frontapp-get)" @RET
+#: Add native apps by bundle ID and web apps by URL regex here.
+typeset -ga llm_focus_app_ids=(
+    'com.openai.codex'
+    'com.anthropic.claudefordesktop'
+    'sh.paseo.desktop'
+)
+typeset -ga llm_focus_url_patterns=(
+    '^https://chatgpt\.'
+    '^https://(?:aistudio|gemini)\.google\.'
+    '^https://claude\.'
+)
 
-            {
-                browser-focus-p &&
-                    browser-current-match-p '^https://(chatgpt\.|(?:aistudio|gemini)\.google\.|claude\.)'
-            } ||
-                [[ "${front_app_cached}" == 'com.openai.codex' || "${front_app_cached}" == 'com.anthropic.claudefordesktop' || "${front_app_cached}" == 'sh.paseo.desktop' ]]
-        }
+function llm-focus-p {
+    : "Return true when dictated speech should get the speech-to-text tag."
+    #: @keywords stt-p
+    local -a app_ids=("${llm_focus_app_ids[@]}")
+    local -a url_patterns=("${llm_focus_url_patterns[@]}")
+
+    #: Kitty cannot reliably identify LLM sessions behind tmux or SSH, so tag
+    #: terminal dictation except when Emacs is focused.
+    kitty-is-focused && ! kitty-emacs-focused-p && return 0
+
+    local front_app_cached app_id
+    front_app_cached="$(frontapp-get)" @RET
+    for app_id in "${app_ids[@]}" ; do
+        [[ "${front_app_cached}" == "${app_id}" ]] && return 0
+    done
+
+    #: Join the patterns so the browser URL is fetched only once. An empty
+    #: list disables web matching instead of matching every URL.
+    (( ${#url_patterns} )) || return 1
+    browser-focus-p && browser-current-match-p "${(j:|:)url_patterns}"
 }
 
 function h-stt-filter {

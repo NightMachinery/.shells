@@ -64,6 +64,22 @@ frontmost application against it, and feeds [agfi:llm-focus-p] in `stt.zsh`,
 which decides whether dictated speech gets tagged for a web LLM. A default that
 drifted between the two would mean reading one browser while watching another.
 
+## Speech-to-text app detection
+
+[agfi:llm-focus-p] in `zshlang/auto-load/others/stt.zsh` decides when dictation
+gets a `speech-to-text` code block. Its two lists are the extension points:
+
+- Add a native app's exact bundle ID to `llm_focus_app_ids`.
+- Add a web app's URL regex to `llm_focus_url_patterns`. Matching is
+  case-insensitive and reads the selected browser's current URL once.
+
+For example, add `'com.example.assistant'` to the app list or
+`'^https://assistant\.example/'` to the URL list. Native apps match regardless
+of the selected browser. Web apps match only when that browser is frontmost;
+an empty URL list disables web matching. Kitty dictation is tagged except when
+Emacs is focused. Run `brishz-restart` after editing the lists so dictation uses
+the new definitions.
+
 ## Emacs
 
 `night/org-link-browser-current` in `~/doom.d/autoload/night-zsh-wrappers.el`
