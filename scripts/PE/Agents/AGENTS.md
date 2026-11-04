@@ -2,7 +2,7 @@
 
 - Root commands must be run as `sudo -kA <command>`. Never run bare `sudo`: there is no TTY, so it will hang until the tool times out.
 
-- Your running shell is Zsh. Use proper Zsh. Quote everything conservatively, to avoid Zsh glob patterns etc. on literal strings.
+- Your running shell is Zsh. Use proper Zsh. Quote everything conservatively, to avoid Zsh glob patterns etc. on literal strings. In particular, '===' should be quoted.
   - Always use full syntax for variables, e.g., `${...}`. Zsh treats `sth` in `$variable_name:sth` as modifier flags.
 
 - Keep `./docs/` updated as you investigate or make changes.
