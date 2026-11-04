@@ -9,6 +9,10 @@ function chrome-cli {
     command chrome-cli "$@"
 }
 
+function brave-cli {
+    with-brave command chrome-cli "$@"
+}
+
 function with-chrome {
     CHROME_BUNDLE_IDENTIFIER='com.google.Chrome' reval-env "$@"
 }
