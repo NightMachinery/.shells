@@ -10,7 +10,7 @@
     command mkdir -p "$test_bin"
     local -x HOME="${fixture}/home" TEST_NOTIFY_LOG="${fixture}/calls"
     local profile app_file
-    for profile in 'Agent Bells' 'Night Mail' ; do
+    for profile in 'Agent Bells' 'Night Mail' 'Agent Done' ; do
         app_file="${HOME}/Applications/${profile}.app/Contents/MacOS/terminal-notifier"
         command mkdir -p "${app_file:h}"
         print -r -- '#!/bin/sh
@@ -41,6 +41,25 @@ printf "%s\\n" "$0" "$@" >> "$TEST_NOTIFY_LOG"' > "$app_file"
     command rm "$TEST_NOTIFY_LOG"
     notif_app=mail notif-os-remove mail-session || exit 1
     check mail-only-dismiss "$(<"$TEST_NOTIFY_LOG")" "${HOME}/Applications/Night Mail.app/Contents/MacOS/terminal-notifier"$'\n-remove\nmail-session'
+    command rm "$TEST_NOTIFY_LOG"
+
+    # Capture a real completion alert at the app boundary, then execute its
+    # argv with an inert zopen to prove the filename stays a literal argument.
+    local report="${fixture}/report 'quoted' \$(printf inert) [x].org"
+    report="${report:A}"
+    local -a notif_on_click=()
+    h-agent-done-announce codex 'Paseo agent' 'Fixture task' "${report}"
+    local -a posted=("${(@f)$(<"$TEST_NOTIFY_LOG")}") click
+    check done-app "${posted[1]}" "${HOME}/Applications/Agent Done.app/Contents/MacOS/terminal-notifier"
+    [[ "${posted[(Ie)-onClick]}" != 0 && "${posted[(Ie)-ignoreDnD]}" == 0 ]] || exit 1
+    local click_json="${posted[$(( ${posted[(Ie)-onClick]} + 1 ))]#\\}"
+    click=("${(@f)$(print -r -- "$click_json" | command jq --raw-output '.[]')}")
+    check done-click-report "${click[5]}" "$report"
+    check done-click-shell "${click[1]}" /bin/zsh
+    command mkdir "${fixture}/click-env"
+    print -r -- 'function zopen { print -r -- "$1" > "$TEST_NOTIFY_LOG"; }' > "${fixture}/click-env/.zshenv"
+    ZDOTDIR="${fixture}/click-env" "${click[@]}" || exit 1
+    check done-click-literal-path "$(<"$TEST_NOTIFY_LOG")" "$report"
     command rm "$TEST_NOTIFY_LOG"
     function notif-app-install { print -r -- unexpected-build >> "$TEST_NOTIFY_LOG"; return 1; }
     command rm -f "${HOME}/Applications/Agent Bells.app/Contents/MacOS/terminal-notifier"

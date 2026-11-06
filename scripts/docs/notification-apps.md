@@ -1,8 +1,8 @@
 # Dedicated macOS notification apps
 
-Night Mail and Agent Bells use separate signed application bundles, with their own
-icons, notification permissions, alert styles, and dismissal boundaries. They
-share `macos/notification-apps/build.py`, the launcher, and the icon renderer.
+Night Mail, Agent Bells, and Agent Done use separate signed application bundles,
+with their own icons, notification permissions, alert styles, and dismissal
+boundaries. They share `macos/notification-apps/build.py`, the launcher, and the icon renderer.
 The system/Homebrew terminal-notifier installation is untouched.
 
 ## Installation
@@ -12,8 +12,11 @@ The system/Homebrew terminal-notifier installation is untouched.
 - `notif-app-install agents` installs `~/Applications/Agent Bells.app`. The first
   agent desktop notification also installs it when missing. Hooks on other
   operating systems retain their existing behavior.
-- `notif-app-install mail --check` and `notif-app-install agents --check` verify
-  the signature and build inputs, and query macOS notification authorization.
+- `notif-app-install done` installs `~/Applications/Agent Done.app`, used by
+  `agent-done` for clickable report notifications. Its first alert also installs
+  it when missing. Its original emerald icon shows a report with a checkmark.
+- `notif-app-install <mail|agents|done> --check` verifies
+  the signature and build inputs, and queries macOS notification authorization.
   Checks run through LaunchServices in the Aqua login session and use a result
   receipt, so a successful `open` launch is not mistaken for permission success.
   Authorization codes: 0 not determined, 1 denied, 2 authorized, 3 provisional,
@@ -21,7 +24,7 @@ The system/Homebrew terminal-notifier installation is untouched.
 
 The first installation requests notification permission and posts a silent setup
 notification, respecting Do Not Disturb. Allow the relevant app in System
-Settings → Notifications. Agent Bells and Night Mail can use different banner or
+Settings → Notifications. Each app can use different banner or
 alert styles. Installation cannot approve the macOS permission prompt for you. Apple records
 that decision and does not prompt again on subsequent authorization requests;
 a denied app must be enabled in System Settings. The bootstrapper requests
@@ -57,7 +60,8 @@ The nib-free launcher removes the stock Terminal sender override, so macOS uses
 the real bundle's icon and identity. It also removes upstream's logging of
 notification contents on click, and replaces its shell `-execute` click command
 with the argv `-onClick` described below. Original envelope and terminal artwork is drawn
-locally from vector source; no third-party app artwork is redistributed.
+locally from vector source, along with Agent Done's report/checkmark artwork;
+no third-party app artwork is redistributed.
 
 ## Notification content
 
@@ -87,10 +91,16 @@ patch to upstream's posting code (untested where the legacy service rejects
 posting outright, as on the development host). Night Mail uses this to open the clicked mail
 in Emacs; Agent Bells does not set it.
 
+The shell gateway accepts the array `notif_on_click=(/absolute/program arg ...)`
+and handles JSON encoding and the leading backslash. Agent Done passes
+`/bin/zsh -c 'zopen "$1"' agent-done /absolute/report.org` to load the normal
+shell opener, with the filename kept out of shell code. Both completion and
+archive failure alerts open the report. See [agent-done.md](agent-done.md).
+
 ## DND and identity
 
-Mail and agent bells respect Do Not Disturb by default. Mail enables bypass only
-through `bypass_dnd: true` in its JSON settings. Agent bells accept an explicit
+Mail, agent bells, and Agent Done respect Do Not Disturb by default. Mail enables
+bypass only through `bypass_dnd: true` in its JSON settings. Agent bells accept an explicit
 `notif_ignore_dnd_p=y bell-claude` (or `bell-codex`) call.
 
 Optional bypass uses terminal-notifier 2's private `_ignoresDoNotDisturb` API.
@@ -99,12 +109,12 @@ this helper pins 2.0.0. This is best effort and depends on macOS compatibility; 
 connection can also prevent bypass delivery. Such failures remain nonfatal.
 macOS Focus allowlists and notification settings can also affect what is shown.
 
-`notif_app=agents` and `notif_app=mail` select the dedicated identities for
-`notif-os` and `notif-os-remove`. The default remains the generic notifier for
+`notif_app=agents`, `notif_app=mail`, and `notif_app=done` select the dedicated
+identities for `notif-os` and `notif-os-remove`. The default remains the generic notifier for
 unrelated shell notifications. `notif-os-dismiss-agent` clears only Agent Bells'
 delivered desktop notifications. It does not stop a ringing job, remove a queued
-Telegram escalation, or touch mail. Per-session acknowledgement still cancels
-the individual agent's notification and its Telegram escalation.
+Telegram escalation, or touch mail or Agent Done. Per-session acknowledgement
+still cancels the individual agent's notification and its Telegram escalation.
 
 Email uninstall remains LaunchAgent-only and preserves apps and settings. To
 remove an unused app, delete its bundle from `~/Applications` manually.

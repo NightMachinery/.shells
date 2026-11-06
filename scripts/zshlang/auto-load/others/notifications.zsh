@@ -1,5 +1,5 @@
 function notif-app-install {
-    : "builds dedicated macOS notification apps: notif-app-install [agents|mail] [--check]"
+    : "builds dedicated macOS notification apps: notif-app-install [agents|mail|done] [--check]"
     local profile="${1:-agents}" night_dir="${NIGHTDIR:-${HOME}/scripts}"
     (( $# )) && shift
     ensure-cmd python3 @RET
@@ -12,6 +12,7 @@ function h-notif-os-command {
     case "$app" in
         agents) app_file="${HOME}/Applications/Agent Bells.app/Contents/MacOS/terminal-notifier" ;;
         mail) app_file="${HOME}/Applications/Night Mail.app/Contents/MacOS/terminal-notifier" ;;
+        done) app_file="${HOME}/Applications/Agent Done.app/Contents/MacOS/terminal-notifier" ;;
         '') ensure-cmd terminal-notifier @RET; REPLY="${commands[terminal-notifier]}"; return 0 ;;
         *) ecerr "$0: unknown notif_app: $app"; return 1 ;;
     esac
@@ -84,6 +85,8 @@ function notif-os {
     #: so repeats update the existing notification instead of piling up.
     #: Empty (the default) posts an ordinary ungrouped notification.
     local group="${notif_group}"
+    #: Dedicated apps accept an argv click action, encoded as literal JSON.
+    local -a on_click=("${notif_on_click[@]}")
 
     if isServer ; then
         return 0
@@ -103,6 +106,13 @@ function notif-os {
 
             if test -n "$group" ; then
                 opts+=(-group "$group")
+            fi
+
+            if (( ${#on_click} )) ; then
+                ensure-cmd jq @RET
+                local click_json
+                click_json="$(command jq --null-input --compact-output '$ARGS.positional' --args -- "${on_click[@]}")" @RET
+                opts+=(-onClick "\\${click_json}")
             fi
 
             if test -n "$image" ; then

@@ -181,6 +181,12 @@ and copy it to `~/.agents/done/`; find the agent's own process; send it
 
 ### The report
 
+New reports use `.org` and open in Org mode. The title and Session, Resume,
+and Summary headings give the file structure; literal example blocks preserve
+the session metadata and pasteable resume commands. The supplied summary is
+Org text. Plain paragraphs and lists remain readable in a terminal pane.
+`agent-done-reports` lists both Org reports and older `.txt` reports, newest first.
+
 The header is there for whoever decides, later and often from another shell,
 whether to carry on. So it records every id that finds the session again,
 and then the commands that resume it. [agfi:h-agent-done-report] writes it:
@@ -225,6 +231,22 @@ is where an agent or a person looks first. It is a plain copy, byte for byte:
 the original stays where `agent-done-reports` and the dead-pane picker look
 for it, and either survives the other being deleted. A failed copy is reported
 on stderr and ends nothing.
+
+### Clickable desktop notifications
+
+Background and Paseo completion alerts come from `Agent Done.app`, with its own
+emerald report/checkmark icon and macOS notification settings. Install with
+`notif-app-install done`; a missing app is also installed on the first alert.
+It respects Do Not Disturb unless `notif_ignore_dnd_p=y` is set explicitly.
+Each report has its own notification group, so finishing another session does
+not replace an unread report alert. Agent Bells dismissal does not clear them.
+
+Clicking an alert runs `zopen` on the original `.org` report through a fresh
+`/bin/zsh -c`, with the report passed as a separate positional argument. This
+loads the shell's normal opener and preserves spaces and punctuation in paths.
+Archive failure alerts use the same app and click action, with the archive log
+path in the message. See [notification-apps.md](notification-apps.md) for setup
+and permission checks.
 
 `--dry-run` resolves the target, saves a report, and prints what it resolved.
 It does not arm a watcher, change tmux options, unregister auto-continue, or

@@ -524,8 +524,11 @@ function h-agent-done-report {
     copy="$(h-agent-done-copy-path "${out}")" || copy=''
 
     {
-        print -r -- "${glyph} ${label} session finished${name:+: ${name}}"
+        print -r -- "#+TITLE: ${glyph} ${label} session finished${name:+: ${name}}"
+        print -r -- '#+STARTUP: showall'
         print -r --
+        print -r -- '* Session'
+        print -r -- '#+begin_example'
         #: The seat belongs here rather than on the pane border: the border
         #: says which session is *live*, and this one is not any more, but
         #: which account did the work is worth recording.
@@ -547,9 +550,14 @@ function h-agent-done-report {
         print -r -- "  ended:      $(date '+%Y-%m-%d %H:%M:%S')"
         print -r -- "  report:     ${out/#${HOME}/~}"
         test -n "${copy}" && print -r -- "  copy:       ${copy/#${HOME}/~}"
+        print -r -- '#+end_example'
         print -r --
+        print -r -- '* Resume'
+        print -r -- '#+begin_example'
         h-agent-done-resume-help "${agent}" "${id}" "${transcript}" "${cwd}" "${paseo}"
+        print -r -- '#+end_example'
         print -r --
+        print -r -- '* Summary'
         if test -n "${agent_done_summary}" ; then
             print -r -- "${agent_done_summary}"
         else
@@ -689,6 +697,18 @@ function h-agent-done-watch {
     return 0
 }
 
+function h-agent-done-notify {
+    : "usage: h-agent-done-notify <report> <message>; a clickable Agent Done notification"
+    local report="${1}" message="${2}"
+    assert-args report message @RET
+    #: The shell code is fixed; the report travels only as a positional argument.
+    #: A fresh zsh loads zopen even when macOS supplies launchd's environment.
+    local -a notif_on_click=(/bin/zsh -c 'zopen "$1"' agent-done "${report:A}")
+    notif_app=done notif_ignore_dnd_p="${notif_ignore_dnd_p:-n}" \
+        notif_group="agent-done-${report:t}" notif_title='Agent Done' \
+        notif "${message}" >/dev/null 2>&1 || true
+}
+
 function h-agent-done-announce {
     #: For a session with no screen of its own to leave the report on -- a
     #: background Claude Code session, a Paseo agent -- a notification names
@@ -700,7 +720,7 @@ function h-agent-done-announce {
     local glyph label
     glyph="$(h-agent-field "${agent}" glyph 2>/dev/null)" || glyph=''
     label="$(h-agent-field "${agent}" label 2>/dev/null)" || label="${agent}"
-    notif_group='agent-done' notif "${glyph} ${label} ${what} finished${name:+: ${name}} -- report: ${report/#${HOME}/~}" >/dev/null 2>&1 || true
+    h-agent-done-notify "${report}" "${glyph} ${label} ${what} finished${name:+: ${name}} -- report: ${report/#${HOME}/~}"
 }
 
 function h-agent-done-paseo-id {
@@ -792,7 +812,7 @@ function h-agent-done-paseo-archive {
         command paseo archive --force --home "${home}" "${uuid}" >>"${log}" 2>&1 ; then
         return 0
     fi
-    notif_group='agent-done' notif "agent-done: could not archive Paseo agent ${uuid[1,8]}; see ${log/#${HOME}/~}" >/dev/null 2>&1 || true
+    h-agent-done-notify "${report}" "agent-done: could not archive Paseo agent ${uuid[1,8]}; see ${log/#${HOME}/~}"
     return 1
 }
 
@@ -955,7 +975,7 @@ work is actually finished. --dry-run writes the report and kills nothing."
     local dir report script
     dir="$(h-agent-done-dir)" @TRET
     mkdir -p -- "${dir}" @RET
-    report="${dir}/$(date '+%Y-%m-%dT%H%M%S')-${agent}${id:+-${id}}.txt"
+    report="${dir}/$(date '+%Y-%m-%dT%H%M%S')-${agent}${id:+-${id}}.org"
     script="${report}.pane.sh"
 
     h-agent-done-report "${agent}" "${id}" "${name}" "${transcript}" "${cwd}" "${seat}" "${report}" "${paseo_uuid}" @RET
@@ -1113,7 +1133,7 @@ function agent-done-reports {
     dir="$(h-agent-done-dir)" @TRET
 
     local -a reports
-    reports=( "${dir}"/*.txt(NOm) )
+    reports=( "${dir}"/*.(org|txt)(Nom) )
     if (( ! ${#reports} )) ; then
         ecgray "$0: none yet in ${dir/#${HOME}/~}"
         return 0

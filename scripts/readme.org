@@ -117,7 +117,10 @@ symlink per skill in every agent's skills directory, so a skill's sibling files
 come with it. Codex's live under =~/.agents/skills=;
 =agent-skills-prune-legacy-codex= safely removes
 our obsolete =~/.codex/skills= links after migration. Bundled =.system= skills
-are preserved. See =./docs/agent-done.md=.
+are preserved.
+
+=/done= saves Org reports. Its desktop alerts use Agent Done's own app and icon;
+clicking opens the report with =zopen=. See =./docs/agent-done.md=.
 
 The shared =delegate= skill selects weaker, peer, or stronger workers and keeps
 account selection separate from in-process, Paseo, or tmux execution. Existing

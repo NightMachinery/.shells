@@ -4,6 +4,7 @@
 int main(int argc, const char *argv[]) {
     @autoreleasepool {
         BOOL mail = [@(argv[1]) isEqualToString:@"mail"];
+        BOOL done = [@(argv[1]) isEqualToString:@"done"];
         NSBitmapImageRep *bitmap = [[NSBitmapImageRep alloc]
             initWithBitmapDataPlanes:NULL pixelsWide:1024 pixelsHigh:1024
             bitsPerSample:8 samplesPerPixel:4 hasAlpha:YES isPlanar:NO
@@ -11,6 +12,7 @@ int main(int argc, const char *argv[]) {
         [NSGraphicsContext saveGraphicsState];
         NSGraphicsContext.currentContext = [NSGraphicsContext graphicsContextWithBitmapImageRep:bitmap];
         NSColor *color = mail ? [NSColor colorWithCalibratedRed:0.12 green:0.43 blue:0.87 alpha:1]
+                             : done ? [NSColor colorWithCalibratedRed:0.08 green:0.53 blue:0.38 alpha:1]
                              : [NSColor colorWithCalibratedRed:0.42 green:0.25 blue:0.72 alpha:1];
         [color setFill];
         [[NSBezierPath bezierPathWithRoundedRect:NSMakeRect(48,48,928,928) xRadius:210 yRadius:210] fill];
@@ -25,6 +27,16 @@ int main(int argc, const char *argv[]) {
             [lines moveToPoint:NSMakePoint(244,680)];
             [lines lineToPoint:NSMakePoint(512,470)];
             [lines lineToPoint:NSMakePoint(780,680)];
+        } else if (done) {
+            NSBezierPath *report = [NSBezierPath bezierPathWithRoundedRect:NSMakeRect(280,220,464,584) xRadius:40 yRadius:40];
+            report.lineWidth = 42; [report stroke];
+            [lines moveToPoint:NSMakePoint(380,670)];
+            [lines lineToPoint:NSMakePoint(644,670)];
+            [lines moveToPoint:NSMakePoint(380,570)];
+            [lines lineToPoint:NSMakePoint(580,570)];
+            [lines moveToPoint:NSMakePoint(380,410)];
+            [lines lineToPoint:NSMakePoint(470,320)];
+            [lines lineToPoint:NSMakePoint(644,490)];
         } else {
             [lines moveToPoint:NSMakePoint(270,650)];
             [lines lineToPoint:NSMakePoint(430,512)];

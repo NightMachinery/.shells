@@ -20,7 +20,8 @@ import tempfile
 SOURCE_URL = "https://codeload.github.com/julienXX/terminal-notifier/tar.gz/2.0.0"
 SOURCE_SHA256 = "6f22a7626e4e68e88df2005a5f256f7d3b432dbf4c0f8a0c15c968d9e38bf84c"
 PROFILES = {"mail": ("Night Mail", "com.user.night-mail.notify"),
-            "agents": ("Agent Bells", "com.user.night-agent-bells.notify")}
+            "agents": ("Agent Bells", "com.user.night-agent-bells.notify"),
+            "done": ("Agent Done", "com.user.night-agent-done.notify")}
 HERE = Path(__file__).resolve().parent
 LSREGISTER = "/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister"
 

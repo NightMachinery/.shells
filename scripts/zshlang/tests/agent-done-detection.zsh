@@ -215,6 +215,7 @@ function agent-auto-continue-off { print -r -- auto-continue >> "${agent_done_de
 
 agent-done-detection-fixture
 output="$(agent-done --dry-run finished </dev/null)"
+[[ "${output}" == *'.org'* ]] || agent-done-detection-fail 'new reports should use the Org extension'
 [[ "${output}" == *'pane=%3 tty=/dev/ttys999 socket=/tmp/tmux socket'* ]] ||
     agent-done-detection-fail 'dry-run should report the recovered outer pane tty and socket'
 [[ ! -s "${agent_done_detection_calls}" ]] ||
@@ -381,7 +382,7 @@ typeset -g agent_done_summary='the summary'
 typeset -gx CLAUDE_CONFIG_DIR="${HOME}/.claude-work"
 unset CODEX_HOME
 typeset -g report_id='11111111-2222-3333-4444-555555555555'
-typeset -g report="${agent_done_detection_tmp}/reports/report.txt"
+typeset -g report="${agent_done_detection_tmp}/reports/report.org"
 command mkdir -p -- "${report:h}"
 
 function agent-done-detection-expect-report {
@@ -398,13 +399,14 @@ typeset -gA agent_done_ids=(
     [paseo_provider]=handoff-claude-x [paseo_cwd]=/work/dir [paseo_keep]=true
     [paseo_subagents]=$'child-1  idle  first child\nchild-2  error  second child' )
 h-agent-done-report claude "${report_id}" name /t/x.jsonl /work/dir WORK "${report}" "${agent_done_paseo_uuid}"
-command cmp -s -- "${report}" "${agent_done_copy_dir}/report.txt" ||
+command cmp -s -- "${report}" "${agent_done_copy_dir}/report.org" ||
     agent-done-detection-fail 'the copy should be the report, byte for byte'
 agent-done-detection-expect-report 'Paseo agent' \
+    '#+TITLE:' '* Session' '* Resume' '* Summary' '#+begin_example' '#+end_example' \
     '  agent:      claude' \
     "  paseo:      ${agent_done_paseo_uuid} (provider handoff-claude-x)" \
     $'  paseo subagents:\n    child-1  idle  first child\n    child-2  error  second child' \
-    "  copy:       ${agent_done_copy_dir/#${HOME}/~}/report.txt" \
+    "  copy:       ${agent_done_copy_dir/#${HOME}/~}/report.org" \
     "paseo:  paseo send ${agent_done_paseo_uuid} 'your next message'" \
     "paseo import --provider handoff-claude-x --cwd /work/dir ${report_id}" \
     "paseo-keep ${agent_done_paseo_uuid}" \
@@ -426,5 +428,14 @@ agent-done-detection-expect-report 'pane' \
 typeset -g agent_done_copy_dir=''
 h-agent-done-copy-path "${report}" >/dev/null &&
     agent-done-detection-fail 'an empty agent_done_copy_dir should turn the copy off'
+
+# Both extensions remain discoverable, with a global newest-first ordering.
+typeset -g listing_dir="${agent_done_detection_tmp}/listing"
+function h-agent-done-dir { print -r -- "${listing_dir}"; }
+command mkdir "${listing_dir}"
+command touch -t 202001010000 "${listing_dir}/report.org"
+command touch -t 202101010000 "${listing_dir}/legacy.txt"
+[[ "$(agent-done-reports)" == "${listing_dir}/legacy.txt"$'\n'"${listing_dir}/report.org" ]] ||
+    agent-done-detection-fail 'reports should include Org and legacy text in time order'
 
 print -r -- 'ok: agent-done tmux ownership detection, and Paseo agents'
