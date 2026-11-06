@@ -27,7 +27,8 @@
       "Bash(/Users/evar/code/uni/linroute/ops/bear-fleet/:*)",
       "Bash(sh /Users/evar/code/uni/linroute/ops/bear-fleet/:*)",
       "Bash(/Users/evar/tmp/agents/LIN/0/claude/qwen27b-ops/:*)",
-      "Bash(sh /Users/evar/tmp/agents/LIN/0/claude/qwen27b-ops/:*)"
+      "Bash(sh /Users/evar/tmp/agents/LIN/0/claude/qwen27b-ops/:*)",
+      "mcp__paseo__create_agent"
     ],
     "deny": [],
     "ask": [
