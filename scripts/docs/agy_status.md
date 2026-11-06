@@ -266,6 +266,36 @@ showed up on Deny:
 - The `finished` notification repeats the child's previous answer, so it reads
   like success. After a deny, check `get_agent_activity` instead.
 
+### What reduces the prompts, and what does not
+
+Measured the same day with throwaway Flash children and inert `printf`/`touch`
+payloads:
+
+- `settings.json` `permissions` rules (`write_file(...)`, `command(...)`) are
+  loaded (the log prints them) but change nothing under `agy acp`: a request
+  matching an allow rule still reaches the parent. They are also read only at
+  process start.
+- The sandbox (`--sandbox`) blocks shell writes inside the workspace in 1.5.2,
+  with an explicit `write_file(<workspace>/)` rule and the folder trusted,
+  while `/tmp` stays writable. Shell writes that matter therefore run as a
+  bypass request, which the parent sees as `rawInput.BypassSandbox: true`.
+- `toolPermission: "proceed-in-sandbox"` does stop prompts for sandboxed
+  commands, and `accept-edits` mode stops them for file-tool edits inside the
+  workspace.
+- A `PreToolUse` hook (`configFiles/antigravity/hooks.json`) runs under
+  `agy acp`. Its `deny` blocks the call and tells the child why, which then
+  carries on; its `allow` is ignored, and the request still reaches the parent.
+- With `--dangerously-skip-permissions` the hook's `allow` works and
+  `force_ask` still reaches the parent, so the hook decides everything. But that
+  flag turns the sandbox off: a "sandboxed" `touch` into the home directory
+  succeeded.
+
+The hook entry `paseo-agy-driver` does nothing unless the agy process has
+`PASEO_AGY_DRIVER_RULES` set, which only the Paseo provider entries set. When
+that variable is set and the hook script cannot run, it answers
+`$PASEO_AGY_DRIVER_FALLBACK` (`force_ask` for the skip-permissions provider),
+so a missing script never turns into a silent allow.
+
 ## Hook activation
 
 The hook transport guards function existence before invocation and always
