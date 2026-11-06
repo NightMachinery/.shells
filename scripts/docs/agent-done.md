@@ -183,8 +183,8 @@ and copy it to `~/.agents/done/`; find the agent's own process; send it
 
 New reports use `.org` and open in Org mode. The title and Session, Resume,
 and Summary headings give the file structure. Session metadata uses Org
-description lists with inline verbatim values, an inactive finish timestamp
-and a separate time zone. Multiline values, or values containing a verbatim
+labeled bullets (`- Label: =value=`) and an inactive finish timestamp.
+Multiline values, or values containing a verbatim
 delimiter, use nested example blocks. Each resume command has its own labeled
 Zsh source block. The supplied summary is Org text. Plain paragraphs and lists
 remain readable in a terminal pane.
@@ -202,25 +202,20 @@ and then the commands that resume it. [agfi:h-agent-done-report] writes it:
   inherited `PASEO_AGENT_ID` from it (see "Which agent" below);
 - Background session, the short id of a background Claude Code session, and tmux pane,
   the tmux pane it ran in;
-- Transcript, Working directory, Ended, Time zone, Report and Copy.
+- Transcript, Working directory, Ended, Report and Copy.
 
-The Resume section ([agfi:h-agent-done-resume-help]) has a heading, description
-and separate `zsh` source block for each command. `:eval never` keeps these
+The Resume section ([agfi:h-agent-done-resume-help]) has each heading immediately
+followed by its `zsh` source block, without a blank line or description.
+`:eval never` keeps these
 copyable commands from running as part of an Org export. For example:
 
 ```org
 ** Paseo: continue the conversation
-
-Unarchive this agent and run your next message as a turn.
-
 #+begin_src zsh :eval never
 paseo send <agent-uuid> 'your next message'
 #+end_src
 
 ** Zsh session helper
-
-Resolve the agent and account from the saved transcript.
-
 #+begin_src zsh :eval never
 agent-session-resume /path/to/transcript.jsonl
 #+end_src

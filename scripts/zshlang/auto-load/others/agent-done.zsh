@@ -395,7 +395,7 @@ function h-agent-done-resume-help {
     local -A ids=()
     (( ${+agent_done_ids} )) && ids=( "${(@kv)agent_done_ids}" )
 
-    local -a titles details resume_cmds
+    local -a titles resume_cmds
     if test -n "${paseo}" ; then
         #: `--home' only when it is not the default, to keep the lines short.
         local home='' home_arg=''
@@ -409,17 +409,14 @@ function h-agent-done-resume-help {
         #: session whose agent is archived revives that agent rather than
         #: making a new one, provided the directory matches.
         titles+=( 'Paseo: continue the conversation' )
-        details+=( 'Unarchive this agent and run your next message as a turn.' )
         resume_cmds+=( "paseo send ${home_arg}${paseo} 'your next message'" )
         local provider="${ids[paseo_provider]-}" pcwd="${ids[paseo_cwd]:-${cwd}}"
         if test -n "${provider}" && test -n "${id}" && test -n "${pcwd}" ; then
             titles+=( 'Paseo: restore without starting a turn' )
-            details+=( 'Unarchive the same agent without sending a message.' )
             resume_cmds+=( "paseo import ${home_arg}--provider ${(q-)provider} --cwd $(h-agent-done-shq "${pcwd}") ${id}" )
         fi
         if [[ "${ids[paseo_keep]-}" == true ]] ; then
             titles+=( 'Paseo: restore the pin (optional)' )
-            details+=( 'Pin this agent again; /done lifted its pin to archive it.' )
             resume_cmds+=( "paseo-keep ${paseo}" )
         fi
     fi
@@ -427,13 +424,11 @@ function h-agent-done-resume-help {
     local native
     if test -n "${id}" && native="$(h-agent-done-resume-native "${agent}" "${id}" "${transcript}")" ; then
         titles+=( "Native CLI: ${agent}" )
-        details+=( 'Resume with the original agent and account configuration.' )
         resume_cmds+=( "${cwd:+cd $(h-agent-done-shq "${cwd}") && }${native}" )
     fi
 
     if test -n "${transcript}" ; then
         titles+=( 'Zsh session helper' )
-        details+=( 'Resolve the agent and account from the saved transcript.' )
         resume_cmds+=( "agent-session-resume $(h-agent-done-shq "${transcript}")" )
     fi
 
@@ -442,13 +437,14 @@ function h-agent-done-resume-help {
         print -r -- 'Nothing was recorded to resume from.'
         return 0
     fi
-    print -r -- 'Choose one resume method; starting two would write to the same transcript.'
     local -i i
     for (( i = 1; i <= ${#resume_cmds}; i++ )) ; do
-        print -rl -- '' "** ${titles[i]}" '' "${details[i]}" '' '#+begin_src zsh :eval never' "${resume_cmds[i]}" '#+end_src'
+        (( i > 1 )) && print -r --
+        print -rl -- "** ${titles[i]}" '#+begin_src zsh :eval never' "${resume_cmds[i]}" '#+end_src'
     done
     if test -n "${pane}" && test -z "${paseo}" ; then
-        print -rl -- '' '** tmux pane' '' "Press =prefix-r= in the dead pane =${pane}=."
+        (( ${#resume_cmds} )) && print -r --
+        print -rl -- '** tmux pane' "Press =prefix-r= in the dead pane =${pane}=."
     fi
 }
 
@@ -458,9 +454,9 @@ function h-agent-done-org-field {
     local label="${1}" value="${2}"
     if [[ -n "${value}" && "${value}" != *'='* && "${value}" != *$'\n'* &&
         "${value}" != [[:space:]]* && "${value}" != *[[:space:]] ]] ; then
-        print -r -- "- ${label} :: =${value}="
+        print -r -- "- ${label}: =${value}="
     else
-        print -rl -- "- ${label} ::" '  #+begin_example'
+        print -rl -- "- ${label}:" '  #+begin_example'
         local line prefix content
         for line in "${(@f)value}" ; do
             prefix="${line%%[^[:space:]]*}"
@@ -576,8 +572,7 @@ function h-agent-done-report {
         test -n "${ids[pane]-}" && h-agent-done-org-field 'tmux pane' "${ids[pane]}"
         test -n "${transcript}" && h-agent-done-org-field 'Transcript' "${transcript/#${HOME}/~}"
         test -n "${cwd}" && h-agent-done-org-field 'Working directory' "${cwd/#${HOME}/~}"
-        print -r -- "- Ended :: $(LC_ALL=C command date '+[%Y-%m-%d %a %H:%M]')"
-        h-agent-done-org-field 'Time zone' "$(command date '+%Z')"
+        print -r -- "- Ended: $(LC_ALL=C command date '+[%Y-%m-%d %a %H:%M]')"
         h-agent-done-org-field 'Report' "${out/#${HOME}/~}"
         test -n "${copy}" && h-agent-done-org-field 'Copy' "${copy/#${HOME}/~}"
         print -r --
