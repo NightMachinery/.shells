@@ -180,12 +180,32 @@ file contents again before renaming, and refuses read-only files, hard links,
 editor locks, or files changed during retrieval. Dry run is the default;
 `--write` must be supplied explicitly.
 
+## One writer per machine
+
+A `--write` run takes an exclusive lock on
+`${XDG_STATE_HOME:-~/.local/state}/org-paper-metadata/updater-write.lock`
+(override with `org_paper_metadata_updater_lock`). A second `--write` run on the
+same machine exits 75 before reading any file, and names the holder's PID,
+start time and arguments. Dry runs take no lock. It is one lock per machine,
+not per root, because overlapping roots (`~/notes` and `~/notes/public`) edit
+the same files and every run shares one Semantic Scholar rate limit. Three
+concurrent runs on `notes/public` on 2026-11-06 left the files intact, thanks to
+the content check above, but spent the API budget three times over.
+
+The lock is `flock(2)`, so the kernel drops it when the holder exits for any
+reason, SIGKILL included: a stale lock cannot exist, and nothing needs
+removing. The file stays on disk and is not itself the lock. If a run is
+refused, the holder is a live process: wait for it, or kill that PID. Never
+delete the file to get past it, since the next run would lock a new file while
+the old holder carries on.
+
 ## Tests
 
 Run `go test -race ./...` in `golang/org-paper-metadata`. Offline fixtures cover
 freshness boundaries, duplicate fetching, partial failure, dry runs, metadata
 and body edits, personal-content preservation, CRLF, nested paper headings,
-editor locks, concurrent changes, cancellation, contextual diffs, canonical-ID
+editor locks, concurrent changes, the write lock (including release after its
+holder is SIGKILLed), cancellation, contextual diffs, canonical-ID
 redirects, disabled automatic HTML retrieval, and atomic writes. Live smoke tests
 use temporary Org files. A read-only audit across a research tree also checked
 custom properties, handwritten content, saved citations, source blocks, heading

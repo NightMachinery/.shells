@@ -3,6 +3,7 @@ package cli
 import (
 	"io"
 	"org-paper-metadata/paper"
+	"org-paper-metadata/update"
 	"os"
 	"path/filepath"
 	"strings"
@@ -83,6 +84,7 @@ func TestBibTeXFlagsAndLastSwitchWins(t *testing.T) {
 }
 func TestUpdaterNoBibTeXCleansRecentEntry(t *testing.T) {
 	root := t.TempDir()
+	t.Setenv(update.LockPathEnv, filepath.Join(t.TempDir(), "updater-write.lock"))
 	path := filepath.Join(root, "papers.org")
 	m := paper.Metadata{"title": {"Synthetic paper"}, "authors_names": {"Example Author"}, "abstract": {"Full abstract."}, "url": {"https://www.semanticscholar.org/paper/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}}
 	m.Put("bibtex", "@inproceedings{source_key, title={Synthetic paper}}")
@@ -94,5 +96,23 @@ func TestUpdaterNoBibTeXCleansRecentEntry(t *testing.T) {
 	after, _ := os.ReadFile(path)
 	if code != 0 || strings.Contains(string(after), "@bibtex") || !strings.Contains(err, "recent=1") {
 		t.Fatal(code, out, err, string(after))
+	}
+}
+
+func TestUpdaterWriteRefusesWhileLocked(t *testing.T) {
+	lockPath := filepath.Join(t.TempDir(), "updater-write.lock")
+	t.Setenv(update.LockPathEnv, lockPath)
+	held, err := update.AcquireWriteLock(lockPath, "pid 1 since now: other run")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer held.Release()
+	root := t.TempDir()
+	code, _, stderr := captureCommand(t, "", updaterCode, "--write", root)
+	if code != exitLocked || !strings.Contains(stderr, "pid 1 since now: other run") {
+		t.Fatal(code, stderr)
+	}
+	if code, _, stderr := captureCommand(t, "", updaterCode, root); code != 0 {
+		t.Fatal("dry run must not need the lock:", code, stderr)
 	}
 }
