@@ -172,7 +172,9 @@ For a job that must outlive your shell and session:
   output stays in the pane (`tmux attach`, `capture-pane`). It refuses a NAME
   that is still running; `tmux-job-status NAME`, and `tmux-job-stop NAME` kills
   the process tree. Prefer it for a job that must run once or whose output
-  someone will read.
+  someone will read. A sandbox (Codex's) cannot reach the tmux server: there
+  the status is `UNKNOWN` with exit 2, never proof the job is gone. Run all
+  three with the same elevated access you started the job with.
 - `awaysh-bnamed NAME cmd...` is fire-and-forget under BrishGarden, in the
   garden's working directory and environment (pass absolute paths), with output
   on `/dev/null` unless the command redirects it. NAME is only a `ps` marker

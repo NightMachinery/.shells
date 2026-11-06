@@ -539,11 +539,32 @@ aliasfn tnameme-status tmux-session-autoname status
 #:
 #: Targets are written `=name`, tmux's exact match: without it, `foo` also selects a
 #: session named `foobar`.
+#:
+#: Nor is a failed `has-session` proof of absence: it exits 1 for a missing session and
+#: for a server it cannot reach alike. Codex's sandbox blocks the tmux socket, so there
+#: every job read as `not running` while it ran, and on 2026-11-06 an agent started two
+#: duplicate runs of a live metadata updater on that answer. Hence a third answer, 2.
+function h-tmux-job-server-check {
+    : "0 when the tmux server answers or definitely is not running; 2, with the reason on stderr, when it cannot be reached"
+    local err
+    err="$(command tmux list-sessions -F '#{session_name}' 2>&1 >/dev/null)" && return 0
+    #: No server: no socket, or a socket left behind by a dead server.
+    if [[ "${err}" == *'no server running'* || "${err}" == *'(No such file or directory)'* || "${err}" == *'(Connection refused)'* ]] ; then
+        return 0
+    fi
+    ecerr "cannot reach the tmux server: ${err}; inside a sandbox, rerun with elevated access"
+    return 2
+}
+
 function tmux-job-running-p {
+    : "0 running; 1 not running, or only a dead session; 2 unknown, because the tmux server cannot be reached"
     local name="$1"
     assert-args name @RET
 
-    command tmux has-session -t "=${name}" &>/dev/null || return 1
+    if ! command tmux has-session -t "=${name}" &>/dev/null ; then
+        h-tmux-job-server-check || return 2
+        return 1
+    fi
     local dead
     dead="$(command tmux list-panes -t "=${name}" -F '#{pane_dead}' 2>/dev/null)" || return 1
     #: one line per pane; a single live pane is enough to call the job running
@@ -555,10 +576,15 @@ function tmux-job-start {
     assert-args name @RET
     (( $# )) || { ecerr "$0: ${name}: no command given" ; return 1 }
 
-    if tmux-job-running-p "$name" ; then
-        ecerr "$0: ${name} is already running; tmux-job-status ${name}, or tmux-job-stop ${name} first"
-        return 1
-    fi
+    tmux-job-running-p "$name"
+    case $? in
+        0)
+            ecerr "$0: ${name} is already running; tmux-job-status ${name}, or tmux-job-stop ${name} first"
+            return 1 ;;
+        2)
+            ecerr "$0: ${name}: cannot tell whether it is already running; not starting it"
+            return 2 ;;
+    esac
     command tmux kill-session -t "=${name}" &>/dev/null || true #: a corpse is not a job
 
     tmuxnewsh2 "$name" "$@" @RET
@@ -570,6 +596,7 @@ function tmux-job-stop {
     assert-args name @RET
 
     if ! command tmux has-session -t "=${name}" &>/dev/null ; then
+        h-tmux-job-server-check || return 2
         ecgray "$0: ${name}: nothing to stop"
         return 0
     fi
@@ -584,10 +611,16 @@ function tmux-job-status {
     local name="$1"
     assert-args name @RET
 
-    if tmux-job-running-p "$name" ; then
+    : "exit 0 running; 1 not running or DEAD; 2 UNKNOWN, when the tmux server cannot be reached"
+    tmux-job-running-p "$name"
+    local rc=$?
+    if (( rc == 0 )) ; then
         local pids
         pids="$(command tmux list-panes -t "=${name}" -F '#{pane_pid}' 2>/dev/null | command tr '\n' ' ')"
         ec "${name}: running (pane pid ${pids% })"
+    elif (( rc == 2 )) ; then
+        ec "${name}: UNKNOWN, cannot reach the tmux server; this does not mean it is not running"
+        return 2
     elif command tmux has-session -t "=${name}" &>/dev/null ; then
         ec "${name}: DEAD, session kept by remain-on-exit; a start will clear it"
         return 1
