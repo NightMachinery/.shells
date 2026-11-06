@@ -241,12 +241,22 @@ It respects Do Not Disturb unless `notif_ignore_dnd_p=y` is set explicitly.
 Each report has its own notification group, so finishing another session does
 not replace an unread report alert. Agent Bells dismissal does not clear them.
 
-Clicking an alert runs `zopen` on the original `.org` report through a fresh
-`/bin/zsh -c`, with the report passed as a separate positional argument. This
-loads the shell's normal opener and preserves spaces and punctuation in paths.
-Archive failure alerts use the same app and click action, with the archive log
-path in the message. See [notification-apps.md](notification-apps.md) for setup
-and permission checks.
+The card uses the task name as title (or “Session complete” when unnamed) and
+one body line, such as “Codex · View report”. The app icon supplies the identity;
+file paths, glyphs, subtitles and image attachments stay off the card. Detailed
+paths remain in the report and the message sent to Telegram when enabled.
+
+Clicking runs [agfi:h-agent-done-open-report] in the installed Zsh, found with
+`whence -p zsh`. It calls `zopen` on the original `.org` report, with its path
+passed as a separate argument. Apple's `/bin/zsh` lacks the PCRE module this
+shell setup needs and cannot reliably load the opener.
+
+The opener reads the frontmost app through Hammerspoon and supplies
+`front_app_cached` to `zopen`'s existing Emacs focus step. Agent Done therefore
+does not need Automation access to System Events. Archive failures use the same
+click action, with “Could not archive session” and “Report saved · View report”
+on the card. See [notification-apps.md](notification-apps.md) for setup and
+permission checks.
 
 `--dry-run` resolves the target, saves a report, and prints what it resolved.
 It does not arm a watcher, change tmux options, unregister auto-continue, or

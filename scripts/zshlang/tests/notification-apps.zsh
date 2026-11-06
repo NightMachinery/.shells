@@ -55,11 +55,20 @@ printf "%s\\n" "$0" "$@" >> "$TEST_NOTIFY_LOG"' > "$app_file"
     local click_json="${posted[$(( ${posted[(Ie)-onClick]} + 1 ))]#\\}"
     click=("${(@f)$(print -r -- "$click_json" | command jq --raw-output '.[]')}")
     check done-click-report "${click[5]}" "$report"
-    check done-click-shell "${click[1]}" /bin/zsh
+    check done-click-shell "${click[1]}" "${${commands[zsh]}:a}"
+    check done-title "${posted[$(( ${posted[(Ie)-title]} + 1 ))]}" '\Fixture task'
+    check done-body "${posted[$(( ${posted[(Ie)-message]} + 1 ))]}" '\Codex · View report'
+    [[ "${posted[(Ie)-subtitle]}" == 0 && "${posted[(Ie)-contentImage]}" == 0 ]] || exit 1
     command mkdir "${fixture}/click-env"
-    print -r -- 'function zopen { print -r -- "$1" > "$TEST_NOTIFY_LOG"; }' > "${fixture}/click-env/.zshenv"
+    print -r -- 'function aliasfn { :; }
+alias -g "@RET= || return \$?"
+source "$TEST_AGENT_DONE_SOURCE"
+function hammerspoon { print -r -- org.gnu.Emacs; }
+function assert-args { :; }
+function zopen { print -rl -- "$1" "$front_app_cached" > "$TEST_NOTIFY_LOG"; }' > "${fixture}/click-env/.zshenv"
+    local -x TEST_AGENT_DONE_SOURCE="${NIGHTDIR}/zshlang/auto-load/others/agent-done.zsh"
     ZDOTDIR="${fixture}/click-env" "${click[@]}" || exit 1
-    check done-click-literal-path "$(<"$TEST_NOTIFY_LOG")" "$report"
+    check done-click-literal-path "$(<"$TEST_NOTIFY_LOG")" "$report"$'\norg.gnu.Emacs'
     command rm "$TEST_NOTIFY_LOG"
     function notif-app-install { print -r -- unexpected-build >> "$TEST_NOTIFY_LOG"; return 1; }
     command rm -f "${HOME}/Applications/Agent Bells.app/Contents/MacOS/terminal-notifier"

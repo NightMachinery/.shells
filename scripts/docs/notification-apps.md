@@ -68,6 +68,8 @@ no third-party app artwork is redistributed.
 Mail alerts use the subject as title, sender as subtitle, and a bounded multiline
 body preview. Agent bells use the session/task as title, project/agent as subtitle,
 and the actual event text as body. Constant app names do not occupy the title.
+Agent Done uses the task as title and a single “Codex · View report” body line,
+with no path, extra glyph, subtitle or attachment. Its icon identifies the app.
 The common shell gateway accepts `notif_title`, `notif_subtitle`, and `notif_body`
 for callers that have structured context; generic calls keep their previous
 behavior. Content changes preserve per-app grouping and dismissal boundaries.
@@ -92,10 +94,14 @@ posting outright, as on the development host). Night Mail uses this to open the 
 in Emacs; Agent Bells does not set it.
 
 The shell gateway accepts the array `notif_on_click=(/absolute/program arg ...)`
-and handles JSON encoding and the leading backslash. Agent Done passes
-`/bin/zsh -c 'zopen "$1"' agent-done /absolute/report.org` to load the normal
-shell opener, with the filename kept out of shell code. Both completion and
-archive failure alerts open the report. See [agent-done.md](agent-done.md).
+and handles JSON encoding and the leading backslash. Agent Done uses the absolute
+installed Zsh path with `-c 'h-agent-done-open-report "$1"' agent-done
+/absolute/report.org`. The helper calls `zopen`, keeping the filename out of
+shell code. The installed shell supports the modules required by startup;
+Apple's `/bin/zsh` does not. Hammerspoon supplies the front-app cache used by
+the existing Emacs focus step, avoiding a System Events permission prompt for
+Agent Done. Both completion and archive failure alerts open the report.
+See [agent-done.md](agent-done.md).
 
 ## DND and identity
 

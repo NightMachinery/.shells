@@ -697,15 +697,33 @@ function h-agent-done-watch {
     return 0
 }
 
+function h-agent-done-open-report {
+    : "usage: h-agent-done-open-report <report>; zopen without a System Events permission prompt"
+    local report="${1}" front_app_cached
+    assert-args report @RET
+    #: zopen's Emacs focus step consumes this cache. Get the real front app
+    #: through Hammerspoon, which already handles focus, instead of AppleScript
+    #: whose Automation permission would be attributed to Agent Done.
+    front_app_cached="$(hammerspoon -c 'local app = hs.application.frontmostApplication(); return app and (app:bundleID() or app:name()) or ""')" @RET
+    test -n "${front_app_cached}" || return 1
+    zopen "${report}"
+}
+
 function h-agent-done-notify {
-    : "usage: h-agent-done-notify <report> <message>; a clickable Agent Done notification"
-    local report="${1}" message="${2}"
+    : "usage: h-agent-done-notify <report> <message> [<title> <body>]; a clickable Agent Done notification"
+    local report="${1}" message="${2}" title="${3:-Session complete}" body="${4:-View report}"
     assert-args report message @RET
     #: The shell code is fixed; the report travels only as a positional argument.
-    #: A fresh zsh loads zopen even when macOS supplies launchd's environment.
-    local -a notif_on_click=(/bin/zsh -c 'zopen "$1"' agent-done "${report:A}")
+    #: Use the installed shell, not /bin/zsh: Apple's build lacks the PCRE module
+    #: our startup needs, so zopen silently fails under launchd otherwise.
+    local zsh_path
+    zsh_path="$(whence -p zsh)" @RET
+    local -a notif_on_click=("${zsh_path:a}" -c 'h-agent-done-open-report "$1"' agent-done "${report:A}")
+    title="${title//[$'\n\r\t']/ }"
+    (( ${#title} > 80 )) && title="${title[1,79]}…"
     notif_app=done notif_ignore_dnd_p="${notif_ignore_dnd_p:-n}" \
-        notif_group="agent-done-${report:t}" notif_title='Agent Done' \
+        notif_group="agent-done-${report:t}" notif_title="${title}" \
+        notif_body="${body}" notif_subtitle='' notif_image='' \
         notif "${message}" >/dev/null 2>&1 || true
 }
 
@@ -717,10 +735,10 @@ function h-agent-done-announce {
     ##
     local agent="${1}" what="${2}" name="${3}" report="${4}"
 
-    local glyph label
-    glyph="$(h-agent-field "${agent}" glyph 2>/dev/null)" || glyph=''
+    local label
     label="$(h-agent-field "${agent}" label 2>/dev/null)" || label="${agent}"
-    h-agent-done-notify "${report}" "${glyph} ${label} ${what} finished${name:+: ${name}} -- report: ${report/#${HOME}/~}"
+    h-agent-done-notify "${report}" "${label} ${what} finished${name:+: ${name}} -- report: ${report/#${HOME}/~}" \
+        "${name:-Session complete}" "${label} · View report"
 }
 
 function h-agent-done-paseo-id {
@@ -812,7 +830,8 @@ function h-agent-done-paseo-archive {
         command paseo archive --force --home "${home}" "${uuid}" >>"${log}" 2>&1 ; then
         return 0
     fi
-    h-agent-done-notify "${report}" "agent-done: could not archive Paseo agent ${uuid[1,8]}; see ${log/#${HOME}/~}"
+    h-agent-done-notify "${report}" "agent-done: could not archive Paseo agent ${uuid[1,8]}; see ${log/#${HOME}/~}" \
+        'Could not archive session' 'Report saved · View report'
     return 1
 }
 
