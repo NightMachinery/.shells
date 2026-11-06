@@ -74,8 +74,9 @@ func updaterCode(args []string) int {
 // exitLocked is EX_TEMPFAIL: nothing was attempted, so a later retry is safe.
 const exitLocked = 75
 
-// lockWaitPoll is how often a waiting run retries the lock.
-var lockWaitPoll = 500 * time.Millisecond
+// lockWaitPoll is how often a waiting run retries the lock. A wait still ends
+// on time, since the last delay is cut to what is left, and Ctrl-C ends it at once.
+var lockWaitPoll = time.Minute
 
 // acquireUpdaterLock keeps two --write runs off the same machine at once. A
 // dry run takes no lock, since it writes nothing.

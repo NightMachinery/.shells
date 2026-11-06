@@ -190,7 +190,8 @@ start time and arguments. Dry runs take no lock.
 
 `--lock-wait` makes a refused run wait instead: `0` (the default) refuses at
 once, `-1` waits indefinitely, and a duration such as `30m` waits up to that
-long, then exits 75. A waiting run says once whom it is waiting for, and again
+long, then exits 75. It checks once a minute, so it starts up to a minute after
+the holder finishes. A waiting run says once whom it is waiting for, and again
 only if the holder changes. Ctrl-C or SIGTERM stops the wait (exit 1). The
 daily job keeps the default, so a clash is reported rather than queued behind a
 run that can take over an hour. It is one lock per machine,
