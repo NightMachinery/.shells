@@ -619,7 +619,7 @@ function tmux-job-status {
         pids="$(command tmux list-panes -t "=${name}" -F '#{pane_pid}' 2>/dev/null | command tr '\n' ' ')"
         ec "${name}: running (pane pid ${pids% })"
     elif (( rc == 2 )) ; then
-        ec "${name}: UNKNOWN, which does not mean it is not running"
+        ec "${name}: UNKNOWN, could not check; it may still be running"
         return 2
     elif command tmux has-session -t "=${name}" &>/dev/null ; then
         ec "${name}: DEAD, session kept by remain-on-exit; a start will clear it"
