@@ -552,7 +552,7 @@ function h-tmux-job-server-check {
     if [[ "${err}" == *'no server running'* || "${err}" == *'(No such file or directory)'* || "${err}" == *'(Connection refused)'* ]] ; then
         return 0
     fi
-    ecerr "cannot reach the tmux server: ${err}; inside a sandbox, rerun with elevated access"
+    ecerr "tmux server cannot be reached: ${err}. This might be because of a sandbox, and might be solved by running with elevated access."
     return 2
 }
 
@@ -619,7 +619,7 @@ function tmux-job-status {
         pids="$(command tmux list-panes -t "=${name}" -F '#{pane_pid}' 2>/dev/null | command tr '\n' ' ')"
         ec "${name}: running (pane pid ${pids% })"
     elif (( rc == 2 )) ; then
-        ec "${name}: UNKNOWN, cannot reach the tmux server; this does not mean it is not running"
+        ec "${name}: UNKNOWN, which does not mean it is not running"
         return 2
     elif command tmux has-session -t "=${name}" &>/dev/null ; then
         ec "${name}: DEAD, session kept by remain-on-exit; a start will clear it"

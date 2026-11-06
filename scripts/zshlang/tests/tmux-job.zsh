@@ -46,10 +46,10 @@ function check {
 }
 
 export TMUX_FAKE=denied
-check 'denied: status is UNKNOWN'   2 'UNKNOWN'                  tmux-job-status job
-check 'denied: running-p is 2'      2 'cannot reach'             tmux-job-running-p job
+check 'denied: status is UNKNOWN'   2 'elevated access'          tmux-job-status job
+check 'denied: running-p is 2'      2 'cannot be reached'       tmux-job-running-p job
 check 'denied: start refuses'       2 'not starting it'          tmux-job-start job sleep 1
-check 'denied: stop refuses'        2 'cannot reach'             tmux-job-stop job
+check 'denied: stop refuses'        2 'cannot be reached'       tmux-job-stop job
 export TMUX_FAKE=none
 check 'none: status is not running' 1 'not running'              tmux-job-status job
 check 'none: stop is a no-op'       0 'nothing to stop'          tmux-job-stop job
