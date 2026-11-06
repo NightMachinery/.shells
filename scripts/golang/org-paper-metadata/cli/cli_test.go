@@ -116,3 +116,39 @@ func TestUpdaterWriteRefusesWhileLocked(t *testing.T) {
 		t.Fatal("dry run must not need the lock:", code, stderr)
 	}
 }
+
+func TestLockWaitFlag(t *testing.T) {
+	for in, want := range map[string]time.Duration{"0": 0, "-1": -1, "30m": 30 * time.Minute, "1.5s": 1500 * time.Millisecond} {
+		var d time.Duration
+		if err := (lockWaitFlag{&d}).Set(in); err != nil || d != want {
+			t.Fatalf("%q: got %v %v, want %v", in, d, err, want)
+		}
+	}
+	for _, in := range []string{"-5m", "-2", "soon", "30"} {
+		var d time.Duration
+		if err := (lockWaitFlag{&d}).Set(in); err == nil {
+			t.Fatalf("%q accepted as %v", in, d)
+		}
+	}
+}
+
+func TestUpdaterLockWaitTimesOutAndWaits(t *testing.T) {
+	lockPath := filepath.Join(t.TempDir(), "updater-write.lock")
+	t.Setenv(update.LockPathEnv, lockPath)
+	old := lockWaitPoll
+	lockWaitPoll = 5 * time.Millisecond
+	defer func() { lockWaitPoll = old }()
+	held, err := update.AcquireWriteLock(lockPath, "pid 1 since now: other run")
+	if err != nil {
+		t.Fatal(err)
+	}
+	root := t.TempDir()
+	code, _, stderr := captureCommand(t, "", updaterCode, "--write", "--lock-wait", "40ms", root)
+	if code != exitLocked || !strings.Contains(stderr, "waiting for the write lock") {
+		t.Fatal("timed wait:", code, stderr)
+	}
+	go func() { time.Sleep(40 * time.Millisecond); held.Release() }()
+	if code, _, stderr := captureCommand(t, "", updaterCode, "--write", "--lock-wait", "-1", root); code != 0 {
+		t.Fatal("indefinite wait:", code, stderr)
+	}
+}

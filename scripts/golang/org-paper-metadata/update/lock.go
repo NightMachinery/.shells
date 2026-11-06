@@ -1,6 +1,7 @@
 package update
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -8,6 +9,7 @@ import (
 	"path/filepath"
 	"strings"
 	"syscall"
+	"time"
 )
 
 // WriteLock serialises --write runs on one machine.
@@ -90,4 +92,38 @@ func (l *WriteLock) Release() error {
 	err := l.f.Close()
 	l.f = nil
 	return err
+}
+
+// WaitWriteLock retries AcquireWriteLock every poll until it gets the lock,
+// wait runs out, or ctx ends. wait 0 tries once; a negative wait never runs
+// out. On timeout it returns the last *LockedError. holder is called on each
+// attempt, so the recorded start time is when the lock was taken. waiting, if
+// set, is told about each new holder seen while waiting.
+func WaitWriteLock(ctx context.Context, path string, holder func() string, wait, poll time.Duration, waiting func(*LockedError)) (*WriteLock, error) {
+	deadline := time.Now().Add(wait)
+	seen := ""
+	for {
+		l, err := AcquireWriteLock(path, holder())
+		var locked *LockedError
+		if err == nil || !errors.As(err, &locked) || wait == 0 {
+			return l, err
+		}
+		delay := poll
+		if wait > 0 {
+			left := time.Until(deadline)
+			if left <= 0 {
+				return nil, err
+			}
+			delay = min(delay, left)
+		}
+		if waiting != nil && locked.Holder != seen {
+			seen = locked.Holder
+			waiting(locked)
+		}
+		select {
+		case <-ctx.Done():
+			return nil, fmt.Errorf("stopped waiting for the write lock %s: %w", path, ctx.Err())
+		case <-time.After(delay):
+		}
+	}
 }

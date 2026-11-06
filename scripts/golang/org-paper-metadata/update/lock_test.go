@@ -1,6 +1,7 @@
 package update
 
 import (
+	"context"
 	"errors"
 	"io"
 	"os"
@@ -94,4 +95,47 @@ func TestLockHolderHelper(t *testing.T) {
 	}
 	os.Stdout.WriteString("locked")
 	time.Sleep(time.Minute)
+}
+
+func waitTestHolder() string { return "waiter" }
+
+func TestWaitWriteLock(t *testing.T) {
+	const poll = 5 * time.Millisecond
+	path := filepath.Join(t.TempDir(), "updater-write.lock")
+	held, err := AcquireWriteLock(path, "holder")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var locked *LockedError
+
+	start := time.Now()
+	if _, err := WaitWriteLock(context.Background(), path, waitTestHolder, 0, poll, nil); !errors.As(err, &locked) || time.Since(start) > time.Second {
+		t.Fatalf("wait 0 must refuse at once: %v", err)
+	}
+	if _, err := WaitWriteLock(context.Background(), path, waitTestHolder, 30*time.Millisecond, poll, nil); !errors.As(err, &locked) {
+		t.Fatalf("timed wait must end with LockedError: %v", err)
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	time.AfterFunc(30*time.Millisecond, cancel)
+	if _, err := WaitWriteLock(ctx, path, waitTestHolder, -1, poll, nil); !errors.Is(err, context.Canceled) {
+		t.Fatalf("cancelled wait: %v", err)
+	}
+
+	for _, wait := range []time.Duration{-1, 10 * time.Second} {
+		var told []string
+		current := held
+		time.AfterFunc(40*time.Millisecond, func() { current.Release() })
+		l, err := WaitWriteLock(context.Background(), path, waitTestHolder, wait, poll, func(e *LockedError) { told = append(told, e.Holder) })
+		if err != nil {
+			t.Fatalf("wait %v: %v", wait, err)
+		}
+		if len(told) != 1 || told[0] != "holder" {
+			t.Fatalf("wait %v: waiting reports %q, want one for the holder", wait, told)
+		}
+		l.Release()
+		if held, err = AcquireWriteLock(path, "holder"); err != nil {
+			t.Fatal(err)
+		}
+	}
+	held.Release()
 }
