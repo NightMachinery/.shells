@@ -182,36 +182,48 @@ and copy it to `~/.agents/done/`; find the agent's own process; send it
 ### The report
 
 New reports use `.org` and open in Org mode. The title and Session, Resume,
-and Summary headings give the file structure; literal example blocks preserve
-the session metadata and pasteable resume commands. The supplied summary is
-Org text. Plain paragraphs and lists remain readable in a terminal pane.
+and Summary headings give the file structure. Session metadata uses Org
+description lists with inline verbatim values, an inactive finish timestamp
+and a separate time zone. Multiline values, or values containing a verbatim
+delimiter, use nested example blocks. Each resume command has its own labeled
+Zsh source block. The supplied summary is Org text. Plain paragraphs and lists
+remain readable in a terminal pane.
 `agent-done-reports` lists both Org reports and older `.txt` reports, newest first.
 
 The header is there for whoever decides, later and often from another shell,
 whether to carry on. So it records every id that finds the session again,
 and then the commands that resume it. [agfi:h-agent-done-report] writes it:
 
-- `seat`, `agent` (`claude`, `codex` or `agy`) and `id`, the session's own id;
-- `paseo`, for a Paseo agent: its uuid and provider; and `paseo subagents`,
+- Seat, Agent (`claude`, `codex` or `agy`) and Session ID;
+- Paseo agent and Paseo provider, plus Paseo subagents,
   its direct subagents with their status and title, since the archive takes
   them down with it;
-- `paseo parent`, for a session that merely runs under a Paseo agent, having
+- Paseo parent, for a session that merely runs under a Paseo agent, having
   inherited `PASEO_AGENT_ID` from it (see "Which agent" below);
-- `background`, the short id of a background Claude Code session, and `pane`,
+- Background session, the short id of a background Claude Code session, and tmux pane,
   the tmux pane it ran in;
-- `transcript`, `cwd`, `ended`, `report` and `copy`.
+- Transcript, Working directory, Ended, Time zone, Report and Copy.
 
-The resume block ([agfi:h-agent-done-resume-help]) gives one line per harness
-that can bring the session back, each a command to paste:
+The Resume section ([agfi:h-agent-done-resume-help]) has a heading, description
+and separate `zsh` source block for each command. `:eval never` keeps these
+copyable commands from running as part of an Org export. For example:
 
-```
-  resume, with one of these (two at once would both write the same transcript):
-    paseo:  paseo send c821264a-… 'your next message'
-              unarchives it, then runs that message as a turn
-            paseo import --provider handoff-claude-… --cwd ~/scripts c97aa4d7-…
-              unarchives it without starting a turn
-    claude: cd ~/scripts && CLAUDE_CONFIG_DIR=~/.claude-work claude --resume c97aa4d7-…
-    zsh:    agent-session-resume ~/.claude-work/projects/-Users-evar-scripts/c97aa4d7-….jsonl
+```org
+** Paseo: continue the conversation
+
+Unarchive this agent and run your next message as a turn.
+
+#+begin_src zsh :eval never
+paseo send <agent-uuid> 'your next message'
+#+end_src
+
+** Zsh session helper
+
+Resolve the agent and account from the saved transcript.
+
+#+begin_src zsh :eval never
+agent-session-resume /path/to/transcript.jsonl
+#+end_src
 ```
 
 The agent's own line ([agfi:h-agent-done-resume-native]) is the bare binary
@@ -220,10 +232,11 @@ plus the environment variable that selects the seat (`CLAUDE_CONFIG_DIR`,
 from the agent. So it works from any shell, zsh or not. Antigravity is the
 exception: its accounts are separate homes that only the per-account launcher
 sets up, so its line names that launcher (`agy-<account> --conversation <id>`).
-The `zsh:` line goes through our own launchers instead, which pick the seat
-from the transcript and repaint the pane cues. A session in a tmux pane also
-gets a `tmux:` line for `prefix-r` in the dead pane, and one whose Paseo pin
-was lifted gets the `paseo-keep` that puts it back.
+The Zsh session helper goes through our own launchers instead, which pick the
+seat from the transcript and repaint the pane cues. A session in a tmux pane also
+gets a tmux subsection with the `prefix-r` keybinding in inline verbatim,
+and one whose Paseo pin was lifted gets a separate `paseo-keep` block that
+puts it back. Keybindings and explanatory text stay outside shell blocks.
 
 The copy goes to `agent_done_copy_dir`, `~/.agents/done/` by default, next to
 the agents' other shared state (`~/.agents/runs`, `~/.agents/skills`), which
@@ -419,8 +432,8 @@ behind it, in order: Claude Code's project directory, which
 names the directory a session started in with every non-alphanumeric character
 replaced by a dash — lossy, since `-Users-evar-my-dir` could be two different
 paths, so it is accepted only when the result really is a directory — and then
-the pane's own path. The report's `cwd:` line shows whichever won, so it names
-the place a resume will land, and `agent_done_cwd` overrides all three.
+the pane's own path. The report's Working directory field shows whichever won,
+so it names the place a resume will land, and `agent_done_cwd` overrides all three.
 
 The pane's path is a genuinely different answer, not a cheaper one. This
 feature was written in a session that had been restarted into a scratch
@@ -492,7 +505,7 @@ be left with a border line labelling a session that no longer exists — on a
 dead pane, no less.
 
 The seat is not lost by removing the row, only moved: the report's header
-carries a `seat:` line. That is the right place for it once the session is
+carries a Seat field. That is the right place for it once the session is
 over — the border says which session is *live*, and this one is not, but which
 account did the work is worth recording.
 

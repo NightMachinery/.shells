@@ -403,27 +403,47 @@ command cmp -s -- "${report}" "${agent_done_copy_dir}/report.org" ||
     agent-done-detection-fail 'the copy should be the report, byte for byte'
 agent-done-detection-expect-report 'Paseo agent' \
     '#+TITLE:' '* Session' '* Resume' '* Summary' '#+begin_example' '#+end_example' \
-    '  agent:      claude' \
-    "  paseo:      ${agent_done_paseo_uuid} (provider handoff-claude-x)" \
-    $'  paseo subagents:\n    child-1  idle  first child\n    child-2  error  second child' \
-    "  copy:       ${agent_done_copy_dir/#${HOME}/~}/report.org" \
-    "paseo:  paseo send ${agent_done_paseo_uuid} 'your next message'" \
+    '- Agent :: =claude=' \
+    "- Paseo agent :: =${agent_done_paseo_uuid}=" \
+    '- Paseo provider :: =handoff-claude-x=' \
+    $'- Paseo subagents ::\n  #+begin_example\n  child-1  idle  first child\n  child-2  error  second child\n  #+end_example' \
+    "- Copy :: =${agent_done_copy_dir/#${HOME}/~}/report.org=" \
+    "paseo send ${agent_done_paseo_uuid} 'your next message'" \
     "paseo import --provider handoff-claude-x --cwd /work/dir ${report_id}" \
     "paseo-keep ${agent_done_paseo_uuid}" \
-    "claude: cd /work/dir && CLAUDE_CONFIG_DIR=~/.claude-work claude --resume ${report_id}" \
-    'zsh:    agent-session-resume /t/x.jsonl' \
+    "cd /work/dir && CLAUDE_CONFIG_DIR=~/.claude-work claude --resume ${report_id}" \
+    $'#+begin_src zsh :eval never\nagent-session-resume /t/x.jsonl\n#+end_src' \
     'the summary'
-[[ "$(<"${report}")" != *'tmux:'* ]] || agent-done-detection-fail 'a Paseo agent has no dead pane to restart'
+[[ "$(<"${report}")" != *'** tmux pane'* ]] || agent-done-detection-fail 'a Paseo agent has no dead pane to restart'
+
+# Every resume command occupies its own source block, with prose kept outside.
+typeset -gi src_blocks=0 in_src=0 src_lines=0
+typeset -g report_line
+while IFS= read -r report_line ; do
+    case "${report_line}" in
+        '#+begin_src zsh :eval never') (( in_src == 0 )) || agent-done-detection-fail 'nested source block'; in_src=1; src_lines=0 ;;
+        '#+end_src') (( in_src == 1 && src_lines == 1 )) || agent-done-detection-fail 'source block must contain one command'; in_src=0; (( ++src_blocks )) ;;
+        *) if (( in_src )); then (( ++src_lines )); fi ;;
+    esac
+done < "${report}"
+(( in_src == 0 && src_blocks == 5 )) || agent-done-detection-fail 'Paseo report should have five separate commands'
+command rg --quiet '^\- Ended :: \[[0-9]{4}-[0-9]{2}-[0-9]{2} [A-Za-z]{3} [0-9]{2}:[0-9]{2}\]$' "${report}" ||
+    agent-done-detection-fail 'ended should be an inactive Org timestamp'
 
 typeset -gA agent_done_ids=( [pane]=%7 [paseo_parent]=parent-uuid )
 typeset -g spaced="${HOME}/proj dir"
 h-agent-done-report codex "${report_id}" '' /t/c.jsonl "${spaced}" '' "${report}"
 agent-done-detection-expect-report 'pane' \
-    '  paseo parent: parent-uuid' \
-    '  pane:       %7' \
-    "codex:  cd ${(q-)spaced} && codex resume ${report_id}" \
-    'tmux:   prefix-r in the dead pane %7'
-[[ "$(<"${report}")" != *'paseo:  '* ]] || agent-done-detection-fail 'an inherited Paseo id is not this session to resume'
+    '- Paseo parent :: =parent-uuid=' \
+    '- tmux pane :: =%7=' \
+    "cd ${(q-)spaced} && codex resume ${report_id}" \
+    'Press =prefix-r= in the dead pane =%7=.'
+[[ "$(<"${report}")" != *'** Paseo:'* ]] || agent-done-detection-fail 'an inherited Paseo id is not this session to resume'
+
+[[ "$(h-agent-done-org-field 'Path' '/work/a=b')" == $'- Path ::\n  #+begin_example\n  /work/a=b\n  #+end_example' ]] ||
+    agent-done-detection-fail 'values with verbatim delimiters should use an example block'
+[[ "$(h-agent-done-org-field 'Details' $'first\n  #+end_example\n* heading')" == $'- Details ::\n  #+begin_example\n  first\n    ,#+end_example\n  ,* heading\n  #+end_example' ]] ||
+    agent-done-detection-fail 'metadata structural lines should be comma-escaped inside examples'
 
 typeset -g agent_done_copy_dir=''
 h-agent-done-copy-path "${report}" >/dev/null &&
