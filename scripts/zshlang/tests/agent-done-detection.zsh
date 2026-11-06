@@ -274,12 +274,18 @@ typeset -g agent_done_paseo_session='sess-own'
 typeset -g agent_done_paseo_rows=''
 function agent-done-detection-paseo-rows {
     #: Usage: agent-done-detection-paseo-rows <native session> <keep> [<extra rows json>]
-    agent_done_paseo_rows="[{\"id\":\"${agent_done_paseo_uuid}\",\"nativeSessionId\":\"${1}\",\"status\":\"running\",\"keep\":${2},\"parentAgentId\":null}${3:+,${3}}]"
+    agent_done_paseo_rows="[{\"id\":\"${agent_done_paseo_uuid}\",\"nativeSessionId\":\"${1}\",\"title\":\"Agent Done report formatting\",\"status\":\"running\",\"keep\":${2},\"parentAgentId\":null}${3:+,${3}}]"
 }
 function paseo-ls { print -r -- "${agent_done_paseo_rows}"; }
 function h-agent-done-id { print -r -- "${agent_done_paseo_session}"; }
-function h-agent-done-report { command touch -- "${7}"; }
-function h-agent-done-announce { print -r -- "announce ${2}" >> "${agent_done_detection_calls}"; }
+function h-agent-done-report {
+    print -r -- "${3}" > "${agent_done_detection_tmp}/report-name"
+    command touch -- "${7}"
+}
+function h-agent-done-announce {
+    print -r -- "${3}" > "${agent_done_detection_tmp}/notification-name"
+    print -r -- "announce ${2}" >> "${agent_done_detection_calls}"
+}
 function awaysh-sure { print -r -- "awaysh-sure ${1} ${2}" >> "${agent_done_detection_calls}"; }
 function agent-auto-continue-off { print -r -- "auto-continue [${PASEO_AGENT_ID:-}]" >> "${agent_done_detection_calls}"; }
 typeset -gx PASEO_AGENT_ID="${agent_done_paseo_uuid}" TMUX='/tmp/custom,1,0' TMUX_PANE=''
@@ -292,12 +298,26 @@ output="$(agent-done --dry-run finished </dev/null 2>&1)" || actual_status=$?
     agent-done-detection-fail "a Paseo agent should be archived, not refused for its inherited TMUX (status ${actual_status}): ${output}"
 [[ ! -s "${agent_done_detection_calls}" ]] ||
     agent-done-detection-fail 'Paseo dry-run must not announce, archive or unregister'
+[[ "$(<"${agent_done_detection_tmp}/report-name")" == 'Agent Done report formatting' ]] ||
+    agent-done-detection-fail 'report should use the current Paseo session title when the transcript has none'
 
 actual_status=0
 agent-done finished </dev/null >/dev/null 2>&1 || actual_status=$?
 (( actual_status == 0 )) || agent-done-detection-fail "Paseo archive should succeed, got ${actual_status}"
+[[ "$(<"${agent_done_detection_tmp}/notification-name")" == 'Agent Done report formatting' ]] ||
+    agent-done-detection-fail 'completion notification should receive the current Paseo session title'
 [[ "$(<"${agent_done_detection_calls}")" == "auto-continue [${agent_done_paseo_uuid}]"$'\n''announce Paseo agent'$'\n'"awaysh-sure h-agent-done-paseo-archive ${agent_done_paseo_uuid}" ]] ||
     agent-done-detection-fail "Paseo archive calls: $(<"${agent_done_detection_calls}")"
+
+# Missing Paseo titles retain the native transcript title.
+(
+    function h-agent-session-call { print -r -- /fixture/transcript.jsonl; }
+    function h-agent-session-name-of-transcript { print -r -- 'Native transcript title'; }
+    agent_done_paseo_rows="$(print -r -- "${agent_done_paseo_rows}" | command jq 'map(del(.title))')"
+    agent-done --dry-run fallback </dev/null >/dev/null
+    [[ "$(<"${agent_done_detection_tmp}/report-name")" == 'Native transcript title' ]] ||
+        agent-done-detection-fail 'missing Paseo title should retain the transcript title'
+)
 
 # Archiving cascades to subagents, and pinned agents are never archived.
 function agent-done-detection-paseo-refuses {
@@ -358,6 +378,8 @@ agent-done-detection-paseo-rows sess-parent false
 actual_status=0
 agent-done inherited </dev/null >/dev/null 2>&1 || actual_status=$?
 (( actual_status == 2 )) || agent-done-detection-fail "an inherited Paseo id should fall back to the pane checks, got ${actual_status}"
+[[ "$(<"${agent_done_detection_tmp}/report-name")" != 'Agent Done report formatting' ]] ||
+    agent-done-detection-fail 'an inherited Paseo id must not supply the parent session title'
 [[ ! -s "${agent_done_detection_calls}" ]] ||
     agent-done-detection-fail "an inherited Paseo id must not archive: $(<"${agent_done_detection_calls}")"
 

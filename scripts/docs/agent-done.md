@@ -249,7 +249,9 @@ It respects Do Not Disturb unless `notif_ignore_dnd_p=y` is set explicitly.
 Each report has its own notification group, so finishing another session does
 not replace an unread report alert. Agent Bells dismissal does not clear them.
 
-The card uses the task name as title (or “Session complete” when unnamed) and
+The card uses the session title shown in Paseo, taken only from the record
+verified to belong to this native session. Otherwise it uses the native
+transcript title (or “Session complete” when unnamed). It has
 one body line, such as “Codex · View report”. The app icon supplies the identity;
 file paths, glyphs, subtitles and image attachments stay off the card. Detailed
 paths remain in the report and the message sent to Telegram when enabled.

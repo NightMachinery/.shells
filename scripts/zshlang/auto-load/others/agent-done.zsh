@@ -784,7 +784,7 @@ function h-agent-done-paseo-ids {
     #: What the report needs from this agent's Paseo record besides its uuid,
     #: into `agent_done_ids' (see [agfi:h-agent-done-report]): the provider
     #: and directory `paseo import' wants to unarchive it, whether it is pinned,
-    #: and its direct subagents, which the archive takes down with it.
+    #: its display title, and its direct subagents, which the archive takes down.
     #: Usage: h-agent-done-paseo-ids <uuid> <paseo-ls --json rows>
     ##
     local uuid="${1}" rows="${2}"
@@ -797,6 +797,8 @@ function h-agent-done-paseo-ids {
     agent_done_ids[paseo_provider]="${f[1]-}"
     agent_done_ids[paseo_cwd]="${f[2]-}"
     agent_done_ids[paseo_keep]="${f[3]-}"
+    agent_done_ids[paseo_title]="$(print -r -- "${rows}" | command jq --raw-output --arg uuid "${uuid}" '
+        .[] | select(.id == $uuid) | .title // empty | select(. != "-")')"
     agent_done_ids[paseo_subagents]="$(print -r -- "${rows}" | command jq --raw-output --arg uuid "${uuid}" '
         .[] | select(.parentAgentId == $uuid)
         | "\(.id)  \(.status // "?")  \((.title // "")[0:60])"')"
@@ -935,6 +937,9 @@ work is actually finished. --dry-run writes the report and kills nothing."
     local -A agent_done_ids=()
     if test -n "${paseo_uuid}" ; then
         h-agent-done-paseo-ids "${paseo_uuid}" "${paseo_rows}" || true
+        #: Paseo's visible title can differ from, or be absent in, the native
+        #: transcript. Only this session's verified Paseo record may supply it.
+        test -z "${agent_done_ids[paseo_title]-}" || name="${agent_done_ids[paseo_title]}"
     elif test -n "${PASEO_AGENT_ID:-}" ; then
         agent_done_ids[paseo_parent]="${PASEO_AGENT_ID}"
     fi
