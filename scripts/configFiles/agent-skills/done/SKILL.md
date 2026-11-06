@@ -50,9 +50,10 @@ Write for someone who was not watching:
 - what is deliberately left, and any risk worth knowing about;
 - the obvious next step, if there is one.
 
-Five to fifteen lines. Plain text, no markdown headings — it is displayed by
-`cat` in a terminal pane. Leave out what the exit command puts in the header
-above it: this session's name, ids (its Paseo agent and subagents included),
+Five to fifteen lines of Org-mode text: plain paragraphs and lists, with Org
+syntax for any emphasis or links. The report is saved as `.org` and also
+displayed by `cat` in a terminal pane. Leave out what the exit command puts in
+the header above it: this session's name, ids (its Paseo agent and subagents included),
 transcript, directory and timestamp, and the commands that resume it. Do name
 any other agent you launched that outlives the session, such as a tmux
 subagent or a separate Paseo agent, with its id: the header knows only this
@@ -70,8 +71,9 @@ That saves the report, with a copy in `~/.agents/done/`, asks this agent to
 exit, and then shows the report where the session was: inside tmux it replaces
 the pane with it and lets the pane die with the text still on screen, and
 outside tmux it prints it to the terminal once the agent is gone. A Paseo agent
-is archived instead, after its pin is lifted if it has one, and a notification
-names the report. The saved reports are listed by `agent-done-reports`
+is archived instead, after its pin is lifted if it has one. Background and
+Paseo completion alerts use Agent Done's own app and icon; clicking one opens
+the Org report with `zopen`. The saved reports are listed by `agent-done-reports`
 and the newest is printed by `agent-done-report-last`, so nothing is lost even
 if the terminal is closed.
 
