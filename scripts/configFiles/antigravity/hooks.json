@@ -31,20 +31,6 @@
       }
     ]
   },
-  "paseo-agy-driver": {
-    "PreToolUse": [
-      {
-        "matcher": "*",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "if [ -z \"$PASEO_AGY_DRIVER_RULES\" ]; then printf '{}\\n'; else python3 \"$HOME/notes/skills/paseo-agy-driver/scripts/agy_permission_hook.py\" 2>/dev/null || if [ -n \"$PASEO_AGY_DRIVER_FALLBACK\" ]; then printf '{\"decision\":\"%s\"}\\n' \"$PASEO_AGY_DRIVER_FALLBACK\"; else printf '{}\\n'; fi; fi",
-            "timeout": 10
-          }
-        ]
-      }
-    ]
-  },
   "auto-continue": {
     "Stop": [
       {
