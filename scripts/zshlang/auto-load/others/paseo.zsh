@@ -649,3 +649,74 @@ Clear the pin with keep=false; the CLI has no label-delete option."
     ensure-cmd paseo @RET
     command paseo agent update "${1}" --label keep=false
 }
+
+function paseo-transcript-delete-fz {
+    : "usage: paseo-transcript-delete-fz [--dry-run] [--yes] [--filter TEXT] [QUERY]
+Pick archived Paseo sessions and permanently delete their Paseo and native transcripts."
+    emulate -L zsh
+    setopt pipefail
+    local root="${NIGHTDIR:-${HOME}/scripts}" home helper
+    local dry=n yes=n filter='' filter_p=n query='' rows selected row tmp
+    local -a ids=() fz_args=()
+    while (( $# )) ; do
+        case "${1}" in
+            -n|--dry-run) dry=y ;;
+            -y|--yes) yes=y ;;
+            --filter)
+                (( $# >= 2 )) || { ecerr "$0: --filter needs text"; return 64; }
+                filter="${2}" filter_p=y ; shift ;;
+            -h|--help)
+                print -r -- 'usage: paseo-transcript-delete-fz [-n|--dry-run] [-y|--yes] [--filter TEXT] [QUERY]
+Lists archived sessions on this host, oldest archive first. Tab selects multiple
+rows. Shows the exact native files, then confirms permanent deletion (default No).
+--dry-run previews without deleting; --yes skips confirmation. --filter performs
+non-interactive fzf selection and still requires --yes for deletion without a tty.
+Codex: rollouts in sessions and archived_sessions. Claude: the main transcript
+and its native subagent transcripts. Configured provider aliases are supported.
+Paseo records and timelines are removed through paseo agent delete. Other Paseo
+sessions are never cascaded. Shared native sessions, pins, unsupported harnesses
+and remote PASEO_HOST targets are refused. See docs/paseo-transcript-delete.md.'
+                return 0 ;;
+            --) shift ; query="${*}" ; break ;;
+            -*) ecerr "$0: unknown option: ${1}"; return 64 ;;
+            *) query+="${query:+ }${1}" ;;
+        esac
+        shift
+    done
+    ensure-cmd python3 fzf @RET
+    home="$(h-paseo-home)" @RET
+    helper="${root}/python/paseo_transcript_delete.py"
+    tmp="$(command mktemp -d "${TMPDIR:-/tmp}/paseo-transcript-delete.XXXXXXXX")" @RET
+    {
+        command python3 "${helper}" --home "${home}" catalog > "${tmp}/catalog.json" @RET
+        rows="$(command python3 "${helper}" --home "${home}" rows "${tmp}/catalog.json")" @RET
+        if [[ -z "${rows}" ]] ; then
+            print -r -- 'No eligible archived sessions.'
+            return 0
+        fi
+        local preview="$(gquote python3 "${helper}" --home "${home}" preview "${tmp}/catalog.json") {1}"
+        fz_args=(--multi --no-sort --delimiter=$'\t' --with-nth=2.. \
+            --query "${query}" --header='ARCHIVED: ID | ARCHIVED AT | PROVIDER | NATIVE SIZE | TITLE | CWD; Tab selects; Enter reviews deletion' \
+            --preview "${preview}" --preview-window=down,60%,wrap)
+        [[ "${filter_p}" == y ]] && fz_args+=(--filter "${filter}")
+        selected="$(print -r -- "${rows}" | fzf-gateway "${fz_args[@]}")" || return $?
+        [[ -n "${selected}" ]] || return 0
+        for row in "${(@f)selected}" ; do
+            ids+=("${row%%$'\t'*}")
+        done
+        command python3 "${helper}" --home "${home}" review "${tmp}/catalog.json" "${ids[@]}" > "${tmp}/selected.json" @RET
+        command python3 "${helper}" --home "${home}" show "${tmp}/selected.json" @RET
+        [[ "${dry}" == y ]] && return 0
+        ensure-cmd paseo @RET
+        if [[ "${yes}" != y ]] ; then
+            if ! { : < /dev/tty } 2>/dev/null ; then
+                ecerr "$0: confirmation needs a terminal; use --yes (or --dry-run)"
+                return 64
+            fi
+            ask "Permanently delete these ${#ids} archived sessions and their native transcripts?" N || return 1
+        fi
+        command python3 "${helper}" --home "${home}" delete "${tmp}/selected.json"
+    } always {
+        command rm -rf -- "${tmp}"
+    }
+}

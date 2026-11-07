@@ -1,5 +1,8 @@
 # Archive Paseo agents
 
+To permanently remove archived sessions and their native harness transcripts,
+use [paseo-transcript-delete-fz](paseo-transcript-delete.md).
+
 `paseo-archive-fz` and `paseo-archive-all` default to **inactive agents last active
 at least 72 hours ago**, across every directory. Creation age is deliberately
 omitted: an old coordinator can still be doing active work. LAST ACTIVE uses
