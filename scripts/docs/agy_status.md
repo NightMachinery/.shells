@@ -223,89 +223,16 @@ See [Google's sandbox guide](https://antigravity.google/docs/sandbox/) and
 
 ## Paseo subagents that ask their parent for permission
 
-@Opus5.5 [2026-11-06 Fri], agy 1.5.2, Paseo 0.14.0.
-
-Paseo's built-in `antigravity` provider runs `agy --print` with
-`--dangerously-skip-permissions`, so its only mode is "Full access" and every
-tool call, shell commands included, runs unasked. `agy acp`, agy's own Agent
-Client Protocol server, does ask: it sends `session/request_permission`, Paseo
-turns that into a pending permission, and a parent that created the child with
-`notifyOnFinish` (the default) receives a `permission-required` notification it
-can answer with `respond_to_permission`. No adapter is needed;
-[paseo-agy-acp](https://github.com/tiezbro/paseo-agy-acp) wraps an older
-separately-downloaded kernel with its own login and is aimed at Linux.
-
-The provider lives in the per-machine `~/.paseo/config.json`, so set it up on
-each Mac. Point it at the real binary and pass what [agfi:h-agy-account-argv]
-passes, or it signs in through the keychain or the wrong account:
-
-```json
-"agy-acp": {
-  "extends": "acp",
-  "label": "Antigravity ACP (asks permission)",
-  "command": ["/Users/YOU/.local/bin/agy", "acp", "--sandbox",
-              "--gemini_dir=/Users/YOU/.gemini", "--app_data_dir=antigravity-cli"],
-  "env": {"ANTIGRAVITY_GEMINI_DIR": "/Users/YOU/.gemini",
-          "AGY_ACCOUNT_ID": "m", "SSH_CONNECTION": "agy-file-auth"}
-}
-```
-
-Another account is another provider entry with that account's directory. Run
-`paseo reload`; `paseo provider models agy-acp` listing models proves the
-sign-in works. Modes are `default` (ask for edits and commands),
-`accept-edits` and `plan`.
-
-Verified with `agy-acp/gemini-3.8-flash-low` in `default` mode: a
-`printf 'sentinel-42\n'` arrived at the parent as a `permission-required`
-notification carrying the exact command, with only Allow once and Deny once
-(no "always"); allowing ran it and the child reported the output. Two traps
-showed up on Deny:
-
-- The child's turn ends at once. It does not get to reply, even when told to
-  say "DENIED".
-- The `finished` notification repeats the child's previous answer, so it reads
-  like success. After a deny, check `get_agent_activity` instead.
-
-### What reduces the prompts, and what does not
-
-Measured the same day with throwaway Flash children and inert `printf`/`touch`
-payloads:
-
-- `settings.json` `permissions` rules (`write_file(...)`, `command(...)`) are
-  loaded (the log prints them) but change nothing under `agy acp`: a request
-  matching an allow rule still reaches the parent. They are also read only at
-  process start.
-- The sandbox (`--sandbox`) blocks shell writes inside the workspace in 1.5.2,
-  with an explicit `write_file(<workspace>/)` rule and the folder trusted,
-  while `/tmp` stays writable. Shell writes that matter therefore run as a
-  bypass request, which the parent sees as `rawInput.BypassSandbox: true`.
-- `toolPermission: "proceed-in-sandbox"` does stop prompts for sandboxed
-  commands, and `accept-edits` mode stops them for file-tool edits inside the
-  workspace.
-- A `PreToolUse` hook (`configFiles/antigravity/hooks.json`) runs under
-  `agy acp`. Its `deny` blocks the call and tells the child why, which then
-  carries on; its `allow` is ignored, and the request still reaches the parent.
-- With `--dangerously-skip-permissions` the hook's `allow` works and
-  `force_ask` still reaches the parent, so the hook decides everything. But that
-  flag turns the sandbox off: a "sandboxed" `touch` into the home directory
-  succeeded.
+Paseo's built-in `antigravity` provider runs agy with
+`--dangerously-skip-permissions`. Agy subagents that ask their parent for
+permission instead run through `agy acp` under the private `paseo-agy-driver`
+skill, which also holds the measurements behind it.
 
 Never register a `PreToolUse` hook in the shared
-`configFiles/antigravity/hooks.json`. Every agy process loads it, including
-Paseo's built-in `antigravity` provider, which runs with
-`--dangerously-skip-permissions`; there a hook answer of `{}` refuses the tool
-call. A brief global hook (2026-11-06) denied every tool call of the built-in
-provider's children until it was removed. The private `paseo-agy-driver` skill
-therefore gives its two providers their own `--gemini_dir`
-(`~/.agy-driver/gemini`, with `antigravity-cli` symlinked to the account's
-state, since `--app_data_dir` refuses absolute paths) whose `config/hooks.json`
-is the only place the hook is registered. In that setup the hook's no-rule
-answer is `ask` for the sandboxed provider, which keeps `proceed-in-sandbox` and
-`accept-edits` in charge, and `force_ask` for the skip-permissions one, which
-sends the request to the parent. In skip-permissions mode `accept-edits` still
-approves in-workspace edits that the hook answered `force_ask`. The toolset
-the hook sees is small: `read_file`, `edit_file`, `write_file`, `run_command`
-and `search_web`; directory listing and search go through the shell.
+`configFiles/antigravity/hooks.json`. Every agy process loads it, including the
+built-in provider, where a hook answer of `{}` refuses the tool call. A brief
+global hook (2026-11-06) denied every tool call of that provider's children
+until it was removed. Register such hooks under a separate `--gemini_dir`.
 
 ## Hook activation
 
