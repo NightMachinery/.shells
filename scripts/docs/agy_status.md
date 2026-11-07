@@ -290,11 +290,22 @@ payloads:
   flag turns the sandbox off: a "sandboxed" `touch` into the home directory
   succeeded.
 
-The hook entry `paseo-agy-driver` does nothing unless the agy process has
-`PASEO_AGY_DRIVER_RULES` set, which only the Paseo provider entries set. When
-that variable is set and the hook script cannot run, it answers
-`$PASEO_AGY_DRIVER_FALLBACK` (`force_ask` for the skip-permissions provider),
-so a missing script never turns into a silent allow.
+Never register a `PreToolUse` hook in the shared
+`configFiles/antigravity/hooks.json`. Every agy process loads it, including
+Paseo's built-in `antigravity` provider, which runs with
+`--dangerously-skip-permissions`; there a hook answer of `{}` refuses the tool
+call. A brief global hook (2026-11-06) denied every tool call of the built-in
+provider's children until it was removed. The private `paseo-agy-driver` skill
+therefore gives its two providers their own `--gemini_dir`
+(`~/.agy-driver/gemini`, with `antigravity-cli` symlinked to the account's
+state, since `--app_data_dir` refuses absolute paths) whose `config/hooks.json`
+is the only place the hook is registered. In that setup the hook's no-rule
+answer is `ask` for the sandboxed provider, which keeps `proceed-in-sandbox` and
+`accept-edits` in charge, and `force_ask` for the skip-permissions one, which
+sends the request to the parent. In skip-permissions mode `accept-edits` still
+approves in-workspace edits that the hook answered `force_ask`. The toolset
+the hook sees is small: `read_file`, `edit_file`, `write_file`, `run_command`
+and `search_web`; directory listing and search go through the shell.
 
 ## Hook activation
 
