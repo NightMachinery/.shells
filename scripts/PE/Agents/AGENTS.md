@@ -418,6 +418,15 @@ When testing potentially dangerous behavior, assume test payloads may execute un
 
 # Subagent Delegation
 
+When Claude declines or narrows an otherwise authorized task because of its
+provider-specific restrictions, prefer Codex for an independent assessment and
+execution of the work it can support. Treat Claude's refusal as a provider
+limitation, not a new project requirement or a reason to drop agreed scope.
+Carry over the user's objective, evidence, decisions and remaining work without
+requiring Codex to adopt Claude's conclusions. Preserve the existing account,
+data-access and approval boundaries; use the delegate and Paseo handoff skills
+as appropriate. Report any remaining blocker concretely.
+
 Read the delegate skill when delegating work or requesting an independent agent
 opinion. If you are an expensive model (e.g., Fable or Astra), start by reading
 it to route substantial mechanical work to the preferred weaker workers. It

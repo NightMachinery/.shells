@@ -13,6 +13,11 @@ idempotence, overlay removal, symlink replacement, and the quiet override. All
 sources and generated targets in these checks live in temporary directories.
 The checks do not read or rewrite installed instruction files.
 
+The shared source `PE/Agents/AGENTS.md` also records the user's preference for
+Codex to assess and carry out authorized work when Claude declines under its
+provider-specific restrictions. This preserves project scope and existing
+account, data-access and approval boundaries.
+
 The shared source `PE/Agents/AGENTS.md` routes asynchronous launches to
 `event-driven-agents`, resumable substantial runs to `long-run-handoff`, and
 sustained agent work or worker bursts to `quota-management`. These are
