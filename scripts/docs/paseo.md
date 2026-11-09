@@ -107,6 +107,12 @@ daemon it talks to. A staged build therefore waits for the next restart.
 `~/.ypaseo/daemon-activate.zsh --off`, run while the daemon is stopped, goes
 back to the npm CLI; `paseo-cli-update` warns while the link shadows it.
 
+Our two changes to Paseo used to be patches applied to the installed app and
+daemon at login and after each update: no "Set up worktree scripts" callout,
+and no phone push when a scheduled run merely finishes. Both are YPaseo changes
+now, recorded in the fork's `YPASEO.md`, so the official app and the npm CLI
+run unpatched.
+
 ## Tailnet HTTPS on port 6767
 
 Keep the daemon listening on `127.0.0.1:6767` and use Tailscale Serve to

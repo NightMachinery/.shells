@@ -34,10 +34,6 @@ if isdefined-cmd paseo ; then
     #: The CLI backgrounds its supervisor; disable Desktop's built-in daemon management.
     paseo-start
 fi
-if isdefined-cmd paseo-desktop-patch ; then
-    #: The desktop app updates itself and drops our patch; relaunch picks it up.
-    paseo-desktop-patch
-fi
 
 if isScion ; then
     #: Emacs's native compilation needs this; GUI apps get it through launchd.
