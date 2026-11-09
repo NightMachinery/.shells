@@ -241,7 +241,12 @@ func TestResolveUsesHEADRedirectAndNoSearch(t *testing.T) {
 			t.Fatal(got, err)
 		}
 	}
-	for _, input := range []string{"https://example.org/paper/" + testID, "javascript:bad", "https://arxiv.org/abs/not-an-id"} {
+	for _, input := range []string{"arXiv:2505.00001", "arxiv:2505.00001v3", " ARXIV:2505.00001 "} {
+		if got, err = c.Resolve(context.Background(), input); err != nil || got != testURL {
+			t.Fatal(input, got, err)
+		}
+	}
+	for _, input := range []string{"https://example.org/paper/" + testID, "javascript:bad", "https://arxiv.org/abs/not-an-id", "arXiv:", "arXiv:not-an-id", "arXiv:https://arxiv.org/abs/2505.00001"} {
 		if _, err = c.Resolve(context.Background(), input); err == nil {
 			t.Fatal(input)
 		}

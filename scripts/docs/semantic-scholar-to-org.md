@@ -2,7 +2,8 @@
 
 `semantic-scholar-to-org` (alias `ssorg`) fetches a paper's authors, full abstract,
 publication details, counts, and links, then produces an Org entry. Pass an
-arXiv or Semantic Scholar paper URL; arguments, piped URLs, and interactive
+arXiv or Semantic Scholar paper URL, a bare arXiv ID, or arXiv's citation form
+`arXiv:2502.04520`; arguments, piped URLs, and interactive
 clipboard input work as before. Emacs uses the same command through BrishGarden.
 
 ```zsh

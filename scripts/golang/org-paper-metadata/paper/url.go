@@ -32,7 +32,11 @@ func PaperID(raw string) string {
 }
 func arxivID(raw string) (string, bool) {
 	value := raw
-	if u, err := url.Parse(raw); err == nil && u.Host != "" {
+	//: =arXiv:2502.04520= is how arXiv itself cites a paper ("Cite as"). It
+	//: parses as a URL with scheme =arxiv= and no host, so strip it first.
+	if len(value) > len("arxiv:") && strings.EqualFold(value[:len("arxiv:")], "arxiv:") {
+		value = value[len("arxiv:"):]
+	} else if u, err := url.Parse(raw); err == nil && u.Host != "" {
 		host := strings.ToLower(u.Hostname())
 		if host != "arxiv.org" && host != "www.arxiv.org" && host != "export.arxiv.org" {
 			return "", false
