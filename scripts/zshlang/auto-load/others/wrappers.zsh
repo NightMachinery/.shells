@@ -143,6 +143,13 @@ function open-sioyek-v2 {
 
   file="$(path-unabbrev "${file}")" @TRET
 
+  #: sioyek does not complain about a missing file; it just shows the running
+  #: window, and since we then focus it, a typo looks like success.
+  if ! [[ -f "${file}" ]] ; then
+    ecerr "$0: file does not exist: ${file}"
+    return 1
+  fi
+
   awaysh sioyek "${file}" "$@" @TRET
   sioyek-reload
   sioyek-focus
