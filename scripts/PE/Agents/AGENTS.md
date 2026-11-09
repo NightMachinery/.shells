@@ -232,6 +232,7 @@ git commit-own -m "subject" -m "body" -- <paths>
 git commit-own -m "..." -- .gitignore --untrack <path>   #: stop tracking; the file stays on disk
 git commit-own -m "..." --patch <file.patch>              #: part of a file: a patch against HEAD
 git commit-own --dry-run -- <paths>                       #: what would be committed
+git commit-own --amend -- <paths>                         #: fold into your own last commit, before it is pushed
 ```
 
 In a vcsh repository it is `vcsh <repo> commit-own ...`. `git commit-own -h`
