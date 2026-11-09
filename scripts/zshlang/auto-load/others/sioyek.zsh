@@ -43,16 +43,28 @@ function build-sioyek {
 
         unsetopt SOURCE_TRACE XTRACE
 
-        local d='/Applications/sioyek.app/Contents/MacOS/'
-        local backup_d=~base'/_Local TMP/sioyek_db'
-
-        cp2 "${backup_d}"/ "$d"/*.db(DN)
+        #: The databases live in =~/Library/Application Support/sioyek/=; sioyek
+        #: on macOS never reads =*.db= next to its binary. Do not copy any into
+        #: the bundle: a file added after signing breaks the signature's seal.
+        #: (An old layout kept them there; that backup is in =~base/_Local TMP/sioyek_db=.)
 
         trs /Applications/sioyek.app
         command gcp -v -r build/sioyek.app /Applications/
-        sudo codesign --force --sign - --deep /Applications/sioyek.app
-
-        cp2 "$d" "${backup_d}"/*(DN)
+        #: A certificate signature identifies the app by bundle id and
+        #: certificate, so macOS privacy grants (e.g., folder access) survive
+        #: rebuilds; an ad hoc one is the hash of this exact build. Set up once
+        #: per Mac, at its screen: =macos-local-signing ensure 'Sioyek Local Signing'=
+        #: https://github.com/NightMachinery/macos-local-signing
+        #: No =sudo=: the bundle we just copied is ours.
+        local signing_identity="${sioyek_signing_identity:-Sioyek Local Signing}"
+        if (( ${+commands[macos-local-signing]} )) &&
+            macos-local-signing ready "${signing_identity}" ; then
+            ecgray "signing as '${signing_identity}'"
+            macos-local-signing codesign "${signing_identity}" --force --deep /Applications/sioyek.app
+        else
+            ecgray "signing ad hoc (run once: macos-local-signing ensure '${signing_identity}')"
+            command codesign --force --deep --sign - /Applications/sioyek.app
+        fi
 
         bell-p2-target-acquired
     ) ; (( $? == 0 )) || bell-fail
