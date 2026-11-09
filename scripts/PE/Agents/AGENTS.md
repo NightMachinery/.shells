@@ -186,6 +186,18 @@ For a job that must outlive your shell and session:
 - A job whose completion must notify you stays a harness-tracked background
   task (Claude Code's `run_in_background`, for example); none of these can.
 
+## Upstream Paseo Threads
+
+When you open or take part in a `getpaseo/paseo` issue, pull request or
+discussion on my behalf, record it in
+`${nightNotesPublic}/subjects/tools/AI/code/agent-management/paseo/issues.org`
+in the same task. That includes the follow-ups: answering a review, pushing
+fixes, a maintainer carrying or closing the work. Give the thread a heading
+that links it, or a dated line under its existing heading, saying what happened
+and what is left. Do this only if the file already exists; where
+`nightNotesPublic` is unset or the file is missing, skip it and do not create
+it. A change the YPaseo fork carries also goes in the fork's `YPASEO.md`.
+
 # Git Commit Guidelines
 
 ## General Rules
