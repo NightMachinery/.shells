@@ -15,9 +15,9 @@
 hide_return_policy = "screen"
 
 --- How an app hotkey brings its app forward.
----   false  straight to the window server. unhide() first, since the second
----          press of a hotkey hides its app; it is a no-op on a visible app.
----          Then _bringtofront(false), the call hs.application:activate()
+---   false  straight to the window server. unhide() first if the app is
+---          hidden, since the second press of a hotkey hides its app. Then
+---          _bringtofront(false), the call hs.application:activate()
 ---          itself ends with (SetFrontProcessWithOptions, front window only).
 ---   true   hs.application:activate() as it is, which before that asks the
 ---          target app over Accessibility for its focused window and makes
@@ -26,6 +26,19 @@ hide_return_policy = "screen"
 ---          app with several windows (on several spaces, say) ever comes
 ---          forward with the wrong one.
 app_hotkey_activate_via_ax_p = false
+
+--- Apps that always come forward the `true' way, by bundle id, whatever
+--- app_hotkey_activate_via_ax_p says. Brave, its window fullscreen in its
+--- own Space, brought forward from another Space (2026-11-09): it was
+--- frontmost, but Cmd+2 and its other shortcuts went nowhere whenever
+---   - unhide() had been called on it while visible, before either call:
+---     5 switches out of 5 (main.lua now unhides only a hidden app), or
+---   - it had been hidden, and came back through _bringtofront(false):
+---     4 out of 4.
+--- activate() worked every time: 6 out of 6 when visible, 4 out of 4 when
+--- hidden. Once stuck it stays stuck; activate() does not cure it, but
+--- Cmd+. then Escape does. See docs/hammerspoon.md.
+app_hotkey_activate_via_ax_apps = { ["com.brave.Browser"] = true }
 
 --- Whether an activation this config causes moves focus off a floating
 --- window, such as a Picture-in-Picture video, to the app's front normal

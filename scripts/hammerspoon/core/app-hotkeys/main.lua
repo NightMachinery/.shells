@@ -705,8 +705,14 @@ appSwitchWatcher:start()
 -- in config.lua.
 
 local function appBringForward(app)
-    if app_hotkey_activate_via_ax_p then return app:activate() end
-    app:unhide()
+    -- Only a hidden app: unhide() on a visible Brave cost its browser window
+    -- the keyboard, whichever call followed (config.lua). isHidden() reads
+    -- NSRunningApplication and asks the app nothing.
+    if app:isHidden() then app:unhide() end
+    if app_hotkey_activate_via_ax_p
+        or (app_hotkey_activate_via_ax_apps and app_hotkey_activate_via_ax_apps[app:bundleID()]) then
+        return app:activate()
+    end
     return app:_bringtofront(false)
 end
 

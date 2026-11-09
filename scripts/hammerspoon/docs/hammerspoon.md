@@ -117,8 +117,8 @@ keys, 6.1 ms in `entered()`), which only delays a key pressed within that time
 of hyper.
 
 How the app comes forward is set by `app_hotkey_activate_via_ax_p` in
-`core/app-hotkeys/config.lua`. With `false`, the hotkey calls `app:unhide()`, since the
-second press of a hotkey hides its app, and then `app:_bringtofront(false)`,
+`core/app-hotkeys/config.lua`. With `false`, the hotkey calls `app:unhide()` if the app is
+hidden, since the second press of a hotkey hides its app, and then `app:_bringtofront(false)`,
 the call `hs.application:activate()` itself ends with
 (`SetFrontProcessWithOptions`, front window only). With `true` it calls
 `activate()` as it is, which first asks the target app over Accessibility for
@@ -126,6 +126,35 @@ its focused window and makes it main: 3 to 8 ms of round trips to an app that
 answers promptly, and unbounded for one that does not. Set it to `true` there,
 or from the console, if an app with several windows,
 on several spaces say, ever comes forward with the wrong one.
+
+The fast path calls `unhide()` only when the app is hidden (`isHidden()`,
+which asks the app nothing), and `app_hotkey_activate_via_ax_apps`, in the
+same file, lists bundle ids that always take the `activate()` path; it holds
+only Brave. Both come from one fault. With Brave's window fullscreen in its
+own Space and Brave brought forward from another fullscreen Space, Brave was
+frontmost but its browser window did not get the keyboard: Cmd+2 and Brave's
+other shortcuts went nowhere, while Hammerspoon's own Brave hotkeys
+(system-wide) still worked. Measured 2026-11-09 by sending Cmd+2 after each
+switch and reading the active tab over AppleScript, from a working Brave each
+time:
+
+- Visible Brave: `unhide()` before either `_bringtofront(false)` or
+  `activate()` broke it, 5 out of 5. Either call without it worked:
+  `_bringtofront(false)` 3 out of 3, `activate()` 6 out of 6.
+- Hidden Brave: `_bringtofront(false)` broke it, 4 out of 4, with or without
+  `unhide()` first; `activate()` worked, 4 out of 4.
+
+`unhide()` on a visible app was assumed to be a no-op, and the fast path
+called it on every switch, so every hyper+/ broke Brave. Which window gets the
+keyboard instead is not known (macOS does not expose the key window); Brave
+fullscreen has two extra windows, a 72 px tab strip and toolbar and a 24 px
+strip at layer 26.
+
+The state then sticks: `activate()`, `hs.window:focus()` and `AXRaise` did not
+clear it. Taking focus away and giving it back within Brave's Space did, every
+time: an `hs.chooser` shown and cancelled, which is what Cmd+. (Omni) and
+Escape does by hand. Restarting Brave also clears it. Other Chromium browsers
+may behave the same; they were not tested, so they are not listed.
 
 Hyper's Secure Input workaround temporarily unfocuses the current control.
 `core/hyper-focus-restore.lua` first records its process and native focused
