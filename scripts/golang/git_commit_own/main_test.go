@@ -531,7 +531,7 @@ func TestDryRun(t *testing.T) {
 
 func TestRefusesDuringMerge(t *testing.T) {
 	f := newRepo(t)
-	f.git("update-ref", "MERGE_HEAD", "HEAD")
+	f.write(".git/MERGE_HEAD", f.git("rev-parse", "HEAD")+"\n") // as git merge leaves it; newer git refuses update-ref on it
 	f.write("a.txt", "a2\n")
 	if r := f.own("", "-m", "x", "a.txt"); r.code != 1 || !strings.Contains(r.stderr, "MERGE_HEAD") {
 		t.Fatalf("exit %d\n%s", r.code, r.stderr)
