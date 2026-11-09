@@ -55,6 +55,19 @@ you are deliberately opening a document.
 `reload`, which repaints with a visible flicker. Against a stock sioyek, the
 command name is what fails, not the flag.
 
+## Gotcha: a second sioyek window after a few days
+
+`sioyek-reload` only works if the forwarding process finds the running
+instance. Before 2026-11-09, sioyek's single-instance lock depended on a file
+in `$TMPDIR`, which macOS deletes after about three days without access. After
+that, the next reload started a second sioyek instead of reloading the first,
+and the first became unreachable. The fork's `night_dev3` now uses a lock
+file in `~/Library/Application Support/sioyek/` instead; see
+`docs/single-instance.md` in `~/code/misc/sioyek` (upstream PR
+https://github.com/ahrm/sioyek/pull/1718). After installing a build with the
+fix, quit all running sioyek windows once: the new binary cannot reach an old
+one.
+
 ## Checking the behaviour
 
 ```zsh
