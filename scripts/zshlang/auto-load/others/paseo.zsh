@@ -24,6 +24,12 @@ function paseo-cli-update {
     : "usage: paseo-cli-update [version]"
     : "Install the latest (or given) Paseo CLI. It neither starts nor restarts the daemon."
     paseo-install "$@"
+    local ret=$?
+    #: The install replaces the daemon's files, and with them our local patches.
+    #: Patch even when the install reported a problem: the patch is idempotent.
+    "${NIGHTDIR}/setup/patches/paseo/disable-scheduled-push-notifs.zsh" ||
+        ecerr "$0: could not reapply the scheduled-push patch; see setup/patches/paseo/"
+    return ${ret}
 }
 
 function h-paseo-daemon-env {
