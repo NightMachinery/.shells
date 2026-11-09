@@ -111,10 +111,16 @@ Two refusals keep it from rewriting anything but your own fresh commit:
 
 - A commit that any remote-tracking branch already contains is refused,
   because replacing it rewrites history others may have pulled. Make a new
-  commit instead.
+  commit instead. When a force-push is intended, `--rewrite-pushed` lifts
+  this refusal; then push with `git push --force-with-lease`, which fails
+  rather than overwrites if someone pushed in the meantime.
 - If the branch moves while the amended commit is being built, the tool stops
   instead of rebuilding: the new tip is someone else's commit, and amending it
   would fold your change into their work.
+
+Rewriting more than the last commit (dropping a file from several commits,
+say) is outside this tool: rebuild those commits with `git commit-tree`, and
+force-push the same way.
 
 It cannot tell whether the last commit is yours when another session made it
 before you started, since the agents all commit as the same person. Amend

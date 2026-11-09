@@ -47,6 +47,8 @@ left as it was.
       --amend          replace the last commit with one that also holds the
                        named paths; its message and author are kept unless -m,
                        -F or --author is given; refused once it is pushed
+      --rewrite-pushed with --amend: replace a commit that is already pushed,
+                       to force-push it afterwards (git push --force-with-lease)
       --author A       the author: "Name <email>", or a pattern matching the
                        author of an earlier commit, as for git commit
       --allow-empty    commit even when nothing changed
@@ -83,6 +85,7 @@ type options struct {
 	wholeTree  bool
 	dryRun     bool
 	amend      bool
+	rewrite    bool
 	author     string
 }
 
@@ -161,6 +164,8 @@ func parseArgs(args []string) (*options, error) {
 			err = flag(&o.dryRun)
 		case "--amend":
 			err = flag(&o.amend)
+		case "--rewrite-pushed":
+			err = flag(&o.rewrite)
 		case "--author":
 			v, err = value()
 			o.author = v
@@ -181,6 +186,8 @@ func parseArgs(args []string) (*options, error) {
 		return nil, fmt.Errorf("a commit message is required (-m or -F)")
 	case len(o.paths)+len(o.untrack)+len(o.patchFiles) == 0 && !o.allowEmpty && !o.amend:
 		return nil, fmt.Errorf("name the paths to commit")
+	case o.rewrite && !o.amend:
+		return nil, fmt.Errorf("--rewrite-pushed only goes with --amend")
 	}
 	stdinUsers := 0
 	if o.msgFile == "-" {
@@ -556,8 +563,12 @@ func (a *app) attempt(o *options, r *repo, msg string, author []string, patches 
 		if parents, emptyTree, err = a.amendBase(h.commit, r); err != nil {
 			return err
 		}
-		if err := a.checkUnpushed(h.commit); err != nil {
+		if pushed, err := a.pushedIn(h.commit); err != nil {
 			return err
+		} else if pushed != "" && !o.rewrite {
+			return fmt.Errorf("%.10s is already pushed (it is in %s); amending it rewrites published history, so make a new commit instead, or pass --rewrite-pushed if a force-push is intended", h.commit, pushed)
+		} else if pushed != "" && !o.dryRun && n == 1 {
+			a.warnf("rewriting %.10s, which is already in %s; push with git push --force-with-lease", h.commit, pushed)
 		}
 		if msg == "" {
 			old, err := a.git(call{}, "show", "-s", "--format=%B", h.commit)
@@ -760,18 +771,15 @@ func (a *app) amendBase(commit string, r *repo) ([]string, string, error) {
 	return parents, tree, err
 }
 
-// checkUnpushed refuses to amend a commit that a remote-tracking branch
-// already contains: replacing it rewrites history that others may have.
-func (a *app) checkUnpushed(commit string) error {
+// pushedIn names a remote-tracking branch that already contains commit, or
+// returns "" when none does. Amending such a commit rewrites history that
+// others may have pulled.
+func (a *app) pushedIn(commit string) (string, error) {
 	out, err := a.line(call{}, "for-each-ref", "--contains", commit, "--format=%(refname:short)", "refs/remotes")
 	if err != nil {
-		return err
+		return "", err
 	}
-	if out != "" {
-		return fmt.Errorf("%.10s is already pushed (it is in %s); amending would rewrite published history, so make a new commit instead",
-			commit, strings.SplitN(out, "\n", 2)[0])
-	}
-	return nil
+	return strings.SplitN(out, "\n", 2)[0], nil
 }
 
 var authorForm = regexp.MustCompile(`^\s*([^<>]*?)\s*<([^<>]*)>\s*$`)

@@ -139,6 +139,7 @@ func TestParseArgs(t *testing.T) {
 		{args: []string{"--dry-run", "a"}, path: []string{"a"}},
 		{args: []string{"--amend"}},
 		{args: []string{"--amend", "--author"}, err: "needs a value"},
+		{args: []string{"-m", "x", "--rewrite-pushed", "a"}, err: "only goes with --amend"},
 	}
 	for _, c := range cases {
 		o, err := parseArgs(c.args)
@@ -624,6 +625,16 @@ func TestAmendRefusals(t *testing.T) {
 	}
 	if got := f.git("rev-parse", "HEAD"); got != head {
 		t.Fatal("HEAD moved")
+	}
+	r := f.mustOwn("--amend", "--rewrite-pushed", "b.txt")
+	if !strings.Contains(r.stderr, "force-with-lease") {
+		t.Fatalf("no force-push note:\n%s", r.stderr)
+	}
+	if got := f.git("rev-parse", "HEAD^"); got != f.git("rev-parse", "origin/master^") {
+		t.Fatal("the rewritten commit has a different parent")
+	}
+	if got := f.changedIn("HEAD"); got != "a.txt\nb.txt" {
+		t.Fatalf("changed %q", got)
 	}
 
 	root := t.TempDir()
