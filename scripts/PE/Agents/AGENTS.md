@@ -246,6 +246,8 @@ lists the options, and `~/scripts/docs/git-commit-own.md` explains them.
   `git diff -- <paths>`: the file is committed as it is on disk.
 - It prints the commit's `--stat`. Check that only your paths landed.
 - If signing fails, it says so; retry with `--no-gpg-sign` (see General Rules).
+- `--amend` refuses a pushed commit. Add `--rewrite-pushed` only when I asked
+  for a force-push, then push with `--force-with-lease`.
 - Where `git commit-own` is missing (a host without `~/scripts`), use
   `git commit -- <paths>`, and do not untrack or commit part of a file there
   without telling me.
