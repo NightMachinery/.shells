@@ -1,9 +1,11 @@
 #!/usr/bin/env -S zsh -f
 #: `git commit-own' (and `vcsh <repo> commit-own') runs this, since git looks
 #: up `git-<name>' on PATH. It keeps the Go binary built from
-#: golang/git_commit_own and no older than its source, then runs it.
+#: golang/git_commit_own and no older than its source, then runs it. It sits
+#: in zshlang/wrappers because ~/.shared.sh puts that on the base PATH, so a
+#: non-interactive shell (ssh host 'git commit-own ...') finds it too.
 #: See docs/git-commit-own.md.
-local root="${${(%):-%x}:A:h:h}"
+local root="${${(%):-%x}:A:h:h:h}"
 source "${root}/zshlang/basic/basic.plugin.zsh" || exit 70
 source "${root}/zshlang/basic/colors.zsh" || exit 70
 source "${root}/zshlang/basic/conditions-personal.zsh" || exit 70

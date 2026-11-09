@@ -131,8 +131,10 @@ looked up among the authors of existing commits.
 
 ## Installation
 
-`bin/git-commit-own` is a zsh shim: git finds it on `PATH` as the
-`commit-own` subcommand. It calls [agfi:go-local-dep], which builds
+`zshlang/wrappers/git-commit-own` is a zsh shim: git finds it on `PATH` as
+the `commit-own` subcommand. It lives there because `~/.shared.sh` puts that
+directory on the base `PATH`, so a non-interactive shell finds it too, such
+as `ssh host 'git commit-own ...'`. It calls [agfi:go-local-dep], which builds
 `golang/git_commit_own` into `~/go/bin/git_commit_own` when the binary is
 missing or older than its source, and then runs it. So a `git pull` of
 `~/scripts` is all a host needs, as long as it has Go. Run the tests with
