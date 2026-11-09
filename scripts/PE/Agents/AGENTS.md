@@ -409,6 +409,7 @@ The following has been redefined in Zsh as functions or aliases; use `command ..
 - `install`
 - `as`
 - `log`
+- `ffmpeg`: outside an interactive shell it adds `-loglevel error`, which hides informational output such as `volumedetect`'s levels.
 
 You should offer to expand this list as you encounter new such cases.
 
