@@ -879,21 +879,46 @@ function toggleFocus(appName)
     end
 end
 
---- The first running app of an ordered candidate list. Every candidate but
---- the last must also have a window: hear's background mpv, on scion
---- (mpv 0.41, 2026-10-31), sometimes runs as a regular app with no window at
---- all, and hyper+m kept switching to it instead of moving on to Paseo.
+--- The first app of an ordered candidate list that is running and has a
+--- window, else the first that is running at all. hear's background mpv, on
+--- scion (mpv 0.41, 2026-10-31), sometimes runs as a regular app with no
+--- window, and hyper+m kept switching to it instead of moving on to Paseo.
 --- A fullscreen window in another Space can be absent from allWindows()
---- even while focusedWindow() and mainWindow() find it. Check those first.
+--- even while focusedWindow() and mainWindow() find it, so check those first.
+--- Even those miss it now and then: on 2026-11-09 hyper+k went to a
+--- windowless Preview over a sioyek fullscreen in another Space, whose
+--- window the same checks found every time a minute later. Hence the
+--- fallback is the first running candidate, not the last.
+local function appHasWindow(app)
+    local ok, has = pcall(function()
+        return app:focusedWindow() ~= nil or app:mainWindow() ~= nil
+            or #app:allWindows() > 0
+    end)
+    return ok and has
+end
+
 function appHotkeyCandidate(appNames)
+    local fallback, skipped = nil, nil
     for i = 1, #appNames do
         local app = getApp(appNames[i])
-        if app and (i == #appNames or app:focusedWindow() or app:mainWindow()
-                    or #app:allWindows() > 0) then
-            return app
+        if app then
+            if appHasWindow(app) then
+                if skipped then
+                    print(string.format("appHotkey: skipped %s (running, no window found) for %s",
+                                        table.concat(skipped, ", "), app:name() or appNames[i]))
+                end
+                return app
+            end
+            fallback = fallback or app
+            skipped = skipped or {}
+            skipped[#skipped + 1] = app:name() or appNames[i]
         end
     end
-    return nil
+    if fallback then
+        print(string.format("appHotkey: no candidate has a window (%s); using %s",
+                            table.concat(skipped, ", "), fallback:name() or "?"))
+    end
+    return fallback
 end
 
 function appHotkey(o)

@@ -61,14 +61,23 @@ order:
 Boolean knobs end in `_p`, after the Lisp convention.
 
 `appHotkey` accepts either one app name/bundle ID or a dense ordered array of
-them. On each press it uses `getApp` to try the candidates in order. Candidates
-before the last must have a focused window, main window, or enumerated window;
-the last only needs to be running. This skips background mpv processes without
-windows while keeping a final fallback available. A focused or main window is
-sufficient because `allWindows()` can omit a fullscreen window in another Space.
-Measured on 2026-10-31, Brave returned no enumerated windows but did return both
-its focused and main window, which made Hyper+/ silently skip it before this
-check was corrected.
+them. On each press it uses `getApp` to try the candidates in order and picks
+the first running one that has a focused window, main window, or enumerated
+window. If no running candidate has one, it falls back to the first running
+candidate. This skips background mpv processes without windows. A focused or
+main window is sufficient because `allWindows()` can omit a fullscreen window in
+another Space. Measured on 2026-10-31, Brave returned no enumerated windows but
+did return both its focused and main window, which made Hyper+/ silently skip it
+before this check was corrected.
+
+Even the focused and main window queries occasionally miss a fullscreen window in
+another Space. On 2026-11-09 Hyper+K went to a windowless Preview instead of a
+fullscreen sioyek, while the same queries found sioyek's window on every one of
+30 tries a minute later. The fallback used to be the *last* running candidate,
+which turned that miss into a switch to an empty app; the *first* running one
+lands on the app you most likely meant. Each press that passes over a running
+candidate logs an `appHotkey: skipped ...` or `appHotkey: no candidate has a
+window ...` line to the console.
 
 The selected app toggles: frontmost apps hide, while other running apps activate.
 If no candidate qualifies, the key does nothing and never launches one.
