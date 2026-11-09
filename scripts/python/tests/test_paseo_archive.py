@@ -188,6 +188,14 @@ function h-agent-session-preview-cmd { print -r -- "printf 'RICH:%s:%s\\n' {13}"
         r = self.shell('paseo-archive-all -n')
         self.assertNotIn('old test', r.stdout)
 
+    def test_archiving_several_prints_no_variable_dumps(self):
+        # A `local` re-run inside the loop made zsh print `fresh=$'...'` per agent.
+        self.record(OTHER, lastActivityAt=self.ago(100))
+        r = self.shell('paseo-archive-all --yes')
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertEqual(sorted(c[1] for c in self.calls() if c[0] == 'archive'), sorted([IDLE, OTHER]))
+        self.assertNotIn('fresh=', r.stdout + r.stderr)
+
     def test_eligible_children_listed_and_requests_deduplicated(self):
         self.record(OTHER, labels={'paseo.parent-agent-id': IDLE})
         r = self.shell('paseo-archive-all --yes')

@@ -601,11 +601,14 @@ ${summary}" \
     done
     local -a archive_opts=()
     [[ "${force}" == y ]] && archive_opts+=(--force)
+    #: Declared once, outside the loop: zsh prints an existing variable when
+    #: `local` names it again without a value.
+    local fresh fresh_row old_cascade old_descendants
     for row in "${(@f)selected}" ; do
         fields=( "${(@ps:\t:)row}" )
         id="${fields[1]}"
         [[ "${covered[$id]:-}" == y ]] && continue
-        local fresh fresh_row='' old_cascade="${fields[9]}" old_descendants="${fields[10]}"
+        fresh_row='' old_cascade="${fields[9]}" old_descendants="${fields[10]}"
         fresh="$(h-paseo-archive-rows "${scope}" "${kind}" "${minimum}" "${force}")" @RET
         for fresh_row in "${(@f)fresh}" ; do
             [[ "${fresh_row%%$'\t'*}" == "${id}" ]] && break
