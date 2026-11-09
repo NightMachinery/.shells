@@ -37,6 +37,9 @@ function paseo-cli-update {
     "${NIGHTDIR}/setup/patches/paseo/disable-scheduled-push-notifs.zsh" ||
         ecerr "$0: could not reapply the scheduled-push patch; see setup/patches/paseo/"
     paseo-desktop-patch
+    if [[ "${commands[paseo]:A}" == */ypaseo-daemon/* ]] ; then
+        ecerr "$0: note: paseo runs the YPaseo daemon build, which shadows this install; see ~/.ypaseo/daemon-activate.zsh --off"
+    fi
     return ${ret}
 }
 
@@ -61,6 +64,14 @@ function h-paseo-daemon-env {
 
 function paseo-start {
     : "usage: paseo-start [paseo daemon start options]"
+    #: A daemon built from the YPaseo fork is staged by ~/.ypaseo/build-daemon.zsh
+    #: and switched to only here, while no daemon runs, so that \`paseo' always
+    #: matches the daemon it talks to.
+    local activate="${HOME}/.ypaseo/daemon-activate.zsh"
+    if [[ -x "${activate}" ]] ; then
+        "${activate}" || ecerr "$0: could not activate the staged YPaseo daemon; starting the current one"
+        rehash
+    fi
     h-paseo-daemon-env paseo daemon start "$@"
 }
 

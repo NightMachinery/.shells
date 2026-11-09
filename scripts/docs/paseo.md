@@ -95,6 +95,18 @@ agent turn, including the caller's, so run it detached from an agent.
 
 See the official [daemon lifecycle reference](https://paseo.sh/docs/cli.md#daemon-management).
 
+### A daemon built from a fork
+
+A machine with a private `~/.ypaseo` (the YPaseo fork's tooling) can run a
+daemon built from the fork instead of the npm release. `build-daemon.zsh` there
+stages a release under `~/.local/share/ypaseo-daemon`, and `paseo-start`
+switches to it with a `paseo` link in `~/bin` or `~/.local/bin`, whichever
+comes first on PATH (the Macs differ). It does that only while no daemon runs,
+because the daemon loads its code when it starts, and the CLI must match the
+daemon it talks to. A staged build therefore waits for the next restart.
+`~/.ypaseo/daemon-activate.zsh --off`, run while the daemon is stopped, goes
+back to the npm CLI; `paseo-cli-update` warns while the link shadows it.
+
 ## Tailnet HTTPS on port 6767
 
 Keep the daemon listening on `127.0.0.1:6767` and use Tailscale Serve to
