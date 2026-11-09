@@ -60,7 +60,9 @@ load and every 15 minutes, logging one line per row it ends to
 The daemon never runs anything from the repository. A root job that executes a
 user-writable file would let anything running as the user become root. The
 installer therefore compiles a **snapshot** and installs it `root:wheel 755` as
-`/usr/local/libexec/utmpx-clean-stale`. It first checks that every directory
+`/usr/local/libexec/end-stale-ssh-logins`. System Settings > Login Items lists
+the daemon under that file name, so the name says what the job does rather than
+which file it edits. It first checks that every directory
 above both install locations is root-owned and not group- or world-writable.
 
 ## Commands
@@ -83,7 +85,7 @@ update also changes the build, which triggers one reinstall.
 
 The `cmp` comparison relies on same-named builds being byte-identical. The
 ad-hoc code signature embeds the output file name, which is why the build is
-always named `utmpx-clean-stale`.
+always named `end-stale-ssh-logins`.
 
 ## Checking by hand
 

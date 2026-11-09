@@ -16,7 +16,7 @@
          repository. -->
     <key>ProgramArguments</key>
     <array>
-        <string>/usr/local/libexec/utmpx-clean-stale</string>
+        <string>/usr/local/libexec/end-stale-ssh-logins</string>
         <string>--apply</string>
     </array>
 

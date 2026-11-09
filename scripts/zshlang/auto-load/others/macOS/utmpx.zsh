@@ -6,7 +6,7 @@ function h-utmpx-clean-build {
     #: Compiles c/utmpx_clean_stale.c into a fresh temp dir and prints the
     #: binary's path; the caller removes its directory.
     #:
-    #: Keep the output named utmpx-clean-stale. The ad-hoc code signature
+    #: Keep the output named end-stale-ssh-logins. The ad-hoc code signature
     #: embeds the file name, and same-named builds are otherwise
     #: byte-identical, which is how [agfi:utmpx-clean-daemon-install] detects
     #: drift with a plain cmp.
@@ -14,11 +14,11 @@ function h-utmpx-clean-build {
     local dir
     dir="$(command mktemp -d -t utmpx-clean)" @TRET
     if ! /usr/bin/cc -O2 -Wall -Wextra -Werror \
-        -o "${dir}/utmpx-clean-stale" "${NIGHTDIR}/c/utmpx_clean_stale.c" ; then
+        -o "${dir}/end-stale-ssh-logins" "${NIGHTDIR}/c/utmpx_clean_stale.c" ; then
         command rm -rf "$dir"
         return 1
     fi
-    print -r -- "${dir}/utmpx-clean-stale"
+    print -r -- "${dir}/end-stale-ssh-logins"
 }
 
 function utmpx-stale-list {
@@ -79,7 +79,7 @@ function utmpx-clean-daemon-install {
     fi
 
     local label='com.user.utmpx-clean'
-    local bin_dst='/usr/local/libexec/utmpx-clean-stale'
+    local bin_dst='/usr/local/libexec/end-stale-ssh-logins'
     local plist_src="${NIGHTDIR}/launchers/utmpx-clean/${label}.plist"
     local plist_dst="/Library/LaunchDaemons/${label}.plist"
     if ! [[ -r $plist_src ]] ; then
@@ -128,6 +128,8 @@ function utmpx-clean-daemon-install {
             set -e
             bin_new=$1 bin_dst=$2 plist_src=$3 plist_dst=$4 label=$5
             do_bin=$6 do_plist=$7 do_load=$8
+            #: The binary was named utmpx-clean-stale before 2026-11.
+            /bin/rm -f /usr/local/libexec/utmpx-clean-stale
             if [ "$do_bin" = y ] ; then
                 /usr/bin/install -o root -g wheel -m 755 "$bin_new" "${bin_dst}.new"
                 /bin/mv -f "${bin_dst}.new" "$bin_dst"
@@ -161,7 +163,8 @@ function utmpx-clean-daemon-uninstall {
     local -a sudo_cmd=( ${(@f)"$(h-sudo-cmd)"} )
     "${sudo_cmd[@]}" /bin/sh -c '
         /bin/launchctl bootout "system/$1" 2>/dev/null
-        /bin/rm -f "/Library/LaunchDaemons/$1.plist" /usr/local/libexec/utmpx-clean-stale
+        /bin/rm -f "/Library/LaunchDaemons/$1.plist" /usr/local/libexec/end-stale-ssh-logins \
+            /usr/local/libexec/utmpx-clean-stale
     ' utmpx-clean-uninstall "$label"
 }
 ##
