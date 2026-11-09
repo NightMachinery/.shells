@@ -18,6 +18,20 @@ def duration(value):
     return float(m[1]) * {'m': 60, 'h': 3600, 'd': 86400}[m[2]]
 
 
+def folder_gone(cwd):
+    """True when the directory was deleted, not merely on an unmounted volume.
+
+    Paseo keeps a workspace whose directory is missing, because the disk may
+    just be unmounted. A missing directory whose parent still exists was
+    deleted (a retired worktree, typically), so its agents can go regardless of
+    how recently they ran.
+    """
+    if not cwd:
+        return False
+    path = Path(str(cwd)).expanduser()
+    return not path.exists() and path.parent.is_dir()
+
+
 def activity(record):
     for key in ('lastActivityAt', 'updatedAt', 'createdAt'):
         value = record.get(key)
@@ -45,7 +59,8 @@ def load_records(home):
                 raise ValueError()
             # Never expose persistence metadata, transcript data or credentials.
             record = {key: raw.get(key) for key in ('id', 'title', 'cwd', 'lastStatus', 'archivedAt',
-                                                    'lastActivityAt', 'updatedAt', 'createdAt')}
+                                                    'lastActivityAt', 'updatedAt', 'createdAt',
+                                                    'workspaceId')}
             record['keep'] = str(labels.get('keep', '')).lower() == 'true'
             record['parent'] = labels.get('paseo.parent-agent-id')
             if ident in records and records[ident] != record:
@@ -75,6 +90,7 @@ def plan(live, records, *, scope='global', cwd='', caller='', parent='', minimum
         if r.get('parent'):
             children.setdefault(r['parent'], []).append(ident)
     stamp = {i: activity(r) for i, r in active.items()}
+    gone = {i: folder_gone(r.get('cwd')) for i, r in active.items()}
     def in_scope(r):
         return scope == 'global' or Path(str(r.get('cwd') or '')).expanduser().resolve() == Path(cwd).resolve()
     def own_reason(ident, descendant=False):
@@ -93,6 +109,8 @@ def plan(live, records, *, scope='global', cwd='', caller='', parent='', minimum
         # Running descendants are ALWAYS blockers, including with --force.
         if status == 'running' and (descendant or not (force and kind == 'fz')):
             return 'running'
+        if gone[ident]:
+            return ''
         if not force and minimum > 0:
             if stamp[ident] is None:
                 return 'unknown activity'
@@ -158,7 +176,10 @@ def plan(live, records, *, scope='global', cwd='', caller='', parent='', minimum
         relative = '?' if age is None else (f'{age / 86400:.1f}d ago' if age >= 86400 else f'{age / 3600:.1f}h ago' if age >= 3600 else f'{age / 60:.0f}m ago')
         names = [f'{short_id(child)} {active[child].get("title") or "(untitled)"} [{current.get(child, {}).get("status", "?")}]' for child in descendants]
         cascade = f'archives {len(names)} subagents with it: ' + '; '.join(names) if names else '-'
-        row = [ident, short_id(ident), 'RUNNING!' if a.get('status') == 'running' else a.get('status', '?'),
+        status = 'RUNNING!' if a.get('status') == 'running' else a.get('status', '?')
+        if gone[ident]:
+            status += ' (folder gone)'
+        row = [ident, short_id(ident), status,
                relative, a.get('provider', '?'), a.get('name') or a.get('title') or '(untitled)', a.get('cwd', '?'),
                'hidden' if reason else 'selectable', cascade, ','.join(descendants) or '-', reason or '-']
         rows.append('\t'.join(map(safe, row)))
@@ -166,6 +187,28 @@ def plan(live, records, *, scope='global', cwd='', caller='', parent='', minimum
         count = sum(hidden.values())
         detail = ', '.join(f'{n} {why}' for why, n in sorted(hidden.items()))
         rows.append(f'#summary\t{count} hidden' + (f' ({detail})' if detail else '') + '; --show-hidden lists them')
+    return rows
+
+
+def stale_workspaces(workspaces, records, agent_ids):
+    """Workspaces to archive after their agents: the directory was deleted, the
+    workspace held one of agent_ids, and none of its agents is still unarchived.
+    Archiving an agent leaves its workspace in the sidebar, and for a deleted
+    directory nothing else ever removes it."""
+    agent_ids = set(agent_ids)
+    by_workspace = {}
+    for ident, r in records.items():
+        if r.get('workspaceId'):
+            by_workspace.setdefault(r['workspaceId'], []).append(ident)
+    rows = []
+    for w in workspaces:
+        ident = w.get('workspaceId')
+        members = by_workspace.get(ident, [])
+        if not ident or not folder_gone(w.get('cwd')) or not agent_ids & set(members):
+            continue
+        if any(records[m]['archivedAt'] is None for m in members):
+            continue
+        rows.append('\t'.join(str(v) for v in (ident, w.get('name') or '?', w.get('cwd') or '?')))
     return rows
 
 
@@ -181,7 +224,15 @@ def main():
     ap.add_argument('--force', action='store_true')
     ap.add_argument('--show-hidden', action='store_true')
     ap.add_argument('--summary', action='store_true')
+    ap.add_argument('--stale-workspaces', metavar='AGENT_IDS',
+                    help='read `paseo workspace ls --json` and list the workspaces of these '
+                         'comma-separated agents that are now empty with a deleted directory')
     opts = ap.parse_args()
+    if opts.stale_workspaces is not None:
+        for row in stale_workspaces(json.load(sys.stdin), load_records(opts.home),
+                                    opts.stale_workspaces.split(',')):
+            print(row)
+        return
     minimum = duration(opts.min_idle)
     live = json.load(sys.stdin)
     records = load_records(opts.home)

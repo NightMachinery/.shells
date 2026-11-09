@@ -466,7 +466,7 @@ function h-paseo-archive {
     local kind="${1}" ; shift
     local scope=global dry=n yes=n force=n filter='' filter_p=n minimum=72h show_hidden=n summary='' eligible_rows=''
     local row rows selected id failed=0 answer
-    local -a fields
+    local -a fields archived_ids=()
     local -A allowed covered
     while (( $# )) ; do
         case "${1}" in
@@ -490,6 +490,9 @@ function h-paseo-archive {
        paseo-archive-all [-l] [-n] [-y] [--min-idle DUR|--all-ages] [--show-hidden]
 Default: idle or terminal agents last active at least 72 hours ago, oldest first,
 across every directory. --local-dir (-l) restricts cwd; --global (-g) is default.
+An agent whose directory was deleted (missing, with its parent present) is
+offered at any age, marked "(folder gone)"; once its workspace has no agents
+left, the workspace is archived too, since nothing else removes it.
 --min-idle accepts 72h, 3d, 90m, or 0; --all-ages is --min-idle 0.
 Terminal statuses: closed, error, errored, failed, stopped; archived rows are excluded.
 LAST ACTIVE uses stored lastActivityAt, then updatedAt, then createdAt.
@@ -621,7 +624,36 @@ ${summary}" \
         fi
         #: No --force in archive-all: the CLI also guards a run starting after
         #: the fresh listing. Each command prints its own success or failure.
-        command paseo archive "${id}" "${archive_opts[@]}" || failed=1
+        if command paseo archive "${id}" "${archive_opts[@]}" ; then
+            archived_ids+=("${id}" "${(@s:,:)old_descendants:#-}")
+        else
+            failed=1
+        fi
+    done
+    h-paseo-archive-stale-workspaces "${archived_ids[@]}" || failed=1
+    return "${failed}"
+}
+
+function h-paseo-archive-stale-workspaces {
+    : "usage: h-paseo-archive-stale-workspaces AGENT_ID..."
+    #: Archiving an agent leaves its workspace in the sidebar. When the
+    #: workspace's directory was deleted (a retired worktree) and none of its
+    #: agents remains, nothing else will ever remove it, so archive it too.
+    #: Paseo deletes only directories it owns, and this one is already gone.
+    emulate -L zsh
+    setopt pipefail
+    (( $# )) || return 0
+    local root="${NIGHTDIR:-${HOME}/scripts}" archive_home stale row failed=0
+    local -a fields
+    archive_home="$(h-paseo-home)" @RET
+    stale="$(command paseo workspace ls --json |
+        command python3 "${root}/python/paseo_archive.py" --home "${archive_home}" \
+            --stale-workspaces "${(j:,:)@}")" @RET
+    for row in "${(@f)stale}" ; do
+        [[ -n "${row}" ]] || continue
+        fields=( "${(@ps:\t:)row}" )
+        print -r -- "workspace ${fields[2]}: folder gone (${fields[3]}); archiving it"
+        command paseo workspace archive "${fields[1]}" || failed=1
     done
     return "${failed}"
 }

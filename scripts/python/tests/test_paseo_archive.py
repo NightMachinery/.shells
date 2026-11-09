@@ -33,7 +33,9 @@ class ArchiveTests(unittest.TestCase):
         self.env.pop('paseo_home', None)
         self.agents = [dict(id=i, status=s, name=t, created='10 years ago', provider='fixture/model', cwd=str(self.tmp))
                        for i, s, t in [(CALLER, 'idle', 'caller'), (PARENT, 'idle', 'parent'), (IDLE, 'idle', 'old test'), (RUNNING, 'running', 'busy')]]
-        self.agents += [dict(id=OTHER, status='idle', name='other dir', cwd='/elsewhere')]
+        self.elsewhere = self.tmp / 'elsewhere'
+        self.elsewhere.mkdir()
+        self.agents += [dict(id=OTHER, status='idle', name='other dir', cwd=str(self.elsewhere))]
         (self.tmp / 'rows.json').write_text(json.dumps(self.agents))
         for a in self.agents:
             self.record(a['id'], title=a['name'], cwd=a['cwd'])
@@ -46,6 +48,9 @@ if sys.argv[1]=='ls':
  rows=json.loads((p/'rows.json').read_text())
  if '--all' not in sys.argv: rows=[r for r in rows if r.get('status')!='closed']
  print(json.dumps(rows))
+elif sys.argv[1:3]==['workspace','ls']:
+ f=p/'workspaces.json'
+ print(f.read_text() if f.exists() else '[]')
 else:
  with (p/'calls').open('a') as f: f.write(json.dumps(sys.argv[1:])+'\\n')
  print('updated' if sys.argv[1]=='agent' else 'archived',sys.argv[-1])
@@ -109,6 +114,55 @@ function h-agent-session-preview-cmd { print -r -- "printf 'RICH:%s:%s\\n' {13}"
         r = self.shell('paseo-archive-all -n')
         self.assertEqual(r.returncode, 0, r.stderr)
         self.assertLess(r.stdout.index('other dir'), r.stdout.index('old test'))
+
+    def gone_dir(self, name):
+        parent = self.tmp / 'wt'
+        parent.mkdir(exist_ok=True)
+        return str(parent / name)
+
+    def test_deleted_folder_offered_regardless_of_age(self):
+        gone = self.gone_dir('task-1')
+        self.record(IDLE, lastActivityAt=self.ago(1), cwd=gone)
+        r = self.shell('paseo-archive-all -n')
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertIn('old test', r.stdout)
+        self.assertIn('(folder gone)', r.stdout)
+        self.assertEqual(self.calls(), [])
+
+    def test_unmounted_volume_is_not_folder_gone(self):
+        self.record(IDLE, lastActivityAt=self.ago(1), cwd=str(self.tmp / 'no-such-volume' / 'task'))
+        r = self.shell('paseo-archive-all -n')
+        self.assertNotIn('old test', r.stdout)
+
+    def test_deleted_folder_still_respects_running_and_pins(self):
+        gone = self.gone_dir('task-2')
+        self.record(RUNNING, cwd=gone)
+        self.record(IDLE, lastActivityAt=self.ago(1), cwd=gone, labels={'keep': 'true'})
+        r = self.shell('paseo-archive-all -n')
+        self.assertNotIn('busy', r.stdout)
+        self.assertNotIn('old test', r.stdout)
+
+    def test_empty_workspace_with_deleted_folder_is_archived_after_its_agent(self):
+        gone = self.gone_dir('task-3')
+        self.record(IDLE, lastActivityAt=self.ago(1), cwd=gone, workspaceId='wks_gone')
+        self.record(OTHER, workspaceId='wks_other')
+        (self.tmp / 'workspaces.json').write_text(json.dumps([
+            dict(workspaceId='wks_gone', name='task-3', cwd=gone),
+            dict(workspaceId='wks_other', name='other', cwd=gone)]))
+        # The fake archive does not touch records; mark it archived as the daemon would.
+        self.record(IDLE, archivedAt=self.ago(0))
+        r = self.shell('h-paseo-archive-stale-workspaces ' + IDLE)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertEqual(self.calls(), [['workspace', 'archive', 'wks_gone']])
+
+    def test_workspace_kept_while_an_agent_remains(self):
+        gone = self.gone_dir('task-4')
+        self.record(IDLE, cwd=gone, workspaceId='wks_gone', archivedAt=self.ago(0))
+        self.record(OTHER, cwd=gone, workspaceId='wks_gone')
+        (self.tmp / 'workspaces.json').write_text(json.dumps([dict(workspaceId='wks_gone', name='t', cwd=gone)]))
+        r = self.shell('h-paseo-archive-stale-workspaces ' + IDLE)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertEqual(self.calls(), [])
 
     def test_age_overrides(self):
         self.record(IDLE, lastActivityAt=self.ago(1))
@@ -381,7 +435,7 @@ paseo-archive-fz --filter "old test"
             with self.subTest(condition=condition):
                 self.agents = [dict(a, status=('running' if a['id']==RUNNING else 'idle')) for a in baseline]
                 self.record(OTHER, lastActivityAt=self.ago(100), updatedAt=self.ago(100), createdAt=self.ago(1000),
-                            labels={'paseo.parent-agent-id': IDLE}, cwd='/elsewhere')
+                            labels={'paseo.parent-agent-id': IDLE}, cwd=str(self.elsewhere))
                 flags = '--local-dir' if condition == 'scope' else ''
                 if condition == 'missing': self.agents = [a for a in self.agents if a['id'] != OTHER]
                 if condition == 'status':
