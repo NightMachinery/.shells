@@ -11,7 +11,7 @@
 // anyone runs. Here the private index carries untracking (--untrack) and part
 // of a file (--patch) safely.
 //
-// Invoked as `git commit-own` through the shim in scripts/zshlang/wrappers. See
+// Invoked as `git commit-own` through the shim in scripts/bin. See
 // scripts/docs/git-commit-own.md. Stdlib only.
 package main
 
