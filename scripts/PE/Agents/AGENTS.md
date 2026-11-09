@@ -211,22 +211,43 @@ For a job that must outlive your shell and session:
 
 ## Staging
 
-- To stage changes in a single file selectively, you can use `git add -p`. Do not use this if you want to stage a whole file.
-- If one file contains multiple unrelated changes, split those changes into separate commits.
-- Do not treat “one file” as automatically meaning “one commit.”
+- If one file contains multiple unrelated changes, split them into separate commits. Do not treat “one file” as automatically meaning “one commit.” Commit part of a file with `git commit-own --patch` (below), not `git add -p`.
 
 ## Concurrent Sessions
 
 Another agent or a human may be staging and committing in the same repository
-while you work. The index is shared state, so a plain `git commit` picks up
-whatever *they* staged, even when you only ever `git add`ed your own paths.
+while you work. The index is shared state: a plain `git commit` picks up
+whatever *they* staged, and whatever you build in it (`git add -p`,
+`git rm --cached`) can land in *their* next commit before you make yours.
+`git commit -- <paths>` avoids the first and undoes the second: it takes the
+named paths from disk, so it re-adds a file you untracked and commits the
+whole of a file you staged in part.
 
-- Commit with an explicit pathspec — `git commit -- <paths>`, so the commit
-  contains only what you name, regardless of what else is sitting in the index.
-- Re-check `status` immediately before committing. A check from earlier in the
-  session proves nothing; the index may have changed since.
-- After committing, confirm with `show --stat` that only the intended paths
-  landed.
+So commit with `git commit-own`, never `git commit`. It builds the commit in a
+private index from the paths you name, stages nothing in the shared one, and
+leaves what others staged alone:
+
+```
+git commit-own -m "subject" -m "body" -- <paths>
+git commit-own -m "..." -- .gitignore --untrack <path>   #: stop tracking; the file stays on disk
+git commit-own -m "..." --patch <file.patch>              #: part of a file: a patch against HEAD
+git commit-own --dry-run -- <paths>                       #: what would be committed
+```
+
+In a vcsh repository it is `vcsh <repo> commit-own ...`. `git commit-own -h`
+lists the options, and `~/scripts/docs/git-commit-own.md` explains them.
+
+- Name the files you changed. A directory takes in every new file under it,
+  and the whole work tree (`.`) is refused.
+- A path that matches nothing is an error and nothing is committed. Fix the
+  path; do not work around it.
+- Before committing a file another session may also have edited, read
+  `git diff -- <paths>`: the file is committed as it is on disk.
+- It prints the commit's `--stat`. Check that only your paths landed.
+- If signing fails, it says so; retry with `--no-gpg-sign` (see General Rules).
+- Where `git commit-own` is missing (a host without `~/scripts`), use
+  `git commit -- <paths>`, and do not untrack or commit part of a file there
+  without telling me.
 - Expect the mirror case too: work you leave uncommitted can be swept into
   someone else's commit. Commit your own work promptly rather than letting it
   sit in the worktree.

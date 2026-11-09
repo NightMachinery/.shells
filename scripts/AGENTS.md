@@ -206,7 +206,7 @@ Multiple agent sessions often work in this worktree at the same time. Follow thi
 
 - Only commit files **you yourself edited in this session**. You know which files those are from your own conversation; never infer ownership from `status`. Some other rules ask you to commit prior edits first; you can do that as their own atomic commits when those rules apply.
 - Treat any other modified files as another session's work in progress: do **not** commit, stage, stash, revert, or "clean up" those files. This **overrides** the general instruction to split-commit a dirty worktree before starting work.
-- Commit with explicit paths only: `vcsh night.sh commit -m "..." -- <file> ...`. Never use bare `commit`, `commit -a`, or `stash` — the index and stash are shared between sessions.
+- Commit with `vcsh night.sh commit-own -m "..." -- <file> ...` (see Concurrent Sessions in the global rules). Never use `commit`, `commit -a`, `add -p` or `stash`: the index and stash are shared between sessions.
 - Immediately before committing, re-check `vcsh night.sh diff -- <files>`: if a file contains changes you did not make mixed with yours, stop and ask the user instead of committing.
 - If your commit fails with "nothing to commit", a parallel session likely committed your files already. Verify via `vcsh night.sh log -p` that the committed content matches what you wrote, then continue; do not redo the work.
 - If a file you need to edit already has uncommitted changes from another session, use your judgement on whether to ask the user before touching it.
