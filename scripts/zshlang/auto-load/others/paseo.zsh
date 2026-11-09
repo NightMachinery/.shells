@@ -20,6 +20,13 @@ function paseo-install {
     fi
 }
 
+function paseo-desktop-patch {
+    : "usage: paseo-desktop-patch"
+    : "Reapply our patches to the Paseo desktop app, which updates itself and drops them."
+    "${NIGHTDIR}/setup/patches/paseo/disable-worktree-setup-callout.zsh" ||
+        ecerr "$0: could not reapply the worktree-setup-callout patch; see setup/patches/paseo/"
+}
+
 function paseo-cli-update {
     : "usage: paseo-cli-update [version]"
     : "Install the latest (or given) Paseo CLI. It neither starts nor restarts the daemon."
@@ -29,6 +36,7 @@ function paseo-cli-update {
     #: Patch even when the install reported a problem: the patch is idempotent.
     "${NIGHTDIR}/setup/patches/paseo/disable-scheduled-push-notifs.zsh" ||
         ecerr "$0: could not reapply the scheduled-push patch; see setup/patches/paseo/"
+    paseo-desktop-patch
     return ${ret}
 }
 
