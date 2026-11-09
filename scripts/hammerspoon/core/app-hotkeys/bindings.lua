@@ -125,11 +125,12 @@ appHotkey{
         'mpv',
         'io.mpv',
         'com.openai.codex',
+        'sh.paseo.ypaseo.desktop', -- YPaseo, the personal Paseo build
         'sh.paseo.desktop'
     }
 }
--- shift+m: paseo:
-appHotkey{ key='m', mods={'shift'}, appName='sh.paseo.desktop' }
+-- shift+m: paseo (YPaseo when it has a window, else Paseo):
+appHotkey{ key='m', mods={'shift'}, appName={ 'sh.paseo.ypaseo.desktop', 'sh.paseo.desktop' } }
 -- appHotkey{ key='m', appName='com.adobe.Reader' }
 
 appHotkey{ key='n', appName='com.apple.MobileSMS' } -- Apple Messages
