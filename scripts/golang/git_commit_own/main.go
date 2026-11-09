@@ -24,6 +24,7 @@ import (
 	"os/exec"
 	"os/signal"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"sync"
 	"syscall"
@@ -31,6 +32,7 @@ import (
 )
 
 const usageText = `usage: git commit-own [options] [--] <path>...
+       git commit-own --amend [options] [--] [<path>...]
 
 Commit exactly the named paths, as they are on disk, through a private index.
 Whatever else is staged in the shared index stays out of the commit, and is
@@ -42,6 +44,11 @@ left as it was.
       --patch FILE     apply FILE, a patch against HEAD, as part of the commit,
                        to commit only part of a file (repeatable; "-": stdin)
   -f, --force          allow adding ignored files
+      --amend          replace the last commit with one that also holds the
+                       named paths; its message and author are kept unless -m,
+                       -F or --author is given; refused once it is pushed
+      --author A       the author: "Name <email>", or a pattern matching the
+                       author of an earlier commit, as for git commit
       --allow-empty    commit even when nothing changed
   -n, --no-verify      skip the pre-commit and commit-msg hooks
       --no-gpg-sign    do not sign, even when commit.gpgSign is set
@@ -75,6 +82,8 @@ type options struct {
 	noSign     bool
 	wholeTree  bool
 	dryRun     bool
+	amend      bool
+	author     string
 }
 
 func parseArgs(args []string) (*options, error) {
@@ -150,6 +159,11 @@ func parseArgs(args []string) (*options, error) {
 			err = flag(&o.wholeTree)
 		case "--dry-run":
 			err = flag(&o.dryRun)
+		case "--amend":
+			err = flag(&o.amend)
+		case "--author":
+			v, err = value()
+			o.author = v
 		case "-h", "--help":
 			return nil, errHelp
 		default:
@@ -163,9 +177,9 @@ func parseArgs(args []string) (*options, error) {
 	switch {
 	case len(o.messages) > 0 && o.msgFile != "":
 		return nil, fmt.Errorf("give the message with -m or with -F, not both")
-	case len(o.messages) == 0 && o.msgFile == "" && !o.dryRun:
+	case len(o.messages) == 0 && o.msgFile == "" && !o.dryRun && !o.amend:
 		return nil, fmt.Errorf("a commit message is required (-m or -F)")
-	case len(o.paths)+len(o.untrack)+len(o.patchFiles) == 0 && !o.allowEmpty:
+	case len(o.paths)+len(o.untrack)+len(o.patchFiles) == 0 && !o.allowEmpty && !o.amend:
 		return nil, fmt.Errorf("name the paths to commit")
 	}
 	stdinUsers := 0
@@ -441,18 +455,29 @@ func (a *app) run(args []string) int {
 		a.warnf("%v", err)
 		return 1
 	}
-	msg := ""
-	if !o.dryRun {
+	msg := "" // when amending, empty means "keep the old message"
+	if !o.dryRun && (raw != "" || !o.amend) {
 		if msg, err = a.cleanMessage(raw); err != nil {
 			a.warnf("%v", err)
 			return 1
 		}
 	}
+	author, err := a.resolveAuthor(o.author)
+	if err != nil {
+		a.warnf("%v", err)
+		return 1
+	}
 
 	for n := 1; n <= maxAttempts; n++ {
-		err = a.attempt(o, r, msg, patches, n)
+		err = a.attempt(o, r, msg, author, patches, n)
 		if !errors.Is(err, errRaced) {
 			break
+		}
+		if o.amend {
+			// The new tip is someone else's commit; folding into it would mix
+			// their work with ours.
+			a.warnf("the branch moved while amending, so its tip is no longer the commit to amend; nothing was changed")
+			return 1
 		}
 		if n < maxAttempts {
 			a.warnf("the branch moved while committing; rebuilding on its new tip")
@@ -506,14 +531,56 @@ func (a *app) readHead() (head, error) {
 
 // attempt builds the commit from HEAD as it is now, and moves the branch only
 // if HEAD is still there; otherwise it returns errRaced for a rebuild.
-func (a *app) attempt(o *options, r *repo, msg string, patches []patch, n int) error {
+func (a *app) attempt(o *options, r *repo, msg string, author []string, patches []patch, n int) error {
 	h, err := a.readHead()
 	if err != nil {
 		return err
 	}
 	base := h.commit
 	if base == "" {
+		if o.amend {
+			return fmt.Errorf("nothing to amend: %s has no commits yet", h.where())
+		}
 		base = r.empty
+	}
+	baseTree, err := a.line(call{}, "rev-parse", base+"^{tree}")
+	if err != nil {
+		return err
+	}
+
+	// The new commit's parents, and the tree it must differ from: HEAD's for
+	// a new commit, HEAD's first parent's when amending.
+	var parents []string
+	emptyTree := baseTree
+	if o.amend {
+		if parents, emptyTree, err = a.amendBase(h.commit, r); err != nil {
+			return err
+		}
+		if err := a.checkUnpushed(h.commit); err != nil {
+			return err
+		}
+		if msg == "" {
+			old, err := a.git(call{}, "show", "-s", "--format=%B", h.commit)
+			if err != nil {
+				return err
+			}
+			if msg, err = a.cleanMessage(old); err != nil {
+				return err
+			}
+		}
+		// The amended commit keeps its author and author date, as with git
+		// commit --amend; --author replaces only the name and email.
+		info, err := a.git(call{}, "show", "-s", "--date=raw", "--format=%an%x00%ae%x00%ad", h.commit)
+		if err != nil {
+			return err
+		}
+		f := strings.SplitN(strings.TrimSuffix(info, "\n"), "\x00", 3)
+		if len(f) != 3 {
+			return fmt.Errorf("could not read the author of %s", h.commit)
+		}
+		author = append([]string{"GIT_AUTHOR_NAME=" + f[0], "GIT_AUTHOR_EMAIL=" + f[1], "GIT_AUTHOR_DATE=" + f[2]}, author...)
+	} else if h.commit != "" {
+		parents = []string{h.commit}
 	}
 
 	idx := filepath.Join(r.gitDir, fmt.Sprintf("commit-own-%d-%d.index", os.Getpid(), n))
@@ -563,19 +630,25 @@ func (a *app) attempt(o *options, r *repo, msg string, patches []patch, n int) e
 		}
 	}
 
-	if _, err := a.git(private, "diff", "--cached", "--quiet", base); err == nil && !o.allowEmpty {
-		return errNothing
-	} else if err != nil && exitCode(err) != 1 {
-		return err
+	if !o.amend && !o.allowEmpty {
+		if _, err := a.git(private, "diff", "--cached", "--quiet", base); err == nil {
+			return errNothing
+		} else if exitCode(err) != 1 {
+			return err
+		}
 	}
 
 	if o.dryRun {
-		fmt.Fprintf(a.stdout, "Would commit on %s:\n", h.where())
-		_, err := a.git(call{env: private.env, show: true}, "diff", "--cached", "--stat", base)
+		if o.amend {
+			fmt.Fprintf(a.stdout, "Would amend %.10s on %s; the commit would contain:\n", h.commit, h.where())
+		} else {
+			fmt.Fprintf(a.stdout, "Would commit on %s:\n", h.where())
+		}
+		_, err := a.git(call{env: private.env, show: true}, "diff", "--cached", "--stat", emptyTree)
 		return err
 	}
 
-	hook := call{env: append(private.env, "GIT_EDITOR=:"), show: true}
+	hook := call{env: append(append(private.env, "GIT_EDITOR=:"), author...), show: true}
 	if !o.noVerify {
 		if _, err := a.git(hook, "hook", "run", "--ignore-missing", "pre-commit"); err != nil {
 			return fmt.Errorf("the pre-commit hook failed; nothing was committed")
@@ -586,7 +659,11 @@ func (a *app) attempt(o *options, r *repo, msg string, patches []patch, n int) e
 	if err := os.WriteFile(msgFile, []byte(msg), 0o644); err != nil {
 		return err
 	}
-	if _, err := a.git(hook, "hook", "run", "--ignore-missing", "prepare-commit-msg", "--", msgFile, "message"); err != nil {
+	source := []string{msgFile, "message"}
+	if o.amend && o.msgFile == "" && len(o.messages) == 0 {
+		source = []string{msgFile, "commit", h.commit} // what git commit --amend --no-edit passes
+	}
+	if _, err := a.git(hook, append([]string{"hook", "run", "--ignore-missing", "prepare-commit-msg", "--"}, source...)...); err != nil {
 		return fmt.Errorf("the prepare-commit-msg hook failed; nothing was committed")
 	}
 	if !o.noVerify {
@@ -607,23 +684,22 @@ func (a *app) attempt(o *options, r *repo, msg string, patches []patch, n int) e
 	if err != nil {
 		return err
 	}
-	baseTree, err := a.line(call{}, "rev-parse", base+"^{tree}")
-	if err != nil {
-		return err
-	}
-	if tree == baseTree && !o.allowEmpty {
+	if tree == emptyTree && !o.allowEmpty {
+		if o.amend {
+			return fmt.Errorf("amending would leave the commit with no changes (pass --allow-empty to keep it anyway)")
+		}
 		return errNothing
 	}
 
 	args := []string{"commit-tree", tree}
-	if h.commit != "" {
-		args = append(args, "-p", h.commit)
+	for _, p := range parents {
+		args = append(args, "-p", p)
 	}
 	if r.sign {
 		args = append(args, "-S")
 	}
 	args = append(args, "-F", "-")
-	commit, err := a.line(call{stdin: final}, args...)
+	commit, err := a.line(call{stdin: final, env: author}, args...)
 	if err != nil {
 		if r.sign {
 			return fmt.Errorf("%v\nsigning failed (commit.gpgSign is set); if the key is unavailable, retry with --no-gpg-sign", err)
@@ -633,7 +709,10 @@ func (a *app) attempt(o *options, r *repo, msg string, patches []patch, n int) e
 
 	subject := strings.SplitN(final, "\n", 2)[0]
 	kind := "commit"
-	if h.commit == "" {
+	switch {
+	case o.amend:
+		kind = "commit (amend)"
+	case h.commit == "":
 		kind = "commit (initial)"
 	}
 	if _, err := a.git(call{}, "update-ref", "-m", kind+": "+subject, "HEAD", commit, h.commit); err != nil {
@@ -655,12 +734,73 @@ func (a *app) attempt(o *options, r *repo, msg string, patches []patch, n int) e
 	}
 
 	label := h.where()
-	if h.commit == "" {
+	if len(parents) == 0 {
 		label += " (root-commit)"
 	}
 	label = strings.ReplaceAll(label, "%", "%%")
-	_, err = a.git(call{show: true}, "-c", "color.ui=never", "show", "--stat", "--format=["+label+" %h] %s", commit)
+	if _, err := a.git(call{show: true}, "show", "-s", "--format=["+label+" %h] %s", commit); err != nil {
+		return err
+	}
+	_, err = a.git(call{show: true}, "-c", "color.ui=never", "diff-tree", "--stat", "--root", "--no-commit-id", "-r", commit)
 	return err
+}
+
+// amendBase returns the parents of the commit being amended, and the tree of
+// its first parent (the empty tree for a root commit).
+func (a *app) amendBase(commit string, r *repo) ([]string, string, error) {
+	out, err := a.line(call{}, "rev-parse", commit+"^@")
+	if err != nil {
+		return nil, "", err
+	}
+	if out == "" {
+		return nil, r.empty, nil
+	}
+	parents := strings.Split(out, "\n")
+	tree, err := a.line(call{}, "rev-parse", parents[0]+"^{tree}")
+	return parents, tree, err
+}
+
+// checkUnpushed refuses to amend a commit that a remote-tracking branch
+// already contains: replacing it rewrites history that others may have.
+func (a *app) checkUnpushed(commit string) error {
+	out, err := a.line(call{}, "for-each-ref", "--contains", commit, "--format=%(refname:short)", "refs/remotes")
+	if err != nil {
+		return err
+	}
+	if out != "" {
+		return fmt.Errorf("%.10s is already pushed (it is in %s); amending would rewrite published history, so make a new commit instead",
+			commit, strings.SplitN(out, "\n", 2)[0])
+	}
+	return nil
+}
+
+var authorForm = regexp.MustCompile(`^\s*([^<>]*?)\s*<([^<>]*)>\s*$`)
+
+// resolveAuthor turns --author into GIT_AUTHOR_NAME and GIT_AUTHOR_EMAIL. As
+// with git commit, the value is either "Name <email>", or a pattern matched
+// against the authors of existing commits, the most recent match winning.
+func (a *app) resolveAuthor(spec string) ([]string, error) {
+	if spec == "" {
+		return nil, nil
+	}
+	name, email := "", ""
+	if m := authorForm.FindStringSubmatch(spec); m != nil {
+		name, email = m[1], m[2]
+	} else {
+		out, err := a.git(call{}, "log", "-1", "--all", "-i", "--format=%an%x00%ae", "--author="+spec)
+		if err != nil {
+			return nil, err
+		}
+		if f := strings.SplitN(strings.TrimSuffix(out, "\n"), "\x00", 2); len(f) == 2 {
+			name, email = f[0], f[1]
+		} else {
+			return nil, fmt.Errorf("--author %q is not \"Name <email>\", and matches no existing author", spec)
+		}
+	}
+	if name == "" {
+		return nil, fmt.Errorf("--author %q has no name", spec)
+	}
+	return []string{"GIT_AUTHOR_NAME=" + name, "GIT_AUTHOR_EMAIL=" + email}, nil
 }
 
 // syncIndex resets the shared index entries of the committed paths to the new

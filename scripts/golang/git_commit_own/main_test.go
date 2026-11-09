@@ -137,6 +137,8 @@ func TestParseArgs(t *testing.T) {
 		{args: []string{"-F", "-", "--patch", "-"}, err: "stdin"},
 		{args: []string{"-m", "x", ""}, err: "empty path"},
 		{args: []string{"--dry-run", "a"}, path: []string{"a"}},
+		{args: []string{"--amend"}},
+		{args: []string{"--amend", "--author"}, err: "needs a value"},
 	}
 	for _, c := range cases {
 		o, err := parseArgs(c.args)
@@ -546,5 +548,146 @@ func TestNoTempFilesLeft(t *testing.T) {
 	}
 	if len(matches) != 0 {
 		t.Fatalf("left behind: %q", matches)
+	}
+}
+
+// commitAs makes a commit with plain git, with a fixed author and date.
+func (f *fixture) commitAs(msg string, paths ...string) {
+	f.t.Helper()
+	f.git(append([]string{"add", "--"}, paths...)...)
+	f.git("commit", "-q", "--author=Orig Author <orig@example.invalid>", "--date=2020-01-02T03:04:05+0100", "-m", msg)
+}
+
+func TestAmendKeepsMessageAndAuthor(t *testing.T) {
+	f := newRepo(t)
+	baseCommit := f.git("rev-parse", "HEAD")
+	f.write("a.txt", "a2\n")
+	f.commitAs("first line\n\nbody", "a.txt")
+	before := f.git("show", "-s", "--date=raw", "--format=%an|%ae|%ad|%B", "HEAD")
+	f.write("b.txt", "b2\n")
+	f.write("other.txt", "not mine\n")
+
+	f.mustOwn("--amend", "--", "b.txt")
+
+	if got := f.git("show", "-s", "--date=raw", "--format=%an|%ae|%ad|%B", "HEAD"); got != before {
+		t.Fatalf("author or message changed:\n%s\nwant\n%s", got, before)
+	}
+	if got := f.git("rev-parse", "HEAD^"); got != baseCommit {
+		t.Fatal("the parent changed")
+	}
+	if got := f.changedIn("HEAD"); got != "a.txt\nb.txt" {
+		t.Fatalf("changed %q", got)
+	}
+	if got := f.git("reflog", "-1", "--format=%gs", "master"); got != "commit (amend): first line" {
+		t.Fatalf("reflog %q", got)
+	}
+	if got := f.git("status", "--porcelain"); got != "?? other.txt" {
+		t.Fatalf("status = %q", got)
+	}
+}
+
+func TestAmendMessageAndAuthor(t *testing.T) {
+	f := newRepo(t)
+	f.write("a.txt", "a2\n")
+	f.commitAs("old", "a.txt")
+	tree := f.git("rev-parse", "HEAD^{tree}")
+
+	f.mustOwn("--amend", "-m", "new", "--author", "New Person <new@example.invalid>")
+
+	if got := f.git("show", "-s", "--date=raw", "--format=%an|%ae|%ad|%s", "HEAD"); got != "New Person|new@example.invalid|1577930645 +0100|new" {
+		t.Fatalf("got %q", got)
+	}
+	if got := f.git("rev-parse", "HEAD^{tree}"); got != tree {
+		t.Fatal("a message-only amend changed the tree")
+	}
+}
+
+func TestAmendRefusals(t *testing.T) {
+	f := newRepo(t)
+	f.write("a.txt", "a2\n")
+	f.commitAs("change a", "a.txt")
+	head := f.git("rev-parse", "HEAD")
+
+	// Undoing the commit's only change would leave it empty.
+	f.write("a.txt", "a\n")
+	if r := f.own("", "--amend", "a.txt"); r.code != 1 || !strings.Contains(r.stderr, "no changes") {
+		t.Fatalf("empty amend: exit %d\n%s", r.code, r.stderr)
+	}
+	f.write("a.txt", "a2\n")
+
+	f.gitIn(f.root, "init", "-q", "--bare", "remote.git")
+	f.git("remote", "add", "origin", filepath.Join(f.root, "remote.git"))
+	f.git("push", "-q", "origin", "master")
+	f.write("b.txt", "b2\n")
+	if r := f.own("", "--amend", "b.txt"); r.code != 1 || !strings.Contains(r.stderr, "already pushed") {
+		t.Fatalf("pushed amend: exit %d\n%s", r.code, r.stderr)
+	}
+	if got := f.git("rev-parse", "HEAD"); got != head {
+		t.Fatal("HEAD moved")
+	}
+
+	root := t.TempDir()
+	g := &fixture{t: t, root: root, work: filepath.Join(root, "work"), env: testEnv(t, root)}
+	g.gitIn(root, "init", "-q", "-b", "main", "work")
+	g.write("a.txt", "a\n")
+	if r := g.own("", "--amend", "a.txt"); r.code != 1 || !strings.Contains(r.stderr, "nothing to amend") {
+		t.Fatalf("unborn amend: exit %d\n%s", r.code, r.stderr)
+	}
+}
+
+// If another session commits while we amend, the tip is theirs: amending
+// stops instead of folding our change into their commit.
+func TestAmendRaceStops(t *testing.T) {
+	f := newRepo(t)
+	marker := filepath.Join(f.root, "raced")
+	f.write(".git/hooks/pre-commit", `#!/bin/sh
+[ -e "`+marker+`" ] && exit 0
+touch "`+marker+`"
+export GIT_INDEX_FILE="$(git rev-parse --git-dir)/other.index"
+git read-tree HEAD
+echo theirs > b.txt
+git add b.txt
+git commit -q -m theirs
+`)
+	if err := os.Chmod(filepath.Join(f.work, ".git/hooks/pre-commit"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	f.write("a.txt", "ours\n")
+	r := f.own("", "--amend", "a.txt")
+	if r.code != 1 || !strings.Contains(r.stderr, "amending") {
+		t.Fatalf("exit %d\n%s", r.code, r.stderr)
+	}
+	if got := f.git("log", "--format=%s"); got != "theirs\nbase" {
+		t.Fatalf("log:\n%s", got)
+	}
+}
+
+func TestAuthorPattern(t *testing.T) {
+	f := newRepo(t)
+	f.write("a.txt", "a2\n")
+	f.commitAs("by orig", "a.txt")
+	f.write("b.txt", "b2\n")
+	f.mustOwn("-m", "x", "--author", "orig author", "b.txt")
+	if got := f.git("show", "-s", "--format=%an <%ae>|%cn", "HEAD"); got != "Orig Author <orig@example.invalid>|Tester" {
+		t.Fatalf("got %q", got)
+	}
+	f.write("b.txt", "b3\n")
+	if r := f.own("", "-m", "x", "--author", "nobody-like-this", "b.txt"); r.code != 1 || !strings.Contains(r.stderr, "matches no existing author") {
+		t.Fatalf("exit %d\n%s", r.code, r.stderr)
+	}
+}
+
+func TestAmendDryRun(t *testing.T) {
+	f := newRepo(t)
+	f.write("a.txt", "a2\n")
+	f.commitAs("change a", "a.txt")
+	f.write("b.txt", "b2\n")
+	head := f.git("rev-parse", "HEAD")
+	r := f.mustOwn("--amend", "--dry-run", "b.txt")
+	if !strings.Contains(r.stdout, "Would amend") || !strings.Contains(r.stdout, "a.txt") || !strings.Contains(r.stdout, "b.txt") {
+		t.Fatalf("stdout:\n%s", r.stdout)
+	}
+	if got := f.git("rev-parse", "HEAD"); got != head {
+		t.Fatal("dry run moved HEAD")
 	}
 }

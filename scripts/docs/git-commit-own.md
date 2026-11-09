@@ -11,6 +11,8 @@ work in one worktree at the same time.
     git commit-own -m "..." -- .gitignore --untrack big.bin    #: stop tracking, keep the file
     git commit-own -m "..." --patch part.patch                 #: part of a file
     git commit-own --dry-run -- <path>...                      #: what would be committed
+    git commit-own --amend -- <path>...                        #: fold into the last commit
+    git commit-own -m "..." --author "Name <email>" -- <path>...
     vcsh night.sh commit-own -m "..." -- <path>...             #: the same, in a vcsh repository
 
 `git commit-own -h` lists every option. (`--help` is taken by git itself,
@@ -97,8 +99,29 @@ unstaged.
 - **Hooks that rewrite the worktree.** A `pre-commit` framework that stashes
   unstaged changes does so against the private index, just as it would
   against the shared one under `git commit`.
-- **Amending.** There is no `--amend`; use `git commit --amend` when no one
-  else is committing, or make a new commit.
+
+## Amending and the author
+
+`--amend` replaces the last commit with one that also holds the named paths
+(none is fine, to change only the message). As with `git commit --amend`, the
+commit keeps its parents, its message unless `-m` or `-F` is given, and its
+author name, email and date; `--author` replaces the name and email only.
+
+Two refusals keep it from rewriting anything but your own fresh commit:
+
+- A commit that any remote-tracking branch already contains is refused,
+  because replacing it rewrites history others may have pulled. Make a new
+  commit instead.
+- If the branch moves while the amended commit is being built, the tool stops
+  instead of rebuilding: the new tip is someone else's commit, and amending it
+  would fold your change into their work.
+
+It cannot tell whether the last commit is yours when another session made it
+before you started, since the agents all commit as the same person. Amend
+only a commit you made yourself, just now.
+
+`--author` takes `Name <email>`, or, as with `git commit`, a pattern that is
+looked up among the authors of existing commits.
 
 ## Installation
 
