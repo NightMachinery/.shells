@@ -166,6 +166,9 @@ addToPATH "$HOME/.poetry/bin"
 addToPATH ~/.nimble/bin
 # addToPATH /Applications/mpv.app/Contents/MacOS
 addToPATH "${NIGHTDIR}/zshlang/wrappers"
+#: Standalone commands, such as git-commit-own, which git finds on PATH even in
+#: a non-interactive shell (ssh host cmd), where zsh has not added ~/scripts.
+addToPATH "${NIGHTDIR}/bin"
 
 addToPATH "${HOME}/.config/guix/current/bin"
 GUIX_PROFILE="${HOME}/.guix-profile"
