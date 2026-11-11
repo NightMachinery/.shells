@@ -313,17 +313,37 @@ function agy-acc-login {
     h-agy-account-info "${1}" @RET
     local id="${reply[1]}" session="agy-login-${reply[1]}"
     ensure-cmd tmux @RET
-    #: Never use tmuxnewsh2 here: it replaces an existing named session.
+    local pane_states row pane dead restart_pane=''
+    local -a fields
+    #: Never use tmuxnewsh2 here: it replaces even a live named session.
     if command tmux has-session -t "=${session}" 2>/dev/null ; then
-        ec "Sign-in already open. Attach: tmux attach-session -t ${(q)session}"
-        return 0
+        pane_states="$(command tmux list-panes -s -t "=${session}" -F '#{pane_id} #{pane_dead}')" @RET
+        for row in "${(@f)pane_states}" ; do
+            fields=( ${=row} )
+            pane="${fields[1]}" dead="${fields[2]}"
+            if [[ "${pane}" != %<-> || "${dead}" != (0|1) ]] ; then
+                ecerr "$0: cannot determine login pane state"
+                return 1
+            fi
+            if [[ "${dead}" == 0 ]] ; then
+                ec "Sign-in already open. Attach: tmux attach-session -t ${(q)session}"
+                return 0
+            fi
+            restart_pane="${restart_pane:-${pane}}"
+        done
+        test -n "${restart_pane}" || { ecerr "$0: no login panes found"; return 1; }
     fi
     agy-account-prepare "${id}" @RET
     #: The root and label travel as arguments; a tmux server may have old env.
     local script
     script="$(gquote zsh -c 'agy-account-hook "$1" "$2" "$3" h-agy-account-login-run' \
         agy-login "${id}" "${reply[3]}" "${reply[2]}")" @RET
-    command tmux new-session -d -s "${session}" "${script}" @RET
+    if test -n "${restart_pane}" ; then
+        #: Without -k, tmux refuses if another caller already revived the pane.
+        command tmux respawn-pane -t "${restart_pane}" "${script}" @RET
+    else
+        command tmux new-session -d -s "${session}" "${script}" @RET
+    fi
     ec "Attach: tmux attach-session -t ${(q)session}"
     ec "Complete sign-in in that pane; after you exit agy, models verifies the account."
 }

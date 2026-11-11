@@ -38,9 +38,11 @@ agy-acc-login fm2
 
 The helper prints a `tmux attach-session` command. Complete Google sign-in
 there, exit agy, and the same pane runs `models` to verify the account. If a token
-already exists it verifies without signing out. Re-running the helper attaches
-to the existing login session rather than replacing it. No sign-in is performed
-by account setup or status reporting.
+already exists it verifies without signing out. Re-running the helper prints
+the attach command if any pane in the login session is alive. If all panes have
+exited (and tmux retained them with `remain-on-exit`), it restarts a dead pane.
+It refuses to replace a pane that another caller has already restarted. No
+sign-in is performed by account setup or status reporting.
 
 ## File authentication
 

@@ -127,4 +127,55 @@ h-agy-session-resume "${transcript}"
 function agy-conversation-name { print -r -- fixture }
 [[ "$(AGY_ACCOUNT_ID=acc2 AGY_ACCOUNT_LABEL=cave h-agy-session-tmux-name "${conversation}" "${transcript}")" == '+Agy/cave fixture' ]] || fail 'live account identity lost'
 
-print -r -- 'ok: launch isolation, named accounts, configuration, status JSON, best and cache-only'
+# Login recovery must inspect every window and never replace a live pane.
+command cat > "${test_tmp}/bin/tmux" <<'PY'
+#!/usr/bin/env python3
+import json, os, sys
+args = sys.argv[1:]
+with open(os.environ["AGY_TEST_TMUX_LOG"], "a") as f:
+    f.write(json.dumps(args) + "\n")
+case = os.environ["AGY_TEST_TMUX_CASE"]
+if args[0] == "has-session":
+    sys.exit(1 if case == "missing" else 0)
+if args[0] == "list-panes":
+    assert "-s" in args, "must inspect every window"
+    if case == "query-failed":
+        sys.exit(1)
+    print({"dead": "%101 1\n%102 1", "live": "%101 0",
+           "mixed": "%101 1\n%102 0", "invalid": "%101 unknown",
+           "empty": "", "respawn-failed": "%101 1"}[case])
+if args[0] == "respawn-pane":
+    assert "-k" not in args, "must not kill a concurrently revived pane"
+    sys.exit(1 if case == "respawn-failed" else 0)
+PY
+command chmod +x "${test_tmp}/bin/tmux"
+rehash
+typeset -gx AGY_TEST_TMUX_LOG="${test_tmp}/tmux.jsonl" AGY_TEST_TMUX_CASE=''
+typeset -g login_output='' login_rc=0
+for AGY_TEST_TMUX_CASE in missing dead live mixed query-failed invalid empty respawn-failed ; do
+    : > "${AGY_TEST_TMUX_LOG}"
+    login_rc=0
+    login_output="$(agy-acc-login acc2 2>"${test_tmp}/login.err")" || login_rc=$?
+    case "${AGY_TEST_TMUX_CASE}" in
+        missing|dead)
+            (( login_rc == 0 )) || fail "login ${AGY_TEST_TMUX_CASE} failed: $(<"${test_tmp}/login.err")"
+            [[ "${login_output}" == Attach:* ]] || fail 'missing fresh attach hint'
+            command jq --slurp --exit-status --arg kind "${AGY_TEST_TMUX_CASE}" '
+                map(select(.[0] == "new-session" or .[0] == "respawn-pane")) |
+                length == 1 and
+                (.[0] | if $kind == "dead" then
+                    .[0:3] == ["respawn-pane", "-t", "%101"]
+                 else .[0:4] == ["new-session", "-d", "-s", "agy-login-acc2"] end)
+            ' "${AGY_TEST_TMUX_LOG}" >/dev/null ;;
+        live|mixed)
+            (( login_rc == 0 )) || fail 'live login failed'
+            [[ "${login_output}" == 'Sign-in already open.'* ]] || fail 'live login lost attach hint' ;;
+        *) (( login_rc != 0 )) || fail "login ${AGY_TEST_TMUX_CASE} silently succeeded" ;;
+    esac
+    if [[ "${AGY_TEST_TMUX_CASE}" == (live|mixed|query-failed|invalid|empty) ]] ; then
+        command jq --slurp --exit-status 'all(.[]; .[0] == "has-session" or .[0] == "list-panes")' \
+            "${AGY_TEST_TMUX_LOG}" >/dev/null
+    fi
+done
+
+print -r -- 'ok: launch isolation, named accounts, configuration, status JSON, best, cache-only and login recovery'
