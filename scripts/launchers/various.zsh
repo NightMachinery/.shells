@@ -34,6 +34,7 @@ tmuxnewsh2 serve-dl caddy-run-garden run --config $NIGHTDIR/launchers/Caddyfile
 
 # tmuxnew vless xray -config ~/vless.json
 tmuxnew vless-reality xray -config ~/vless_reality_server.json
+tmuxnew eva-cdn-server xray run -config ~/notes/private/configs/eva/v2ray/CDN/eva_cdn_server.json
 
 # tmuxnew gost-ssh gost -L ssh://alice:unfamed-scaum-contagiosity-bimodal-anthranoyl@:8104
 # tmuxnew gost-wss gost -L 'http+wss://alice:unfamed-scaum-contagiosity-bimodal-anthranoyl@:8103'
