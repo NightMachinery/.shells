@@ -34,8 +34,10 @@ later (every entry point above), `continue` resumes now. The `continue` ones
 are `agent-continue-kitty-fz`, `agent-continue-tmux-fz` and
 `agent-continue-paseo-fz` (alias `paseo-continue-fz`): the same pickers and the
 same delivery as an arm, sent at once. The Paseo picker offers only the agents
-stopped at a usage limit, subagents included, found by
-`paseo-auto-continue-stopped`; `-a` or `--all` offers every root agent. The
+stopped at a usage limit whose seat has quota left for their model now,
+subagents included (`paseo-auto-continue-stopped --usable`: one usage check per
+seat and model family; an agent whose seat is still blocked is for `ccp`).
+Archived agents never appear. `-a` or `--all` offers every root agent. The
 kitty picker drops its `frontmost` row, since the frontmost window is the
 terminal you are typing in. A target that cannot be reached (an agent already
 running, a pane that no longer holds an agent) is reported and the rest still

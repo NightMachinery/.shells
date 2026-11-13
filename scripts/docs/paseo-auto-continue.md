@@ -32,7 +32,8 @@ shell"). They list Paseo agents next to ordinary sessions, each agent once.
 ### Compared with `ccp` and `paseo-continue-fz`
 
 `paseo-continue-fz` (`agent-continue-paseo-fz`) resumes now: it offers the
-agents this watcher's own test finds stopped at a usage limit (`-a` for every
+agents this watcher's own test finds stopped at a usage limit and whose
+seat has quota left now (`paseo-auto-continue-stopped --usable`; `-a` for every
 root agent) and sends `Continue.` at once, arming nothing.
 
 `ccp` (`claude-code-usage-auto-continue-paseo-fz`, see

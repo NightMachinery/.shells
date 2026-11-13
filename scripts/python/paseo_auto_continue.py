@@ -13,6 +13,7 @@ import os
 from pathlib import Path
 import re
 import stat
+import subprocess
 import sys
 import tempfile
 import time
@@ -232,6 +233,37 @@ def stopped_agents(home, transcript_fn=claude_limit_failure):
             yield record['id']
 
 
+def usable_agents(home, agent_ids, quota_fn=None, stored_fn=None, warn=None):
+    """The agents among agent_ids whose seat has quota left for their model now.
+
+    One usage check per (provider, model family), the same check the watcher
+    makes before it sends. An agent whose check fails is left out and named on
+    stderr: a resume sent into a seat that is still blocked only fails again.
+    """
+    quota_fn = quota_fn or quota
+    stored_fn = stored_fn or stored_agent
+    warn = warn or (lambda text: print(text, file=sys.stderr))
+    verdicts = {}
+    for agent_id in agent_ids:
+        try:
+            record = stored_fn(agent_id, home)
+        except (HandoffError, OSError, ValueError):
+            warn(agent_id + ': no readable record; left out')
+            continue
+        provider = record.get('provider')
+        model = (record.get('config') or {}).get('model') or (record.get('runtimeInfo') or {}).get('model') or ''
+        snapshot = {'Model': model}
+        key = (provider, model_family(snapshot))
+        if key not in verdicts:
+            try:
+                verdicts[key] = quota_fn({'home': str(home), 'binding': {'provider': provider}}, snapshot)
+            except (HandoffError, OSError, ValueError, KeyError, subprocess.SubprocessError) as error:
+                warn(str(provider) + ': quota check failed (' + str(error) + '); its agents are left out')
+                verdicts[key] = False
+        if verdicts[key]:
+            yield agent_id
+
+
 def model_family(snapshot):
     model = snapshot.get('Model') or ''
     return model.removeprefix('claude-').split('-')[0].lower()
@@ -389,13 +421,19 @@ def main():
     parser.add_argument('agent_id', nargs='?', default=os.environ.get('PASEO_AGENT_ID'))
     parser.add_argument('--home', default=os.environ.get('PASEO_HOME') or str(Path.home() / '.paseo'))
     parser.add_argument('--poll', type=int, default=300)
+    parser.add_argument('--usable', action='store_true',
+                        help='with stopped: only agents whose seat has quota left now')
     parser.add_argument('--state')
     parser.add_argument('--state-dir', default=str(Path(os.environ.get('XDG_STATE_HOME', Path.home() / '.local/state')) / 'agent-sessions/auto-continue-paseo'))
     args = parser.parse_args()
     if args.action == 'stopped':
         # One agent ID per line: every local agent stopped at a usage limit.
-        for agent_id in stopped_agents(Path(args.home).expanduser().resolve()):
-            print(agent_id)
+        home = Path(args.home).expanduser().resolve()
+        found = stopped_agents(home)
+        if args.usable:
+            found = usable_agents(home, list(found))
+        for agent_id in found:
+            print(agent_id, flush=True)
         return
     if args.action == 'list':
         for row in registrations(Path(args.state_dir).expanduser()):

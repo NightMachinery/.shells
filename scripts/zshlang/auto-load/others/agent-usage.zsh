@@ -729,20 +729,28 @@ function h-agent-usage-continue-targets-paseo-fz {
     #: wait on them, so they need the resume too). The test is auto-continue's
     #: own, [agfi:paseo-auto-continue-stopped], so the two never disagree about
     #: who was stopped. The default, `all', is every root agent, as before.
+    #: `usable' narrows `stopped' to the agents whose seat has quota left for
+    #: their model right now, for a resume sent at once ([agfi:agent-continue]).
     ##
     local filter="${agent_usage_continue_paseo_filter:-all}"
     local agent_session_fz_header=''
 
     local pairs
-    if [[ "${filter}" == stopped ]] ; then
+    if [[ "${filter}" == (stopped|usable) ]] ; then
         local home stopped=''
+        local -a stopped_opts=()
+        [[ "${filter}" == usable ]] && stopped_opts+=( --usable )
         home="$(h-paseo-home)" @TRET
-        stopped="$(paseo-auto-continue-stopped --home "${home}")" @TRET
+        stopped="$(paseo-auto-continue-stopped --home "${home}" "${stopped_opts[@]}")" @TRET
         if test -n "${stopped}" ; then
             pairs="$(paseo_agent_pairs_ids="${stopped}" h-paseo-agent-pairs paseo:)" @TRET
         fi
         if test -z "${pairs}" ; then
-            ecerr "$0: no Paseo agent stopped at a usage limit; pass -a (--all) to pick from every agent"
+            if [[ "${filter}" == usable ]] ; then
+                ecerr "$0: no Paseo agent stopped at a usage limit whose seat has quota left now; pass -a (--all) to pick from every agent"
+            else
+                ecerr "$0: no Paseo agent stopped at a usage limit; pass -a (--all) to pick from every agent"
+            fi
             return 1
         fi
     elif [[ "${filter}" == all ]] ; then
@@ -752,7 +760,7 @@ function h-agent-usage-continue-targets-paseo-fz {
             return 1
         fi
     else
-        ecerr "$0: unknown agent_usage_continue_paseo_filter: ${filter} (stopped, all)"
+        ecerr "$0: unknown agent_usage_continue_paseo_filter: ${filter} (usable, stopped, all)"
         return 64
     fi
 
@@ -775,11 +783,13 @@ function h-agent-usage-continue-targets-paseo-fz {
 function agent-continue {
     #: Usage: agent_usage_continue_via=<kitty|tmux|paseo> agent-continue [-a|--all]
     #:
-    #: The Paseo picker offers only the agents stopped at a usage limit,
-    #: subagents included; `-a' or `--all' offers every root agent.
+    #: The Paseo picker offers only the agents stopped at a usage limit whose
+    #: seat has quota left for their model now, subagents included: an agent
+    #: whose seat is still blocked would only fail again (arm `ccp' for those).
+    #: `-a' or `--all' offers every root agent.
     ##
     local via="${agent_usage_continue_via:-kitty}"
-    local filter=stopped arg
+    local filter=usable arg
     for arg in "$@" ; do
         case "${arg}" in
             -a|--all) filter=all ;;

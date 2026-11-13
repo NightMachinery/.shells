@@ -6,9 +6,11 @@ function h-paseo-auto-continue {
 }
 
 function paseo-auto-continue-stopped {
-    : "usage: paseo-auto-continue-stopped [--home PATH]
+    : "usage: paseo-auto-continue-stopped [--home PATH] [--usable]
 The local Paseo agents whose last turn stopped at a usage limit, subagents
-included, one UUID per line; registered for auto-continue or not."
+included, one UUID per line; registered for auto-continue or not. --usable
+keeps only those whose seat has quota left for their model now (one usage
+check per seat and model family)."
     h-paseo-auto-continue stopped "$@"
 }
 

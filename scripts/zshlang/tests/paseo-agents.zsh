@@ -272,7 +272,7 @@ function h-agent-usage-continue-targets {
 function h-agent-usage-continue-send { print -r -- "send $1" >> "${cn_log}" ; [[ "$1" != tmux:%9 ]] ; }
 : > "${cn_log}"
 agent_usage_continue_via=paseo agent-continue >/dev/null 2>&1 && { print -ru2 -- 'FAIL: a failed send was not reported'; exit 1; }
-expect-eq "$(<"${cn_log}")" "pick paseo stopped n"$'\n'"send paseo:${a_live}"$'\n'"send tmux:%9" 'agent-continue sends'
+expect-eq "$(<"${cn_log}")" "pick paseo usable n"$'\n'"send paseo:${a_live}"$'\n'"send tmux:%9" 'agent-continue sends'
 : > "${cn_log}"
 agent_usage_continue_via=paseo agent-continue --all >/dev/null 2>&1 || true
 expect-eq "$(command head -n1 "${cn_log}")" "pick paseo all n" 'agent-continue --all'

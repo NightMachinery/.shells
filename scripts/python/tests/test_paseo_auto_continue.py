@@ -189,6 +189,32 @@ class PaseoAutoContinueTests(unittest.TestCase):
             self.home, transcript_fn=lambda record, identity: record['id'] == 'claude-quota'))
         self.assertEqual(found, ['claude-quota', 'codex-quota'])
 
+    def test_usable_agents_filter(self):
+        records = {
+            'work-opus': {'provider': 'claude-work', 'config': {'model': 'claude-opus-5-5'}},
+            'work-opus-2': {'provider': 'claude-work', 'config': {'model': 'claude-opus-5-5'}},
+            'work-sonnet': {'provider': 'claude-work', 'config': {'model': 'claude-sonnet-5-5'}},
+            'codex': {'provider': 'codex', 'runtimeInfo': {'model': 'gpt-6.1'}},
+            'broken': {'provider': 'odd', 'config': {}},
+        }
+        calls, warnings = [], []
+
+        def quota_fn(state, snapshot):
+            calls.append((state['binding']['provider'], snapshot['Model']))
+            if state['binding']['provider'] == 'odd':
+                raise mod.HandoffError('Provider must resolve to Claude or Codex')
+            return snapshot['Model'] != 'claude-opus-5-5'
+
+        found = list(mod.usable_agents(
+            self.home, ['work-opus', 'work-opus-2', 'work-sonnet', 'codex', 'broken', 'gone'],
+            quota_fn=quota_fn, warn=warnings.append,
+            stored_fn=lambda agent_id, home: records[agent_id] if agent_id in records
+            else (_ for _ in ()).throw(mod.HandoffError('missing'))))
+        self.assertEqual(found, ['work-sonnet', 'codex'])
+        # One check per seat and model family, not per agent.
+        self.assertEqual(len(calls), 4)
+        self.assertEqual(len(warnings), 2)
+
     def test_codex_quota_verdict(self):
         self.assertTrue(mod.quota_usable({'ok': True, 'quota': {'blocked': False}}, 'codex'))
         self.assertFalse(mod.quota_usable({'ok': True, 'quota': {'blocked': True}}, 'codex'))
