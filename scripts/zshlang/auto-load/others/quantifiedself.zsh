@@ -90,7 +90,17 @@ function tokei-percent() {
     table-print "$headers[@]" -- "$newline[@]"
 }
 ##
+function h-file-line-counter-dep {
+    go-local-dep file_line_counter "${NIGHTDIR}/golang/file_line_counter"
+}
+
+function file_line_counter {
+    h-file-line-counter-dep @RET
+    command file_line_counter "$@"
+}
+
 function nt-count-lines {
-    fd --absolute-path --type f --extension org --exclude 'private/archive/*' --exclude 'private/backups' . "$nightNotes" | file_line_counter.lisp | tac
+    h-file-line-counter-dep @RET
+    fd --absolute-path --type f --extension org --exclude 'private/archive/*' --exclude 'private/backups' . "$nightNotes" | command file_line_counter | tac
 }
 ##
