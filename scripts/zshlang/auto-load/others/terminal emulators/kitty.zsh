@@ -611,11 +611,338 @@ function kitty-theme-reload {
 }
 ##
 ##
+#: * Popup panel toggle (`hyper+z' equivalent without Hammerspoon)
 #: hyper+z in panel mode (the default, see `kitty_hotkey_mode' in
-#: hammerspoon/core/window-media-bindings.lua): every tab of the one kitty
-#: instance lives in a *panel* OS window that floats over fullscreen apps.
-#: Creating, showing and hiding it is Lua now, in
-#: hammerspoon/core/kitty-panel.lua, which talks to kitty over remote control
-#: directly. It used to be kitty-panel-ensure / -show / -hide here, run in the
-#: garden, so the key died whenever the garden did. Story:
-#: ~/notes/public/subjects/tools/CLI/terminal emulators/Kitty/hotkey window.org
+#: hammerspoon/core/window-media-bindings.lua) lives in
+#: hammerspoon/core/kitty-panel.lua. [agfi:kitty-popup-window-toggle] provides
+#: the same panel-mode toggle, show, and hide directly from zsh +
+#: `swift/kitty_panel.swift' so it still works when Hammerspoon hangs or is
+#: unavailable. See =docs/kitty-popup-window-toggle.md=.
+
+function h-kitty-panel-kitten-bin {
+    local direct='/Applications/kitty.app/Contents/MacOS/kitten'
+    if [[ -x "${direct}" ]] ; then
+        ec "${direct}"
+    else
+        ec kitten
+    fi
+}
+
+function h-kitty-panel-swift-bin {
+    if (( ${+commands[kitty_panel.swift]} )) ; then
+        ec "${commands[kitty_panel.swift]}"
+    else
+        ec "${NIGHTDIR:-${HOME}/scripts}/swift/kitty_panel.swift"
+    fi
+}
+
+function h-kitty-panel-state-json {
+    local sock="${1}"
+    assert-args sock @RET
+    ensure-cmd jq @RET
+
+    local kitten_bin
+    kitten_bin="$(h-kitty-panel-kitten-bin)"
+
+    local jq_prog='
+    [.[] | select(.wm_class == $class)] as $p
+    | {
+        win: ([$p[] | .tabs[] | .windows[] | .id][0]),
+        active: ([$p[] | .tabs[] | select(.is_active) | .windows[] | select(.is_active) | .id][0]),
+        firstTab: ([$p[] | .tabs[0].id][0]),
+        strays: [.[] | select(.wm_class != $class) | .tabs[].id]
+      }
+    '
+    "${kitten_bin}" @ --to "${sock}" ls |
+        command jq -c --arg class kitty-panel "${jq_prog}"
+}
+
+function h-kitty-panel-fold-strays {
+    local sock="${1}" panel_tab="${2}" fresh_tab="${3}"
+    shift 3
+    local -a strays=( "$@" )
+    strays=( ${strays:#} )
+    (( ${#strays} )) || return 0
+
+    test -n "${panel_tab}" || { ecerr "$0: no panel tab to move into"; return 1 }
+
+    local kitten_bin moved=0 t
+    kitten_bin="$(h-kitty-panel-kitten-bin)"
+
+    for t in "${strays[@]}" ; do
+        if "${kitten_bin}" @ --to "${sock}" detach-tab --match "id:${t}" --target-tab "id:${panel_tab}" >/dev/null ; then
+            (( moved++ ))
+        else
+            ecerr "$0: could not move tab ${t} into the panel"
+        fi
+    done
+
+    if (( moved > 0 )) && test -n "${fresh_tab}" ; then
+        "${kitten_bin}" @ --to "${sock}" close-tab --match "id:${fresh_tab}" >/dev/null 2>&1 || true
+    fi
+}
+
+function h-kitty-panel-launch-and-wait {
+    command open -b net.kovidgoyal.kitty --args --start-as minimized @RET
+
+    local kitten_bin sock i
+    kitten_bin="$(h-kitty-panel-kitten-bin)"
+    for i in {1..80} ; do
+        sleep 0.25
+        if sock="$(kitty-socket-get 2>/dev/null)" &&
+            "${kitten_bin}" @ --to "${sock}" ls >/dev/null 2>&1 ; then
+            ec "${sock}"
+            return 0
+        fi
+    done
+
+    ecerr "kitty-popup-window-toggle: kitty did not come up within 20 seconds"
+    return 1
+}
+
+function h-kitty-panel-slow-ensure {
+    #: Ensures a kitty-panel OS window exists and folds stray tabs when
+    #: creating the panel or when `fold_strays_p' is enabled. Prints the
+    #: latest panel state JSON on stdout.
+    local sock="${1}" fold_strays_p="${2:-n}" screen_name="${3}"
+    assert-args sock @RET
+
+    local kitten_bin state_json win first_tab fresh_win fresh_tab
+    kitten_bin="$(h-kitty-panel-kitten-bin)"
+    state_json="$(h-kitty-panel-state-json "${sock}")" @RET
+    win="$(ec "${state_json}" | command jq -r '.win // empty')"
+
+    if test -z "${win}" ; then
+        local -a launch_args=(
+            launch --type=os-panel
+            --os-panel edge=center
+            --os-panel layer=top
+            --os-panel focus-policy=on-demand
+            --os-window-class kitty-panel
+            --dont-take-focus
+        )
+        if test -n "${screen_name}" ; then
+            launch_args+=( --os-panel "output-name=${screen_name}" )
+        fi
+        fresh_win="$("${kitten_bin}" @ --to "${sock}" "${launch_args[@]}")" @RET
+        fresh_win="${fresh_win//[[:space:]]/}"
+
+        #: A fresh panel counts as shown for kitty while macOS places it on
+        #: the desktop space only; hide once so the upcoming show orders it
+        #: onto the active space.
+        "${kitten_bin}" @ --to "${sock}" resize-os-window --match "id:${fresh_win}" --action=hide >/dev/null 2>&1 || true
+
+        state_json="$(h-kitty-panel-state-json "${sock}")" @RET
+        first_tab="$(ec "${state_json}" | command jq -r '.firstTab // empty')"
+        fresh_tab="$("${kitten_bin}" @ --to "${sock}" ls | command jq -r --argjson w "${fresh_win}" '[.[] | .tabs[] | select(any(.windows[]; .id == $w)) | .id][0] // empty')"
+
+        local -a strays
+        strays=( ${(f)"$(ec "${state_json}" | command jq -r '.strays[]?')"} )
+        h-kitty-panel-fold-strays "${sock}" "${first_tab}" "${fresh_tab}" "${strays[@]}"
+        state_json="$(h-kitty-panel-state-json "${sock}")" @RET
+    elif bool "${fold_strays_p}" ; then
+        first_tab="$(ec "${state_json}" | command jq -r '.firstTab // empty')"
+        local -a strays
+        strays=( ${(f)"$(ec "${state_json}" | command jq -r '.strays[]?')"} )
+        if (( ${#strays} )) ; then
+            h-kitty-panel-fold-strays "${sock}" "${first_tab}" '' "${strays[@]}"
+            state_json="$(h-kitty-panel-state-json "${sock}")" @RET
+        fi
+    fi
+
+    ec "${state_json}"
+}
+
+function h-kitty-panel-slow-show {
+    local swift_bin="${1}" sock="${2}" fold_strays_p="${3}" decor_p="${4}" fit_p="${5}" screen_name="${6}" quiet_p="${7}"
+    local kitten_bin
+    kitten_bin="$(h-kitty-panel-kitten-bin)"
+
+    local -a swift_opts=()
+    test -n "${screen_name}" && swift_opts+=( --screen "${screen_name}" )
+    bool "${decor_p}" || swift_opts+=( --no-decor )
+    bool "${fit_p}" || swift_opts+=( --no-fit )
+    bool "${quiet_p}" && swift_opts+=( --quiet )
+
+    if test -z "${screen_name}" ; then
+        screen_name="$("${swift_bin}" screen 2>/dev/null || true)"
+    fi
+
+    local state_json win active
+    state_json="$(h-kitty-panel-slow-ensure "${sock}" "${fold_strays_p}" "${screen_name}")" @RET
+    win="$(ec "${state_json}" | command jq -r '.win // empty')"
+    active="$(ec "${state_json}" | command jq -r '.active // empty')"
+    test -n "${win}" || { ecerr "kitty-popup-window-toggle: no panel window found"; return 1 }
+
+    if bool "${decor_p}" ; then
+        "${swift_bin}" decor-prepare "${swift_opts[@]}" || true
+    fi
+
+    "${kitten_bin}" @ --to "${sock}" resize-os-window --match "id:${win}" --action=hide >/dev/null 2>&1 || true
+    if test -n "${screen_name}" ; then
+        "${kitten_bin}" @ --to "${sock}" resize-os-window --match "id:${win}" --action=os-panel --incremental "output-name=${screen_name}" >/dev/null 2>&1 || true
+    fi
+    "${kitten_bin}" @ --to "${sock}" resize-os-window --match "id:${win}" --action=show >/dev/null @RET
+    if test -n "${active}" ; then
+        "${kitten_bin}" @ --to "${sock}" focus-window --match "id:${active}" >/dev/null 2>&1 || true
+    fi
+    if bool "${fit_p}" ; then
+        "${swift_bin}" fit "${swift_opts[@]}" || true
+    fi
+}
+
+function h-kitty-panel-slow-hide {
+    local swift_bin="${1}" sock="${2}"
+    local kitten_bin was_frontmost=n
+    kitten_bin="$(h-kitty-panel-kitten-bin)"
+
+    if "${swift_bin}" panel-shown ; then
+        was_frontmost=y
+    fi
+
+    local state_json win
+    state_json="$(h-kitty-panel-state-json "${sock}")" @RET
+    win="$(ec "${state_json}" | command jq -r '.win // empty')"
+    test -n "${win}" || return 0
+
+    "${kitten_bin}" @ --to "${sock}" resize-os-window --match "id:${win}" --action=hide >/dev/null @RET
+    if [[ "${was_frontmost}" == y ]] ; then
+        "${swift_bin}" focus-back || true
+    fi
+}
+
+function kitty-popup-window-toggle {
+    : "usage: kitty-popup-window-toggle [toggle|show|hide] [--screen <name>] [--fold-strays] [--no-decor] [--no-fit] [--quiet]
+Toggles, shows, or hides the kitty panel OS window without Hammerspoon."
+    @darwinOnly
+
+    local action=toggle
+    local screen_name="${kitty_panel_screen:-}"
+    local fold_strays_p="${kitty_panel_fold_strays:-n}"
+    local decor_p="${kitty_panel_decor_p:-y}"
+    local fit_p="${kitty_panel_fit_p:-y}"
+    local quiet_p=n
+
+    while (( $# > 0 )) ; do
+        case "${1}" in
+            toggle|show|hide)
+                action="${1}"
+                shift
+                ;;
+            --screen)
+                shift
+                test -n "${1:-}" || { ecerr "$0: --screen requires a value"; return 2 }
+                screen_name="${1}"
+                shift
+                ;;
+            --fold-strays)
+                fold_strays_p=y
+                shift
+                ;;
+            --no-decor)
+                decor_p=n
+                shift
+                ;;
+            --no-fit)
+                fit_p=n
+                shift
+                ;;
+            --quiet|-q)
+                quiet_p=y
+                shift
+                ;;
+            -h|--help)
+                ec "usage: kitty-popup-window-toggle [toggle|show|hide] [--screen <name>] [--fold-strays] [--no-decor] [--no-fit] [--quiet]"
+                return 0
+                ;;
+            *)
+                ecerr "$0: unknown argument: ${1}"
+                return 2
+                ;;
+        esac
+    done
+
+    local swift_bin
+    swift_bin="$(h-kitty-panel-swift-bin)"
+    test -x "${swift_bin}" || { ecerr "$0: missing executable ${swift_bin}"; return 1 }
+
+    local lock_dir="${TMPDIR:-/tmp}/kitty-popup-window-toggle.lock"
+    if ! command mkdir "${lock_dir}" 2>/dev/null ; then
+        local holder_pid=""
+        if [[ -r "${lock_dir}/pid" ]] ; then
+            holder_pid="$(< "${lock_dir}/pid")"
+        fi
+        if [[ "${holder_pid}" == <-> ]] && kill -0 "${holder_pid}" 2>/dev/null ; then
+            bool "${quiet_p}" || ecgray "$0: toggle already in progress (pid ${holder_pid})"
+            return 0
+        fi
+        command rm -rf -- "${lock_dir}" 2>/dev/null || true
+        if ! command mkdir "${lock_dir}" 2>/dev/null ; then
+            bool "${quiet_p}" || ecgray "$0: toggle already in progress"
+            return 0
+        fi
+    fi
+    print -r -- "$$" >| "${lock_dir}/pid"
+
+    local ret=0
+    {
+        local -a swift_opts=()
+        test -n "${screen_name}" && swift_opts+=( --screen "${screen_name}" )
+        bool "${fold_strays_p}" && swift_opts+=( --fold-strays )
+        bool "${decor_p}" || swift_opts+=( --no-decor )
+        bool "${fit_p}" || swift_opts+=( --no-fit )
+        bool "${quiet_p}" && swift_opts+=( --quiet )
+
+        local rc=0
+        "${swift_bin}" "${action}" "${swift_opts[@]}" || rc=$?
+
+        if (( rc == 0 )) ; then
+            ret=0
+        elif (( rc == 10 )) ; then
+            local sock
+            sock="$(h-kitty-panel-launch-and-wait)" || { ret=$?; }
+            if (( ret == 0 )) ; then
+                local resolved_screen="${screen_name}"
+                if test -z "${resolved_screen}" ; then
+                    resolved_screen="$("${swift_bin}" screen 2>/dev/null || true)"
+                fi
+                h-kitty-panel-slow-ensure "${sock}" "${fold_strays_p}" "${resolved_screen}" >/dev/null || ret=$?
+                if (( ret == 0 )) ; then
+                    local rc2=0
+                    "${swift_bin}" show "${swift_opts[@]}" --socket "${sock}" || rc2=$?
+                    if (( rc2 == 11 )) ; then
+                        h-kitty-panel-slow-show "${swift_bin}" "${sock}" "${fold_strays_p}" "${decor_p}" "${fit_p}" "${screen_name}" "${quiet_p}" || ret=$?
+                    elif (( rc2 != 0 )) ; then
+                        ret="${rc2}"
+                    fi
+                fi
+            fi
+        elif (( rc == 11 )) ; then
+            local sock
+            sock="$(kitty-socket-get)" || { ret=$?; }
+            if (( ret == 0 )) ; then
+                h-kitty-panel-slow-show "${swift_bin}" "${sock}" "${fold_strays_p}" "${decor_p}" "${fit_p}" "${screen_name}" "${quiet_p}" || ret=$?
+            fi
+        elif (( rc == 12 )) ; then
+            local sock
+            sock="$(kitty-socket-get)" || { ret=$?; }
+            if (( ret == 0 )) ; then
+                h-kitty-panel-slow-hide "${swift_bin}" "${sock}" || ret=$?
+            fi
+        else
+            ret="${rc}"
+        fi
+    } always {
+        command rm -rf -- "${lock_dir}" 2>/dev/null || true
+    }
+
+    return "${ret}"
+}
+
+function kitty-popup-window-show {
+    kitty-popup-window-toggle show "$@"
+}
+
+function kitty-popup-window-hide {
+    kitty-popup-window-toggle hide "$@"
+}
