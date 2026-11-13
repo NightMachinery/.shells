@@ -848,7 +848,12 @@ function getlinks-img() {
 ##
 aliasfn rss-tll rss-tl -e w2e-curl
 ##
-aliasfn html-links-textualize ifdefined-cmd-or-cat html_links_textualize.lisp
+function html-links-textualize {
+    local -x html_links_textualize_truncate_p="${html_links_textualize_truncate_p:-y}"
+
+    go-local-dep html_links_textualize "${NIGHTDIR}/golang/html_links_textualize" @RET
+    command html_links_textualize "$@"
+}
 
 function html-links-absolutify {
     local url_current="$1"
@@ -856,8 +861,10 @@ function html-links-absolutify {
     local url_root
     url_root="${2:-$(url-head "$url_current")}" @TRET
     local -x html_links_absolutify_p="${html_links_absolutify_p:-y}"
+    local -x html_links_url_final_p="${html_links_url_final_p}"
 
-    ifdefined-cmd-or-cat html_links_absolutify.lisp "$url_current" "$url_root"
+    go-local-dep html_links_absolutify "${NIGHTDIR}/golang/html_links_absolutify" @RET
+    command html_links_absolutify "$url_current" "$url_root"
 }
 
 function html-links-urlfinal {
