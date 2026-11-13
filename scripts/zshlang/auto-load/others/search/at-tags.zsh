@@ -1,9 +1,14 @@
 ##
+function tag-filter-date {
+    go-local-dep tag-filter-date "${NIGHTDIR}/golang/tag-filter-date" @RET
+    command tag-filter-date "$@"
+}
+
 function tag-filter-date-past-stdin {
     local tags=(${tag_filter_date_past_tags[@]})
     assert-args tags @RET
 
-    revaldbg tag-filter-date.lispexe "$tags[@]"
+    revaldbg tag-filter-date "$tags[@]"
 }
 @opts-setprefix tag-filter-date-past-stdin tag-filter-date-past
 
