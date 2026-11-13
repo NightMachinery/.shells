@@ -1,0 +1,19 @@
+--------
+
+* Standalone CLI Helpers
+- Put each helper in its own Go module under =golang/<name>/= with =package main= at the module root (so =cd "${dir}" && go install= builds =<name>= into =GOBIN=).
+- Prefer the Go standard library when practical, and add =*_test.go= unit tests alongside =main.go=.
+- Wrap it in zsh using =[agfi:go-local-dep]= (in =zshlang/basic/compatibility.zsh=):
+#+begin_src zsh :eval never
+function h-<name>-dep {
+    go-local-dep <name> "${NIGHTDIR}/golang/<name>"
+}
+
+function <name> {
+    h-<name>-dep @RET
+    command <name> "$@"
+}
+#+end_src
+- =go-local-dep= probes =whence -p= (avoiding =$commands=) and rebuilds only when a non-test =.go=, =go.mod=, or =go.sum= file is newer than the installed binary; failed rebuilds warn on stderr and keep the existing binary.
+
+--------
