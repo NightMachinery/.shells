@@ -390,10 +390,19 @@ function icat-emc {
 }
 # alias ice='icat-emc'
 ##
+function h-lisp-quote-dep {
+    go-local-dep lisp-quote "${NIGHTDIR}/golang/lisp-quote"
+}
+
+function h-lisp-quote-all-dep {
+    go-local-dep lisp-quote-all "${NIGHTDIR}/golang/lisp-quote-all"
+}
+
 function lisp-quote {
+    h-lisp-quote-dep @RET
     ##
     in-or-args "$@" |
-        lisp-quote.lisp |
+        command lisp-quote |
         cat-copy-if-tty
     ##
     # local i res=''
@@ -414,15 +423,17 @@ function lisp-quote {
 aliasfn emc-quote lisp-quote
 
 function lisp-quote-all {
-    cat-paste-if-tty | in-or-args "$@" | lisp-quote-all.lisp | cat-copy-if-tty
+    h-lisp-quote-all-dep @RET
+    cat-paste-if-tty | in-or-args "$@" | command lisp-quote-all | cat-copy-if-tty
 }
 
 function lisp-quote-safe {
     # slower than `lisp-quote', but preserves newlines in arguments
     ##
+    h-lisp-quote-all-dep @RET
     local arg
     for arg in "$@" ; do
-        ecn "$arg" | lisp-quote-all.lisp
+        ecn "$arg" | command lisp-quote-all
     done | cat-copy-if-tty
 }
 aliasfn emc-quote-safe lisp-quote-safe
