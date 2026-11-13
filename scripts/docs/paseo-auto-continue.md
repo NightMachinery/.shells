@@ -34,7 +34,10 @@ shell"). They list Paseo agents next to ordinary sessions, each agent once.
 `paseo-continue-fz` (alias of `claude-code-usage-continue-paseo-fz`, see
 `docs/agent-usage-armed.md`) is the other way to resume Paseo agents. It arms
 a one-shot job for the current Claude profile's reset and sends `Continue.`
-to the agents picked at arm time. It sends even if an agent never hit the
+to the agents picked at arm time. Its picker offers the agents this watcher's
+own test finds stopped at a usage limit, registered or not and subagents
+included (`paseo-auto-continue-stopped` lists them; `-a` offers every root
+agent). Once picked, it sends even if an agent never hit the
 limit, as long as the agent is idle with no pending permission when the job
 fires (a Paseo target has no keyboard idle check unless
 `agent_usage_continue_idle_min_s_paseo` sets one). The watcher here is

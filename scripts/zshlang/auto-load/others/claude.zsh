@@ -1190,6 +1190,11 @@ function claude-code-usage-fable-notify {
             #: `${via%-fz}' because the name advertises the picker and the knob
             #: names the mechanism: `-continue-tmux-fz' arms
             #: `agent_usage_continue_via=tmux'.
+            if [[ "${via}" == paseo-fz ]] ; then
+                #: The Paseo picker takes `-a' itself; see the helper.
+                aliasfnq "${name}" h-claude-code-usage-continue-paseo "${base}"
+                continue
+            fi
             aliasfnq "${name}" \
                 claude_code_usage_arm_p=y \
                 agent_usage_arm_action=continue \
@@ -1197,6 +1202,36 @@ function claude-code-usage-fable-notify {
                 "${base}"
         done
     done
+}
+
+function h-claude-code-usage-continue-paseo {
+    #: The `-continue-paseo-fz' entry points. Their picker offers only the agents
+    #: whose last turn stopped at a usage limit, subagents included, which is
+    #: what a resume is for; `-a' or `--all' offers every root agent, the old
+    #: list. Taken out of the arguments here because the report script has an
+    #: `--all' of its own (every profile), which an arm for one profile has no
+    #: use for.
+    #: Usage: h-claude-code-usage-continue-paseo <report-fn> [-a|--all] [report args...]
+    ##
+    local filter="${agent_usage_continue_paseo_filter:-stopped}"
+    local base="${1}"
+    assert-args base @RET
+    shift
+
+    local -a rest=()
+    local arg
+    for arg in "$@" ; do
+        case "${arg}" in
+            -a|--all) filter=all ;;
+            *) rest+=( "${arg}" ) ;;
+        esac
+    done
+
+    claude_code_usage_arm_p=y \
+        agent_usage_arm_action=continue \
+        agent_usage_continue_via=paseo \
+        agent_usage_continue_paseo_filter="${filter}" \
+        "${base}" "${rest[@]}"
 }
 
 #: The short names, mirroring the =ccu-default= block above.

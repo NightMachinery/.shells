@@ -109,6 +109,8 @@ expect-eq "$(h-paseo-agent-pairs paseo: | command cut -f1 | command sort)" \
     "paseo:${a_live}"$'\n'"paseo:${a_idle}" 'picker excludes children'
 expect-eq "$(agent_session_fz_subagents_p=y h-paseo-agent-pairs paseo: | command cut -f1 | command sort)" \
     "paseo:${a_live}"$'\n'"paseo:${a_idle}"$'\n'"paseo:${a_child}" 'picker child opt-in'
+expect-eq "$(paseo_agent_pairs_ids="${a_child}"$'\n'"${a_idle}" h-paseo-agent-pairs paseo: | command cut -f1 | command sort)" \
+    "paseo:${a_idle}"$'\n'"paseo:${a_child}" 'an id list selects exactly those, children included'
 function h-agent-session-live-list {
     printf '1\t%s\tnative\t/p\t%s\t-\tbusy\tinteractive\n' "${live_id}" "${native_t}"
     printf '2\tother\tother\t/p\t%s\t-\tidle\tinteractive\n' "${other_t}"

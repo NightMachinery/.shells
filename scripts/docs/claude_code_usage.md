@@ -980,8 +980,12 @@ named by *how* the text is delivered, since that is what you are choosing:
   picker offers only panes running Claude Code under the profile being armed.
 - `claude-code-usage-continue-paseo-fz` (aliases `ccp` and
   `paseo-continue-fz`) — pick Paseo agents; each is sent `Continue.` with
-  `paseo send`, which needs no window. The kitty and tmux pickers offer Paseo
-  agents too, so this is the narrower list rather than the only way in.
+  `paseo send`, which needs no window. The picker offers only the agents whose
+  last turn stopped at a usage limit, subagents included, found by the same
+  test as Paseo auto-continue (`paseo-auto-continue-stopped`; see
+  `docs/paseo-auto-continue.md`). `-a` or `--all` offers every root agent
+  instead (this replaces the report's own `--all`, which an arm for one
+  profile has no use for). The kitty and tmux pickers offer Paseo agents too.
 - `claude-code-usage-continue-frontmost` (alias `ccfront`) — no picker;
   type wherever the keyboard focus is when the reset comes.
 

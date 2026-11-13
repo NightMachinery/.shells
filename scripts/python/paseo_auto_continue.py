@@ -132,13 +132,19 @@ def binding(snapshot, home):
     return {**identity, 'provider': snapshot['Provider'], 'cwd': snapshot['Cwd']}
 
 
+def quota_error(record):
+    """Whether the record's last error is a usage limit (Codex reports those this way)."""
+    error = record.get('lastError')
+    return isinstance(error, str) and QUOTA_ERROR.search(error) is not None
+
+
 def quota_failure(record):
     """Account exhaustion elsewhere must not resume an intentionally idle agent."""
     if record.get('archivedAt') or record.get('lastStatus') != 'error':
         return None
-    error = record.get('lastError')
-    if not isinstance(error, str) or not QUOTA_ERROR.search(error):
+    if not quota_error(record):
         return None
+    error = record['lastError']
     # lastActivityAt can move for incidental events. The failed turn identity
     # instead uses its user message and attention timestamp, plus error text.
     return digest([error, record.get('lastUserMessageAt'), record.get('attentionTimestamp')])
@@ -190,6 +196,40 @@ def failure_of(snapshot, record, state, transcript_fn):
             and not record.get('archivedAt'):
         return transcript_fn(record, state['binding'])
     return None
+
+
+def stopped_agents(home, transcript_fn=claude_limit_failure):
+    """The local agents whose last turn stopped at a usage limit, registered or not.
+
+    The same tests the watcher applies to one agent, read from the stored records
+    alone so a scan asks the daemon nothing. A stored record says `closed' for an
+    agent the daemon has not loaded since it restarted, so that counts as well
+    as the live statuses.
+    """
+    records = list((home / 'agents').glob('*.json')) + list((home / 'agents').glob('*/*.json'))
+    identities = {}
+    for path in sorted(records):
+        try:
+            record = read_json(path)
+        except (OSError, ValueError):
+            continue
+        if not isinstance(record, dict) or record.get('archivedAt') or record.get('internal'):
+            continue
+        status = record.get('lastStatus')
+        if status in ('error', 'closed') and quota_error(record):
+            yield record['id']
+            continue
+        if status not in ('idle', 'closed'):
+            continue
+        provider = record.get('provider')
+        if provider not in identities:
+            try:
+                identities[provider] = provider_config(home, provider)[0]
+            except (HandoffError, OSError, ValueError, KeyError):
+                identities[provider] = None
+        identity = identities[provider]
+        if identity and identity['agent'] == 'claude' and transcript_fn(record, identity):
+            yield record['id']
 
 
 def model_family(snapshot):
@@ -345,13 +385,18 @@ def registrations(directory):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('action', choices=('on', 'off', 'status', 'list', 'watch', 'check'))
+    parser.add_argument('action', choices=('on', 'off', 'status', 'list', 'watch', 'check', 'stopped'))
     parser.add_argument('agent_id', nargs='?', default=os.environ.get('PASEO_AGENT_ID'))
     parser.add_argument('--home', default=os.environ.get('PASEO_HOME') or str(Path.home() / '.paseo'))
     parser.add_argument('--poll', type=int, default=300)
     parser.add_argument('--state')
     parser.add_argument('--state-dir', default=str(Path(os.environ.get('XDG_STATE_HOME', Path.home() / '.local/state')) / 'agent-sessions/auto-continue-paseo'))
     args = parser.parse_args()
+    if args.action == 'stopped':
+        # One agent ID per line: every local agent stopped at a usage limit.
+        for agent_id in stopped_agents(Path(args.home).expanduser().resolve()):
+            print(agent_id)
+        return
     if args.action == 'list':
         for row in registrations(Path(args.state_dir).expanduser()):
             print('\t'.join(' '.join(field.split()) for field in row))

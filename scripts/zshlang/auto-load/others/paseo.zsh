@@ -370,6 +370,9 @@ function h-paseo-agent-pairs {
 
     local subagents_p="${agent_session_fz_subagents_p:-n}"
     local sort_by="${agent_session_rows_sort-last}"
+    #: Newline-separated agent UUIDs: only these, subagents or not. Applied
+    #: before the per-row work below, which costs about 0.2s an agent.
+    local only_ids="${paseo_agent_pairs_ids:-}"
     local prefix="${1}"
     bool "${subagents_p}" && subagents_p=y
 
@@ -377,9 +380,11 @@ function h-paseo-agent-pairs {
     #: Keep paseo-ls complete: the duplicate filter needs to hide children's
     #: native processes too. Only the picker applies this parent filter.
     paseo_rows="$(paseo-ls --json | command jq --raw-output \
-        --arg subagents "${subagents_p}" --arg sort_by "${sort_by}" '
-        .[]
-        | select($subagents == "y" or (.parentAgentId // "") == "")
+        --arg subagents "${subagents_p}" --arg sort_by "${sort_by}" --arg only "${only_ids}" '
+        ($only | split("\n") | map(select(. != "")) | map({(.): true}) | add // null) as $only_set
+        | .[]
+        | select(if $only_set then $only_set[.id] == true
+                 else ($subagents == "y" or (.parentAgentId // "") == "") end)
         | (if $sort_by == "user" then (.lastUserMessageAt // .lastActivityAt)
            else .lastActivityAt end) as $stamp
         | (try ($stamp | sub("\\.[0-9]+Z$"; "Z") | fromdateiso8601) catch 0) as $epoch

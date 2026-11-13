@@ -167,6 +167,28 @@ class PaseoAutoContinueTests(unittest.TestCase):
         with self.assertRaises(mod.HandoffError):
             mod.provider_config(self.home, self.provider)
 
+    def test_stopped_agents_scan(self):
+        agents = self.home / 'agents' / '-tmp-project'
+        agents.mkdir(parents=True)
+        claude_quota = {'id': 'claude-quota', 'provider': 'claude', 'lastStatus': 'idle'}
+        records = [
+            {'id': 'codex-quota', 'provider': self.provider, 'lastStatus': 'closed',
+             'lastError': 'You have hit your usage limit.'},
+            {'id': 'codex-other-error', 'provider': self.provider, 'lastStatus': 'error',
+             'lastError': 'Bad Request'},
+            {'id': 'codex-archived', 'provider': self.provider, 'lastStatus': 'error',
+             'lastError': 'Usage limit reached', 'archivedAt': '2026-11-01T00:00:00Z'},
+            {'id': 'codex-running', 'provider': self.provider, 'lastStatus': 'running',
+             'lastError': 'Usage limit reached'},
+            claude_quota,
+            {'id': 'claude-finished', 'provider': 'claude', 'lastStatus': 'idle'},
+        ]
+        for record in records:
+            (agents / (record['id'] + '.json')).write_text(json.dumps(record))
+        found = sorted(mod.stopped_agents(
+            self.home, transcript_fn=lambda record, identity: record['id'] == 'claude-quota'))
+        self.assertEqual(found, ['claude-quota', 'codex-quota'])
+
     def test_codex_quota_verdict(self):
         self.assertTrue(mod.quota_usable({'ok': True, 'quota': {'blocked': False}}, 'codex'))
         self.assertFalse(mod.quota_usable({'ok': True, 'quota': {'blocked': True}}, 'codex'))

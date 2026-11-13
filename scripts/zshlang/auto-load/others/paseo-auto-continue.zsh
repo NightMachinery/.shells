@@ -5,6 +5,13 @@ function h-paseo-auto-continue {
     command python3 "${NIGHTDIR}/python/paseo_auto_continue.py" "$@"
 }
 
+function paseo-auto-continue-stopped {
+    : "usage: paseo-auto-continue-stopped [--home PATH]
+The local Paseo agents whose last turn stopped at a usage limit, subagents
+included, one UUID per line; registered for auto-continue or not."
+    h-paseo-auto-continue stopped "$@"
+}
+
 function paseo-auto-continue-on {
     : "usage: paseo-auto-continue-on [agent-uuid] [--home PATH] [--poll SECONDS]"
     h-paseo-auto-continue on "$@"
