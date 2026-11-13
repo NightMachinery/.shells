@@ -144,6 +144,11 @@ function links2org-dir {
     notif "finished org-links-by-freq $(retcode 2>&1)"
 }
 ##
+function h-pathtree2org {
+    go-local-dep pathtree2org "${NIGHTDIR}/golang/pathtree2org" @RET
+    command pathtree2org "$@"
+}
+
 function pathtree2org {
     local dir="$1"
     assert-args dir @RET ; shift
@@ -159,7 +164,7 @@ function pathtree2org {
     (
         mark-me "$0" # useful for forcefully interrupting this
 
-        pathtree2org.lisp "$dir" '(?i)/\.((trash(es)?|(_\.)?DS_STORE|mypy_cache)/?$|git|Spotlight-|trash-)' '/System Volume Information/' '/(\$RECYCLE.BIN|_gsdata_|found\.\d+)/' '\.(sparsebundle|photoslibrary|app)/.+' "$@" 2> >(eval "$err_skip[@]" >&2)
+        h-pathtree2org "$dir" '(?i)/\.((trash(es)?|(_\.)?DS_STORE|mypy_cache)/?$|git|Spotlight-|trash-)' '/System Volume Information/' '/(\$RECYCLE.BIN|_gsdata_|found\.\d+)/' '\.(sparsebundle|photoslibrary|app)/.+' "$@" 2> >(eval "$err_skip[@]" >&2)
     )
 }
 ##
