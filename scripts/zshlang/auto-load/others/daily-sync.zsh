@@ -539,7 +539,9 @@ function h-daily-sync-converge {
         : > "${run}/conflict-seen"
     fi
     ec
-    h-daily-sync-status
+    out="$(h-daily-sync-status)"
+    ec "${out}"
+    ec "${out}" > "${run}/status.log"
 }
 
 function h-daily-sync-clone-missing {
@@ -787,6 +789,31 @@ function h-daily-sync-metadata-commit {
     command git -C "${root}" commit-own -m "org-paper-metadata-updater: updated at $(command date +%Y-%m-%d)" -- "${files[@]}"
 }
 ##
+function h-daily-sync-leftover {
+    : "Committable changes in the status that ended the last converge, minus held files."
+    local run
+    run="$(h-daily-sync-run-dir)" @RET
+    [[ -r "${run}/status.log" ]] || return 0
+    command perl -e '
+        my ($log, $held) = @ARGV; my %held;
+        if (open(my $h, "<", $held)) { while (<$h>) { $held{"$1 $2 $3"} = 1 if /^(\S+) (\S+): (.*) \(.*\)$/ } }
+        open(my $f, "<", $log) or exit 0; my @l = <$f>; my $start = 0;
+        my ($machine, $repo, $kind) = ("", "", "");
+        for my $line (@l[$start .. $#l]) {
+            chomp $line;
+            if ($line =~ /^## (\S+) \(status\)/) { $machine = $1; $repo = ""; next }
+            if ($line =~ /^(\S.*?) \[([a-z-]+)\] /) { ($repo, $kind) = ($1, $2); next }
+            next unless $repo ne "" && $line =~ /^  (..) (.*)$/;
+            my ($xy, $rest) = ($1, $2);
+            next if $xy eq ".." || $rest =~ /^(OVER-100|\.\.\. )/ || $line =~ /^  OVER-100/;
+            my $ok = $kind eq "notes" || ($kind =~ /code$/ && $rest =~ s/^commit-ok //);
+            next unless $ok;
+            (my $file = $rest) =~ s{/ \(\d+ new files in this directory\)$}{/};
+            next if $held{"$machine $repo $file"};
+            print "  $machine $repo: $xy $file\n";
+        }' "${run}/status.log" "${run}/held"
+}
+
 function h-daily-sync-next-hint {
     case "$(h-daily-sync-stage)" in
         begun)
@@ -796,9 +823,22 @@ function h-daily-sync-next-hint {
             ec "  zsh -c 'daily-sync git <machine> <repo> commit-own -m \"<message>\" -- <file>...'"
             ec "Then, even when there was nothing to commit, run: zsh -c 'daily-sync converge'" ;;
         converged)
+            local -a left
+            left=( "${(@f)$(h-daily-sync-leftover)}" )
+            left=( "${(@)left:#}" )
             ec
-            ec "NEXT: if a line above says CONFLICT, resolve it or leave it blocked (rules are in your"
-            ec "instructions), and run converge again after resolving. Then run: zsh -c 'daily-sync metadata start'" ;;
+            if (( ${#left} )) ; then
+                ec "STILL TO COMMIT (${#left}): these are committable and were left out:"
+                print -rl -- "${(@)left[1,25]}"
+                ec
+                ec "NEXT: commit them now (diff first; privacy check in [public-code]; a file you must not"
+                ec "publish goes to 'daily-sync hold'), then run again: zsh -c 'daily-sync converge'"
+                ec "Only when a file truly cannot be committed, go on and name it in the report:"
+                ec "  zsh -c 'daily-sync metadata start'"
+            else
+                ec "NEXT: if a line above says CONFLICT, resolve it or leave it blocked (rules are in your"
+                ec "instructions), and run converge again after resolving. Then run: zsh -c 'daily-sync metadata start'"
+            fi ;;
         metadata)
             ec
             ec "NEXT: write the Phase 1 report as your message and end your turn. You will be woken"
