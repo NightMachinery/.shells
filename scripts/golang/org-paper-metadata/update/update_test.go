@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -339,5 +340,46 @@ func TestPersonalSummarySiblingDoesNotBlockAbstractRefresh(t *testing.T) {
 	out := transform(t, text)
 	if !strings.Contains(out, personal) || !strings.Contains(out, "The new complete abstract.") || strings.Contains(out, "Old abstract.") {
 		t.Fatal(out)
+	}
+}
+
+func TestAgeLimitSpreadsPapersDeterministically(t *testing.T) {
+	day := 24 * time.Hour
+	if got := AgeLimit("a", 30*day, 0); got != 30*day {
+		t.Fatalf("no jitter: got %v", got)
+	}
+	buckets := map[int]int{}
+	for i := 0; i < 3000; i++ {
+		key := fmt.Sprintf("paper-%d", i)
+		limit := AgeLimit(key, 30*day, 30*day)
+		if limit < 30*day || limit >= 60*day {
+			t.Fatalf("%s: limit %v outside [30d, 60d)", key, limit)
+		}
+		if limit != AgeLimit(key, 30*day, 30*day) {
+			t.Fatalf("%s: limit is not stable", key)
+		}
+		buckets[int((limit-30*day)/(5*day))]++
+	}
+	// Six five-day buckets of about 500 each; a clump would fail this.
+	for b := 0; b < 6; b++ {
+		if buckets[b] < 400 || buckets[b] > 600 {
+			t.Fatalf("bucket %d holds %d of 3000 papers: %v", b, buckets[b], buckets)
+		}
+	}
+}
+
+func TestJitterKeepsAFreshlyFetchedBatchFromExpiringTogether(t *testing.T) {
+	day := 24 * time.Hour
+	now := time.Date(2026, 3, 1, 0, 0, 0, 0, time.UTC)
+	fetched := paper.Metadata{"metadataFetchedAt": {now.Add(-45 * day).Format(time.RFC3339)}}
+	due := 0
+	for i := 0; i < 1000; i++ {
+		if !Recent(fetched, now, AgeLimit(fmt.Sprintf("paper-%d", i), 30*day, 30*day)) {
+			due++
+		}
+	}
+	// Halfway through the jitter window about half the batch is due.
+	if due < 400 || due > 600 {
+		t.Fatalf("%d of 1000 papers due after 45 days", due)
 	}
 }

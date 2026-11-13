@@ -2,6 +2,8 @@
 package update
 
 import (
+	"crypto/sha256"
+	"encoding/binary"
 	"errors"
 	"fmt"
 	"regexp"
@@ -207,6 +209,30 @@ func (d Document) Targets() ([]Target, error) {
 	}
 	return targets, nil
 }
+
+// AgeLimit is how old one paper's metadata may get: maxAge plus a share of
+// jitter fixed by the paper's key. Papers fetched in the same run would
+// otherwise all expire in the same run again, every maxAge, forever: one
+// refresh of 1400 papers took three hours and came back a week later. With
+// the limits spread over [maxAge, maxAge+jitter), a batch comes due a little
+// each day, and because each paper keeps its own period the batch never
+// re-forms.
+func AgeLimit(key string, maxAge, jitter time.Duration) time.Duration {
+	if jitter <= 0 {
+		return maxAge
+	}
+	// A cryptographic hash, because FNV left similar keys visibly clumped.
+	sum := sha256.Sum256([]byte(key))
+	return maxAge + time.Duration(binary.BigEndian.Uint64(sum[:8])%uint64(jitter))
+}
+
+func jitterKey(identity, url string) string {
+	if identity != "" {
+		return identity
+	}
+	return url
+}
+
 func Recent(m paper.Metadata, now time.Time, maxAge time.Duration) bool {
 	t, err := time.Parse(time.RFC3339, m.First("metadataFetchedAt"))
 	return err == nil && !t.After(now.Add(5*time.Minute)) && now.Sub(t) < maxAge

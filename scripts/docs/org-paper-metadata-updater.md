@@ -1,7 +1,8 @@
 # Refresh Org paper metadata
 
 `org-paper-metadata-updater` walks a directory tree and refreshes existing Org
-paper headings whose metadata was last fetched at least seven days ago. It
+paper headings whose metadata has passed its age limit, 30 to 60 days by
+default (see "Age limit" below). It
 shares the native Go fetching, normalization, and rendering code used by
 `semantic-scholar-to-org`. No Python or Lisp helper runs on the default path.
 
@@ -42,7 +43,7 @@ go install . ./cmd/org-paper-metadata-updater
   of old fabricated BibTeX still run on recent entries without fetching metadata
   or changing the timestamp.
   File modification times are irrelevant. Missing or invalid
-  timestamps trigger retrieval; an entry exactly seven days old is eligible.
+  timestamps trigger retrieval; an entry exactly at its age limit is eligible.
 - Duplicate paper URLs share one fetch during a run. Paper fetches are sequential,
   with a one-second minimum interval between uncached fetch starts by default.
   Actual HTTP requests also have a separate one-second minimum spacing per
@@ -54,13 +55,28 @@ go install . ./cmd/org-paper-metadata-updater
 
 Useful overrides, placed before the directory argument:
 
+### Age limit
+
+A paper is refreshed once its metadata is older than `--max-age` plus a share
+of `--max-age-jitter` that is fixed per paper, from a hash of its identity. So
+with the defaults each paper has its own limit between 30 and 60 days.
+
+The jitter is there because papers fetched in one run otherwise expire in one
+run. With a flat seven-day limit, a first run over about 1400 papers took
+three hours, and the same three-hour run came back every week while the days
+in between had nothing to do. With spread limits a batch comes due a little
+each day (about 60 papers a day out of 1850), and since each paper keeps its
+own period the batch does not re-form. `--max-age-jitter 0` restores a flat
+limit.
+
 ```zsh
 org-paper-metadata-updater --write --force '<directory-root>'
 org-paper-metadata-updater --write --max-age 336h '<directory-root>'
 org-paper-metadata-updater --scraper page-data --timeout 2m '<directory-root>'
 ```
 
-`--force` bypasses freshness checks. `--max-age` defaults to `168h`; `--timeout`
+`--force` bypasses freshness checks. `--max-age` defaults to `720h` and
+`--max-age-jitter` to `720h`; `--timeout`
 defaults to one minute per paper, including all fallbacks and rate-limit waits.
 `--interval` controls paper-fetch spacing; setting it to zero does not disable
 HTTP request pacing. HTTP 429 and server errors get at most two retries with

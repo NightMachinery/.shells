@@ -23,6 +23,8 @@ import (
 type Options struct {
 	Write, Force, Diff, NoBibTeX bool
 	MaxAge, Interval, Timeout    time.Duration
+	// MaxAgeJitter spreads refreshes out; see AgeLimit.
+	MaxAgeJitter time.Duration
 }
 type Stats struct{ Files, Headings, Recent, Updated, Failed, Locked int }
 type FetchFunc func(context.Context, string) (paper.Metadata, error)
@@ -90,8 +92,8 @@ func WriteFile(path string, before, after []byte, mode fs.FileMode) error {
 
 func Run(ctx context.Context, root string, o Options, fetch FetchFunc, now time.Time, out, log io.Writer) (Stats, error) {
 	var stats Stats
-	if o.MaxAge <= 0 || o.Interval < 0 || o.Timeout <= 0 {
-		return stats, errors.New("max-age and timeout must be positive; interval must be nonnegative")
+	if o.MaxAge <= 0 || o.Interval < 0 || o.Timeout <= 0 || o.MaxAgeJitter < 0 {
+		return stats, errors.New("max-age and timeout must be positive; interval and max-age-jitter must be nonnegative")
 	}
 	root, err := filepath.Abs(root)
 	if err != nil {
@@ -189,12 +191,12 @@ func Run(ctx context.Context, root string, o Options, fetch FetchFunc, now time.
 			if ctx.Err() != nil {
 				return ctx.Err()
 			}
-			if !o.Force && Recent(target.Properties, now, o.MaxAge) {
+			key, _ := paper.Identity(target.URL)
+			if !o.Force && Recent(target.Properties, now, AgeLimit(jitterKey(key, target.URL), o.MaxAge, o.MaxAgeJitter)) {
 				stats.Recent++
 				applyLocal(target)
 				continue
 			}
-			key, _ := paper.Identity(target.URL)
 			r, cached := cache[key]
 			if !cached {
 				if wait := o.Interval - time.Since(last); wait > 0 {
