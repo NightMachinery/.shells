@@ -974,32 +974,37 @@ Instead of only telling you the limits have reset, the armed job can type
 profile's ordinary report plus an arm whose action is `continue`, and they are
 named by *how* the text is delivered, since that is what you are choosing:
 
-- `claude-code-usage-continue-kitty-fz` (alias `cck`) — pick kitty windows;
+- `claude-code-usage-auto-continue-kitty-fz` (alias `cck`) — pick kitty windows;
   the picker offers every agent's live sessions, plus a `frontmost` row.
-- `claude-code-usage-continue-tmux-fz` (alias `cct`) — pick tmux panes; the
+- `claude-code-usage-auto-continue-tmux-fz` (alias `cct`) — pick tmux panes; the
   picker offers only panes running Claude Code under the profile being armed.
-- `claude-code-usage-continue-paseo-fz` (aliases `ccp` and
-  `paseo-continue-fz`) — pick Paseo agents; each is sent `Continue.` with
+- `claude-code-usage-auto-continue-paseo-fz` (alias `ccp`) — pick Paseo agents; each is sent `Continue.` with
   `paseo send`, which needs no window. The picker offers only the agents whose
   last turn stopped at a usage limit, subagents included, found by the same
   test as Paseo auto-continue (`paseo-auto-continue-stopped`; see
   `docs/paseo-auto-continue.md`). `-a` or `--all` offers every root agent
   instead (this replaces the report's own `--all`, which an arm for one
   profile has no use for). The kitty and tmux pickers offer Paseo agents too.
-- `claude-code-usage-continue-frontmost` (alias `ccfront`) — no picker;
+- `claude-code-usage-auto-continue-frontmost` (alias `ccfront`) — no picker;
   type wherever the keyboard focus is when the reset comes.
 
 Each has `-default-` and `-work-` forms naming the profile explicitly —
-`claude-code-usage-default-continue-tmux-fz`, and so on — with aliases in the
+`claude-code-usage-default-auto-continue-tmux-fz`, and so on — with aliases in the
 `cck-default`, `cct-work`, `ccp-work` shape, matching `ccu-default`. The bare forms follow
 the current profile, like `ccu` itself. Under the hood they set
 `agent_usage_arm_action=continue` and `agent_usage_continue_via` on the
 matching `-notify` report and nothing else.
 
-`h-claude-code-usage-continue-schedule [profile]` arms without printing a
+`h-claude-code-usage-auto-continue-schedule [profile]` arms without printing a
 report, matching the `h-…-arm-schedule` escape hatches above; it reads
 `agent_usage_continue_via` from the environment rather than having a hatch
 per mechanism.
+
+These all *wait*. To resume right away (the limits have already lifted, which
+is exactly when an arm refuses with "usage already possible"), use
+`agent-continue-paseo-fz` (alias `paseo-continue-fz`), `agent-continue-tmux-fz`
+or `agent-continue-kitty-fz`; see `docs/agent-usage-armed.md`.
+The naming rule: `continue` sends now, `auto-continue` is any watcher.
 
 There is deliberately no `-all` variant: the action needs an interactively
 chosen target per profile, and prompting twice from one command is worse than

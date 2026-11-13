@@ -625,10 +625,14 @@ function h-agent-usage-continue-targets-kitty-fz {
     #: `local` is dynamically scoped in zsh, so the picker sees these without
     #: anything being exported. The row layout is
     #: [agfi:h-agent-session-live-rows]'s.
-    local -a agent_session_live_fz_extra_rows
-    agent_session_live_fz_extra_rows=(
-        $'frontmost\t-\t-\tfrontmost\t-\t-\t-\twhatever holds the keyboard when the limits reset'
-    )
+    #: `agent_usage_continue_frontmost_p=n' leaves the row out, for a resume
+    #: sent now, when the frontmost window is the terminal you typed it in.
+    local -a agent_session_live_fz_extra_rows=()
+    if bool "${agent_usage_continue_frontmost_p:-y}" ; then
+        agent_session_live_fz_extra_rows=(
+            $'frontmost\t-\t-\tfrontmost\t-\t-\t-\twhatever holds the keyboard when the limits reset'
+        )
+    fi
 
     #: No header: the picker's own advertises alt+enter, which converts a
     #: transcript to org. This picker is choosing what to resume, and that is
@@ -759,9 +763,74 @@ function h-agent-usage-continue-targets-paseo-fz {
     ec "${selected}" | command cut -f1
 }
 ##
+#: Resuming now
+#:
+#: `continue' resumes immediately; `auto-continue' is every watcher that
+#: resumes later (at a reset, at a time you name). These pick with the same
+#: pickers the arms use and send the same `Continue.' with
+#: [agfi:h-agent-usage-continue-send], but at once and without arming
+#: anything, so they work when the limits have already lifted, which is
+#: exactly when an arm refuses.
+##
+function agent-continue {
+    #: Usage: agent_usage_continue_via=<kitty|tmux|paseo> agent-continue [-a|--all]
+    #:
+    #: The Paseo picker offers only the agents stopped at a usage limit,
+    #: subagents included; `-a' or `--all' offers every root agent.
+    ##
+    local via="${agent_usage_continue_via:-kitty}"
+    local filter=stopped arg
+    for arg in "$@" ; do
+        case "${arg}" in
+            -a|--all) filter=all ;;
+            *)
+                ecerr "$0: unknown argument: ${arg} (only -a, --all)"
+                return 64
+                ;;
+        esac
+    done
+
+    case "${via}" in
+        kitty|tmux|paseo) : ;;
+        *)
+            ecerr "$0: unknown agent_usage_continue_via: ${via} (kitty, tmux, paseo)"
+            return 64
+            ;;
+    esac
+
+    local targets
+    targets="$(
+        agent_usage_continue_via="${via}" \
+            agent_usage_continue_paseo_filter="${filter}" \
+            agent_usage_continue_frontmost_p=n \
+            h-agent-usage-continue-targets
+    )" @RET
+    if test -z "${targets}" ; then
+        ecerr "$0: nothing picked"
+        return 1
+    fi
+
+    local target failed=0
+    for target in "${(@f)targets}" ; do
+        test -n "${target}" || continue
+        if h-agent-usage-continue-send "${target}" ; then
+            ecgray "$0: resumed ${target}"
+        else
+            failed=1
+        fi
+    done
+
+    return "${failed}"
+}
+
+aliasfnq agent-continue-kitty-fz agent_usage_continue_via=kitty agent-continue
+aliasfnq agent-continue-tmux-fz agent_usage_continue_via=tmux agent-continue
+aliasfnq agent-continue-paseo-fz agent_usage_continue_via=paseo agent-continue
+aliasfn paseo-continue-fz agent-continue-paseo-fz
+##
 #: A deadline you name yourself
 ##
-function agent-usage-continue-at {
+function agent-usage-auto-continue-at {
     #: Resumes the sessions you pick at a time you name, in whatever words --
     #: `in 2 hours', `tomorrow 9am', `at 17:30'.
     #:
@@ -774,7 +843,7 @@ function agent-usage-continue-at {
     #:
     #: Its own tmux session, so it coexists with the per-agent armed jobs rather
     #: than replacing one; [agfi:agent-usage-armed-sessions] lists it with them.
-    #: Usage: agent-usage-continue-at <when...>
+    #: Usage: agent-usage-auto-continue-at <when...>
     ##
     local when="${*}"
     assert-args when @RET
@@ -807,21 +876,21 @@ function agent-usage-continue-at {
     #: No `agent_usage_continue_profile' and no `agent_session_agents': this
     #: belongs to no agent, so every live session is offered, an agy pane
     #: included.
-    h-agent-usage-arm agent-usage-continue-at "${deadline}" \
+    h-agent-usage-arm agent-usage-auto-continue-at "${deadline}" \
         "Manual resume at $(date-unix-to-3339 "${deadline}")"
 }
 
 #: The mechanism goes in the name, as it does for the Claude entry points.
-aliasfnq agent-usage-continue-at-kitty-fz agent_usage_continue_via=kitty agent-usage-continue-at
-aliasfnq agent-usage-continue-at-tmux-fz agent_usage_continue_via=tmux agent-usage-continue-at
-aliasfnq agent-usage-continue-at-paseo-fz agent_usage_continue_via=paseo agent-usage-continue-at
-aliasfnq agent-usage-continue-at-frontmost agent_usage_continue_via=frontmost agent-usage-continue-at
+aliasfnq agent-usage-auto-continue-at-kitty-fz agent_usage_continue_via=kitty agent-usage-auto-continue-at
+aliasfnq agent-usage-auto-continue-at-tmux-fz agent_usage_continue_via=tmux agent-usage-auto-continue-at
+aliasfnq agent-usage-auto-continue-at-paseo-fz agent_usage_continue_via=paseo agent-usage-auto-continue-at
+aliasfnq agent-usage-auto-continue-at-frontmost agent_usage_continue_via=frontmost agent-usage-auto-continue-at
 
 #: `a' for agent, `ca' for continue-at, then the mechanism.
-aliasfn acak agent-usage-continue-at-kitty-fz
-aliasfn acat agent-usage-continue-at-tmux-fz
-aliasfn acap agent-usage-continue-at-paseo-fz
-aliasfn acafront agent-usage-continue-at-frontmost
+aliasfn acak agent-usage-auto-continue-at-kitty-fz
+aliasfn acat agent-usage-auto-continue-at-tmux-fz
+aliasfn acap agent-usage-auto-continue-at-paseo-fz
+aliasfn acafront agent-usage-auto-continue-at-frontmost
 ##
 #: Waiting for a measured reset
 #:
@@ -1409,9 +1478,9 @@ function agent-usage-armed-sessions {
         out+=( "${(@f)$("${fn}")}" )
     done
 
-    #: [agfi:agent-usage-continue-at] names its session after itself, and is
+    #: [agfi:agent-usage-auto-continue-at] names its session after itself, and is
     #: defined right here, so it needs no guard.
-    out+=( 'agent-usage-continue-at' )
+    out+=( 'agent-usage-auto-continue-at' )
 
     #: A list that is empty right now contributes one empty line, which would
     #: otherwise reach `status' as a session called "".

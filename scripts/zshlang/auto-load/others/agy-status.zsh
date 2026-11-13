@@ -1266,21 +1266,21 @@ function agy-status-notify {
 #: exactly as Claude Code's are; see
 #: [agfi:h-agent-usage-continue-targets].
 ##
-aliasfnq agy-status-continue-kitty-fz \
+aliasfnq agy-status-auto-continue-kitty-fz \
     agent_usage_arm_action=continue agent_usage_continue_via=kitty \
     agy-status-notify
 
-aliasfnq agy-status-continue-tmux-fz \
+aliasfnq agy-status-auto-continue-tmux-fz \
     agent_usage_arm_action=continue agent_usage_continue_via=tmux \
     agy-status-notify
 
-aliasfnq agy-status-continue-frontmost \
+aliasfnq agy-status-auto-continue-frontmost \
     agent_usage_arm_action=continue agent_usage_continue_via=frontmost \
     agy-status-notify
 
-aliasfn agyk agy-status-continue-kitty-fz
-aliasfn agyt agy-status-continue-tmux-fz
-aliasfn agyfront agy-status-continue-frontmost
+aliasfn agyk agy-status-auto-continue-kitty-fz
+aliasfn agyt agy-status-auto-continue-tmux-fz
+aliasfn agyfront agy-status-auto-continue-frontmost
 ##
 function agy-status-armed-sessions {
     #: Every tmux session an Antigravity armed job can live in, one per line.

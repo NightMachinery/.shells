@@ -520,8 +520,8 @@ and how to cancel it. This section is what is Antigravity's: the deadline, and
 the delivery.
 
 - `agy-status-notify` prints the report and arms a plain notification.
-- `agy-status-continue-kitty-fz` (alias `agyk`), `agy-status-continue-tmux-fz`
-  (alias `agyt`) and `agy-status-continue-frontmost` (alias `agyfront`) print
+- `agy-status-auto-continue-kitty-fz` (alias `agyk`), `agy-status-auto-continue-tmux-fz`
+  (alias `agyt`) and `agy-status-auto-continue-frontmost` (alias `agyfront`) print
   the report and arm a resume, named by how the text is delivered, like their
   Claude counterparts `cck`, `cct` and `ccfront`.
 - `h-agy-status-arm-schedule` arms without printing a report, for when the
@@ -581,5 +581,5 @@ resume on one reset.
 
 The caveat from the shared doc applies unchanged: the job trusts the reset
 time it was armed with and does not re-run `agy-status` when it fires. And
-when the reset agy printed turns out to be wrong, `agent-usage-continue-at`
+when the reset agy printed turns out to be wrong, `agent-usage-auto-continue-at`
 is there to name the time yourself.

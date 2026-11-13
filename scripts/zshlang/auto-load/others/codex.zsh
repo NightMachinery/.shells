@@ -300,7 +300,7 @@ function h-codex-status-gauges {
 #:
 #: Two things are worth knowing before reading the code.
 #:
-#: There are no =-continue-kitty-fz= / =-continue-tmux-fz= / =-continue-frontmost=
+#: There are no =-auto-continue-kitty-fz= / =-auto-continue-tmux-fz= / =-auto-continue-frontmost=
 #: variants here, where Claude Code has three. Codex accepts a message for a
 #: thread by *name* (`codex queue --thread'), so a resume needs no kitty
 #: window, no tmux pane, no keyboard focus and no awake display, and it cannot
@@ -604,11 +604,11 @@ function codex-status-notify {
 #: The report plus an arm whose action is to pick the threads back up, rather
 #: than merely to announce that it is possible. One entry point, not three:
 #: see the delivery note at the top of this block.
-aliasfnq codex-status-continue-fz \
+aliasfnq codex-status-auto-continue-fz \
     agent_usage_arm_action=continue \
     codex-status-notify
 
-aliasfn csc codex-status-continue-fz
+aliasfn csc codex-status-auto-continue-fz
 
 #: Cancelling and reporting are the same act whatever armed the job, so both
 #: are the shared helpers over the session Codex owns. Named arguments still

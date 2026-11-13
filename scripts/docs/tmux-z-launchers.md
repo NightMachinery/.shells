@@ -122,7 +122,7 @@ ran `z` inside the session's own pane, where a popup always had a client.
 - A session literally named `<cmd> <query>@<tag>` that carries no `@tz_key`
   will not be found by the tagged path, and `tmuxnew` will replace it.
 - `agy-t` sits one dash away from `agyt`
-  ([agfi:agy-status-continue-tmux-fz]), which is a different thing.
+  ([agfi:agy-status-auto-continue-tmux-fz]), which is a different thing.
 - If no tmux server is running, the first `tz` starts one, and every pane of
   that server inherits the caller's macOS permission attribution. From mosh,
   that attribution is the ssh daemon's. [agfi:tmuxnew] therefore has kitty

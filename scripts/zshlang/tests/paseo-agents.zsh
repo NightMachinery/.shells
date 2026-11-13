@@ -261,4 +261,21 @@ test -e "${agent_auto_continue_dir}/claude-default/claude-${child_id}"
 agent_session_fz_subagents_p=y agent-auto-continue-off-fz >/dev/null
 expect-eq "$(command cut -f1 "${t}/child-offered")" "paseo:${a_child}" 'off-fz child opt-in'
 test ! -e "${agent_auto_continue_dir}/claude-default/claude-${child_id}"
+# agent-continue: picks with the arm's picker (stopped agents by default, -a for
+# all, no frontmost row) and sends at once, reporting a failed send.
+typeset -g cn_log="${t}/cn.log"
+function ecgray { print -ru2 -- "$@"; }
+function h-agent-usage-continue-targets {
+    print -r -- "pick ${agent_usage_continue_via} ${agent_usage_continue_paseo_filter} ${agent_usage_continue_frontmost_p}" >> "${cn_log}"
+    print -r -- "paseo:${a_live}" ; print -r -- tmux:%9
+}
+function h-agent-usage-continue-send { print -r -- "send $1" >> "${cn_log}" ; [[ "$1" != tmux:%9 ]] ; }
+: > "${cn_log}"
+agent_usage_continue_via=paseo agent-continue >/dev/null 2>&1 && { print -ru2 -- 'FAIL: a failed send was not reported'; exit 1; }
+expect-eq "$(<"${cn_log}")" "pick paseo stopped n"$'\n'"send paseo:${a_live}"$'\n'"send tmux:%9" 'agent-continue sends'
+: > "${cn_log}"
+agent_usage_continue_via=paseo agent-continue --all >/dev/null 2>&1 || true
+expect-eq "$(command head -n1 "${cn_log}")" "pick paseo all n" 'agent-continue --all'
+agent_usage_continue_via=frontmost agent-continue 2>/dev/null && { print -ru2 -- 'FAIL: frontmost accepted'; exit 1; }
+
 print -r -- 'Paseo agent row checks passed'

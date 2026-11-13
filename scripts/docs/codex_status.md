@@ -239,7 +239,7 @@ covers the job itself, its idle gate, its knobs and how to cancel it. This
 section is what is Codex's: the deadline, and the delivery.
 
 - `codex-status-notify` prints the ordinary report and arms a notification.
-- `codex-status-continue-fz` prints the report and arms a resume: an fzf
+- `codex-status-auto-continue-fz` prints the report and arms a resume: an fzf
   picker over every live Codex thread, multi-select, and at reset time the
   job queues `Continue.` into each one you chose.
 - `h-codex-status-arm-schedule` arms without printing a report, for when

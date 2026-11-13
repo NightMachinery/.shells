@@ -996,7 +996,7 @@ function h-claude-code-usage-arm {
                 REPLY=available
             fi
             if bool "${report_p}" ; then
-                ecgray "$0: ${profile}: usage already possible, not arming (use \`deus\` to arm anyway)"
+                ecgray "$0: ${profile}: usage already possible, not arming (use \`deus\` to arm anyway, or \`agent-continue-paseo-fz\` to resume now)"
             fi
             return 0
         fi
@@ -1166,10 +1166,10 @@ function claude-code-usage-fable-notify {
 #: what distinguishes them and it is what decides whether a resume can reach
 #: you at all:
 #:
-#:   -continue-kitty-fz   pick kitty windows; typed into with `kitty @ send-text'
-#:   -continue-tmux-fz    pick tmux panes; typed into with `send-keys'
-#:   -continue-paseo-fz   pick Paseo agents; sent with `paseo send'
-#:   -continue-frontmost  no picker; typed wherever the focus is at the time
+#:   -auto-continue-kitty-fz   pick kitty windows; typed into with `kitty @ send-text'
+#:   -auto-continue-tmux-fz    pick tmux panes; typed into with `send-keys'
+#:   -auto-continue-paseo-fz   pick Paseo agents; sent with `paseo send'
+#:   -auto-continue-frontmost  no picker; typed wherever the focus is at the time
 #:
 #: A Codex thread picked in either picker is *queued* instead of typed into,
 #: and a Paseo agent is sent its message through Paseo; neither needs a
@@ -1185,14 +1185,14 @@ function claude-code-usage-fable-notify {
     for via in kitty-fz tmux-fz paseo-fz frontmost ; do
         for profile in '' default work ; do
             base="claude-code-usage${profile:+-${profile}}"
-            name="${base}-continue-${via}"
+            name="${base}-auto-continue-${via}"
 
             #: `${via%-fz}' because the name advertises the picker and the knob
-            #: names the mechanism: `-continue-tmux-fz' arms
+            #: names the mechanism: `-auto-continue-tmux-fz' arms
             #: `agent_usage_continue_via=tmux'.
             if [[ "${via}" == paseo-fz ]] ; then
                 #: The Paseo picker takes `-a' itself; see the helper.
-                aliasfnq "${name}" h-claude-code-usage-continue-paseo "${base}"
+                aliasfnq "${name}" h-claude-code-usage-auto-continue-paseo "${base}"
                 continue
             fi
             aliasfnq "${name}" \
@@ -1204,14 +1204,14 @@ function claude-code-usage-fable-notify {
     done
 }
 
-function h-claude-code-usage-continue-paseo {
-    #: The `-continue-paseo-fz' entry points. Their picker offers only the agents
+function h-claude-code-usage-auto-continue-paseo {
+    #: The `-auto-continue-paseo-fz' entry points. Their picker offers only the agents
     #: whose last turn stopped at a usage limit, subagents included, which is
     #: what a resume is for; `-a' or `--all' offers every root agent, the old
     #: list. Taken out of the arguments here because the report script has an
     #: `--all' of its own (every profile), which an arm for one profile has no
     #: use for.
-    #: Usage: h-claude-code-usage-continue-paseo <report-fn> [-a|--all] [report args...]
+    #: Usage: h-claude-code-usage-auto-continue-paseo <report-fn> [-a|--all] [report args...]
     ##
     local filter="${agent_usage_continue_paseo_filter:-stopped}"
     local base="${1}"
@@ -1235,31 +1235,28 @@ function h-claude-code-usage-continue-paseo {
 }
 
 #: The short names, mirroring the =ccu-default= block above.
-aliasfn cck claude-code-usage-continue-kitty-fz
-aliasfn cck-default claude-code-usage-default-continue-kitty-fz
-aliasfn cck-work claude-code-usage-work-continue-kitty-fz
+aliasfn cck claude-code-usage-auto-continue-kitty-fz
+aliasfn cck-default claude-code-usage-default-auto-continue-kitty-fz
+aliasfn cck-work claude-code-usage-work-auto-continue-kitty-fz
 
-aliasfn cct claude-code-usage-continue-tmux-fz
-aliasfn cct-default claude-code-usage-default-continue-tmux-fz
-aliasfn cct-work claude-code-usage-work-continue-tmux-fz
+aliasfn cct claude-code-usage-auto-continue-tmux-fz
+aliasfn cct-default claude-code-usage-default-auto-continue-tmux-fz
+aliasfn cct-work claude-code-usage-work-auto-continue-tmux-fz
 
-aliasfn ccp claude-code-usage-continue-paseo-fz
-aliasfn ccp-default claude-code-usage-default-continue-paseo-fz
-aliasfn ccp-work claude-code-usage-work-continue-paseo-fz
-#: The name asked for first. It follows the current profile, like `ccp': most
-#: Paseo agents here run Claude, so its reset is the natural deadline.
-aliasfn paseo-continue-fz claude-code-usage-continue-paseo-fz
+aliasfn ccp claude-code-usage-auto-continue-paseo-fz
+aliasfn ccp-default claude-code-usage-default-auto-continue-paseo-fz
+aliasfn ccp-work claude-code-usage-work-auto-continue-paseo-fz
 
-aliasfn ccfront claude-code-usage-continue-frontmost
-aliasfn ccfront-default claude-code-usage-default-continue-frontmost
-aliasfn ccfront-work claude-code-usage-work-continue-frontmost
+aliasfn ccfront claude-code-usage-auto-continue-frontmost
+aliasfn ccfront-default claude-code-usage-default-auto-continue-frontmost
+aliasfn ccfront-work claude-code-usage-work-auto-continue-frontmost
 
-function h-claude-code-usage-continue-schedule {
+function h-claude-code-usage-auto-continue-schedule {
     #: Arming a resume without printing a report, matching the
     #: =h-...-arm-schedule= escape hatches above. One hatch for all three
     #: mechanisms, since `agent_usage_continue_via' already names them and a
     #: function per mechanism would say nothing the knob does not.
-    #: Usage: h-claude-code-usage-continue-schedule [profile]
+    #: Usage: h-claude-code-usage-auto-continue-schedule [profile]
     ##
     local profile="${1:-default}"
 

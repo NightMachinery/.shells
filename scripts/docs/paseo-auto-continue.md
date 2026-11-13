@@ -29,10 +29,14 @@ To pick agents instead of passing UUIDs, use `agent-auto-continue-fz` and
 `agent-auto-continue-off-fz` (see `docs/agent-auto-continue.md`, "From another
 shell"). They list Paseo agents next to ordinary sessions, each agent once.
 
-### Compared with `paseo-continue-fz`
+### Compared with `ccp` and `paseo-continue-fz`
 
-`paseo-continue-fz` (alias of `claude-code-usage-continue-paseo-fz`, see
-`docs/agent-usage-armed.md`) is the other way to resume Paseo agents. It arms
+`paseo-continue-fz` (`agent-continue-paseo-fz`) resumes now: it offers the
+agents this watcher's own test finds stopped at a usage limit (`-a` for every
+root agent) and sends `Continue.` at once, arming nothing.
+
+`ccp` (`claude-code-usage-auto-continue-paseo-fz`, see
+`docs/agent-usage-armed.md`) is the other way to resume Paseo agents later. It arms
 a one-shot job for the current Claude profile's reset and sends `Continue.`
 to the agents picked at arm time. Its picker offers the agents this watcher's
 own test finds stopped at a usage limit, registered or not and subagents

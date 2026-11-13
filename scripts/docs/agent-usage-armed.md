@@ -11,12 +11,12 @@ deadline over:
   `docs/claude_code_usage.md` covers the windows, the roles and the entry
   points (`cck`, `cct`, `ccfront` and their profile variants).
 - Codex reads it from `codex-status --json`; `docs/codex_status.md` covers
-  `codex-status-notify` and `codex-status-continue-fz`.
+  `codex-status-notify` and `codex-status-auto-continue-fz`.
 - Antigravity reads it from `agy-status`, which asks `agy -p /usage`;
   `docs/agy_status.md` covers `agy-status-notify` and the
-  `agy-status-continue-*` variants.
+  `agy-status-auto-continue-*` variants.
 - Anything else, and any agent whose own reset time you do not trust, goes
-  through `agent-usage-continue-at <when>`, where you name the time yourself.
+  through `agent-usage-auto-continue-at <when>`, where you name the time yourself.
 - A reset that may come early or unannounced, as Codex's do, goes through
   `agent-usage-reset-wait`, which waits on measured usage instead of a time.
   See "Waiting for a measured reset" below.
@@ -28,6 +28,18 @@ deadline over:
 
 That list is where the per-agent deadline sources are enumerated; the linked
 docs say how each one is read and reduced to a single time.
+
+The names follow one rule: `auto-continue` is anything that waits and resumes
+later (every entry point above), `continue` resumes now. The `continue` ones
+are `agent-continue-kitty-fz`, `agent-continue-tmux-fz` and
+`agent-continue-paseo-fz` (alias `paseo-continue-fz`): the same pickers and the
+same delivery as an arm, sent at once. The Paseo picker offers only the agents
+stopped at a usage limit, subagents included, found by
+`paseo-auto-continue-stopped`; `-a` or `--all` offers every root agent. The
+kitty picker drops its `frontmost` row, since the frontmost window is the
+terminal you are typing in. A target that cannot be reached (an agent already
+running, a pane that no longer holds an agent) is reported and the rest still
+get their message; the exit status is 1 if any failed.
 
 The shared entry is `h-agent-usage-arm <session> <reset-epoch> <msg>`.
 Everything below is what happens once it has been called.
@@ -77,7 +89,7 @@ actually flipped by the time the job claims it has. The margin is
 `agent_usage_continue_grace_s` when it is a resume, and the second is
 deliberately the longer of the two: an early notification is harmless, an
 early resume is spent on a session that is still blocked. The manual
-`agent-usage-continue-at` adds no grace at all, since there you named the
+`agent-usage-auto-continue-at` adds no grace at all, since there you named the
 time.
 
 Notifications go out through `notif` under one fixed `notif_group`, so a
@@ -295,7 +307,7 @@ that list sees them all.
 
 ## Naming the time yourself
 
-`agent-usage-continue-at <when>` arms a resume for a time you give in natural
+`agent-usage-auto-continue-at <when>` arms a resume for a time you give in natural
 language -- `2h`, `tomorrow 9am`, `in 45 minutes` -- parsed by `datenat-unix`.
 A phrase that resolves to the past is refused, but by the arm rather than the
 parser: `h-agent-usage-arm` rejects any deadline that has already gone,
@@ -308,12 +320,12 @@ offered, an Antigravity pane included. It is the fallback for every agent,
 not only for those without a status command: when an endpoint's reset time
 is wrong, or you know something it does not, this is how to override it. It
 lives in its own session,
-`agent-usage-continue-at`, so it coexists with the Claude and Codex jobs
+`agent-usage-auto-continue-at`, so it coexists with the Claude and Codex jobs
 instead of replacing one, and shows up in their status through
 `agent-usage-armed-sessions`.
 
-`agent-usage-continue-at-tmux-fz`, `agent-usage-continue-at-kitty-fz`,
-`agent-usage-continue-at-paseo-fz` and `agent-usage-continue-at-frontmost` are
+`agent-usage-auto-continue-at-tmux-fz`, `agent-usage-auto-continue-at-kitty-fz`,
+`agent-usage-auto-continue-at-paseo-fz` and `agent-usage-auto-continue-at-frontmost` are
 presets over `agent_usage_continue_via`, with `acat`, `acak`, `acap` and
 `acafront` as their short aliases.
 
