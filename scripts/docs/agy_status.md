@@ -44,6 +44,11 @@ exited (and tmux retained them with `remain-on-exit`), it restarts a dead pane.
 It refuses to replace a pane that another caller has already restarted. No
 sign-in is performed by account setup or status reporting.
 
+After updating login helpers, start a fresh shell before retrying. Existing
+terminals retain their old function definitions. The account hook deduplicates
+`AGY_ACCOUNTS` before validation so an existing account still runs the login
+command.
+
 ## File authentication
 
 All shell launchers, login verification and print-mode quota calls inject

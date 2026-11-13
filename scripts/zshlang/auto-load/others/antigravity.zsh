@@ -374,7 +374,7 @@ function agy-account-hook {
     local -x AGY_ACCOUNTS="${AGY_ACCOUNTS:-m cave fm2} ${id}"
     #: Deduplicate before the normal registry validation.
     local -a ids=( ${=AGY_ACCOUNTS} )
-    AGY_ACCOUNTS="${(j: :)${(u)ids}}"
+    AGY_ACCOUNTS="${(j: :)${(@u)ids}}"
     local agy_home="${root}/antigravity-cli"
     local agy_summaries_db="${agy_home}/conversation_summaries.db"
     (( $# && ${+functions[$1]} )) || return 0

@@ -127,6 +127,16 @@ h-agy-session-resume "${transcript}"
 function agy-conversation-name { print -r -- fixture }
 [[ "$(AGY_ACCOUNT_ID=acc2 AGY_ACCOUNT_LABEL=cave h-agy-session-tmux-name "${conversation}" "${transcript}")" == '+Agy/cave fixture' ]] || fail 'live account identity lost'
 
+# Exercise the hook itself: a retained duplicate silently skipped the runner.
+function h-agy-test-hook-probe {
+    [[ "${AGY_ACCOUNT_ID}" == acc2 && "${AGY_ACCOUNT_LABEL}" == cave &&
+       "${ANTIGRAVITY_GEMINI_DIR}" == "${AGY_ACCOUNTS_DIR}/acc2" ]] || return 1
+    h-agy-account-info acc2 || return
+    print -r -- 'hook-ran'
+}
+[[ "$(agy-account-hook acc2 "${AGY_ACCOUNTS_DIR}/acc2" cave h-agy-test-hook-probe)" == hook-ran ]] || fail 'account hook silently skipped runner'
+[[ "${AGY_ACCOUNTS}" == 'acc1 acc2 acc3' && -z "${AGY_ACCOUNT_ID:-}" ]] || fail 'hook environment leaked'
+
 # Login recovery must inspect every window and never replace a live pane.
 command cat > "${test_tmp}/bin/tmux" <<'PY'
 #!/usr/bin/env python3
