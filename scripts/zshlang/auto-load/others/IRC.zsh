@@ -17,12 +17,17 @@ function irc-chatlog-dir-get {
     ec "$d"
 }
 
+function irc-log-sort {
+    go-local-dep irc-log-sort "${NIGHTDIR}/golang/irc-log-sort" @RET
+    command irc-log-sort "$@"
+}
+
 function irc-ugb {
     local query="$*"
     local d
     d="$(irc-chatlog-dir-get)" @TRET
 
-    indir-exists "$d" @opts follow y @ ugbase --hidden '--binary-files=without-match' --with-filename --line-number --bool -- '-"-SaslServ-" -"-NickServ-" -"*** Quits:" -"*** Joins:" '"$IRC_USERNAMES $query" | irc-log-sort.lisp
+    indir-exists "$d" @opts follow y @ ugbase --hidden '--binary-files=without-match' --with-filename --line-number --bool -- '-"-SaslServ-" -"-NickServ-" -"*** Quits:" -"*** Joins:" '"$IRC_USERNAMES $query" | irc-log-sort
 }
 @opts-setprefix irc-ugb irc_sees
 ##
