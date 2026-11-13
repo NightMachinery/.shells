@@ -4,6 +4,18 @@ Zsh Coding Guidelines:
 
 - Always use long option/argument forms for CLI commands. This makes the code more readable.
 
+- For Zsh scripts, always use at least these options:
+  #+begin_src zsh :eval never
+  emulate -R zsh
+
+  export PS4='> '
+  setopt LOCAL_OPTIONS PIPE_FAIL ERR_RETURN
+  setopt TYPESET_SILENT NO_CASE_GLOB multios re_match_pcre extendedglob pipefail interactivecomments hash_executables_only
+  setopt NO_BANG_HIST 2>/dev/null || true
+  #+end_src
+
+  - You can also use =SOURCE_TRACE XTRACE PRINT_EXIT_VALUE= according to your own judgment.
+
 - Always use =typeset -g= for variables that are global. Most variables outside functions are meant to be global.
 
 - Always use =zsh -c= instead of =zsh -ic= for non-interactive commands. =zsh -c= is the standard command and already loads our custom configuration. Only use =zsh -ic= if you are specifically testing an interactive shell.

@@ -12,6 +12,7 @@ typeset -ga llm_focus_app_ids=(
     'com.openai.codex'
     'com.anthropic.claudefordesktop'
     'sh.paseo.desktop'
+    'sh.paseo.ypaseo.desktop'
 )
 typeset -ga llm_focus_url_patterns=(
     '^https://chatgpt\.'

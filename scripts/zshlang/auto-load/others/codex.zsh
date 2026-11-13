@@ -205,7 +205,10 @@ function codex-install {
     #: npm for now, because pnpm cannot install codex at all; see
     #: [agfi:codex-install-pnpm].
     ##
-    codex-install-npm "$@"
+    reval-ecgray $proxyenv command curl -fsSL https://chatgpt.com/codex/install.sh | CODEX_NON_INTERACTIVE=true sh
+    ##
+    # codex-install-npm "$@"
+    ##
 }
 ##
 function codex-clean-text {
