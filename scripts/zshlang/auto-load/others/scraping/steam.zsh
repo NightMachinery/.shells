@@ -29,12 +29,18 @@ function steam-to-json {
 }
 
 
+function steam_json_to_org {
+    go-local-dep steam_json_to_org "${NIGHTDIR}/golang/steam_json_to_org" @RET
+    command steam_json_to_org "$@"
+}
+
 function steam-to-org {
     local url="${1:-$(pbpaste)}"
     assert-args url @RET
 
+    go-local-dep steam_json_to_org "${NIGHTDIR}/golang/steam_json_to_org" @RET
     steam-to-json "$url" \
-        | steam_json_to_org.lisp "$url" \
+        | command steam_json_to_org "$url" \
         | cat-copy-if-tty
 }
 ##
