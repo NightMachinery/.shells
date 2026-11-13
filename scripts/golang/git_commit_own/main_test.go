@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
 )
@@ -140,6 +141,12 @@ func TestParseArgs(t *testing.T) {
 		{args: []string{"--amend"}},
 		{args: []string{"--amend", "--author"}, err: "needs a value"},
 		{args: []string{"-m", "x", "--rewrite-pushed", "a"}, err: "only goes with --amend"},
+		{args: []string{"--list-hunks"}, err: "needs the files"},
+		{args: []string{"--list-hunks", "-m", "x", "a"}, err: "only lists"},
+		{args: []string{"--list-hunks", "a"}, path: []string{"a"}},
+		{args: []string{"-m", "x", "--hunks", "a"}, err: "PATH:SELECTION"},
+		{args: []string{"-m", "x", "--hunks", "a:1,z"}, err: "not a block number"},
+		{args: []string{"-m", "x", "--hunks", "a:2-3,@0123abcd"}, msgs: []string{"x"}},
 	}
 	for _, c := range cases {
 		o, err := parseArgs(c.args)
@@ -700,5 +707,158 @@ func TestAmendDryRun(t *testing.T) {
 	}
 	if got := f.git("rev-parse", "HEAD"); got != head {
 		t.Fatal("dry run moved HEAD")
+	}
+}
+
+// numbersRepo commits n.txt holding 1 to 10, one per line.
+func numbersRepo(t *testing.T) *fixture {
+	f := newRepo(t)
+	f.write("n.txt", "1\n2\n3\n4\n5\n6\n7\n8\n9\n10\n")
+	f.git("add", "n.txt")
+	f.git("commit", "-q", "-m", "numbers")
+	return f
+}
+
+// --hunks commits the chosen blocks; the rest stays on disk, unstaged, even
+// when a block left out lies between two chosen ones.
+func TestHunksCommitChosenBlocks(t *testing.T) {
+	f := numbersRepo(t)
+	// Block 1 replaces 2, block 2 inserts after 5, block 3 deletes 9.
+	f.write("n.txt", "1\ntwo\n3\n4\n5\nfive-and-a-half\n6\n7\n8\n10\n")
+
+	list := f.mustOwn("--list-hunks", "n.txt").stdout
+	if !strings.Contains(list, "n.txt: 3 block(s) against HEAD") || !strings.Contains(list, "+five-and-a-half") {
+		t.Fatalf("list:\n%s", list)
+	}
+	f.mustOwn("-m", "two and nine", "--hunks", "n.txt:1,3")
+
+	if got := f.git("show", "HEAD:n.txt"); got != "1\ntwo\n3\n4\n5\n6\n7\n8\n10" {
+		t.Fatalf("committed:\n%s", got)
+	}
+	if !strings.Contains(f.read("n.txt"), "five-and-a-half") {
+		t.Fatal("the block left out left the disk")
+	}
+	if got := f.git("status", "--porcelain"); got != "M n.txt" {
+		t.Fatalf("status = %q, want only an unstaged change", got)
+	}
+	if got := f.git("diff"); !strings.Contains(got, "+five-and-a-half") || strings.Contains(got, "+two") {
+		t.Fatalf("remaining diff:\n%s", got)
+	}
+}
+
+// A block id names the block's content, so it still picks the right block
+// after another edit shifts the block numbers.
+func TestHunksByIdSurviveOtherEdits(t *testing.T) {
+	f := numbersRepo(t)
+	f.write("n.txt", "1\n2\n3\n4\n5\n6\n7\n8\nnine\n10\n")
+	id := regexp.MustCompile(`@[0-9a-f]{8}`).FindString(f.mustOwn("--list-hunks", "n.txt").stdout)
+	if id == "" {
+		t.Fatal("no block id listed")
+	}
+	f.write("n.txt", "zero\n1\n2\n3\n4\n5\n6\n7\n8\nnine\n10\n")
+	f.mustOwn("-m", "nine", "--hunks", "n.txt:"+id)
+	if got := f.git("show", "HEAD:n.txt"); got != "1\n2\n3\n4\n5\n6\n7\n8\nnine\n10" {
+		t.Fatalf("committed:\n%s", got)
+	}
+}
+
+// Insertions at either end, a missing final newline, and a path given from a
+// subdirectory.
+func TestHunksAtFileEdges(t *testing.T) {
+	f := newRepo(t)
+	f.write("d/e.txt", "1\n2\n3\n")
+	f.write("d/x.txt", "x\nmid\ny")
+	f.git("add", "d")
+	f.git("commit", "-q", "-m", "edges")
+	f.write("d/e.txt", "0\n1\n2\n3\n4\n")
+	f.write("d/x.txt", "X\nmid\ny\n")
+
+	sub := filepath.Join(f.work, "d")
+	if r := f.ownIn(sub, "", "-m", "end", "--hunks", "e.txt:2", "--hunks", "x.txt:2"); r.code != 0 {
+		t.Fatalf("exit %d\n%s", r.code, r.stderr)
+	}
+	if got := f.git("show", "HEAD:d/e.txt"); got != "1\n2\n3\n4" {
+		t.Fatalf("e.txt committed:\n%s", got)
+	}
+	if got := f.git("cat-file", "-s", "HEAD:d/x.txt"); got != "8" {
+		t.Fatalf("x.txt is %s bytes, want 8 (x, mid, y and the new final newline)", got)
+	}
+	if r := f.ownIn(sub, "", "-m", "start", "--hunks", "e.txt:1", "--hunks", "x.txt:1"); r.code != 0 {
+		t.Fatalf("exit %d\n%s", r.code, r.stderr)
+	}
+	if got := f.git("status", "--porcelain"); got != "" {
+		t.Fatalf("status = %q, want clean", got)
+	}
+}
+
+func TestHunksRefusals(t *testing.T) {
+	f := numbersRepo(t)
+	f.write("n.txt", "1\ntwo\n3\n4\n5\n6\n7\n8\n9\n10\n")
+	f.write("new.txt", "new\n")
+	f.write("bin.dat", "a\x00b\n")
+	f.git("add", "bin.dat")
+	f.git("commit", "-q", "-m", "binary")
+	f.write("bin.dat", "a\x00c\n")
+	before := f.git("rev-parse", "HEAD")
+
+	cases := []struct {
+		args []string
+		code int
+		err  string
+	}{
+		{[]string{"-m", "x", "--hunks", "n.txt:2"}, 1, "out of range"},
+		{[]string{"-m", "x", "--hunks", "n.txt:@deadbeef"}, 1, "no block has id"},
+		{[]string{"-m", "x", "--hunks", "n.txt:x"}, 2, "not a block number"},
+		{[]string{"-m", "x", "--hunks", "n.txt:1", "--", "n.txt"}, 1, "one way"},
+		{[]string{"-m", "x", "--hunks", "new.txt:1"}, 1, "not in HEAD"},
+		{[]string{"-m", "x", "--hunks", "a.txt:1"}, 1, "no changes"},
+		{[]string{"-m", "x", "--hunks", "bin.dat:1"}, 1, "binary"},
+		{[]string{"--list-hunks", "new.txt"}, 1, "not in HEAD"},
+	}
+	for _, c := range cases {
+		r := f.own("", c.args...)
+		if r.code != c.code || !strings.Contains(r.stderr, c.err) {
+			t.Errorf("%q: exit %d, stderr %q; want exit %d and %q", c.args, r.code, r.stderr, c.code, c.err)
+		}
+	}
+	if got := f.git("rev-parse", "HEAD"); got != before {
+		t.Fatal("a refused run committed something")
+	}
+}
+
+// Listing reads only: HEAD, the shared index and the files stay as they were.
+func TestListHunksIsReadOnly(t *testing.T) {
+	f := numbersRepo(t)
+	f.write("n.txt", "1\ntwo\n3\n4\n5\n6\n7\n8\n9\n10\n")
+	f.git("add", "n.txt")
+	before := f.git("rev-parse", "HEAD") + "|" + f.git("status", "--porcelain")
+	out := f.mustOwn("--list-hunks", "n.txt", "a.txt").stdout
+	if !strings.Contains(out, "a.txt: 0 block(s)") || !strings.Contains(out, "[1] @") {
+		t.Fatalf("list:\n%s", out)
+	}
+	if got := f.git("rev-parse", "HEAD") + "|" + f.git("status", "--porcelain"); got != before {
+		t.Fatalf("listing changed %q to %q", before, got)
+	}
+}
+
+// In a vcsh-like repository (GIT_DIR elsewhere, the home as work tree).
+func TestHunksSeparateGitDir(t *testing.T) {
+	root := t.TempDir()
+	home := filepath.Join(root, "home")
+	f := &fixture{t: t, root: root, work: home, env: testEnv(t, root)}
+	if err := os.MkdirAll(home, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	f.env = append(f.env, "GIT_DIR="+filepath.Join(root, "repo.git"), "GIT_WORK_TREE="+home)
+	f.gitIn(root, "init", "-q", "-b", "master")
+	f.write("scripts/n.txt", "1\n2\n3\n4\n5\n6\n")
+	f.git("add", "scripts")
+	f.git("commit", "-q", "-m", "base")
+	f.write("scripts/n.txt", "one\n2\n3\n4\n5\nsix\n")
+	if r := f.ownIn(filepath.Join(home, "scripts"), "", "-m", "six", "--hunks", "n.txt:2"); r.code != 0 {
+		t.Fatalf("exit %d\n%s", r.code, r.stderr)
+	}
+	if got := f.git("show", "HEAD:scripts/n.txt"); got != "1\n2\n3\n4\n5\nsix" {
+		t.Fatalf("committed:\n%s", got)
 	}
 }

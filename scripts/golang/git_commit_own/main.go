@@ -33,6 +33,7 @@ import (
 
 const usageText = `usage: git commit-own [options] [--] <path>...
        git commit-own --amend [options] [--] [<path>...]
+       git commit-own --list-hunks [--] <file>...
 
 Commit exactly the named paths, as they are on disk, through a private index.
 Whatever else is staged in the shared index stays out of the commit, and is
@@ -43,6 +44,11 @@ left as it was.
       --untrack PATH   stop tracking PATH; the file stays on disk (repeatable)
       --patch FILE     apply FILE, a patch against HEAD, as part of the commit,
                        to commit only part of a file (repeatable; "-": stdin)
+      --hunks FILE:SEL commit only the chosen change blocks of FILE; SEL is
+                       block numbers, ranges or ids from --list-hunks, such
+                       as notes.md:1,3-4 or notes.md:@1a2b3c4d (repeatable)
+      --list-hunks     print the numbered change blocks of each named file
+                       against HEAD, with their ids, and stop
   -f, --force          allow adding ignored files
       --amend          replace the last commit with one that also holds the
                        named paths; its message and author are kept unless -m,
@@ -62,7 +68,10 @@ Paths are pathspecs relative to the current directory, as for git add, and
 each is staged with "git add -A": new files are added, deleted files removed.
 A path that matches nothing is an error, so a typo commits nothing.
 
-The paths are staged first, then --untrack is applied, then each --patch.
+The paths are staged first, then --untrack is applied, then each --patch,
+then each --hunks. A file goes in one way only: as a path, in a patch, or by
+--hunks. A block id stays the same while its own lines do, so prefer ids when
+another session may be editing the file between listing and committing.
 After the commit, the shared index entries of the committed paths are reset
 to the new commit, so git status shows them clean. If the branch moves while
 the commit is being made, it is rebuilt on the new tip.
@@ -78,6 +87,8 @@ type options struct {
 	paths      []string
 	untrack    []string
 	patchFiles []string
+	hunks      []hunkSpec
+	listHunks  bool
 	force      bool
 	allowEmpty bool
 	noVerify   bool
@@ -150,6 +161,15 @@ func parseArgs(args []string) (*options, error) {
 			if v, err = value(); err == nil {
 				o.patchFiles = append(o.patchFiles, v)
 			}
+		case "--hunks":
+			if v, err = value(); err == nil {
+				var spec hunkSpec
+				if spec, err = parseHunkSpec(v); err == nil {
+					o.hunks = append(o.hunks, spec)
+				}
+			}
+		case "--list-hunks":
+			err = flag(&o.listHunks)
 		case "-f", "--force":
 			err = flag(&o.force)
 		case "--allow-empty":
@@ -179,12 +199,21 @@ func parseArgs(args []string) (*options, error) {
 		}
 	}
 
+	if o.listHunks {
+		switch {
+		case len(o.paths) == 0:
+			return nil, fmt.Errorf("--list-hunks needs the files to list")
+		case len(o.messages)+len(o.untrack)+len(o.patchFiles)+len(o.hunks) > 0 || o.msgFile != "" || o.amend || o.dryRun:
+			return nil, fmt.Errorf("--list-hunks only lists; give it just the files")
+		}
+		return o, nil
+	}
 	switch {
 	case len(o.messages) > 0 && o.msgFile != "":
 		return nil, fmt.Errorf("give the message with -m or with -F, not both")
 	case len(o.messages) == 0 && o.msgFile == "" && !o.dryRun && !o.amend:
 		return nil, fmt.Errorf("a commit message is required (-m or -F)")
-	case len(o.paths)+len(o.untrack)+len(o.patchFiles) == 0 && !o.allowEmpty && !o.amend:
+	case len(o.paths)+len(o.untrack)+len(o.patchFiles)+len(o.hunks) == 0 && !o.allowEmpty && !o.amend:
 		return nil, fmt.Errorf("name the paths to commit")
 	case o.rewrite && !o.amend:
 		return nil, fmt.Errorf("--rewrite-pushed only goes with --amend")
@@ -449,6 +478,13 @@ func (a *app) run(args []string) int {
 		a.warnf("%v", err)
 		return 1
 	}
+	if o.listHunks {
+		if err := a.listHunks(r, o.paths); err != nil {
+			a.warnf("%v", err)
+			return 1
+		}
+		return 0
+	}
 	if !o.wholeTree {
 		for _, p := range append(append([]string{}, o.paths...), o.untrack...) {
 			if r.isWholeTree(p) {
@@ -629,6 +665,11 @@ func (a *app) attempt(o *options, r *repo, msg string, author []string, patches 
 		c.dir, c.stdin = r.top, p.data
 		if _, err := a.git(c, "apply", "--cached", "-"); err != nil {
 			return fmt.Errorf("patch %s does not apply to HEAD; nothing was committed", p.name)
+		}
+	}
+	for _, spec := range o.hunks {
+		if err := a.stageHunks(r, h.commit, private, spec); err != nil {
+			return fmt.Errorf("%v; nothing was committed", err)
 		}
 	}
 

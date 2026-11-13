@@ -9,7 +9,9 @@ work in one worktree at the same time.
 
     git commit-own -m "subject" -m "body" -- <path>...
     git commit-own -m "..." -- .gitignore --untrack big.bin    #: stop tracking, keep the file
-    git commit-own -m "..." --patch part.patch                 #: part of a file
+    git commit-own --list-hunks -- notes.md                    #: number a file's change blocks
+    git commit-own -m "..." --hunks notes.md:1,3               #: commit only blocks 1 and 3
+    git commit-own -m "..." --patch part.patch                 #: part of a file, as a patch
     git commit-own --dry-run -- <path>...                      #: what would be committed
     git commit-own --amend -- <path>...                        #: fold into the last commit
     git commit-own -m "..." --author "Name <email>" -- <path>...
@@ -36,8 +38,8 @@ and ignores the rest of the index. It cannot protect what *you* build there:
   commit` sweeps your staged work into its commit.
 
 `git commit-own` does the untracking (`--untrack`) and the partial commit
-(`--patch`) in its private index, so none of it is ever visible to anyone
-else.
+(`--hunks` or `--patch`) in its private index, so none of it is ever visible
+to anyone else.
 
 ## What it does
 
@@ -46,9 +48,9 @@ else.
    `$GIT_DIR/commit-own-<pid>-<n>.index`.
 3. Stages each named path from disk with `git add -A`, so new files are
    added and deleted ones removed; then `--untrack` (`git rm --cached -r`);
-   then each `--patch` (`git apply --cached`). A path that matches nothing is
-   an error, and nothing is committed: a typo cannot turn into a commit that
-   silently left out a file.
+   then each `--patch` (`git apply --cached`); then each `--hunks` (see
+   below). A path that matches nothing is an error, and nothing is committed:
+   a typo cannot turn into a commit that silently left out a file.
 4. Notes any named path that has no changes, and stops when nothing changed
    at all (`--allow-empty` overrides).
 5. Runs the hooks as `git commit` would: `pre-commit`, `prepare-commit-msg`,
@@ -79,8 +81,36 @@ exists, because finishing those needs `git commit`.
 
 ## Committing part of a file
 
-Write a patch against `HEAD` that holds only the hunks you want, and pass it
-with `--patch`:
+List the file's change blocks against `HEAD`, then name the ones to commit:
+
+    git commit-own --list-hunks -- notes.md
+    #: notes.md: 3 block(s) against HEAD
+    #:   [1] @1a2b3c4d  @@ -12 +12,2 @@
+    #:       -old line
+    #:       +new line
+    #:       +another
+    #:   ...
+    git commit-own -m "..." --hunks notes.md:1,3        #: or 2-4, or @1a2b3c4d
+
+A **block** is one hunk of `git diff -U0` between the file in `HEAD` and the
+file on disk (after the clean filters `git add` would apply): a run of
+`HEAD`'s lines replaced by a run of new ones. Its **id** is a hash of its own
+lines, so it stays the same when an edit elsewhere in the file renumbers the
+blocks. Select by id when another session may edit the file between listing
+and committing; an id that no longer matches anything is an error, not a
+guess. `--hunks` repeats for several files, and paths are relative to the
+current directory.
+
+The tool rebuilds `HEAD`'s copy with only the chosen blocks applied and puts
+that blob in the private index. Nothing is handed to `git apply`, so a block
+cannot land at a shifted position because an earlier block was left out. It
+refuses a file that is new, deleted, binary, not a regular file or unchanged,
+and a file that is also named as a path or changed by a `--patch`: a file
+goes in one way only. The rest of the change stays on disk, unstaged.
+
+For finer cuts than a whole block (half of a rewritten paragraph, say), write
+a patch against `HEAD` that holds only the hunks you want, and pass it with
+`--patch`:
 
     git diff -U1 -- notes.md > /tmp/all.patch      #: then delete the hunks to leave out
     git commit-own -m "..." --patch /tmp/all.patch
