@@ -16,6 +16,11 @@ function jfic {
     sout re p2k *.epub(ND)
 }
 ##
+function h-fanficfare2org {
+    go-local-dep fanficfare2org "${NIGHTDIR}/golang/fanficfare2org" @RET
+    command fanficfare2org "$@"
+}
+
 function fanficfare2org {
     local url="$1"
     assert-args url @RET
@@ -24,7 +29,7 @@ function fanficfare2org {
     # fanficfare still creates a junk epub file with --meta-only
     d="$(indir "$(gmktemp -d)" fanficfare --meta-only --json-meta "$url")" @TRET
 
-    { ec "$d" | fanficfare2org.lisp | cat-copy-if-tty } @TRET
+    ec "$d" | h-fanficfare2org | cat-copy-if-tty @TRET
 }
 
 ##
