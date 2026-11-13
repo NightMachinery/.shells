@@ -42,7 +42,7 @@ function goodreads-export-backup() {
 }
 ##
 function goodreads-url-to-json {
-    : "the output of this function needs further processing by goodreads_url_json_to_org.lisp; export JSON from that script if you want to use it elsewhere."
+    : "the output of this function needs further processing by goodreads_url_json_to_org; export JSON from that script if you want to use it elsewhere."
 
     local url="${1:-$(pbpaste)}"
     assert-args url @RET
@@ -73,12 +73,18 @@ function goodreads-url-to-json {
     ##
 }
 
+function goodreads_url_json_to_org {
+    go-local-dep goodreads_url_json_to_org "${NIGHTDIR}/golang/goodreads_url_json_to_org" @RET
+    command goodreads_url_json_to_org "$@"
+}
+
 function goodreads-url-to-org {
     local url="${1:-$(pbpaste)}"
     assert-args url @RET
 
+    go-local-dep goodreads_url_json_to_org "${NIGHTDIR}/golang/goodreads_url_json_to_org" @RET
     goodreads-url-to-json "$url" \
-        | goodreads_url_json_to_org.lisp "$url" \
+        | command goodreads_url_json_to_org "$url" \
         | cat-copy-if-tty
 }
 ##
