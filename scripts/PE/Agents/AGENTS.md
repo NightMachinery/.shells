@@ -223,7 +223,7 @@ it. A change the YPaseo fork carries also goes in the fork's `YPASEO.md`.
 
 ## Staging
 
-- If one file contains multiple unrelated changes, split them into separate commits. Do not treat “one file” as automatically meaning “one commit.” Commit part of a file with `git commit-own --patch` (below), not `git add -p`.
+- If one file contains multiple unrelated changes, split them into separate commits. Do not treat “one file” as automatically meaning “one commit.” Commit part of a file with `git commit-own --hunks` (below), not `git add -p`.
 
 ## Concurrent Sessions
 
@@ -242,7 +242,9 @@ leaves what others staged alone:
 ```
 git commit-own -m "subject" -m "body" -- <paths>
 git commit-own -m "..." -- .gitignore --untrack <path>   #: stop tracking; the file stays on disk
-git commit-own -m "..." --patch <file.patch>              #: part of a file: a patch against HEAD
+git commit-own --list-hunks -- <file>                     #: number a file's change blocks against HEAD
+git commit-own -m "..." --hunks <file>:1,3                #: part of a file: only those blocks (or 2-4, @id)
+git commit-own -m "..." --patch <file.patch>              #: finer cuts: a patch against HEAD
 git commit-own --dry-run -- <paths>                       #: what would be committed
 git commit-own --amend -- <paths>                         #: fold into your own last commit, before it is pushed
 ```
