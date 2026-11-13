@@ -63,11 +63,22 @@ only has to follow them from `begin` to `ALL DONE`.
   `daily-sync metadata commit <repo> [<held-back file>...]`.
 - `daily-sync finish`: a last `converge`, then removes the heartbeats.
 
+## Slow steps
+
+The agent harness cuts a command off after about 30 seconds, and a model
+handles a cut-off command badly: in the first test it never saw the output.
+So `begin`, `status`, `converge` and `finish` run as the tmux job
+`daily-sync-step`. A call waits up to `daily_sync_step_wait` (default 20)
+seconds, then prints `STILL WORKING` and says to run `daily-sync next`, which
+picks the result up once it is there. Set `daily_sync_inner=y` to run a step
+in the foreground instead.
+
 ## State
 
 A run keeps its state in `~/.agents/runs/daily-sync/<date>/`: `stage`, the ids
 of its heartbeats, `converge.log`, `held`, the updater's `rc-*` files and
-`DONE`, and `stderr.log` with the stderr of every generated script. Set
+`DONE`, the pending slow step (`step.*`), and `stderr.log` with the stderr of
+every generated script. Set
 `daily_sync_trace=y` to add an xtrace to that log.
 
 The watchdog heartbeat fires every ten minutes while the agent should be
@@ -92,5 +103,6 @@ relative to `~`; `NIGHTDIR` is the vcsh repository rooted at `~`.
 - `daily_sync_metadata`: repositories the updater runs over (default: the
   notes).
 
-The scheduled prompt itself is in Paseo; `paseo-schedules-export` keeps a copy
-under version control.
+The scheduled prompt is kept as `prompt.md` next to the configuration. After
+editing it, apply it with
+`paseo schedule update <id> --prompt "$(<prompt.md)"`.

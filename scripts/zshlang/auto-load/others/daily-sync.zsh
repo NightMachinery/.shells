@@ -817,12 +817,65 @@ function h-daily-sync-next-hint {
 }
 
 function h-daily-sync-next {
+    #: A slow step that is still running, or whose result was not shown yet, comes first.
+    h-daily-sync-step '' && return 0
     case "$(h-daily-sync-stage)" in
-        '') h-daily-sync-begin ;;
-        begun) h-daily-sync-status ; h-daily-sync-next-hint ;;
+        '') h-daily-sync-step begin ;;
+        begun) h-daily-sync-step status ;;
         metadata|metadata-done) h-daily-sync-metadata-status ;;
         *) h-daily-sync-next-hint ;;
     esac
+}
+
+function h-daily-sync-step-run {
+    : "The background side of h-daily-sync-step."
+    local step="$1" run
+    run="$(h-daily-sync-run-dir)" @RET
+    daily-sync "${step}" > "${run}/step.out.tmp" 2>&1
+    command mv -- "${run}/step.out.tmp" "${run}/step.out"
+    : > "${run}/step.done"
+}
+
+function h-daily-sync-step {
+    : "usage: h-daily-sync-step <step|''> ; start the slow step in the background, or pick up the pending one, and wait briefly for its output"
+    #: The agent harness cuts a command off after about 30 seconds, and a model
+    #: handles that badly. So a slow step runs as a tmux job, and each call
+    #: waits at most `daily_sync_step_wait' seconds before saying to call again.
+    local step="$1" max_wait="${daily_sync_step_wait:-20}" job="${daily_sync_step_job:-daily-sync-step}"
+    local run rc
+    local -i waited=0
+    run="$(h-daily-sync-run-dir)" @RET
+    tmux-job-running-p "${job}"
+    rc=$?
+    if (( rc == 2 )) ; then
+        ec "The tmux server cannot be reached from the sandbox. Run the same command again with elevated access."
+        return 0
+    fi
+    if (( rc != 0 )) ; then
+        if [[ -e "${run}/step.done" && ! -e "${run}/step.shown" && ( -z "${step}" || "$(<"${run}/step.name")" == "${step}" ) ]] ; then
+            : #: finished since the last call; shown below
+        elif [[ -n "${step}" ]] ; then
+            command rm -f -- "${run}/step.done" "${run}/step.shown"
+            ec "${step}" > "${run}/step.name"
+            tmux-job-start "${job}" PASEO_AGENT_ID="${PASEO_AGENT_ID:-}" daily_sync_inner=y \
+                daily_sync_config="${daily_sync_config}" daily_sync_run="${run}" \
+                h-daily-sync-step-run "${step}" &>/dev/null @RET
+        else
+            return 1
+        fi
+    fi
+    while [[ ! -e "${run}/step.done" ]] && (( waited < max_wait )) ; do
+        command sleep 1
+        waited+=1
+    done
+    if [[ -e "${run}/step.done" ]] ; then
+        command cat -- "${run}/step.out"
+        : > "${run}/step.shown"
+    else
+        ec "STILL WORKING on '$(<"${run}/step.name")'; this is normal, it takes a few minutes."
+        ec "NEXT: run now, and again each time it says STILL WORKING: zsh -c 'daily-sync next'"
+    fi
+    return 0
 }
 
 function daily-sync {
@@ -831,14 +884,18 @@ function daily-sync {
        daily-sync hold <machine> <repo> <file> <what was found>
        daily-sync metadata start|status|rerun <directory>...|commit <repo> [<held-back file>...]
 The mechanical half of the daily multi-machine sync; see docs/daily-sync.md."
-    local cmd="${1:-}"
+    local cmd="${1:-}" inner_p="${daily_sync_inner:-n}"
     (( $# )) && shift
     h-daily-sync-config @RET
     ensure-cmd jq perl @RET
+    if [[ "${cmd}" == (begin|status|converge|finish) ]] && ! bool "${inner_p}" ; then
+        h-daily-sync-step "${cmd}"
+        return $?
+    fi
     case "${cmd}" in
         begin) h-daily-sync-begin ;;
         next) h-daily-sync-next ;;
-        status) h-daily-sync-status ;;
+        status) h-daily-sync-status ; h-daily-sync-next-hint ;;
         git) h-daily-sync-git "$@" ;;
         hold) h-daily-sync-hold "$@" ;;
         converge)
