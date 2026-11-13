@@ -39,6 +39,9 @@ json.dump({"argv":sys.argv[1:], "root":os.environ.get("ANTIGRAVITY_GEMINI_DIR"),
            "cache":os.environ.get("agy_status_cache_file")},open(os.environ["AGY_TEST_CALLS"],"w"))
 if sys.argv[-1] == "models":
     print("gemini-fixture\tGemini fixture\nclaude-fixture\tClaude fixture")
+    sys.exit(int(os.environ.get("AGY_TEST_MODELS_EXIT", "0")))
+if sys.argv[-2:] == ["--mode", "plan"]:
+    sys.exit(int(os.environ.get("AGY_TEST_LOGIN_EXIT", "0")))
 if "--print" in sys.argv:
     print("Gemini Models\tWeekly Limit Remaining\t93%\t2030-01-01T00:00:00Z")
 PY
@@ -162,10 +165,37 @@ command chmod +x "${test_tmp}/bin/tmux"
 rehash
 typeset -gx AGY_TEST_TMUX_LOG="${test_tmp}/tmux.jsonl" AGY_TEST_TMUX_CASE=''
 typeset -g login_output='' login_rc=0
+: > "${AGY_TEST_TMUX_LOG}"
+login_output="$(agy-acc-login cave </dev/null)"
+[[ "${login_output}" == *'Account verification exited 0.'* && "${login_output}" != *'Press Enter'* ]] || fail 'foreground login waits for pane close'
+[[ ! -s "${AGY_TEST_TMUX_LOG}" ]] || fail 'foreground login invoked tmux'
+command jq --exit-status '.account == "acc2" and .argv[-1] == "models"' "${AGY_TEST_CALLS}" >/dev/null
+login_rc=0
+AGY_TEST_MODELS_EXIT=7 agy-acc-login acc2 >/dev/null || login_rc=$?
+(( login_rc == 7 )) || fail 'foreground verification lost exit status'
+AGY_ACCOUNT_ID=acc2 agy-acc-login >/dev/null
+command jq --exit-status '.account == "acc2"' "${AGY_TEST_CALLS}" >/dev/null
+command rm -- "${AGY_ACCOUNTS_DIR}/acc2/antigravity-cli/antigravity-oauth-token"
+login_rc=0
+AGY_TEST_LOGIN_EXIT=9 agy-acc-login acc2 >/dev/null || login_rc=$?
+(( login_rc == 9 )) || fail 'foreground sign-in lost exit status'
+command jq --exit-status '.argv[-2:] == ["--mode", "plan"]' "${AGY_TEST_CALLS}" >/dev/null
+for bad_args in '--invalid' 'acc1 acc2' ; do
+    login_rc=0
+    agy-acc-login ${=bad_args} >/dev/null 2>&1 || login_rc=$?
+    (( login_rc == 2 )) || fail 'invalid login arguments accepted'
+done
+agy-acc-login --help >/dev/null
+[[ ! -s "${AGY_TEST_TMUX_LOG}" ]] || fail 'foreground options invoked tmux'
 for AGY_TEST_TMUX_CASE in missing dead live mixed query-failed invalid empty respawn-failed ; do
     : > "${AGY_TEST_TMUX_LOG}"
     login_rc=0
-    login_output="$(agy-acc-login acc2 2>"${test_tmp}/login.err")" || login_rc=$?
+    # Exercise both spellings and both positions relative to the account.
+    if [[ "${AGY_TEST_TMUX_CASE}" == dead ]] ; then
+        login_output="$(agy-acc-login acc2 -t 2>"${test_tmp}/login.err")" || login_rc=$?
+    else
+        login_output="$(agy-acc-login --tmux acc2 2>"${test_tmp}/login.err")" || login_rc=$?
+    fi
     case "${AGY_TEST_TMUX_CASE}" in
         missing|dead)
             (( login_rc == 0 )) || fail "login ${AGY_TEST_TMUX_CASE} failed: $(<"${test_tmp}/login.err")"

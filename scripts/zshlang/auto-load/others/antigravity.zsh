@@ -308,10 +308,27 @@ function agy-best {
 }
 
 function agy-acc-login {
-    : "usage: agy-acc-login N; starts owner-operated sign-in in detached tmux"
+    : "usage: agy-acc-login [-t|--tmux] [ACCOUNT]; signs in here, optionally in detached tmux"
+    local tmux_p=n account='' arg
+    for arg in "$@" ; do
+        case "${arg}" in
+            -t|--tmux) tmux_p=y ;;
+            -h|--help) ec 'usage: agy-acc-login [-t|--tmux] [ACCOUNT]'; return 0 ;;
+            -*) ecerr "$0: unknown option: ${arg}"; return 2 ;;
+            *)
+                test -z "${account}" || { ecerr "$0: expected one account"; return 2; }
+                account="${arg}" ;;
+        esac
+    done
     local -a reply
-    h-agy-account-info "${1}" @RET
+    h-agy-account-info "${account}" @RET
     local id="${reply[1]}" session="agy-login-${reply[1]}"
+    if [[ "${tmux_p}" == n ]] ; then
+        agy-account-prepare "${id}" @RET
+        local -x AGY_ACCOUNT_ID="${id}" AGY_ACCOUNT_LABEL="${reply[2]}"
+        h-agy-account-login-run
+        return $?
+    fi
     ensure-cmd tmux @RET
     local pane_states row pane dead restart_pane=''
     local -a fields
@@ -336,7 +353,7 @@ function agy-acc-login {
     agy-account-prepare "${id}" @RET
     #: The root and label travel as arguments; a tmux server may have old env.
     local script
-    script="$(gquote zsh -c 'agy-account-hook "$1" "$2" "$3" h-agy-account-login-run' \
+    script="$(gquote zsh -c 'agy-account-hook "$1" "$2" "$3" h-agy-account-login-run tmux' \
         agy-login "${id}" "${reply[3]}" "${reply[2]}")" @RET
     if test -n "${restart_pane}" ; then
         #: Without -k, tmux refuses if another caller already revived the pane.
@@ -354,12 +371,15 @@ function h-agy-account-login-run {
     if test -s "${reply[4]}/antigravity-oauth-token" ; then
         ec "File credentials already exist; verifying without signing out."
     else
-        antigravity --mode plan
+        antigravity --mode plan @RET
     fi
     local ret=0
     h-agy-account-command "${AGY_ACCOUNT_ID}" models || ret=$?
-    ec "Account verification exited ${ret}. Press Enter to close this pane."
-    read -r
+    ec "Account verification exited ${ret}."
+    if [[ "${1}" == tmux ]] ; then
+        ec 'Press Enter to close this pane.'
+        read -r || true
+    fi
     return "${ret}"
 }
 

@@ -34,20 +34,24 @@ reconciliation, never moved or overwritten. Override the shared root with
 ```zsh
 agy-acc-login cave
 agy-acc-login fm2
+agy-acc-login --tmux cave  # or: agy-acc-login -t cave
 ```
 
-The helper prints a `tmux attach-session` command. Complete Google sign-in
-there, exit agy, and the same pane runs `models` to verify the account. If a token
-already exists it verifies without signing out. Re-running the helper prints
+The helper runs sign-in in the current terminal. Complete Google sign-in, then
+exit agy; the helper runs `models` to verify the account and returns its status.
+If a token already exists it verifies without signing out. No argument selects
+the current account (or `m` outside an account shell).
+
+Use `-t` or `--tmux` to keep sign-in in a detached session. The helper prints a
+`tmux attach-session` command, and the pane waits for Enter after verification.
+Re-running with `--tmux` prints
 the attach command if any pane in the login session is alive. If all panes have
 exited (and tmux retained them with `remain-on-exit`), it restarts a dead pane.
 It refuses to replace a pane that another caller has already restarted. No
 sign-in is performed by account setup or status reporting.
 
 After updating login helpers, start a fresh shell before retrying. Existing
-terminals retain their old function definitions. The account hook deduplicates
-`AGY_ACCOUNTS` before validation so an existing account still runs the login
-command.
+terminals retain their old function definitions.
 
 ## File authentication
 
