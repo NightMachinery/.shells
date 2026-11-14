@@ -1408,7 +1408,37 @@ function h-daily-sync-next-hint {
     esac
 }
 
+function h-daily-sync-preflight {
+    : "Refuse to run without the access the job needs: the sandbox blocks the run directory, tmux and ssh."
+    local probe rc
+    probe="${daily_sync_runs}/.access-probe-$$"
+    if command mkdir -p -- "${daily_sync_runs}" 2>/dev/null && { : > "${probe}" } 2>/dev/null ; then
+        command rm -f -- "${probe}"
+    else
+        rc=1
+    fi
+    if [[ -z "${rc:-}" ]] ; then
+        tmux-job-running-p "${daily_sync_step_job:-daily-sync-step}" &>/dev/null
+        (( $? == 2 )) && rc=1
+    fi
+    if [[ -n "${rc:-}" ]] ; then
+        ec "NOT ELEVATED: this command needs elevated access (the sandbox blocks the run directory, tmux"
+        ec "and ssh). Nothing was done."
+        ec "NEXT: run the same command again with elevated access."
+        return 1
+    fi
+    return 0
+}
+
 function h-daily-sync-next {
+    #: A run another agent finished is not this agent's: it starts its own.
+    local owner=''
+    owner="$(<"$(h-daily-sync-run-dir)/agent")" 2>/dev/null || true
+    if [[ "$(h-daily-sync-stage)" == finished && -n "${PASEO_AGENT_ID:-}" && -n "${owner}" && "${owner}" != "${PASEO_AGENT_ID}" ]] ; then
+        ec "Today's earlier run (agent ${owner[1,8]}) is finished; yours has not started yet."
+        ec "NEXT: run: zsh -c 'daily-sync begin'"
+        return 0
+    fi
     #: A slow step that is still running, or whose result was not shown yet, comes first.
     h-daily-sync-step '' && return 0
     case "$(h-daily-sync-stage)" in
@@ -1506,11 +1536,18 @@ The mechanical half of the daily multi-machine sync; see docs/daily-sync.md."
     (( $# )) && shift
     h-daily-sync-config @RET
     ensure-cmd jq perl @RET
+    if ! bool "${inner_p}" ; then
+        h-daily-sync-preflight || return 77
+    fi
     if [[ "${cmd}" == begin ]] && ! bool "${inner_p}" && [[ "$(h-daily-sync-stage)" == finished ]] ; then
         #: A second run on the same day starts afresh; the finished one is kept aside.
         local done_run
         done_run="$(h-daily-sync-run-dir)" @RET
-        command mv -- "${done_run}" "${done_run}-done-$(command date +%H%M%S)" @RET
+        if ! command mv -- "${done_run}" "${done_run}-done-$(command date +%H%M%S)" ; then
+            ec "ERROR: could not set the finished earlier run aside, so this run cannot start."
+            ec "NEXT: run the same command again with elevated access: zsh -c 'daily-sync begin'"
+            return 1
+        fi
     fi
     if [[ "${cmd}" == (begin|status|converge|finish) ]] && ! bool "${inner_p}" ; then
         h-daily-sync-step "${cmd}"

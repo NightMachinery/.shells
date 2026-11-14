@@ -92,7 +92,15 @@ run `daily-sync next` instead. Set `daily_sync_inner=y` to run a step in the
 foreground.
 
 The agent is the caller's `PASEO_AGENT_ID`; `begin` records it in the run
-directory for the jobs.
+directory for the jobs. A run finished by another agent is not resumed: `next`
+tells a new agent to `begin`, which sets the finished run aside as
+`<date>-done-<time>`.
+
+Every command first checks for the access it needs. Inside Codex's sandbox the
+run directory, tmux and ssh are blocked, so the command does nothing, prints
+`NOT ELEVATED` and says to rerun it with elevated access. Without this check, a
+sandboxed `begin` could not set the earlier run aside, and the new run then
+reported the earlier run's ALL DONE as its own.
 
 ## Updates are self-contained
 
