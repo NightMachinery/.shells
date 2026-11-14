@@ -202,13 +202,10 @@ function codex-install-pnpm {
 }
 
 function codex-install {
-    #: npm for now, because pnpm cannot install codex at all; see
-    #: [agfi:codex-install-pnpm].
-    ##
-    reval-ecgray $proxyenv command curl -fsSL https://chatgpt.com/codex/install.sh | CODEX_NON_INTERACTIVE=true sh
-    ##
-    # codex-install-npm "$@"
-    ##
+    #: Use npm to leave shell dotfiles untouched. The native install.sh can
+    #: edit shell profiles even with CODEX_NON_INTERACTIVE=true and offers
+    #: no switch to disable that. pnpm has the issue in [agfi:codex-install-pnpm].
+    codex-install-npm "$@"
 }
 ##
 function codex-clean-text {

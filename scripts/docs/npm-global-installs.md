@@ -139,6 +139,15 @@ In `./zshlang/auto-load/others/codex.zsh`: [agfi:codex-install] delegates to
 npm; [agfi:codex-install-npm] and [agfi:codex-install-pnpm] pick the engine
 explicitly.
 
+`codex-install` uses npm to leave shell startup dotfiles untouched. The native
+[`install.sh`](https://chatgpt.com/codex/install.sh), inspected 2026-11-14,
+offers no option to disable profile edits. `CODEX_NON_INTERACTIVE=true` skips
+prompts but does not disable PATH edits. Even having the install directory on
+PATH does not prevent edits when the installer detects a conflicting managed
+installation. Use `codex-install` or `codex-install-npm`; manage PATH in your
+own shell configuration. Existing profile blocks from earlier native installs
+are left untouched. Updates use npm rather than the native installer.
+
 In `./zshlang/auto-load/others/claude.zsh`: [agfi:claude-install] delegates to
 npm; [agfi:claude-install-npm] and [agfi:claude-install-pnpm] pick the engine
 explicitly.
