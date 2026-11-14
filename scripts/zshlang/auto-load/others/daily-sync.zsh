@@ -187,6 +187,16 @@ function ds-status {
     return 0
 }
 
+function ds-why {
+    #: The informative line of git's error output: ssh's own complaint first,
+    #: since "make sure ... the repository exists" ends every ssh failure.
+    local -a l=( "${(@f)1}" ) m
+    m=( ${(M)l:#(ssh|kex_|Connection|Timeout|Host key|Permission denied|client_loop)*} )
+    (( ${#m} )) || m=( ${(M)l:#(fatal|error):*} )
+    (( ${#m} )) || m=( "${l[-1]}" )
+    print -r -- "${m[1]}"
+}
+
 function ds-sync {
     #: ds-sync <repo> <rw|ff> [<remote>[:<branch>]]...: pull, and in rw mode push,
     #: also to the extra remotes. Never leaves a rebase or merge half done: a
@@ -212,7 +222,7 @@ function ds-sync {
     before="$(command "${G[@]}" rev-parse HEAD)" || true
     if [[ "${mode}" == ff ]] ; then
         if ! out="$(command "${G[@]}" pull --ff-only 2>&1)" ; then
-            print -r -- "FF-REFUSED ${repo}: ${${(f)out}[-1]}"
+            print -r -- "FF-REFUSED ${repo}: $(ds-why "${out}")"
             return 0
         fi
     else
@@ -242,7 +252,7 @@ function ds-sync {
             if [[ -n "${files}" ]] ; then
                 print -r -- "CONFLICT ${repo} (pull ${how[1]}, aborted): ${files}"
             else
-                print -r -- "PULL-FAILED ${repo}: ${${(f)out}[-1]}"
+                print -r -- "PULL-FAILED ${repo}: $(ds-why "${out}")"
             fi
             return 0
         fi
@@ -255,7 +265,7 @@ function ds-sync {
         pushed="$(command "${G[@]}" rev-list --count '@{upstream}..HEAD' 2>/dev/null)" || true
         if (( pushed > 0 )) ; then
             if ! out="$(command "${G[@]}" push 2>&1)" ; then
-                print -r -- "PUSH-FAILED ${repo}: ${${(f)out}[-1]}"
+                print -r -- "PUSH-FAILED ${repo}: $(ds-why "${out}")"
                 return 0
             fi
         fi
@@ -266,7 +276,7 @@ function ds-sync {
                 how=( "${spec}" HEAD )
             fi
             if ! out="$(command "${G[@]}" push "${how[@]}" 2>&1)" ; then
-                print -r -- "PUSH-FAILED ${repo} -> ${spec}: ${${(f)out}[-1]} (never force it)"
+                print -r -- "PUSH-FAILED ${repo} -> ${spec}: $(ds-why "${out}") (never force it)"
                 return 0
             fi
             if [[ "${out}" != *'up-to-date'* ]] ; then
@@ -504,7 +514,7 @@ function ds-conflict-show {
             break
         done
         if ! ds-inprog "${repo}" ; then
-            print -r -- "PULL-FAILED ${repo}: ${${(f)out}[-1]}"
+            print -r -- "PULL-FAILED ${repo}: $(ds-why "${out}")"
             return 0
         fi
     fi
@@ -542,7 +552,7 @@ function ds-conflict-continue {
             print -r -- "NEXT-COMMIT-CONFLICTS ${repo}: the next commit conflicts too"
             ds-conflict-print "${repo}" "${label}"
         else
-            print -r -- "CONTINUE-FAILED ${repo}: ${${(f)out}[-1]}"
+            print -r -- "CONTINUE-FAILED ${repo}: $(ds-why "${out}")"
         fi
         return 0
     fi
