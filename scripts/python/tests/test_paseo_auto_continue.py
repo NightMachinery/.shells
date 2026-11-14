@@ -3,6 +3,7 @@ import json
 from pathlib import Path
 import sys
 import tempfile
+import time
 import unittest
 from unittest.mock import patch
 
@@ -208,11 +209,13 @@ class PaseoAutoContinueTests(unittest.TestCase):
         found = list(mod.usable_agents(
             self.home, ['work-opus', 'work-opus-2', 'work-sonnet', 'codex', 'broken', 'gone'],
             quota_fn=quota_fn, warn=warnings.append,
+            checkable_fn=lambda provider: provider != 'odd',
             stored_fn=lambda agent_id, home: records[agent_id] if agent_id in records
             else (_ for _ in ()).throw(mod.HandoffError('missing'))))
-        self.assertEqual(found, ['work-sonnet', 'codex'])
+        # An agent whose quota cannot be read here is kept, with a note.
+        self.assertEqual(found, ['work-sonnet', 'codex', 'broken'])
         # One check per seat and model family, not per agent.
-        self.assertEqual(len(calls), 4)
+        self.assertEqual(len(calls), 3)
         self.assertEqual(len(warnings), 2)
 
     def test_codex_quota_verdict(self):
@@ -296,6 +299,52 @@ class PaseoAutoContinueTests(unittest.TestCase):
         link.symlink_to(target)
         with self.assertRaises(mod.HandoffError):
             mod.private_dir(link)
+
+
+class CodexLimitTests(unittest.TestCase):
+    """Codex limit stops: the last root task_complete in the session log carries the error."""
+    thread = '01a1bbc1-518f-7bb0-b332-515f9a0527ee'
+
+    def setUp(self):
+        self.temp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temp.cleanup)
+        self.native = Path(self.temp.name) / 'codex-home'
+        created = int(self.thread.replace('-', '')[:12], 16) / 1000
+        day = time.strftime('%Y/%m/%d', time.localtime(created))
+        self.log = self.native / 'sessions' / day / ('rollout-2026-11-08T16-22-51-' + self.thread + '.jsonl')
+        self.log.parent.mkdir(parents=True)
+        self.record = {'id': 'agent-id', 'lastStatus': 'idle', 'persistence': {
+            'sessionId': self.thread, 'metadata': {'threadId': self.thread}}}
+
+    def event(self, kind, turn, root=None, error=None):
+        payload = {'type': kind, 'turn_id': turn, 'root_turn_id': root or turn}
+        if error:
+            payload['error'] = {'message': error}
+        return {'type': 'event_msg', 'payload': payload}
+
+    def write(self, *entries):
+        self.log.write_text(''.join(json.dumps(e) + '\n' for e in entries))
+
+    def failure(self):
+        return mod.codex_limit_failure(self.record, {'native_home': str(self.native)})
+
+    def test_limit_on_last_root_turn_is_a_failure(self):
+        limit = 'You\u2019ve hit your usage limit. Visit https://chatgpt.com/settings/usage'
+        self.write(self.event('task_started', 't1'), self.event('task_complete', 't1', error=limit),
+                   self.event('task_complete', 'r1', root='t0'))
+        self.assertIsNotNone(self.failure())
+
+    def test_later_turn_or_other_error_is_not(self):
+        limit = 'You\u2019ve hit your usage limit.'
+        self.write(self.event('task_complete', 't1', error=limit), self.event('task_started', 't2'))
+        self.assertIsNone(self.failure())
+        self.write(self.event('task_complete', 't1', error='Bad Request'))
+        self.assertIsNone(self.failure())
+        self.write(self.event('task_complete', 't1'))
+        self.assertIsNone(self.failure())
+
+    def test_missing_log_is_not_a_failure(self):
+        self.assertIsNone(self.failure())
 
 
 class ClaudeLimitTests(unittest.TestCase):
@@ -383,16 +432,20 @@ class ClaudeLimitTests(unittest.TestCase):
         self.tick()
         self.assertEqual(len(self.sent), 2)
 
-    def test_idle_codex_agent_never_reads_transcripts(self):
+    def test_idle_codex_agent_resumes_on_its_logged_limit(self):
+        # Codex also records a limit stop only in its own log; the watcher reads it.
         config = {'agents': {'providers': {'codex-x': {'extends': 'codex'}}}}
         (self.home / 'config.json').write_text(json.dumps(config))
         self.snapshot['Provider'] = 'codex-x'
         self.state['binding'] = mod.binding(self.snapshot, self.home)
         mod.atomic_write(self.path, self.state)
-        def boom(*_):
-            raise AssertionError('transcript read for a Codex agent')
-        self.assertEqual(self.tick(transcript_fn=boom), 'waiting for a quota-failed turn')
-        self.assertFalse(self.sent)
+        seen = []
+        def codex_log(record, binding):
+            seen.append(binding['agent'])
+            return 'codex-failure'
+        self.tick(transcript_fn=codex_log)
+        self.assertEqual(set(seen), {'codex'})
+        self.assertTrue(self.sent)
 
     def test_running_claude_agent_never_continues(self):
         self.write(self.limit())

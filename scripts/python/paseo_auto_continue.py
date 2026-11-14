@@ -25,7 +25,7 @@ ROOT = Path(__file__).resolve().parent
 QUOTA_ERROR = re.compile(
     r"usage[_ -]limit|rate[_ -]limit|quota (?:exceeded|exhausted)|"
     r"(?:you(?:'ve| have)?|account) (?:hit|reached|exceeded) .*limit|"
-    r"(?:hit|reached) your limit|out of .*usage|too many requests", re.I)
+    r"(?:hit|reached) your limit|out of .*usage|too many requests|quota reached", re.I)
 
 
 def digest(value):
@@ -189,17 +189,90 @@ def claude_limit_failure(record, binding, tail_bytes=1 << 20):
     return None
 
 
+def codex_rollout(native_home, thread_id):
+    """The Codex session log of a thread, found through the creation time in its id.
+
+    Codex thread ids are UUIDv7, so the first 48 bits are the creation time in
+    milliseconds, and Codex files the log under sessions/YYYY/MM/DD of that
+    (local) day. The neighbouring days cover a timezone edge; the full search is
+    the last resort.
+    """
+    sessions = Path(native_home) / 'sessions'
+    name = 'rollout-*-' + thread_id + '.jsonl'
+    try:
+        created = int(thread_id.replace('-', '')[:12], 16) / 1000
+        days = [time.localtime(created + offset * 86400) for offset in (0, -1, 1)]
+    except (ValueError, OverflowError, OSError):
+        days = []
+    for day in days:
+        matches = list(sessions.glob(time.strftime('%Y/%m/%d/', day) + name))
+        if matches:
+            return matches[0]
+    matches = list(sessions.glob('*/*/*/' + name))
+    return matches[0] if matches else None
+
+
+def codex_limit_failure(record, binding, tail_bytes=1 << 20):
+    """A Codex limit stop that Paseo records as an ordinary finished turn.
+
+    Codex ends the turn with a task_complete event whose error says the usage
+    limit was hit, and Paseo shows the agent idle with no lastError. The stop
+    counts only while that is the last root turn in the session log.
+    """
+    persistence = record.get('persistence') or {}
+    thread = (persistence.get('metadata') or {}).get('threadId') or persistence.get('sessionId')
+    try:
+        thread = str(uuid.UUID(str(thread)))
+    except ValueError:
+        return None
+    path = codex_rollout(binding['native_home'], thread)
+    if path is None:
+        return None
+    with open(path, 'rb') as stream:
+        stream.seek(0, os.SEEK_END)
+        stream.seek(max(0, stream.tell() - tail_bytes))
+        lines = stream.read().splitlines()
+    for raw in reversed(lines):
+        try:
+            entry = json.loads(raw)
+        except ValueError:
+            continue
+        payload = entry.get('payload') if isinstance(entry, dict) else None
+        if entry.get('type') != 'event_msg' or not isinstance(payload, dict):
+            continue
+        if payload.get('type') not in ('task_started', 'task_complete'):
+            continue
+        root = payload.get('root_turn_id')
+        if root and payload.get('turn_id') != root:
+            continue  # a review or compaction sub-turn, not the agent's own turn
+        error = payload.get('error') if payload['type'] == 'task_complete' else None
+        message = error.get('message') if isinstance(error, dict) else None
+        if not isinstance(message, str) or not QUOTA_ERROR.search(message):
+            return None
+        return digest(['codex-limit', thread, payload.get('turn_id'), message])
+    return None
+
+
+def limit_failure(record, binding):
+    """A limit stop recorded only in the provider's own transcript, if any."""
+    if binding.get('agent') == 'claude':
+        return claude_limit_failure(record, binding)
+    if binding.get('agent') == 'codex':
+        return codex_limit_failure(record, binding)
+    return None
+
+
 def failure_of(snapshot, record, state, transcript_fn):
     """The current failed turn's identity, or None when nothing should resume."""
     if snapshot.get('Status') == 'error':
         return quota_failure(record)
-    if snapshot.get('Status') == 'idle' and state['binding']['agent'] == 'claude' \
+    if snapshot.get('Status') == 'idle' and state['binding']['agent'] in ('claude', 'codex') \
             and not record.get('archivedAt'):
         return transcript_fn(record, state['binding'])
     return None
 
 
-def stopped_agents(home, transcript_fn=claude_limit_failure):
+def stopped_agents(home, transcript_fn=limit_failure):
     """The local agents whose last turn stopped at a usage limit, registered or not.
 
     The same tests the watcher applies to one agent, read from the stored records
@@ -229,12 +302,25 @@ def stopped_agents(home, transcript_fn=claude_limit_failure):
             except (HandoffError, OSError, ValueError, KeyError):
                 identities[provider] = None
         identity = identities[provider]
-        if identity and identity['agent'] == 'claude' and transcript_fn(record, identity):
+        if identity and identity['agent'] in ('claude', 'codex') and transcript_fn(record, identity):
             yield record['id']
 
 
-def usable_agents(home, agent_ids, quota_fn=None, stored_fn=None, warn=None):
+def quota_checkable(home, provider):
+    """Whether provider resolves to Claude or Codex, whose usage this module reads."""
+    try:
+        provider_config(home, provider)
+    except (HandoffError, OSError, ValueError, KeyError):
+        return False
+    return True
+
+
+def usable_agents(home, agent_ids, quota_fn=None, stored_fn=None, warn=None, checkable_fn=None):
     """The agents among agent_ids whose seat has quota left for their model now.
+
+    Agents of a provider whose quota cannot be read here (Antigravity, ACP and
+    the rest beyond Claude and Codex) are kept, with a note: they were stopped
+    by a limit, and leaving them out would hide them from the resume entirely.
 
     One usage check per (provider, model family), the same check the watcher
     makes before it sends. An agent whose check fails is left out and named on
@@ -242,6 +328,7 @@ def usable_agents(home, agent_ids, quota_fn=None, stored_fn=None, warn=None):
     """
     quota_fn = quota_fn or quota
     stored_fn = stored_fn or stored_agent
+    checkable_fn = checkable_fn or (lambda provider: quota_checkable(home, provider))
     warn = warn or (lambda text: print(text, file=sys.stderr))
     verdicts = {}
     for agent_id in agent_ids:
@@ -253,6 +340,10 @@ def usable_agents(home, agent_ids, quota_fn=None, stored_fn=None, warn=None):
         provider = record.get('provider')
         model = (record.get('config') or {}).get('model') or (record.get('runtimeInfo') or {}).get('model') or ''
         snapshot = {'Model': model}
+        if not checkable_fn(provider):
+            warn(agent_id + ': ' + str(provider) + ' quota is not checked here; kept')
+            yield agent_id
+            continue
         key = (provider, model_family(snapshot))
         if key not in verdicts:
             try:
@@ -324,7 +415,7 @@ def quota(state, snapshot):
 
 
 def tick(path, *, inspect_fn=inspect, stored_fn=stored_agent, quota_fn=quota, send_fn=command,
-         transcript_fn=claude_limit_failure):
+         transcript_fn=limit_failure):
     """Return one status; record a claim before sending to prevent ambiguous retries."""
     with locked(path.with_suffix('.lock')):
         state = read_json(path)

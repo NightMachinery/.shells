@@ -62,6 +62,18 @@ usage after that agent's own failed turn contains a quota/rate-limit error.
 An idle or running agent, a permission request, an unrelated network error,
 or another session exhausting the account does not trigger a continuation.
 
+Where the failed turn is recorded depends on the provider. An error status
+with the limit in `lastError` covers Antigravity and most others. Claude and
+Codex end a limit stop as an ordinary finished turn instead, so Paseo shows the
+agent idle with no error, and the stop is read from the provider's own log:
+Claude's session transcript (a last `isApiErrorMessage` entry with
+`error: "rate_limit"`), and Codex's rollout under `CODEX_HOME/sessions`, found
+by the day encoded in its UUIDv7 thread id (the last root `task_complete`
+carrying a usage-limit error). Either counts only while it is still the last
+turn. The watcher and `paseo-auto-continue-stopped` share these tests.
+`--usable` keeps an agent whose quota this module cannot read (anything beyond
+Claude and Codex), with a note on stderr, rather than hiding it.
+
 Quota comes from the existing `claude_code_usage.py` or `codex_status.py`
 reader, with the selected provider's profile directory. Claude checks its
 session, account-wide weekly and applicable model-family weekly windows.
