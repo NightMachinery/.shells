@@ -202,10 +202,25 @@ function codex-install-pnpm {
 }
 
 function codex-install {
-    #: Use npm to leave shell dotfiles untouched. The native install.sh can
-    #: edit shell profiles even with CODEX_NON_INTERACTIVE=true and offers
-    #: no switch to disable that. pnpm has the issue in [agfi:codex-install-pnpm].
-    codex-install-npm "$@"
+    #: The native installer has no opt-out for shell profile edits, including
+    #: in noninteractive mode. Remove its profile-update call before running;
+    #: refuse an unfamiliar script rather than execute it unmodified.
+    ensure-cmd curl perl sh @RET
+    local installer
+    installer="$(gmktemp)" @TRET
+    {
+        reval-ecgray $proxyenv command curl --fail --silent --show-error --location \
+            https://chatgpt.com/codex/install.sh --output "${installer}" @RET
+        command perl -0777 -i -pe '
+            my $calls = s/^add_to_path$/step "Shell profile edits skipped; manage PATH yourself."/mg;
+            die "codex-install: unexpected native installer; refusing to run\n"
+                unless $calls == 1 && /^add_to_path\(\) \{/m;
+            s/step "\$BIN_DIR is already on PATH"/step "Ensure \$BIN_DIR is on PATH; shell profiles were left untouched."/g;
+        ' "${installer}" @RET
+        CODEX_NON_INTERACTIVE=true command sh "${installer}" "$@"
+    } always {
+        command rm -f -- "${installer}"
+    }
 }
 ##
 function codex-clean-text {

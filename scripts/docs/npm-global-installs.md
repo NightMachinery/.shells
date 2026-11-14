@@ -12,7 +12,7 @@ and exit status 134. Verified on node v24.4.1 and pnpm 10.32.1, on mb2.
 The message is misleading twice over: it is not a heap-size problem, and it is
 not the package's fault. It is a string-length ceiling being hit inside pnpm's
 worker thread while it hashes the tarball. Until pnpm or Node fixes it, install
-large packages with npm, which is what [agfi:codex-install] and
+large packages with npm, which is what [agfi:codex-install-npm] and
 [agfi:claude-install] now do.
 
 ## The mechanism
@@ -135,18 +135,23 @@ In `./zshlang/auto-load/others/ins.zsh`:
 - [agfi:h-npm-install-report] lists every copy of a command on PATH, in PATH
   order, with its version.
 
-In `./zshlang/auto-load/others/codex.zsh`: [agfi:codex-install] delegates to
-npm; [agfi:codex-install-npm] and [agfi:codex-install-pnpm] pick the engine
-explicitly.
+In `./zshlang/auto-load/others/codex.zsh`: [agfi:codex-install] uses the native
+installer; [agfi:codex-install-npm] and [agfi:codex-install-pnpm] remain explicit
+package-manager alternatives.
 
-`codex-install` uses npm to leave shell startup dotfiles untouched. The native
+`codex-install` leaves shell startup dotfiles untouched. The native
 [`install.sh`](https://chatgpt.com/codex/install.sh), inspected 2026-11-14,
 offers no option to disable profile edits. `CODEX_NON_INTERACTIVE=true` skips
 prompts but does not disable PATH edits. Even having the install directory on
 PATH does not prevent edits when the installer detects a conflicting managed
-installation. Use `codex-install` or `codex-install-npm`; manage PATH in your
-own shell configuration. Existing profile blocks from earlier native installs
-are left untouched. Updates use npm rather than the native installer.
+installation. The wrapper downloads the script to a temporary file and removes
+its single `add_to_path` invocation before executing it. It refuses to run if
+the expected function definition or single invocation is missing. This depends
+on upstream keeping profile writes inside that function; review the wrapper
+when the installer changes. Native installation and release handling remain
+upstream's responsibility. Arguments such as `--release VERSION` are forwarded.
+Manage PATH in your own shell configuration. Existing profile blocks from
+earlier native installs are left untouched.
 
 In `./zshlang/auto-load/others/claude.zsh`: [agfi:claude-install] delegates to
 npm; [agfi:claude-install-npm] and [agfi:claude-install-pnpm] pick the engine
