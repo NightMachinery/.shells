@@ -167,8 +167,9 @@ If you want to document installation for a plugin, read the readme of another pl
 ## Agent Instruction Files
 
 The global instruction files the agents actually read — `~/.claude/CLAUDE.md`,
-`~/.claude-work/CLAUDE.md`, `~/.codex/AGENTS.md`, `~/.gemini/GEMINI.md` — are
-**generated**. Never edit them: they are overwritten on the next agent
+`~/.claude-work/CLAUDE.md`, `~/.codex/AGENTS.md`, and agy's
+`~/.gemini/config/rules/agents-md-NN.md` (split to fit its 24 KB cap per file)
+— are **generated**. Never edit them: they are overwritten on the next agent
 launch. Edit the sources under
 `./PE/Agents/` and run `agents-md-sync`, which the `claude`, `codex-m` and
 `antigravity-m` launchers call for you; one sync refreshes every agent's file,
