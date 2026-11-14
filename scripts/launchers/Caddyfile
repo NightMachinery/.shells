@@ -212,3 +212,13 @@ https://ajayeb.lilf.ir {
 	reverse_proxy localhost:38951
 }
 # END ajayeb self_host.py
+
+# BEGIN hamparvaz self_host.py
+http://hamparvaz.lilf.ir {
+    redir https://hamparvaz.lilf.ir{uri} permanent
+}
+https://hamparvaz.lilf.ir {
+    encode zstd gzip
+    reverse_proxy localhost:42873
+}
+# END hamparvaz self_host.py
