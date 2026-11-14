@@ -218,6 +218,44 @@ class PaseoAutoContinueTests(unittest.TestCase):
         self.assertEqual(len(calls), 3)
         self.assertEqual(len(warnings), 2)
 
+    def test_agy_account_resolution(self):
+        config = {'agents': {'providers': {
+            'agy-acp': {'extends': 'acp', 'command': ['/x/bin/agy', 'acp'], 'env': {'AGY_ACCOUNT_ID': 'cave'}},
+            'agy-main': {'extends': 'acp', 'command': ['/x/bin/agy'], 'env': {'AGY_ACCOUNT_ID': 'acc1'}},
+            'other-acp': {'extends': 'acp', 'command': ['/x/bin/gemini']}}}}
+        (self.home / 'config.json').write_text(json.dumps(config))
+        self.assertEqual(mod.agy_account(self.home, 'agy-acp'), 'cave')
+        self.assertEqual(mod.agy_account(self.home, 'agy-main'), 'm')
+        self.assertEqual(mod.agy_account(self.home, 'antigravity'), 'm')
+        self.assertIsNone(mod.agy_account(self.home, 'other-acp'))
+        self.assertIsNone(mod.agy_account(self.home, 'copilot'))
+
+    def test_agy_quota_by_model_pools(self):
+        def bucket(bucket_id, remaining):
+            return {'bucket_id': bucket_id, 'remaining_percent': remaining}
+        report = {'m': {'account': 'm', 'buckets': [
+            bucket('gemini-5h', 40), bucket('gemini-weekly', 60),
+            bucket('gemini-4-argon-weekly', 0), bucket('3p-5h', 0)]},
+            'cave': {'account': 'cave', 'error': 'stale cache', 'buckets': []}}
+        self.assertTrue(mod.agy_usable(report, 'm', 'gemini-4-hydrogen-high'))
+        self.assertFalse(mod.agy_usable(report, 'm', 'gemini-4-argon-medium'))
+        self.assertFalse(mod.agy_usable(report, 'm', 'claude-opus-5-5'))
+        with self.assertRaises(mod.HandoffError):
+            mod.agy_usable(report, 'cave', 'gemini-4-hydrogen-high')
+        records = {'hydrogen': {'provider': 'antigravity', 'config': {'model': 'gemini-4-hydrogen-high'}},
+                   'argon': {'provider': 'antigravity', 'config': {'model': 'gemini-4-argon-medium'}},
+                   'stale': {'provider': 'agy-cave', 'config': {'model': 'gemini-4-hydrogen-high'}}}
+        reports, warnings = [], []
+        found = list(mod.usable_agents(
+            self.home, ['hydrogen', 'argon', 'stale'], stored_fn=lambda agent_id, home: records[agent_id],
+            checkable_fn=lambda provider: False, warn=warnings.append,
+            agy_account_fn=lambda provider: 'cave' if provider == 'agy-cave' else 'm',
+            agy_report_fn=lambda: reports.append(1) or report))
+        # The exhausted Argon pool hides its agent; an unknown quota keeps one, with a note.
+        self.assertEqual(found, ['hydrogen', 'stale'])
+        self.assertEqual(len(reports), 1)
+        self.assertEqual(len(warnings), 1)
+
     def test_codex_quota_verdict(self):
         self.assertTrue(mod.quota_usable({'ok': True, 'quota': {'blocked': False}}, 'codex'))
         self.assertFalse(mod.quota_usable({'ok': True, 'quota': {'blocked': True}}, 'codex'))

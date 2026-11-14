@@ -306,6 +306,55 @@ def stopped_agents(home, transcript_fn=limit_failure):
             yield record['id']
 
 
+def agy_account(home, provider):
+    """The Antigravity account an agent of this provider runs on, or None if not agy.
+
+    The built-in `antigravity` provider and any provider whose command is the agy
+    binary (the ACP driver) count. The account is AGY_ACCOUNT_ID from the
+    provider's environment, else the main account `m`, as agy itself defaults.
+    """
+    config_file = home / 'config.json'
+    providers = read_json(config_file).get('agents', {}).get('providers', {}) if config_file.exists() else {}
+    env, command_name, current, seen = {}, None, provider, set()
+    while isinstance(providers.get(current), dict) and current not in seen:
+        seen.add(current)
+        entry = providers[current]
+        env = {**entry.get('env', {}), **env}
+        argv = entry.get('command')
+        if command_name is None and isinstance(argv, list) and argv:
+            command_name = Path(str(argv[0])).name
+        current = entry.get('extends')
+    if current != 'antigravity' and provider != 'antigravity' and command_name != 'agy':
+        return None
+    account = str(env.get('AGY_ACCOUNT_ID') or 'm')
+    return 'm' if account == 'acc1' else account
+
+
+def agy_quota_report():
+    """Every Antigravity account's cached quota, from agy-status, keyed by account.
+
+    Cache-only: it never starts agy, asks for a login or contacts a backend, so a
+    missing or stale cache is an error for that account, not a hang.
+    """
+    argv = ['zsh', '-ic', 'agy_status_method=statusline agy_status_cache_only_p=y agy-status --json']
+    result = subprocess.run(argv, capture_output=True, text=True, timeout=90,
+                            stdin=subprocess.DEVNULL, cwd=Path.home())
+    accounts = json.loads(result.stdout)  # exit 1 only means some account has an error
+    return {row.get('account'): row for row in accounts if isinstance(row, dict)}
+
+
+def agy_usable(report, account, model):
+    """Whether every quota pool that limits this model on this account has room."""
+    from agy_model_catalog import quota_for_model
+    row = report.get(account)
+    if not row:
+        raise HandoffError('no quota report for Antigravity account ' + str(account))
+    if row.get('error'):
+        raise HandoffError('Antigravity account ' + str(account) + ': ' + str(row['error']))
+    remaining, _ = quota_for_model(row.get('buckets') or [], {'id': model})
+    return remaining > 0
+
+
 def quota_checkable(home, provider):
     """Whether provider resolves to Claude or Codex, whose usage this module reads."""
     try:
@@ -315,12 +364,15 @@ def quota_checkable(home, provider):
     return True
 
 
-def usable_agents(home, agent_ids, quota_fn=None, stored_fn=None, warn=None, checkable_fn=None):
+def usable_agents(home, agent_ids, quota_fn=None, stored_fn=None, warn=None, checkable_fn=None,
+                  agy_account_fn=None, agy_report_fn=None):
     """The agents among agent_ids whose seat has quota left for their model now.
 
-    Agents of a provider whose quota cannot be read here (Antigravity, ACP and
-    the rest beyond Claude and Codex) are kept, with a note: they were stopped
-    by a limit, and leaving them out would hide them from the resume entirely.
+    Antigravity agents are checked against their account's cached quota, every
+    pool that limits their model (`agy-best`'s rule); a missing or stale cache
+    keeps the agent, with a note. Agents of a provider whose quota cannot be
+    read here at all (copilot, opencode, ...) are kept with a note too: they
+    were stopped by a limit, and leaving them out would hide them entirely.
 
     One usage check per (provider, model family), the same check the watcher
     makes before it sends. An agent whose check fails is left out and named on
@@ -329,6 +381,9 @@ def usable_agents(home, agent_ids, quota_fn=None, stored_fn=None, warn=None, che
     quota_fn = quota_fn or quota
     stored_fn = stored_fn or stored_agent
     checkable_fn = checkable_fn or (lambda provider: quota_checkable(home, provider))
+    agy_account_fn = agy_account_fn or (lambda provider: agy_account(home, provider))
+    agy_report_fn = agy_report_fn or agy_quota_report
+    agy_report = None
     warn = warn or (lambda text: print(text, file=sys.stderr))
     verdicts = {}
     for agent_id in agent_ids:
@@ -340,6 +395,20 @@ def usable_agents(home, agent_ids, quota_fn=None, stored_fn=None, warn=None, che
         provider = record.get('provider')
         model = (record.get('config') or {}).get('model') or (record.get('runtimeInfo') or {}).get('model') or ''
         snapshot = {'Model': model}
+        account = None if checkable_fn(provider) else agy_account_fn(provider)
+        if account is not None:
+            key = ('agy', account, model)
+            if key not in verdicts:
+                try:
+                    if agy_report is None:
+                        agy_report = agy_report_fn()
+                    verdicts[key] = agy_usable(agy_report, account, model)
+                except (HandoffError, OSError, ValueError, KeyError, subprocess.SubprocessError) as error:
+                    warn('Antigravity ' + account + ' ' + model + ': quota unknown (' + str(error) + '); its agents are kept')
+                    verdicts[key] = True
+            if verdicts[key]:
+                yield agent_id
+            continue
         if not checkable_fn(provider):
             warn(agent_id + ': ' + str(provider) + ' quota is not checked here; kept')
             yield agent_id

@@ -71,8 +71,12 @@ Claude's session transcript (a last `isApiErrorMessage` entry with
 by the day encoded in its UUIDv7 thread id (the last root `task_complete`
 carrying a usage-limit error). Either counts only while it is still the last
 turn. The watcher and `paseo-auto-continue-stopped` share these tests.
-`--usable` keeps an agent whose quota this module cannot read (anything beyond
-Claude and Codex), with a note on stderr, rather than hiding it.
+`--usable` checks each stopped agent's own quota: Claude and Codex through
+their usage readers, Antigravity through `agy-status --json` in its cache-only
+mode (the agent's account is `AGY_ACCOUNT_ID` from its provider, else `m`, and
+every pool that limits its model counts, by `agy-best`'s rule). An agent whose
+quota is unknown (a stale agy cache, or a provider such as copilot whose usage
+is not read here) is kept with a note on stderr rather than hidden.
 
 Quota comes from the existing `claude_code_usage.py` or `codex_status.py`
 reader, with the selected provider's profile directory. Claude checks its
