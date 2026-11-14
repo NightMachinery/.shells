@@ -35,7 +35,11 @@ only has to follow them from `begin` to `ALL DONE`.
   sync are folded into one `clean:` line. In code repositories each changed
   file is tagged `commit-ok` or `too-new(Nh)`, by whether it was last modified
   at least `daily_sync_min_age_hours` (default 7) ago, and untracked files are
-  tagged `leave`.
+  tagged `leave`. An untracked file that a tracked file names (found with `git
+  grep`, for up to 20 files per repository) is tagged by age like a tracked one
+  and marked `(named in <file>)`: a readme that links a new doc gets the doc
+  committed with it. Code repositories list untracked files one by one for
+  this; four or more in one directory still fold into a single line.
 - `daily-sync git <machine> <repo> <git arguments...>`: git in one repository
   on one machine, with the quoting handled. It refuses the verbs and flags the
   job must never use (`reset`, `stash`, `checkout`, plain `commit`, forced

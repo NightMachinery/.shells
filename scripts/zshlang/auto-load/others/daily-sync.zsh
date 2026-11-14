@@ -109,10 +109,15 @@ function ds-status {
     local -A new_in
     ds-repo "${repo}"
     local branch='' up='' note='' root="${HOME}/${repo}" e xy p tag
-    local -i ahead=0 behind=0 n_tracked=0 skip=0 age=0
+    local -i ahead=0 behind=0 n_tracked=0 skip=0 age=0 n_probed=0
+    local named
+    local -a hits
     if [[ "${repo}" == NIGHTDIR ]] ; then
         root="${HOME}"
         uno=(-uno)
+    elif [[ "${kind}" == *code ]] ; then
+        #: File by file, so an untracked doc inside a new directory can be found named.
+        uno=(-uall)
     fi
     if [[ "${kind}" != mirror ]] ; then
         command "${G[@]}" fetch --quiet 2>/dev/null || note+=' FETCH-FAILED'
@@ -138,13 +143,30 @@ function ds-status {
             skip=0
             continue
         fi
-        xy="${e[1,2]}" p="${e[4,-1]}" tag=''
+        xy="${e[1,2]}" p="${e[4,-1]}" tag='' named=''
         if [[ "${xy}" == [RC]* ]] ; then
             skip=1
         fi
         if [[ "${xy}" == '??' ]] ; then
             if [[ "${kind}" == *code ]] ; then
                 tag='leave'
+                #: An untracked file a tracked file names (a readme linking its doc)
+                #: belongs with that change, so it is committed once old enough.
+                if (( n_probed < 20 )) && [[ "${p}" != */ ]] ; then
+                    n_probed+=1
+                    hits=( "${(@f)$(command "${G[@]}" grep -F -l -e "${p}" 2>/dev/null)}" ) || true
+                    named="${hits[1]:-}"
+                    if [[ -n "${named}" && -e "${root}/${p}" ]] ; then
+                        age=$(( (EPOCHSECONDS - $(zstat +mtime -- "${root}/${p}")) / 3600 ))
+                        if (( age < min_age )) ; then
+                            tag="too-new(${age}h)" named=" (named in ${named})"
+                        else
+                            tag='commit-ok' named=" (named in ${named})"
+                        fi
+                    else
+                        named=''
+                    fi
+                fi
             fi
         else
             n_tracked+=1
@@ -161,7 +183,7 @@ function ds-status {
         if [[ "${xy}" == '??' ]] ; then
             new_in[${p:h}]=$(( ${new_in[${p:h}]:-0} + 1 ))
         fi
-        out+=( "  ${xy} ${tag:+${tag} }${p}" )
+        out+=( "  ${xy} ${tag:+${tag} }${p}${named}" )
     done
     #: Many new files in one directory become a single line.
     for p in "${(@k)new_in}" ; do
@@ -1338,6 +1360,7 @@ function h-daily-sync-leftover {
             my $ok = $kind eq "notes" || ($kind =~ /code$/ && $rest =~ s/^commit-ok //);
             next unless $ok;
             (my $file = $rest) =~ s{/ \(\d+ new files in this directory\)$}{/};
+            $file =~ s{ \(named in .*\)$}{};
             next if $held{"$machine $repo $file"};
             print "  $machine $repo: $xy $file\n";
         }' "${run}/status.log" "${run}/held"
