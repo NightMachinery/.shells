@@ -1151,9 +1151,13 @@ function h-daily-sync-metadata-start {
     local -a repos skipped
     run="$(h-daily-sync-run-dir)" @RET
     h-daily-sync-abort-open "still unsettled when the metadata updater started"
+    #: Only this machine's own sync lines matter: the updater runs here.
+    local here
+    here="$(command perl -ne 'BEGIN { $m = shift } if (/^## (\S+)[ :]/) { $on = $1 eq $m ; next } print if $on' \
+        "${daily_sync_local}" "${run}/converge.log" 2>/dev/null)" || true
     for repo in ${daily_sync_metadata:-${daily_sync_notes}} ; do
         if [[ -z "$(command git -C "${HOME}/${repo}" status --porcelain 2>&1)" ]] \
-            && ! command grep --quiet --extended-regexp "^(CONFLICT|BLOCKED|PULL-FAILED) ${repo}[ :]" "${run}/converge.log" 2>/dev/null ; then
+            && ! print -r -- "${here}" | command grep --quiet --extended-regexp "^(CONFLICT|BLOCKED|PULL-FAILED) ${repo}[ :]" ; then
             repos+=( "${repo}" )
         else
             skipped+=( "${repo}" )
