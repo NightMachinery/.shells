@@ -2,6 +2,7 @@
 local source = assert(io.open('hammerspoon/core/choosers.lua')):read('*a')
 local block = assert(source:match('(local emojiData = {}.-)\n%-%-%- %* Wi%-Fi Chooser'))
 local keys, tap, chooser, tally, clipboard, canvas, pasted = {}, nil, nil, nil, nil, nil, 0
+local tallyImages
 local aliasText, aliasDecodes = 'aliases', 0
 local imageLoads, prewarmTimers = 0, {}
 local settings = {}
@@ -16,7 +17,7 @@ local env = setmetatable({
         if text:match('^aliases') then aliasDecodes=aliasDecodes+1;return {['😀']=text=='aliases' and {'unimpressed','eye'} or {'fresh keyword'}} end
         return data
     end},
-    alert_gateway=function(text) tally=text end,
+    alert_gateway=function(text,opts) tally=text;tallyImages=opts and opts.images end,
     alert_gateway_dismiss=function() tally=nil end,
     inputLangPush=function() end, inputLangPop=function() end, langSetEn=function() end,
     hyper_bind_v2=function() end, copyToClipboard=function(text) clipboard=text end, doPaste=function() pasted=pasted+1 end,
@@ -127,7 +128,7 @@ assert(tally==nil, 'Tab must sort, not add a selection')
 keys[':tab'].fn()
 assert(chooser.rows[1].emoji=='😀')
 for _=1,3 do keys['shift:return'].fn() end
-assert(tally=='😀😀😀')
+assert(tally=='😀😀😀' and #tallyImages==3 and tallyImages[1]:find('emoji_u1f600.png',1,true),'The tally banner shows the Noto previews')
 local event={getKeyCode=function()return 51 end,getFlags=function()return {shift=true} end}
 assert(tap.callback(event));assert(tap.callback(event))
 assert(tally=='😀','Two Backspaces with Shift held must delete two selections')

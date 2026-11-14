@@ -449,7 +449,12 @@ function emojiChooser()
 
     local function updateAlert()
         if #selectedEmojis >= 1 then
+            -- Noto previews rather than text, so the tally never depends on
+            -- the system font; any missing preview falls back to the text.
+            local images = {}
+            for i, emoji in ipairs(selectedEmojis) do images[i] = emojiChooserImage(emoji) end
             alert_gateway(table.concat(selectedEmojis), {
+                images = #images == #selectedEmojis and images or nil,
                 id = kEmojiAlertId,
                 -- The chooser clears this itself; the engine's own 4h ceiling is
                 -- only a backstop against a crash leaving it on screen.

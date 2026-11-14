@@ -455,7 +455,13 @@ function telegramEmojiChooser()
         if #selected==0 then alert_gateway_dismiss(kAlertId);return end
         local text={}
         for i,entry in ipairs(selected) do text[i]=entry.emoji end
-        alert_gateway(table.concat(text),{id=kAlertId,seconds=math.huge,screens="typing"})
+        -- The premium artwork itself: the text is only each emoji's Unicode
+        -- stand-in. Any missing preview falls back to the text.
+        local images=T.images(selected)
+        local complete=true
+        for i=1,#selected do if not images[i] then complete=false end end
+        alert_gateway(table.concat(text),{id=kAlertId,seconds=math.huge,screens="typing",
+            images=complete and images or nil})
     end
     local chooser=ChooserSearch.new(function(choice)
         -- hs.chooser may hide (and run cleanup) before delivering this choice.

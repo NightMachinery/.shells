@@ -127,7 +127,8 @@ env.ChooserSearch={
 env.emojiChooserAliases=function()return {} end
 env.emojiChooserAliasesFor=function()return {} end
 env.emojiChooserImage=function()return nil end
-env.alert_gateway=function(text)alertText=text end
+local alertImages
+env.alert_gateway=function(text,opts)alertText=text;alertImages=opts and opts.images end
 env.alert_gateway_dismiss=function()alertText=nil end
 env.doPaste=function()pasted=pasted+1 end
 env.hs.application={frontmostApplication=function()return {bundleID=function()return 'org.telegram.desktop' end}end}
@@ -281,6 +282,7 @@ keys['shift:down'].fn()
 assert(alertText=='🦀' and chooser.selected==2,'Shift+Down unpicks an already picked premium emoji')
 keys['shift:up'].fn()
 assert(alertText=='🦀🙂' and chooser.selected==1)
+assert(alertImages and alertImages[1]=='unicode:🦀' and alertImages[2]:find('902%-128.png'),'The tally banner shows the premium artwork, not its stand-in')
 keys['cmd:return'].fn()
 assert(prepared[1]=='🦀' and #prepared==1,'Unicode picks fetch their 512px art first')
 assert(not composed.items[1].telegram and composed.items[1].fallback[1]=='/noto-512/🦀.png' and composed.items[2].telegram.id=='902')

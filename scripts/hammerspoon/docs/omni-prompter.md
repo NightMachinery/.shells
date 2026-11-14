@@ -269,7 +269,10 @@ usable while Purple or its export feature is off.
 
 Shift+Enter adds the highlighted emoji to a selection shown as a tally, and
 Shift+Backspace, Shift+Tab or backslash removes the last one, as in Hyper+A.
-Shift+Down and Shift+Up toggle and move, as in Hyper+A.
+Shift+Down and Shift+Up toggle and move, as in Hyper+A. The tally banner shows each
+pick's real artwork (the premium preview, or the Noto image for a Unicode
+pick), not the premium emoji's Unicode stand-in; Hyper+A's tally shows its
+Noto previews the same way.
 
 Tab switches the list to Hyper+A's Unicode emoji and back, keeping the query
 and the selection, so one selection can mix both. Enter pastes a mixed
