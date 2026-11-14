@@ -29,6 +29,10 @@ setopt NO_BANG_HIST 2>/dev/null || true
 #: command that may fail sits in an `if' or ends in `|| true'.
 zmodload zsh/stat zsh/datetime
 builtin cd -- "${HOME}"
+#: A machine that sleeps or changes network mid-fetch leaves a dead TCP link that
+#: ssh waits on forever; keepalives end it in about a minute, and BatchMode
+#: turns a would-be prompt into an error.
+export GIT_SSH_COMMAND="${GIT_SSH_COMMAND:-ssh} -o BatchMode=yes -o ConnectTimeout=20 -o ServerAliveInterval=15 -o ServerAliveCountMax=4"
 typeset -g ds_tmp=''
 typeset -gi ds_n=0
 
@@ -604,6 +608,9 @@ function h-daily-sync-config {
     fi
     source "${daily_sync_config}" @RET
     typeset -g daily_sync_local="${daily_sync_local:-$(command hostname -s)}"
+    #: Same keepalives as the prelude, for the git this machine runs outside it (mirror pushes).
+    [[ "${GIT_SSH_COMMAND:-}" == *ServerAliveInterval* ]] \
+        || export GIT_SSH_COMMAND="${GIT_SSH_COMMAND:-ssh} -o BatchMode=yes -o ConnectTimeout=20 -o ServerAliveInterval=15 -o ServerAliveCountMax=4"
     typeset -gi daily_sync_min_age_hours="${daily_sync_min_age_hours:-7}"
     ensure-array daily_sync_peers daily_sync_notes daily_sync_private_code daily_sync_public \
         daily_sync_server_notes daily_sync_server_no_mirror daily_sync_extra_push
@@ -628,7 +635,7 @@ function h-daily-sync-on {
     } | if [[ "${machine}" == "${daily_sync_local}" ]] ; then
         command zsh -s 2>> "${run}/stderr.log"
     else
-        command ssh -o ConnectTimeout=10 -o BatchMode=yes "${machine}" zsh -s 2>> "${run}/stderr.log"
+        command ssh -o ConnectTimeout=10 -o BatchMode=yes -o ServerAliveInterval=15 -o ServerAliveCountMax=4 "${machine}" zsh -s 2>> "${run}/stderr.log"
     fi
 }
 
