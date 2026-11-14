@@ -292,13 +292,15 @@ local function pages(n)
     return result
 end
 
--- min/max bound N; repeatTo cycles the selection to at least that many cells.
+-- Every shape takes any selection: repeatTo cycles a short one to at least
+-- that many cells, and hero layouts keep the first emoji for their first cell
+-- and cycle the rest. Only Each and Pages, which split stickers, need min.
 L.modes = {
     {key="auto", name="Auto", note="grid, short row centred on top",
      build=function(n) return {L.rowCells(L.autoCounts(n))} end},
-    {key="row", name="Row", note="one line", min=2,
+    {key="row", name="Row", note="one line", repeatTo=3,
      build=function(n) return {L.rowCells({n})} end},
-    {key="column", name="Column", note="one stack", min=2,
+    {key="column", name="Column", note="one stack", repeatTo=3,
      build=function(n)
          local cells = {}
          for i = 1, n do cells[i] = {i=i, x=0, y=i, s=1} end
@@ -311,15 +313,15 @@ L.modes = {
          return result
      end},
     {key="pages", name="Pages", note="Auto grids of up to 16", min=17, separate=true, build=pages},
-    {key="beehive", name="Beehive", note="interlocked rows", min=5, build=beehive},
-    {key="daisy", name="Daisy", note="first in the middle, petals around", min=5, build=daisy},
-    {key="marquee", name="Marquee", note="first as a hero over the rest", min=3, max=25, build=marquee},
+    {key="beehive", name="Beehive", note="interlocked rows", repeatTo=7, build=beehive},
+    {key="daisy", name="Daisy", note="first in the middle, petals around", repeatTo=7, hero=true, build=daisy},
+    {key="marquee", name="Marquee", note="first as a hero over the rest", repeatTo=4, hero=true, build=marquee},
     {key="heart", name="Heart", note="outline, filled past 20", repeatTo=6, build=heart},
     {key="orbit", name="Orbit", note="ring, or rings past 12", repeatTo=3, build=orbit},
     {key="sunflower", name="Sunflower", note="golden-angle spiral", repeatTo=8, build=sunflower},
-    {key="pyramid", name="Pyramid", note="rows shrinking upwards", min=3, max=28, build=pyramid},
-    {key="nautilus", name="Nautilus", note="growing spiral, first largest", min=5, max=30, build=nautilus},
-    {key="jumble", name="Jumble", note="random; Tab re-rolls", min=2, build=jumble},
+    {key="pyramid", name="Pyramid", note="rows shrinking upwards", repeatTo=6, build=pyramid},
+    {key="nautilus", name="Nautilus", note="growing spiral, first largest", repeatTo=8, build=nautilus},
+    {key="jumble", name="Jumble", note="random; Tab re-rolls", repeatTo=5, build=jumble},
 }
 
 function L.mode(key)
@@ -342,7 +344,13 @@ function L.build(key, n, seed)
     local slots = math.max(n, mode.repeatTo or 0)
     local result = mode.build(slots, seed or L.jumbleSeed)
     for _, cells in ipairs(result) do
-        for _, cell in ipairs(cells) do cell.i = (cell.i - 1) % n + 1 end
+        for _, cell in ipairs(cells) do
+            if mode.hero and n > 1 then
+                cell.i = cell.i == 1 and 1 or (cell.i - 2) % (n - 1) + 2
+            else
+                cell.i = (cell.i - 1) % n + 1
+            end
+        end
     end
     return result, slots
 end
@@ -516,6 +524,7 @@ end
 
 -- The Ctrl+Enter menu inside an open chooser. o.images(items) gives preview
 -- images, o.export(key, format, items) exports, o.back() restores the list.
+-- o.ownEnter means the caller already binds Enter and calls m.pick itself.
 function L.menu(o)
     local m = {active=false}
     local enter
@@ -532,7 +541,9 @@ function L.menu(o)
         m.items, m.active = items, true
         o.chooser:query("")
         show(false)
-        enter = enter or hs.hotkey.bind("", "return", function() m.pick("webp") end)
+        if not o.ownEnter then
+            enter = enter or hs.hotkey.bind("", "return", function() m.pick("webp") end)
+        end
     end
     function m.refresh(items)
         if not m.active then return end
@@ -560,4 +571,62 @@ function L.menu(o)
         if enter then enter:delete(); enter = nil end
     end
     return m
+end
+
+-- Recent sticker sets for Hyper+Ctrl+A: every image export of several emoji,
+-- or of one in a layout other than Auto. Items are {emoji=...} for Unicode
+-- and {id=..., emoji=...} for Telegram premium emoji; Jumble keeps its seed.
+local kHistoryKey = "emojiLayout.history.v1"
+L.historyLimit = L.historyLimit or 60
+
+local function historyKey(items, layout, seed)
+    local parts = {layout, layout == "jumble" and tostring(seed) or ""}
+    for _, item in ipairs(items) do parts[#parts+1] = item.id or item.emoji end
+    return table.concat(parts, "\31")
+end
+
+function L.history()
+    local saved = hs.settings.get(kHistoryKey)
+    local result = {}
+    for _, entry in ipairs(type(saved) == "table" and saved or {}) do
+        if type(entry) == "table" and type(entry.items) == "table" and #entry.items > 0
+            and pcall(L.mode, entry.layout) then
+            result[#result+1] = entry
+        end
+    end
+    return result
+end
+
+function L.record(entries, layout, seed)
+    layout = layout or "auto"
+    if #entries < 2 and layout == "auto" then return end
+    local items = {}
+    for i, entry in ipairs(entries) do
+        items[i] = {emoji=entry.emoji, id=not entry.unicode and entry.id or nil}
+    end
+    seed = layout == "jumble" and (seed or L.jumbleSeed) or nil
+    local key = historyKey(items, layout, seed)
+    local history = {{items=items, layout=layout, seed=seed, time=os.time()}}
+    for _, entry in ipairs(L.history()) do
+        if #history >= L.historyLimit then break end
+        if historyKey(entry.items, entry.layout, entry.seed) ~= key then history[#history+1] = entry end
+    end
+    hs.settings.set(kHistoryKey, history)
+end
+
+function L.forget(index)
+    local history = L.history()
+    table.remove(history, index)
+    hs.settings.set(kHistoryKey, history)
+end
+
+-- Shift+Up/Down in the emoji lists: toggle the highlighted row in or out of
+-- the selection, then move one row. toggle(row) does the bookkeeping.
+function L.toggleMove(chooser, delta, toggle)
+    local row = chooser:selectedRow()
+    local contents = chooser:selectedRowContents()
+    if contents and next(contents) then toggle(contents) end
+    local target = row + delta
+    local nextRow = target >= 1 and chooser:selectedRowContents(target)
+    if nextRow and next(nextRow) then chooser:selectedRow(target) end
 end

@@ -33,7 +33,7 @@ T.mergeMetadata(recent,{setTitle='Installed pack',setShortName='InstalledPack',i
 assert(T.packName(recent)=='Installed pack' and recent.icon=='/inert.png' and recent.recentRank==1)
 T.mergeMetadata(recent,{setTitle='Different pack'})
 assert(T.packName(recent)=='Installed pack','A duplicate must not overwrite known pack metadata')
-assert(T.placeholder(1,{state='missing'})=='Telegram premium emoji · 1 emoji · no Purple catalog yet · Cmd+S: save copied emoji · Ctrl+Enter: layouts')
+assert(T.placeholder(1,{state='missing'})=='Telegram premium emoji · 1 emoji · no Purple catalog yet · Cmd+S: save copied emoji · Tab: Unicode · Ctrl+Enter: layouts')
 assert(T.placeholder(3,{state='invalid'}):find('3 emoji · Purple catalog unreadable',1,true))
 assert(T.placeholder(2,{state='ok',modified=0},86400*3):find('catalog 3d old',1,true))
 assert(not T.placeholder(2,{state='ok',modified=100},200):find('old',1,true))
@@ -90,6 +90,16 @@ end
 assert(pos==#raw+1 and previousEnd==2+5+2,'Tags cover the UTF-16 length of the whole text')
 assert(decoded[1]:match('^custom%-emoji://111%?%d+$') and decoded[2]:match('^custom%-emoji://222%?') and decoded[3]:match('^custom%-emoji://111%?'))
 assert(not pcall(T.combine,{}))
+-- Unicode picks from the Tab view add text but no tag.
+local crab=T.unicodeEntry('🦀')
+assert(T.unicodeEntry('🦀')==crab and crab.unicode and T.entryOf({emoji='🦀'})==crab)
+local mixed=T.combine({first,crab,second})
+local mcount,mpos=string.unpack('>i4',mixed[key])
+assert(mcount==2 and mixed['public.utf8-plain-text']=='😍🦀🙂‍↔️')
+local o1,l1,b1;o1,l1,b1,mpos=string.unpack('>i4i4I4',mixed[key],mpos);mpos=mpos+b1
+local o2=string.unpack('>i4',mixed[key],mpos)
+assert(o1==0 and l1==2 and o2==4,'The premium tag after a Unicode emoji starts past its UTF-16 units')
+assert(T.combine({crab,crab})[key]==nil and T.payload(crab)['public.utf8-plain-text']=='🦀','Unicode only is plain text')
 assert(not pcall(T.combine,{{id='999',clipboard=first.clipboard}}),'Each tag is checked against its saved payload')
 -- Chooser keys with stubs: Shift+Enter collects, Shift+Backspace removes, Enter pastes all.
 catalog={version=1,entries={{id='111',alt='😍',setTitle='Inert set'},{id='222',alt='🙂',setTitle='Inert set'}}}
@@ -104,7 +114,7 @@ env.ChooserSearch={
     new=function(complete)
         chooser={complete=complete,rows={},selected=1}
         function chooser:placeholderText(t)self.placeholder=t end
-        function chooser:selectedRowContents()return self.rows[self.selected] end
+        function chooser:selectedRowContents(n)return self.rows[n or self.selected] or {} end
         function chooser:selectedRow(n)if n then self.selected=n end;return self.selected end
         function chooser:hideCallback(fn)self.onHide=fn end
         function chooser:show()self.visible=true end
@@ -189,7 +199,8 @@ env.emojiChooserImage=function(emoji)return "unicode:"..emoji end
 env.emojiChooserImagePath=function(emoji,px)return "/noto"..(px and ("-"..px) or "").."/"..emoji..".png" end
 local settings={}
 env.hs.settings={get=function(k)return settings[k] end,set=function(k,v)settings[k]=v end}
-env.hs.canvas={new=function()return {insertElement=function()end,imageFromCanvas=function()return 'thumb' end,delete=function()end} end}
+env.hs.canvas={new=function()return {insertElement=function()end,imageFromCanvas=function()return 'thumb' end,delete=function()end} end,
+    matrix={translate=function()local m={};function m:rotate()return self end;function m:translate()return self end;return m end}}
 catalogBytes='cache-c'
 catalogRows={version=1,controlSocket='/inert/purple-control.sock',entries={{id="901",alt="😍",setTitle="One",sourcePx=512},{id="902",alt="🙂",setTitle="Two",sourcePx=100}}}
 keys={};env.telegramEmojiChooser()
@@ -248,4 +259,69 @@ keys={};env.telegramEmojiChooser()
 chooser.selected=1;keys['shift:return'].fn();chooser.selected=2;keys['shift:return'].fn()
 assert(#requestsMade==1 and requestsMade[1]=='/inert/requests/902','Only the emoji without a large render is requested')
 chooser.onHide()
+-- Tab switches to Unicode emoji and back; a selection can mix both, as text
+-- or as one sticker.
+env.emojiChooserRows=function()return {{text='crab',name='crab',emoji='🦀'},{text='rose',name='rose',emoji='🌹'}} end
+local prepared
+env.emojiChooserPrepareImages=function(emojis,callback)prepared=emojis;callback() end
+local unicodeRecorded
+env.ChooserSearch.recent=function(namespace)
+    return {sort=function(rows,_,fallback)table.sort(rows,fallback)end,
+        record=function(ids)if namespace=='emoji' then unicodeRecorded=ids else recorded=ids end end}
+end
+keys={};env.telegramEmojiChooser()
+chooser.selected=1;keys['shift:return'].fn()
+keys[':tab'].fn()
+assert(chooser.rows[1].emoji=='🦀' and chooser.placeholder:find('Unicode emoji',1,true) and chooser.placeholder:find('Tab: Telegram',1,true))
+keys['shift:down'].fn()
+assert(alertText=='😍🦀' and chooser.selected==2,'Shift+Down picks a Unicode emoji and moves')
+keys[':tab'].fn()
+assert(chooser.rows[1].entry and chooser.placeholder:find('Telegram premium emoji',1,true),'Tab switches back')
+keys['shift:down'].fn()
+assert(alertText=='🦀' and chooser.selected==2,'Shift+Down unpicks an already picked premium emoji')
+keys['shift:up'].fn()
+assert(alertText=='🦀🙂' and chooser.selected==1)
+keys['cmd:return'].fn()
+assert(prepared[1]=='🦀' and #prepared==1,'Unicode picks fetch their 512px art first')
+assert(not composed.items[1].telegram and composed.items[1].fallback[1]=='/noto-512/🦀.png' and composed.items[2].telegram.id=='902')
+composeCallback(nil,{{['org.webmproject.webp']='mixed'}})
+assert(clip['org.webmproject.webp']=='mixed' and recorded[1]=='902' and #recorded==1 and unicodeRecorded[1]=='🦀',
+    'Premium picks go to this recency, Unicode ones to Hyper+A')
+keys={};env.telegramEmojiChooser()
+chooser.selected=1;keys['shift:return'].fn();keys[':tab'].fn();keys['shift:return'].fn()
+chooser.complete(chooser.rows[1])
+assert(clip['public.utf8-plain-text']=='😍🦀' and select(1,string.unpack('>i4',clip[key]))==1,'Enter makes one rich paste of a mixed selection')
+-- Hyper+Ctrl+A: recent sticker sets with their layouts. Enter re-exports one
+-- as saved; Ctrl+Enter offers the other layouts for that set.
+local stored=settings['emojiLayout.history.v1']
+assert(stored[1].layout=='auto' and stored[1].items[1].emoji=='🦀' and not stored[1].items[1].id and stored[1].items[2].id=='902')
+assert(stored[2].layout=='each' and #stored[2].items==2,'Every image export of several emoji is recorded')
+settings['emojiLayout.history.v1'][1].layout='jumble';settings['emojiLayout.history.v1'][1].seed=7
+keys={};env.emojiStickerHistoryChooser()
+assert(#chooser.rows==3 and chooser.rows[1].text=='🦀🙂' and chooser.rows[1].image=='thumb')
+assert(chooser.rows[1].subText:find('Jumble #7 · 2 emoji',1,true) and chooser.rows[1].subText:find('repeated to 5',1,true))
+assert(chooser.rows[1].entries[1].unicode and chooser.rows[1].entries[2].icon,'Rows resolve premium emoji against the catalog')
+chooser.selected=1;keys[':return'].fn()
+assert(composed.format=='webp' and #composed.items==2)
+local saved7=L.build('jumble',2,7)[1]
+assert(composed.built[1][1].x==saved7[1].x,'The saved Jumble seed is reused')
+beforePaste=pasted
+composeCallback(nil,{{['org.webmproject.webp']='again'}})
+assert(clip['org.webmproject.webp']=='again' and pasted==beforePaste+1)
+assert(settings['emojiLayout.history.v1'][1].seed==7 and #settings['emojiLayout.history.v1']==3,'Re-exporting moves the set up without duplicating it')
+keys={};env.emojiStickerHistoryChooser()
+chooser.query=function(self,q)if q then self.q=q end;return self.q or '' end
+chooser.selected=2;keys['ctrl:return'].fn()
+assert(chooser.rows[1].layout and chooser.placeholder:find('Layout for 2 emoji',1,true),'Ctrl+Enter lists layouts for the set')
+for k,row in ipairs(chooser.rows) do if row.layout=='row' then chooser.selected=k end end
+keys[':return'].fn()
+assert(#composed.built==1 and #composed.built[1]==3,'Enter in the layout list exports the chosen layout (Row repeats two to three)')
+composeCallback(nil,{{['org.webmproject.webp']='row'}})
+assert(settings['emojiLayout.history.v1'][1].layout=='row')
+keys={};env.emojiStickerHistoryChooser()
+local before=#chooser.rows
+chooser.selected=1;keys['cmd:delete'].fn()
+assert(#chooser.rows==before-1 and #settings['emojiLayout.history.v1']==before-1,'Cmd+Backspace forgets a set')
+chooser.onHide()
+for _,binding in pairs(keys) do assert(binding.hk.deleted) end
 print('TELEGRAM_EMOJI_PAYLOAD_TESTS_PASSED')

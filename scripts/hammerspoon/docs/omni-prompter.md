@@ -62,6 +62,9 @@ Unicode name, including older joined sequences such as 🙂‍↔️.
 - Shift+Enter adds the highlighted emoji. Shift+Backspace removes one selection
   per key-down, including repeated presses with Shift held. Shift+Tab and
   backslash also remove the last selection.
+- Shift+Down and Shift+Up toggle the highlighted emoji (add it, or remove it
+  if already picked) and then move one row, so holding Shift and arrowing
+  picks a run of rows. Each press toggles the row it leaves.
 - Enter pastes the selected Unicode text, or the highlighted emoji when empty.
 - Cmd+Enter builds a lossless transparent WebP from native 512px artwork in
   the Auto layout (see [Sticker layouts](#sticker-layouts)), with its longest
@@ -151,28 +154,52 @@ preview of the actual selection and the approximate size, such as
 below 128px. Enter pastes the highlighted layout as WebP, Cmd+Shift+Enter as
 PNG, Tab re-rolls Jumble, Ctrl+Enter returns to the emoji list (restoring the
 query), and Shift+Backspace still removes the last pick and refreshes the
-previews. The last layout used is listed first. The layouts, with the
-selection sizes that offer them:
+previews. The last layout used is listed first. Every shape is offered for any
+selection: a short one repeats to a minimum that suits the shape (shown as
+`repeated to N` in the row). The layouts:
 
-- **Auto**, **Row** (one line), **Column** (one stack).
+- **Auto**, **Row** (one line), **Column** (one stack). Row and Column repeat
+  to 3.
 - **Each**: one 512px sticker per emoji, pasted one after another,
   `EmojiLayout.sequenceDelay` (0.6 s) apart. Purple accepts one WebP per paste
   and adds each to its open send box as a separate sticker, not an album.
 - **Pages** (17 or more): Auto grids of up to 16, pasted the same way.
-- **Beehive** (5+): interlocked rows, alternating long and short.
-- **Daisy** (5+): the first emoji large in the middle, the rest around it.
-- **Marquee** (3 to 25): the first emoji as a hero over the rest.
+- **Beehive**: interlocked rows, alternating long and short (repeats to 7).
+- **Daisy**: the first emoji large in the middle, the rest around it
+  (repeats to 7).
+- **Marquee**: the first emoji as a hero over the rest (repeats to 4).
 - **Heart**: emoji around the parametric heart outline up to 20, a filled
   heart beyond.
 - **Orbit**: a ring up to 12, concentric rings around a centre beyond.
 - **Sunflower**: the golden-angle spiral.
-- **Pyramid** (3 to 28): rows shrinking upwards.
-- **Nautilus** (5 to 30): a growing spiral, first emoji largest.
+- **Pyramid**: rows shrinking upwards (repeats to 6).
+- **Nautilus**: a growing spiral, first emoji largest (repeats to 8).
 - **Jumble**: random cells of a sparse grid, each nudged, turned and resized
-  a little. The seed is shown in the row (`Jumble #3`) and Tab picks the next.
+  a little (repeats to 5). The seed is shown in the row (`Jumble #3`) and Tab
+  picks the next.
 
-Heart, Orbit and Sunflower repeat a short selection (to 6, 3 and 8 cells), so
-even one emoji makes a shape.
+Heart, Orbit and Sunflower repeat to 6, 3 and 8. Daisy and Marquee keep the
+first emoji as the hero and cycle only the rest, so two emoji make one flower
+with six identical petals rather than alternating ones.
+
+### Recent sticker sets (Hyper+Ctrl+A)
+
+Every image export of several emoji, or of one emoji in a layout other than
+Auto, is remembered with its layout (and Jumble seed), newest first, up to
+60. Hyper+Ctrl+A lists them with a preview in the saved layout, the layout
+name, the count and the age.
+
+- Enter (or Cmd+Enter) pastes the set again as WebP in its saved layout, and
+  Cmd+Shift+Enter as PNG. Re-pasting moves it to the top.
+- Ctrl+Enter lists the other layouts for that set, exactly as in the pickers;
+  Enter there pastes in the chosen layout and records it as a new set.
+  Ctrl+Enter again returns to the history.
+- Cmd+Backspace forgets the highlighted set.
+
+Sets may mix Unicode and premium emoji. They are stored in the Hammerspoon
+setting `emojiLayout.history.v1` as `{emoji}` or `{id, emoji}` items, and
+premium items are looked up in the current Purple catalog when the list
+opens, so they keep their icons and high-res renders.
 
 The layout code is `core/emoji-layout.lua`: each layout turns N emoji into
 cells (position, size, rotation) in arbitrary units, which drive both the
@@ -242,6 +269,13 @@ usable while Purple or its export feature is off.
 
 Shift+Enter adds the highlighted emoji to a selection shown as a tally, and
 Shift+Backspace, Shift+Tab or backslash removes the last one, as in Hyper+A.
+Shift+Down and Shift+Up toggle and move, as in Hyper+A.
+
+Tab switches the list to Hyper+A's Unicode emoji and back, keeping the query
+and the selection, so one selection can mix both. Enter pastes a mixed
+selection as one rich paste in which only the premium emoji carry tags;
+image exports fetch the 512px Noto art for the Unicode ones. Unicode picks
+count towards Hyper+A's recent order, premium ones towards this chooser's.
 Enter then pastes the whole selection as one rich paste: the text of every emoji
 with one custom-emoji tag each, at ascending UTF-16 offsets, the layout tdesktop's
 `DeserializeTags` accepts. Without a selection Enter pastes the highlighted

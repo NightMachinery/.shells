@@ -91,6 +91,7 @@ end
 -- here, at paste time, so opening the chooser never packs thousands of them.
 -- Either way the payload is parsed back and must name the entry's own ID.
 function T.payload(entry)
+    if entry.unicode then return {["public.utf8-plain-text"]=entry.emoji} end
     local data
     if entry.clipboard then
         data={}
@@ -113,21 +114,43 @@ end
 -- One rich paste of several premium emoji. tdesktop's DeserializeTags reads
 -- count, then per tag offset, length (UTF-16 units) and a QString id; offsets
 -- must ascend without overlap. Each tag is checked against its saved payload.
+-- Unicode entries (from the Tab view) add their text and no tag.
 function T.combine(entries)
     assert(#entries>0,"Choose at least one premium emoji")
     local texts,tags,offset={}, {},0
     for i,entry in ipairs(entries) do
-        local text=T.payload(entry)[textType]
-        local chars={}
-        for c in ("custom-emoji://"..entry.id.."?"..i):gmatch(".") do chars[#chars+1]=string.pack(">I2",c:byte()) end
-        local wide=table.concat(chars)
+        local text=entry.unicode and entry.emoji or T.payload(entry)[textType]
         local units=utf16Units(text)
-        tags[#tags+1]=string.pack(">i4i4I4",offset,units,#wide)..wide
+        if not entry.unicode then
+            local chars={}
+            for c in ("custom-emoji://"..entry.id.."?"..i):gmatch(".") do chars[#chars+1]=string.pack(">I2",c:byte()) end
+            local wide=table.concat(chars)
+            tags[#tags+1]=string.pack(">i4i4I4",offset,units,#wide)..wide
+        end
         texts[#texts+1]=text;offset=offset+units
     end
     local text=table.concat(texts)
-    return {[tagsType]=string.pack(">i4",#entries)..table.concat(tags),[textType]=text,["public.utf8-plain-text"]=text}
+    if #tags==0 then return {["public.utf8-plain-text"]=text} end
+    return {[tagsType]=string.pack(">i4",#tags)..table.concat(tags),[textType]=text,["public.utf8-plain-text"]=text}
 end
+
+-- Hyper+A's Unicode emoji as entries of this chooser, one table per emoji.
+local unicodeEntries={}
+function T.unicodeEntry(emoji,name)
+    local entry=unicodeEntries[emoji]
+    if not entry then
+        entry={emoji=emoji,name=name or emojiChooserName(emoji),unicode=true}
+        unicodeEntries[emoji]=entry
+    end
+    return entry
+end
+
+function T.entryOf(choice)
+    if not choice then return nil end
+    return choice.entry or (choice.emoji and T.unicodeEntry(choice.emoji,choice.name)) or nil
+end
+
+local function entryKey(entry) return entry.unicode and ("u:"..entry.emoji) or entry.id end
 
 function T.catalogEntry(raw, folder)
     assert(type(raw.id)=="string" and raw.id:match("^%d+$"),"Catalog IDs must be decimal strings")
@@ -337,6 +360,7 @@ function T.placeholder(count,status,now)
         if days>=1 then parts[#parts+1]="catalog "..days.."d old" end
     end
     parts[#parts+1]="Cmd+S: save copied emoji"
+    parts[#parts+1]="Tab: Unicode"
     parts[#parts+1]="Ctrl+Enter: layouts"
     return table.concat(parts," · ")
 end
@@ -355,15 +379,37 @@ function T.exportItems(entries)
         fallback[#fallback+1]=emojiChooserImagePath(entry.emoji,512)
         fallback[#fallback+1]=emojiChooserImagePath(entry.emoji)
         items[i]={fallback=fallback}
-        if catalog.folder and catalog.state=="ok" then
+        if entry.id and catalog.folder and catalog.state=="ok" then
             items[i].telegram={id=entry.id,export=catalog.folder,socket=catalog.socket}
         end
     end
     return items
 end
 
-function T.export(entries,format,layout,callback)
-    return EmojiLayout.compose(T.exportItems(entries),EmojiLayout.build(layout or "auto",#entries),format,callback)
+-- Unicode entries first fetch their 512px Noto images (a failed download
+-- falls back to the 128px previews). Returns a function that cancels.
+function T.export(entries,format,layout,callback,seed)
+    local unicode,cancel,cancelled={},nil,false
+    for _,entry in ipairs(entries) do if entry.unicode then unicode[#unicode+1]=entry.emoji end end
+    local function run()
+        if cancelled then return end
+        local ok,failure=pcall(function()
+            cancel=EmojiLayout.compose(T.exportItems(entries),
+                EmojiLayout.build(layout or "auto",#entries,seed),format,callback)
+        end)
+        if not ok then callback(tostring(failure)) end
+    end
+    if #unicode>0 then emojiChooserPrepareImages(unicode,run) else run() end
+    return function()cancelled=true;if cancel then cancel() end end
+end
+
+-- Preview images for layout thumbnails.
+function T.images(entries)
+    local images={}
+    for i,entry in ipairs(entries) do
+        images[i]=(entry.icon and T.icon(entry.icon)) or emojiChooserImage(entry.emoji)
+    end
+    return images
 end
 
 -- Picking an emoji with Shift+Enter leaves an empty requests/<id> file when
@@ -389,15 +435,21 @@ function telegramEmojiChooser()
     local bundle=app and (app:bundleID() or ""):lower() or ""
     local paste=bundle:find("telegram",1,true) or bundle:find("tdesktop",1,true)
     local recent=ChooserSearch.recent("telegram-emoji")
+    local unicodeRecent=ChooserSearch.recent("emoji")
     -- Shift+Enter collects several emoji for one rich paste, as in Hyper+A.
-    local selected={}
+    -- Tab switches the list to Unicode emoji and back, so picks can mix both.
+    local selected,source={},"telegram"
     -- pendingImages holds one pasteboard table per sticker, for Each/Pages.
-    local pendingImages,pendingEntries,closed,generation,cancelExport=nil,nil,false,0,nil
+    local pendingImages,pendingEntries,pendingLayout,closed,generation,cancelExport=nil,nil,nil,false,0,nil
     local menu -- The Ctrl+Enter layout menu, made once the chooser exists.
-    local function ids(entries)
-        local result={}
-        for i,entry in ipairs(entries) do result[i]=entry.id end
-        return result
+    -- Premium picks go to this chooser's recency, Unicode ones to Hyper+A's.
+    local function recordPicks(entries)
+        local ids,emojis={}, {}
+        for _,entry in ipairs(entries) do
+            if entry.unicode then emojis[#emojis+1]=entry.emoji else ids[#ids+1]=entry.id end
+        end
+        if #ids>0 then recent.record(ids) end
+        if #emojis>0 then unicodeRecent.record(emojis) end
     end
     local function updateAlert()
         if #selected==0 then alert_gateway_dismiss(kAlertId);return end
@@ -416,23 +468,27 @@ function telegramEmojiChooser()
         if choice.layout and not images then
             -- A click on a layout row: the chooser is already gone, so export
             -- and paste once ready.
-            local picked=menu.items
+            local picked,seed=menu.items,EmojiLayout.jumbleSeed
             local ok,err=pcall(T.export,picked,"webp",choice.layout,function(failure,datas)
                 if failure then alert_gateway(tostring(failure),{color="warn"});return end
-                recent.record(ids(picked))
+                recordPicks(picked)
+                EmojiLayout.record(picked,choice.layout,seed)
                 if hs.pasteboard.writeAllData(datas[1]) then doPaste();EmojiLayout.pasteRest(datas) end
-            end)
+            end,seed)
             if not ok then alert_gateway(tostring(err),{color="warn"}) end
             return
         end
-        if #entries==0 then entries={choice.entry} end
+        if #entries==0 then entries={T.entryOf(choice)} end
+        local layout=pendingLayout
+        pendingLayout=nil
         local ok,err=pcall(function()
             local data=images and images[1] or (#entries==1 and T.payload(entries[1]) or T.combine(entries))
             local restore=paste and not images
             local previous=restore and hs.pasteboard.readAllData() or nil
             assert(hs.pasteboard.writeAllData(data),"Clipboard write failed")
             local written=hs.pasteboard.changeCount()
-            recent.record(ids(entries))
+            recordPicks(entries)
+            if images then EmojiLayout.record(entries,layout.key,layout.seed) end
             if paste or images then
                 doPaste()
                 if images then EmojiLayout.pasteRest(images) end
@@ -446,18 +502,48 @@ function telegramEmojiChooser()
         if not ok then alert_gateway(tostring(err),{color="warn"}) end
     end)
     local function refresh()
+        if source=="unicode" then
+            local rows=emojiChooserRows()
+            chooser:placeholderText("Unicode emoji · "..#rows.." emoji · Tab: Telegram · Ctrl+Enter: layouts")
+            ChooserSearch.setChoices(chooser,rows)
+            return
+        end
         local rows,status=T.rows(recent)
         chooser:placeholderText(T.placeholder(#rows,status))
         ChooserSearch.setChoices(chooser,rows,{stable=true})
     end
+    local function switchSource()
+        source=source=="telegram" and "unicode" or "telegram"
+        refresh()
+        chooser:selectedRow(1)
+    end
+    local function pick(entry)
+        selected[#selected+1]=entry;updateAlert()
+        pcall(T.prefetch,entry)
+    end
     local function addCurrent()
         if menu.active then return end
         generation=generation+1
-        local choice=chooser:selectedRowContents()
-        if choice and choice.entry then
-            selected[#selected+1]=choice.entry;updateAlert()
-            pcall(T.prefetch,choice.entry)
+        local entry=T.entryOf(chooser:selectedRowContents())
+        if entry then pick(entry) end
+    end
+    -- Shift+Up/Down: add the highlighted emoji, or remove it if picked, then move.
+    local function toggleMove(delta)
+        if menu.active then
+            local target=chooser:selectedRow()+delta
+            local row=target>=1 and chooser:selectedRowContents(target)
+            if row and next(row) then chooser:selectedRow(target) end
+            return
         end
+        generation=generation+1
+        EmojiLayout.toggleMove(chooser,delta,function(row)
+            local entry=T.entryOf(row)
+            if not entry then return end
+            for i=#selected,1,-1 do
+                if entryKey(selected[i])==entryKey(entry) then table.remove(selected,i);updateAlert();return end
+            end
+            pick(entry)
+        end)
     end
     local function removeLast()
         generation=generation+1
@@ -469,8 +555,8 @@ function telegramEmojiChooser()
     -- The picks, or else the highlighted emoji.
     local function currentEntries()
         if #selected>0 then return {table.unpack(selected)} end
-        local choice=chooser:selectedRowContents()
-        return choice and choice.entry and {choice.entry} or {}
+        local entry=T.entryOf(chooser:selectedRowContents())
+        return entry and {entry} or {}
     end
     -- Export first, then select, so the paste lands in Telegram. Demand
     -- renders can take a few seconds; Escape cancels them.
@@ -480,25 +566,22 @@ function telegramEmojiChooser()
         generation=generation+1
         local current=generation
         if cancelExport then cancelExport() end
+        local seed=EmojiLayout.jumbleSeed
         local ok,err=pcall(function()
             cancelExport=T.export(entries,format,layout,function(failure,datas)
                 if closed or current~=generation then return end
                 cancelExport=nil
                 if failure then alert_gateway(tostring(failure),{color="warn"});return end
-                pendingImages,pendingEntries=datas,entries;chooser:select()
-            end)
+                pendingImages,pendingEntries=datas,entries
+                pendingLayout={key=layout or "auto",seed=seed}
+                chooser:select()
+            end,seed)
         end)
         if not ok then alert_gateway(tostring(err),{color="warn"}) end
     end
     menu=EmojiLayout.menu{
         chooser=chooser,
-        images=function(entries)
-            local images={}
-            for i,entry in ipairs(entries) do
-                images[i]=(entry.icon and T.icon(entry.icon)) or emojiChooserImage(entry.emoji)
-            end
-            return images
-        end,
+        images=T.images,
         export=function(layout,format,entries)exportImage(format,layout,entries)end,
         back=refresh,
     }
@@ -512,7 +595,7 @@ function telegramEmojiChooser()
         layouts=hs.hotkey.bind("ctrl","return",function()
             if menu.active then menu.close() else menu.open(currentEntries()) end
         end),
-        tab=hs.hotkey.bind("","tab",function()if menu.active then menu.reroll() end end),
+        tab=hs.hotkey.bind("","tab",function()if menu.active then menu.reroll() else switchSource() end end),
         save=hs.hotkey.bind("cmd","s",function()
             local ok,err=pcall(T.captureClipboard)
             if ok then refresh() else alert_gateway(tostring(err),{color="warn"}) end
@@ -520,6 +603,8 @@ function telegramEmojiChooser()
         add=hs.hotkey.bind("shift","return",addCurrent),
         shiftTab=hs.hotkey.bind("shift","tab",removeLast),
         backslash=hs.hotkey.bind("","\\",removeLast),
+        shiftUp=hs.hotkey.bind("shift","up",function()toggleMove(-1)end,nil,function()toggleMove(-1)end),
+        shiftDown=hs.hotkey.bind("shift","down",function()toggleMove(1)end,nil,function()toggleMove(1)end),
     }
     -- Carbon hotkeys can latch Shift+Delete; read each key-down, as Hyper+A does.
     local deleteTap=hs.eventtap.new({hs.eventtap.event.types.keyDown},function(event)
@@ -547,4 +632,142 @@ function telegramEmojiChooser()
     chooser:show()
 end
 hyper_bind_v2{mods={"shift"},key="a",pressedfn=telegramEmojiChooser}
+
+--- * Recent sticker sets (Hyper+Ctrl+A)
+-- Every multi-emoji image export from Hyper+A, Hyper+Shift+A or here, with the
+-- layout it used (EmojiLayout.record). Stored items are resolved against the
+-- current catalog, so premium emoji keep their icons and high-res renders.
+function T.historyEntries(items)
+    local byId={}
+    local ok,entries=pcall(T.entries)
+    for _,entry in ipairs(ok and entries or {}) do byId[entry.id]=entry end
+    local result={}
+    for i,item in ipairs(items) do
+        if item.id then
+            result[i]=byId[item.id] or {id=item.id,emoji=item.emoji,name=emojiChooserName(item.emoji)}
+        else
+            result[i]=T.unicodeEntry(item.emoji)
+        end
+    end
+    return result
+end
+
+local function ago(time,now)
+    local seconds=math.max(0,(now or os.time())-(time or 0))
+    if seconds<3600 then return math.max(1,seconds//60).."m ago" end
+    if seconds<86400 then return seconds//3600 .."h ago" end
+    return seconds//86400 .."d ago"
+end
+
+function T.historyRows(now)
+    local rows={}
+    for index,set in ipairs(EmojiLayout.history()) do
+        local entries=T.historyEntries(set.items)
+        local text,names={}, {}
+        for i,entry in ipairs(entries) do text[i]=entry.emoji;names[i]=entry.name or "" end
+        local mode=EmojiLayout.mode(set.layout)
+        local built,slots=EmojiLayout.build(set.layout,#entries,set.seed)
+        local row={text=table.concat(text),entries=entries,set=set,history=index,
+            subText=mode.name..(set.seed and (" #"..set.seed) or "").." · "..#entries.." emoji · "..ago(set.time,now)..
+                (slots>#entries and (" · repeated to "..slots) or ""),
+            searchText=mode.name.." "..table.concat(names," ")}
+        local ok,image=pcall(EmojiLayout.thumbnail,T.images(entries),set.layout,built)
+        if ok then row.image=image end
+        rows[#rows+1]=row
+    end
+    return rows
+end
+
+function emojiStickerHistoryChooser()
+    local pendingImages,pendingSet,closed,generation,cancelExport=nil,nil,false,0,nil
+    local menu
+    local function paste(images,set)
+        EmojiLayout.record(set.entries,set.layout,set.seed)
+        if hs.pasteboard.writeAllData(images[1]) then
+            doPaste()
+            EmojiLayout.pasteRest(images)
+        end
+    end
+    local chooser=ChooserSearch.new(function(choice)
+        if not choice then return end
+        local images,set=pendingImages,pendingSet
+        pendingImages,pendingSet=nil,nil
+        if images then paste(images,set);return end
+        -- A click: the chooser is already gone, so export and paste once ready.
+        local entries=choice.entries or menu.items
+        local layout=choice.layout or choice.set.layout
+        local seed=choice.layout and EmojiLayout.jumbleSeed or choice.set.seed
+        local ok,err=pcall(T.export,entries,"webp",layout,function(failure,datas)
+            if failure then alert_gateway(tostring(failure),{color="warn"});return end
+            paste(datas,{entries=entries,layout=layout,seed=seed})
+        end,seed)
+        if not ok then alert_gateway(tostring(err),{color="warn"}) end
+    end)
+    local function refresh()
+        local rows=T.historyRows()
+        chooser:placeholderText("Recent sticker sets · "..#rows.." · Enter: WebP · Cmd+Shift+Enter: PNG · "..
+            "Ctrl+Enter: other layouts · Cmd+Backspace: forget")
+        ChooserSearch.setChoices(chooser,rows)
+    end
+    -- Export first, then select, so the paste lands where Hyper+Ctrl+A started.
+    local function exportSet(entries,layout,seed,format)
+        generation=generation+1
+        local current=generation
+        if cancelExport then cancelExport() end
+        local ok,err=pcall(function()
+            cancelExport=T.export(entries,format,layout,function(failure,datas)
+                if closed or current~=generation then return end
+                cancelExport=nil
+                if failure then alert_gateway(tostring(failure),{color="warn"});return end
+                pendingImages,pendingSet=datas,{entries=entries,layout=layout,seed=seed}
+                chooser:select()
+            end,seed)
+        end)
+        if not ok then alert_gateway(tostring(err),{color="warn"}) end
+    end
+    local function exportRow(format)
+        if menu.active then menu.pick(format);return end
+        local row=chooser:selectedRowContents()
+        if row and row.set then exportSet(row.entries,row.set.layout,row.set.seed,format) end
+    end
+    menu=EmojiLayout.menu{
+        chooser=chooser,ownEnter=true,
+        images=T.images,
+        export=function(layout,format,entries)exportSet(entries,layout,EmojiLayout.jumbleSeed,format)end,
+        back=refresh,
+    }
+    local hotkeys={
+        enter=hs.hotkey.bind("","return",function()exportRow("webp")end),
+        webp=hs.hotkey.bind("cmd","return",function()exportRow("webp")end),
+        png=hs.hotkey.bind({"cmd","shift"},"return",function()exportRow("png")end),
+        layouts=hs.hotkey.bind("ctrl","return",function()
+            if menu.active then menu.close();return end
+            local row=chooser:selectedRowContents()
+            if row and row.entries then menu.open(row.entries) end
+        end),
+        tab=hs.hotkey.bind("","tab",function()if menu.active then menu.reroll() end end),
+        forget=hs.hotkey.bind("cmd","delete",function()
+            local row=chooser:selectedRowContents()
+            if menu.active or not (row and row.history) then return end
+            EmojiLayout.forget(row.history)
+            local selected=chooser:selectedRow()
+            refresh()
+            chooser:selectedRow(math.max(1,selected))
+        end),
+    }
+    local function cleanup()
+        closed=true;generation=generation+1
+        menu.cleanup()
+        if cancelExport then cancelExport();cancelExport=nil end
+        for _,hotkey in pairs(hotkeys) do hotkey:delete() end
+        inputLangPop()
+    end
+    ChooserSearch.onHide(chooser,cleanup)
+    local ok,err=pcall(refresh)
+    if not ok then cleanup();alert_gateway(tostring(err),{color="warn"});return end
+    inputLangPush()
+    langSetEn()
+    chooser:show()
+end
+hyper_bind_v2{mods={"ctrl"},key="a",pressedfn=emojiStickerHistoryChooser}
 if telegramEmojiPrewarmDelay then T.prewarm() end

@@ -26,7 +26,7 @@ local env = setmetatable({
             chooser={rows={},complete=complete}
             function chooser:placeholderText(text) self.placeholder=text end
             function chooser:selectedRow(n) if n then self.selected=n end;return self.selected end
-            function chooser:selectedRowContents() return self.rows[self.selected or 1] end
+            function chooser:selectedRowContents(n) return self.rows[n or self.selected or 1] or {} end
             function chooser:hideCallback(fn) self.onHide=fn end
             function chooser:show() self.visible=true end
             function chooser:select() self.complete(self:selectedRowContents());self.onHide() end
@@ -85,9 +85,16 @@ local j1,j2,j3=L.build('jumble',6,4)[1],L.build('jumble',6,4)[1],L.build('jumble
 assert(j1[1].x==j2[1].x and j1[1].rot==j2[1].rot and j1[1].x~=j3[1].x,'Jumble repeats per seed')
 local seen={};for _,c in ipairs(j1) do seen[c.i]=true end;assert(#seen==6,'Jumble places every emoji once')
 local function keys_(n)local t={};for _,m in ipairs(L.available(n)) do t[#t+1]=m.key end;return table.concat(t,',') end
-assert(keys_(1)=='auto,heart,orbit,sunflower')
-assert(keys_(3):find('marquee',1,true) and keys_(3):find('pyramid',1,true) and not keys_(3):find('beehive',1,true))
-assert(keys_(17):find('pages',1,true) and not keys_(26):find('marquee',1,true))
+local shapes='auto,row,column,beehive,daisy,marquee,heart,orbit,sunflower,pyramid,nautilus,jumble'
+assert(keys_(1)==shapes,'Every shape is offered for one emoji, by repeating it')
+assert(keys_(3)=='auto,row,column,each,beehive,daisy,marquee,heart,orbit,sunflower,pyramid,nautilus,jumble')
+assert(keys_(17):find('pages',1,true) and keys_(60):find('marquee',1,true) and not keys_(16):find('pages',1,true))
+local daisy2,daisySlots=L.build('daisy',2)
+assert(daisySlots==7 and daisy2[1][1].i==1,'The hero keeps its place')
+for k=2,#daisy2[1] do assert(daisy2[1][k].i==2,'Petals cycle the rest, not the hero') end
+local marquee3=L.build('marquee',3)[1]
+assert(marquee3[1].i==1 and marquee3[2].i==2 and marquee3[3].i==3)
+assert(#L.build('row',1)[1]==3 and L.build('row',1)[1][3].i==1,'Row repeats one emoji to three')
 assert(L.describe('row',7,L.build('row',7),7):find('small in Telegram',1,true))
 assert(L.describe('auto',3,L.build('auto',3),3):find('≈512×476',1,true))
 assert(#prewarmTimers==1 and prewarmTimers[1].delay==5 and imageLoads==0 and aliasDecodes==0,'Loading only schedules the prewarm')
@@ -169,6 +176,19 @@ beforePaste=pasted
 chooser.onHide()
 webpCallback(nil,{{['public.file-url']='file:///cancelled.webp'}})
 assert(pasted==beforePaste,'Cancelled chooser must not paste a late WebP result')
+-- Shift+Down toggles the highlighted emoji and moves; Shift+Up comes back.
+env.emojiChooser()
+chooser.selected=1
+keys['shift:down'].fn()
+assert(tally=='😀' and chooser.selected==2,'Shift+Down picks and moves')
+keys['shift:down'].fn()
+assert(tally=='😀'..chooser.rows[2].emoji and chooser.selected==3)
+keys['shift:up'].fn();keys['shift:up'].fn()
+assert(tally=='😀'..chooser.rows[3].emoji and chooser.selected==1,'Each press toggles the row it leaves: row 3 on, row 2 off')
+chooser.selected=#chooser.rows;local last=chooser.rows[#chooser.rows].emoji
+keys['shift:down'].fn()
+assert(chooser.selected==#chooser.rows and tally=='😀','The picked last row toggles off without moving off the list')
+chooser.onHide()
 -- Ctrl+Enter: layout rows with previews for the picks; Enter exports the
 -- highlighted layout; Ctrl+Enter again restores the emoji list and query.
 local exported
@@ -203,11 +223,14 @@ assert(clipboard['org.webmproject.webp']=='b' and pasted==beforePaste+2)
 table.remove(sequence,1)()
 assert(clipboard['org.webmproject.webp']=='c' and pasted==beforePaste+3 and #sequence==0,'Each sticker is its own paste')
 assert(settings['emojiLayout.last.v1']=='each' and keys[':return'].hk.deleted)
+local history=settings['emojiLayout.history.v1']
+assert(#history==2 and history[1].layout=='each' and #history[1].items==3 and history[1].items[1].emoji=='😀','Image exports join the sticker history, newest first')
+assert(history[2].layout=='auto' and #history[2].items==2,'The earlier two-emoji PNG is there too')
 env.emojiChooser()
 chooser.query=function(self,q)if q then self.q=q end;return self.q or '' end
 chooser.selected=1
 keys['ctrl:return'].fn()
-assert(chooser.rows[1].layout=='auto' and #chooser.rows==4,'One emoji offers Auto and the repeating shapes')
+assert(chooser.rows[1].layout=='auto' and #chooser.rows==12,'One emoji offers every shape, repeated')
 keys['ctrl:return'].fn()
 keys['shift:return'].fn();keys['shift:return'].fn();keys['shift:return'].fn()
 keys['ctrl:return'].fn()

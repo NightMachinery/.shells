@@ -391,6 +391,16 @@ local function emojiRows(aliases)
     return rows
 end
 
+-- Unicode rows in recent-usage order, for Hyper+Shift+A's Tab view.
+function emojiChooserRows()
+    local rows = emojiRows(emojiChooserAliases())
+    ChooserSearch.recent("emoji").sort(rows, function(row) return row.emoji end, function(a, b)
+        if a.name ~= b.name then return a.name < b.name end
+        return a.emoji < b.emoji
+    end)
+    return rows
+end
+
 -- The caches above die with the Lua state, so warm them after each load: a cold
 -- first Hyper+A took about 1 s, 0.7 s of it loading previews. Images load in
 -- chunks of about 25 ms; decoding aliases and building rows take one tick
@@ -423,11 +433,18 @@ function emojiChooserPrewarm(done)
     emojiChooserPrewarmTimer = hs.timer.doAfter(emojiChooserPrewarmDelay or 0, step)
 end
 
+-- History items for Unicode picks (see EmojiLayout.record).
+function emojiItems(emojis)
+    local items = {}
+    for i, emoji in ipairs(emojis) do items[i] = {emoji=emoji} end
+    return items
+end
+
 function emojiChooser()
     local recent=ChooserSearch.recent("emoji")
     local selectedEmojis = {} -- Table to store selected emojis
     -- pendingImages holds one pasteboard table per sticker, for Each/Pages.
-    local pendingImages, pendingEmojis, exporting, closed, cancelExport
+    local pendingImages, pendingEmojis, pendingLayout, exporting, closed, cancelExport
     local menu -- The Ctrl+Enter layout menu, made once the chooser exists.
 
     local function updateAlert()
@@ -460,10 +477,11 @@ function emojiChooser()
             if choice.layout and not pendingImages then
                 -- A click on a layout row: the chooser is already gone, so
                 -- export and paste once ready.
-                local emojis = menu.items
+                local emojis, seed = menu.items, EmojiLayout.jumbleSeed
                 emojiChooserWebp(emojis, function(err, datas)
                     if err then alert_gateway("Emoji WebP: " .. tostring(err), {color="warn"}); return end
                     recent.record(emojis)
+                    EmojiLayout.record(emojiItems(emojis), choice.layout, seed)
                     if hs.pasteboard.writeAllData(datas[1]) then doPaste(); EmojiLayout.pasteRest(datas) end
                 end, choice.layout)
                 selectedEmojis = {}
@@ -479,6 +497,7 @@ function emojiChooser()
             ---
             recent.record(emojis)
             if pendingImages then
+                EmojiLayout.record(emojiItems(emojis), pendingLayout and pendingLayout.key, pendingLayout and pendingLayout.seed)
                 if hs.pasteboard.writeAllData(pendingImages[1]) then
                     doPaste()
                     if pendingImages[1]["public.file-url"] then emojiChooserTelegramDocument() end
@@ -560,6 +579,7 @@ function emojiChooser()
         emojis = emojis or currentEmojis()
         if #emojis == 0 then return end
         exporting = true
+        local seed = EmojiLayout.jumbleSeed
         local function finish(err, datas)
             exporting = false
             cancelExport = nil
@@ -569,6 +589,7 @@ function emojiChooser()
                 return
             end
             pendingImages, pendingEmojis = datas, emojis
+            pendingLayout = {key=layout or "auto", seed=seed}
             chooser:select()
         end
         local ok, err = pcall(function()
@@ -581,6 +602,28 @@ function emojiChooser()
         if not ok then
             finish(err)
         end
+    end
+
+    -- Shift+Up/Down: add the highlighted emoji, or remove it if picked, then move.
+    local function toggleMove(delta)
+        if menu.active then
+            local target = chooser:selectedRow() + delta
+            local row = target >= 1 and chooser:selectedRowContents(target)
+            if row and next(row) then chooser:selectedRow(target) end
+            return
+        end
+        EmojiLayout.toggleMove(chooser, delta, function(row)
+            if not row.emoji then return end
+            for i = #selectedEmojis, 1, -1 do
+                if selectedEmojis[i] == row.emoji then
+                    table.remove(selectedEmojis, i)
+                    updateAlert()
+                    return
+                end
+            end
+            table.insert(selectedEmojis, row.emoji)
+            updateAlert()
+        end)
     end
 
     menu = EmojiLayout.menu{
@@ -609,7 +652,9 @@ function emojiChooser()
             if menu.active then menu.reroll() else cycleSort() end
         end),
         backslash = hs.hotkey.bind('', '\\', removeLast),
-        shiftTab = hs.hotkey.bind('shift', 'tab', removeLast)
+        shiftTab = hs.hotkey.bind('shift', 'tab', removeLast),
+        shiftUp = hs.hotkey.bind('shift', 'up', function() toggleMove(-1) end, nil, function() toggleMove(-1) end),
+        shiftDown = hs.hotkey.bind('shift', 'down', function() toggleMove(1) end, nil, function() toggleMove(1) end),
     }
 
     -- Carbon hotkeys can latch Shift+Delete until the modifier is released.
