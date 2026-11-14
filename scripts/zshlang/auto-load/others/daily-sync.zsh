@@ -1472,6 +1472,12 @@ The mechanical half of the daily multi-machine sync; see docs/daily-sync.md."
     (( $# )) && shift
     h-daily-sync-config @RET
     ensure-cmd jq perl @RET
+    if [[ "${cmd}" == begin ]] && ! bool "${inner_p}" && [[ "$(h-daily-sync-stage)" == finished ]] ; then
+        #: A second run on the same day starts afresh; the finished one is kept aside.
+        local done_run
+        done_run="$(h-daily-sync-run-dir)" @RET
+        command mv -- "${done_run}" "${done_run}-done-$(command date +%H%M%S)" @RET
+    fi
     if [[ "${cmd}" == (begin|status|converge|finish) ]] && ! bool "${inner_p}" ; then
         h-daily-sync-step "${cmd}"
         return $?
