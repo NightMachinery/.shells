@@ -104,8 +104,30 @@ local function canvasElements(stack, origin)
             fillColor = AlertEngine.colorAt(band.color),
             frame = { x = x, y = y, w = stack.w, h = band.height },
         })
+        -- Where this band's elements are, for the animator and the countdown
+        -- ticker. An image band has one element per image and no text.
+        band.rectIndex, band.textIndex = #elements, nil
         if AlertEngine.isAnimated(band.color) then
             table.insert(animated, { offset = #elements, color = band.color })
+        end
+        if band.images then
+            local side, gap, perRow = band.imageSide, band.imageGap, band.imagesPerRow
+            local rows = math.ceil(#band.images / perRow)
+            local top = y + (band.height - (rows * side + (rows - 1) * gap)) / 2
+            for row = 1, rows do
+                local first = (row - 1) * perRow + 1
+                local count = math.min(perRow, #band.images - first + 1)
+                local left = x + (stack.w - (count * side + (count - 1) * gap)) / 2
+                for k = 0, count - 1 do
+                    table.insert(elements, {
+                        type = "image",
+                        image = band.images[first + k],
+                        imageScaling = "scaleProportionally",
+                        frame = { x = left + k * (side + gap), y = top + (row - 1) * (side + gap), w = side, h = side },
+                    })
+                end
+            end
+            goto continue
         end
         -- hs.canvas has no vertical alignment for text, so the block is centred
         -- in the band by placing its own frame.
@@ -141,6 +163,8 @@ local function canvasElements(stack, origin)
                 h = textHeight,
             },
         })
+        band.textIndex = #elements
+        ::continue::
     end
     return elements, animated
 end
@@ -323,10 +347,9 @@ local function animationStep()
     end
 
     for _, record in ipairs(alertEngineState.canvases) do
-        for index, band in ipairs(record.stack.bands) do
-            if AlertEngine.isAnimated(band.color) then
-                -- Two elements per band, rectangle first.
-                record.canvas[index * 2 - 1].fillColor =
+        for _, band in ipairs(record.stack.bands) do
+            if AlertEngine.isAnimated(band.color) and band.rectIndex then
+                record.canvas[band.rectIndex].fillColor =
                     AlertEngine.colorAt(band.color, now)
             end
         end
@@ -436,8 +459,8 @@ local function renderStrips()
                     hs.canvas.windowLevels.overlay)
                 -- Bound to a local first: canvasElements returns the animated
                 -- offsets as a second value, and table.unpack would read that
-                -- as its start index. A strip needs no offsets anyway -- its
-                -- bands are elements 1,3,5..., which the animator derives.
+                -- as its start index. A strip needs no offsets anyway -- each
+                -- band records its own element indexes (rectIndex, textIndex).
                 local elements = canvasElements(
                     stack, { x = stack.x, y = stack.bands[1].y })
                 canvas:appendElements(table.unpack(elements))
@@ -489,7 +512,7 @@ local function tick()
                     return
                 end
                 band.lines, band.spans = lines, spans
-                record.canvas[index * 2].text = bandText(band)
+                if band.textIndex then record.canvas[band.textIndex].text = bandText(band) end
             end
         end
     end

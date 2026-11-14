@@ -129,6 +129,16 @@ function AlertEngine.wrapText(text, maxChars)
     return out, spans
 end
 
+--- ** Images
+--- An alert with `images' draws them in rows instead of its text. Returns the
+--- image side, the gap between images, how many fit on a row, and the rows.
+function AlertEngine.imageGrid(alert, width)
+    local side = alert.imageSize or math.floor(AlertEngine.textSizeOf(alert) * 2.2 + 0.5)
+    local gap = math.max(2, math.floor(side * 0.12))
+    local perRow = math.max(1, math.floor((width - 2 * AlertEngine.kPaddingX + gap) / (side + gap)))
+    return side, gap, perRow, math.ceil(#alert.images / perRow)
+end
+
 --- ** Alert records
 function AlertEngine.findAlert(id)
     for index, alert in ipairs(alertEngineState.alerts) do
@@ -248,7 +258,13 @@ function AlertEngine.layoutStack(screen, position)
     -- One line of this alert, at its own size. The line-by-line arithmetic
     -- below is per alert for the same reason: a band that asked to be large
     -- must be measured large, or its text overflows the band it was granted.
+    --- An image band is never truncated: its minimum is its whole grid, since
+    --- a row cut in half shows nothing useful.
     local function oneLineFor(alert)
+        if alert.images then
+            local side, gap, _, rows = AlertEngine.imageGrid(alert, work.w)
+            return math.max(AlertEngine.kMinBandHeight, rows * side + (rows - 1) * gap + 2 * AlertEngine.kPaddingY)
+        end
         return AlertEngine.lineHeightFor(AlertEngine.textSizeOf(alert)) + 2 * AlertEngine.kPaddingY
     end
 
@@ -273,6 +289,21 @@ function AlertEngine.layoutStack(screen, position)
         local bands = {}
         for _, index in ipairs(chosen) do
             local alert = list[index]
+            if alert.images then
+                local side, gap, perRow = AlertEngine.imageGrid(alert, work.w)
+                bands[index] = {
+                    alert = alert,
+                    lines = {},
+                    images = alert.images,
+                    imageSide = side,
+                    imageGap = gap,
+                    imagesPerRow = perRow,
+                    height = oneLineFor(alert),
+                    color = alert.color,
+                    textSize = AlertEngine.textSizeOf(alert),
+                }
+                goto continue
+            end
             local size = AlertEngine.textSizeOf(alert)
             local lineHeight = AlertEngine.lineHeightFor(size)
             local oneLine = oneLineFor(alert)
@@ -300,6 +331,7 @@ function AlertEngine.layoutStack(screen, position)
                 lineHeight = lineHeight,
                 align = alert.align,
             }
+            ::continue::
         end
 
         -- Back into arrival order for drawing: allocation order is about who

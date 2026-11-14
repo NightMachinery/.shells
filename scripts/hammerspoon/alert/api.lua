@@ -70,6 +70,12 @@ end
 ---                common left edge and the block as a whole is centred on its
 ---                longest line, for a list that should read as a list in the
 ---                middle of the screen
+---   images       a list of hs.image drawn as a row, wrapping onto more rows,
+---                *instead of* the text. The text still names the alert: the
+---                heartbeat below compares it, and it is what logs show. For a
+---                picture the font cannot draw, such as a Telegram premium
+---                emoji whose text is only its Unicode stand-in
+---   imageSize    side of each image in points, default 2.2 x textSize
 --- Returns the alert's id.
 local kAligns = { left = true, center = true, block = true }
 
@@ -99,7 +105,8 @@ function alertV2(text, opts)
     local alert, index = AlertEngine.findAlert(id)
     -- An unchanged message on an existing id is a heartbeat: push the deadline
     -- out, do not flash again. A long-running task would otherwise strobe.
-    local unchanged = (alert ~= nil and alert.text == text)
+    local images = type(opts.images) == "table" and #opts.images > 0 and opts.images or nil
+    local unchanged = (alert ~= nil and alert.text == text and alert.images == images)
 
     if not alert then
         alert = { id = id }
@@ -119,6 +126,8 @@ function alertV2(text, opts)
     -- better report than no band at all.
     alert.textSize = tonumber(opts.textSize)
     alert.align = kAligns[opts.align] and opts.align or nil
+    alert.images = images
+    alert.imageSize = tonumber(opts.imageSize)
     alert.expiry = hs.timer.secondsSinceEpoch() + seconds
 
     if alert.timer then

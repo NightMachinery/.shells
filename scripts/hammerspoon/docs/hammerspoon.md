@@ -849,7 +849,8 @@ indirection that nothing would use.
 
 Options: `id` (re-showing the same id updates that alert in place), `seconds`,
 `color`, `position`, `flashSeconds`, `floodFade`, `countdown`, `pinned`,
-`screens` (a `ModalMode.targetScreens` spec), `textSize` and `align`.
+`screens` (a `ModalMode.targetScreens` spec), `textSize`, `align`, `images`
+and `imageSize`.
 Everything expires on its own, so a caller that crashes cannot leave the
 screen branded.
 
@@ -861,6 +862,16 @@ left-aligned — or `left`, `center`, or `block`. `block` keeps a common left
 edge across the lines and centres the block as a whole on its longest line,
 which is what a list wants in the middle of the screen: `center` would stagger
 the bullets, `left` would pin them to the screen edge.
+
+`images` is a list of `hs.image` drawn centred in rows, wrapping as needed,
+*instead of* the text, for something the font cannot draw: the emoji pickers'
+selection tally uses it, because a Telegram premium emoji's text is only its
+Unicode stand-in. The text still names the alert (the heartbeat compares it,
+and logs show it). Each image is `imageSize` points square, 2.2 times
+`textSize` by default (33). An image band is never truncated, since half a row
+shows nothing useful. Each band records the canvas indexes of its fill and text
+(`rectIndex`, `textIndex`), which the colour animator and the countdown ticker
+use instead of assuming two elements per band.
 
 `alertV2FromFile` is the entry point the shell uses: it reads the message from
 the file and deletes it. `hammerspoon -c` hangs on payloads of a few hundred
