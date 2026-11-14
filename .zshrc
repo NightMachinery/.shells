@@ -539,6 +539,13 @@ function nightsh-load-zshrc() {
   zstyle ':fzf-tab:*' switch-group ',' '.'
   zstyle ':fzf-tab:*' prefix ''
   zstyle ':fzf-tab:*' default-color $'\033[38;5;24m'
+  #: Always open fzf on TAB. When the candidates share a prefix longer than the
+  #: typed word, fzf-tab otherwise only inserts that prefix (it skips fzf
+  #: whenever =compstate[insert]= ends in "unambiguous"). =menu yes= makes zsh
+  #: ask for menu insertion instead. It is scoped to fzf-tab's own run
+  #: (=IN_FZF_TAB=), so Alt+/ (plain zsh completion) still inserts the prefix
+  #: rather than the first match.
+  zstyle -e ':completion:*' menu '(( IN_FZF_TAB )) && reply=(yes)'
   ##
   FZF_TAB_GROUP_COLORS=(
     $'\033[38;5;24m' $'\033[32m' $'\033[33m' $'\033[35m' $'\033[31m' $'\033[38;5;27m' $'\033[36m' \
