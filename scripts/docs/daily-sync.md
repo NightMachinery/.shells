@@ -72,7 +72,10 @@ only has to follow them from `begin` to `ALL DONE`.
   the updater leaves.
 - `daily-sync metadata rerun <directory>...` and
   `daily-sync metadata commit <repo> [<held-back file>...]`.
-- `daily-sync finish`: a last `converge`, then removes the heartbeats.
+- `daily-sync finish`: a last `converge`, then removes the heartbeats. If that
+  converge finds a conflict for the first time (a peer whose earlier pull
+  failed, say), the run stays open once: the NEXT line leads to `daily-sync
+  conflict`, and the next `finish` ends the run whatever is still open.
 
 ## Slow steps
 

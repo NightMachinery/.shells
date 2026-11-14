@@ -1383,7 +1383,17 @@ function h-daily-sync-next-hint {
             ec "NEXT: write the Phase 1 report as your message and end your turn. When the updater"
             ec "finishes, a message brings you its results and the next steps." ;;
         metadata-done)
+            local -a open
+            open=( "${(@f)$(h-daily-sync-open-conflicts)}" )
+            open=( "${(@)open:#}" )
             ec
+            if [[ -e "$(h-daily-sync-run-dir)/finish-blocked" ]] && (( ${#open} )) ; then
+                ec "CONFLICTS TO SETTLE (${#open}), found by the last converge: ${(j:, :)open}"
+                ec "NEXT: look at the hunks of the first one, then resolve it or leave it blocked:"
+                ec "  zsh -c 'daily-sync conflict ${open[1]}'"
+                ec "Once every conflict is settled, run again: zsh -c 'daily-sync finish'"
+                return 0
+            fi
             ec "NEXT: repair failing papers and review the changes (rules are in your instructions), commit"
             ec "each repository listed above with: zsh -c 'daily-sync metadata commit <repo>'"
             ec "Then, even when nothing changed, run: zsh -c 'daily-sync finish'" ;;
@@ -1526,8 +1536,17 @@ The mechanical half of the daily multi-machine sync; see docs/daily-sync.md."
                 *) ecerr "daily-sync metadata: start, status, rerun or commit" ; return 64 ;;
             esac ;;
         finish)
+            local fin_run
+            fin_run="$(h-daily-sync-run-dir)" @RET
             h-daily-sync-abort-open "still unsettled at the end of the run"
             h-daily-sync-converge @RET
+            #: A conflict this last converge found for the first time gets its chance
+            #: to be resolved; the next finish then aborts whatever is still open.
+            if [[ ! -e "${fin_run}/finish-blocked" && -n "$(h-daily-sync-open-conflicts)" ]] ; then
+                : > "${fin_run}/finish-blocked"
+                h-daily-sync-next-hint
+                return 0
+            fi
             h-daily-sync-heartbeat-drop watchdog
             h-daily-sync-heartbeat-drop metadata
             h-daily-sync-stage finished
