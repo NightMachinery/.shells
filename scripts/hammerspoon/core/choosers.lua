@@ -136,17 +136,23 @@ loadEmojiData()
 local kEmojiAlertId = "emoji-chooser"
 local emojiPreviews = {}
 
+-- The cached Noto image for an emoji, which emoji-images.py may not have
+-- fetched yet.
+function emojiChooserImagePath(emoji, resolution)
+    local codes = {}
+    for _, code in utf8.codes(emoji) do
+        if code ~= 0xfe0f then codes[#codes + 1] = string.format("%04x", code) end
+    end
+    local suffix = (resolution or 128) == 128 and "" or "-" .. resolution
+    return os.getenv("HOME") .. "/Library/Caches/night-emoji/noto-18.0" .. suffix .. "/emoji_u" ..
+        table.concat(codes, "_") .. ".png"
+end
+
 function emojiChooserImage(emoji, resolution)
     resolution = resolution or 128
     local key = emoji .. ":" .. resolution
     if emojiPreviews[key] == nil then
-        local codes = {}
-        for _, code in utf8.codes(emoji) do
-            if code ~= 0xfe0f then codes[#codes + 1] = string.format("%04x", code) end
-        end
-        local suffix = resolution == 128 and "" or "-" .. resolution
-        local path = os.getenv("HOME") .. "/Library/Caches/night-emoji/noto-18.0" .. suffix .. "/emoji_u" ..
-            table.concat(codes, "_") .. ".png"
+        local path = emojiChooserImagePath(emoji, resolution)
         emojiPreviews[key] = hs.fs.attributes(path, "mode") == "file" and
             hs.image.imageFromPath(path) or false
     end
@@ -237,33 +243,6 @@ end
 function emojiChooserName(emoji)
     local info = emojiData[emoji] or emojiData[emoji .. "\239\184\143"]
     return info and info.name or emoji
-end
-
--- Offscreen canvas: no windows, screenshots or font substitution are involved.
-function emojiChooserImagesPng(images, side)
-    assert(#images > 0 and #images <= 128, "Choose between 1 and 128 emoji for a PNG")
-    side = side or 128
-    local canvas = hs.canvas.new({x=0, y=0, w=side*#images, h=side})
-    local ok, result = pcall(function()
-        for i, image in ipairs(images) do
-            canvas:insertElement({type="image", image=image, imageScaling="scaleProportionally",
-                                  frame={x=(i-1)*side, y=0, w=side, h=side}})
-        end
-        local image = assert(canvas:imageFromCanvas())
-        local data = assert(image:encodeAsURLString(true, "PNG"):match("^data:image/png;base64,(.*)$"))
-        return assert(hs.base64.decode(data))
-    end)
-    canvas:delete()
-    if not ok then error(result) end
-    return result
-end
-
-function emojiChooserPng(emojis, side, resolution)
-    local images={}
-    for i,emoji in ipairs(emojis) do
-        images[i]=assert(emojiChooserImage(emoji,resolution), "Missing cached emoji image; run emoji-images.py")
-    end
-    return emojiChooserImagesPng(images,side)
 end
 
 local emojiExportTasks = {}
@@ -364,14 +343,30 @@ function emojiChooserWebpPng(png, callback)
     emojiExportTasks[task] = true
 end
 
-function emojiChooserWebp(emojis, callback)
+-- Lays the 512px Noto images out with EmojiLayout (core/emoji-layout.lua).
+-- callback(err, datas) gets one pasteboard table per sticker. Returns a
+-- function that cancels the export.
+function emojiChooserExport(emojis, format, layout, callback)
+    local cancel, cancelled = nil, false
     emojiChooserPrepareImages(emojis, function(err)
+        if cancelled then return end
         if err then callback(err); return end
         local ok, failure = pcall(function()
-            emojiChooserWebpPng(emojiChooserPng(emojis,512/#emojis,512),callback)
+            local items = {}
+            for i, emoji in ipairs(emojis) do
+                local path = emojiChooserImagePath(emoji, 512)
+                assert(hs.fs.attributes(path, "mode") == "file", "Missing cached emoji image; run emoji-images.py")
+                items[i] = {path=path}
+            end
+            cancel = EmojiLayout.compose(items, EmojiLayout.build(layout or "auto", #emojis), format, callback)
         end)
         if not ok then callback(tostring(failure)) end
     end)
+    return function() cancelled = true; if cancel then cancel() end end
+end
+
+function emojiChooserWebp(emojis, callback, layout)
+    return emojiChooserExport(emojis, "webp", layout, callback)
 end
 
 local emojiRowCache
@@ -431,7 +426,9 @@ end
 function emojiChooser()
     local recent=ChooserSearch.recent("emoji")
     local selectedEmojis = {} -- Table to store selected emojis
-    local pendingImage, exporting, closed
+    -- pendingImages holds one pasteboard table per sticker, for Each/Pages.
+    local pendingImages, pendingEmojis, exporting, closed, cancelExport
+    local menu -- The Ctrl+Enter layout menu, made once the chooser exists.
 
     local function updateAlert()
         if #selectedEmojis >= 1 then
@@ -460,23 +457,35 @@ function emojiChooser()
                 return
             end
 
-            if #selectedEmojis == 0 then
-                table.insert(selectedEmojis, choice.emoji)
+            if choice.layout and not pendingImages then
+                -- A click on a layout row: the chooser is already gone, so
+                -- export and paste once ready.
+                local emojis = menu.items
+                emojiChooserWebp(emojis, function(err, datas)
+                    if err then alert_gateway("Emoji WebP: " .. tostring(err), {color="warn"}); return end
+                    recent.record(emojis)
+                    if hs.pasteboard.writeAllData(datas[1]) then doPaste(); EmojiLayout.pasteRest(datas) end
+                end, choice.layout)
+                selectedEmojis = {}
+                clearAlert()
+                return
             end
 
-            local emojiString = table.concat(selectedEmojis)
+            local emojis = pendingEmojis or selectedEmojis
+            if #emojis == 0 then emojis = {choice.emoji} end
             ---
             -- hs.eventtap.keyStrokes(emojiString)
             -- =keyStrokes= cannot insert some emojis.
             ---
-            recent.record(selectedEmojis)
-            if pendingImage then
-                if hs.pasteboard.writeAllData(pendingImage) then
+            recent.record(emojis)
+            if pendingImages then
+                if hs.pasteboard.writeAllData(pendingImages[1]) then
                     doPaste()
-                    if pendingImage["public.file-url"] then emojiChooserTelegramDocument() end
+                    if pendingImages[1]["public.file-url"] then emojiChooserTelegramDocument() end
+                    EmojiLayout.pasteRest(pendingImages)
                 end
             else
-                copyToClipboard(emojiString)
+                copyToClipboard(table.concat(emojis))
                 doPaste()
             end
             ---
@@ -507,7 +516,7 @@ function emojiChooser()
             end)
         end
         chooser:placeholderText("Choose an emoji... [" ..
-            (sortMode == "recent" and "recent usage" or "newest Unicode") .. "; Tab: sort]")
+            (sortMode == "recent" and "recent usage" or "newest Unicode") .. "; Tab: sort; Ctrl+Enter: layouts]")
         ChooserSearch.setChoices(chooser, choices)
         chooser:selectedRow(1)
     end
@@ -520,6 +529,7 @@ function emojiChooser()
     end
 
     local function addCurrent()
+        if menu.active then return end
         local choice = chooser:selectedRowContents()
 
         if choice then
@@ -532,37 +542,40 @@ function emojiChooser()
         if #selectedEmojis > 0 then
             table.remove(selectedEmojis)
             updateAlert()
+            if #selectedEmojis > 0 then menu.refresh({table.unpack(selectedEmojis)}) end
         end
     end
 
-    local function pasteImage(format)
+    -- The picks, or else the highlighted emoji.
+    local function currentEmojis()
+        if #selectedEmojis > 0 then return {table.unpack(selectedEmojis)} end
+        local choice = chooser:selectedRowContents()
+        return choice and choice.emoji and {choice.emoji} or {}
+    end
+
+    -- Export first, then select: the chooser hides and the paste lands in the
+    -- app it came from. Without a layout, several emoji use Auto.
+    local function pasteImage(format, layout, emojis)
         if exporting or closed then return end
-        local emojis = selectedEmojis
-        if #emojis == 0 then
-            local choice = chooser:selectedRowContents()
-            if not choice then return end
-            emojis = {choice.emoji}
-        end
+        emojis = emojis or currentEmojis()
+        if #emojis == 0 then return end
         exporting = true
-        local function finish(err, data)
+        local function finish(err, datas)
             exporting = false
+            cancelExport = nil
             if closed then return end
             if err then
                 alert_gateway("Emoji " .. format .. ": " .. tostring(err), {color="warn"})
                 return
             end
-            pendingImage = data
+            pendingImages, pendingEmojis = datas, emojis
             chooser:select()
         end
         local ok, err = pcall(function()
             if format == "WebP" then
-                emojiChooserWebp(emojis, finish)
+                cancelExport = emojiChooserWebp(emojis, finish, layout)
             else
-                emojiChooserPrepareImages(emojis, function(failure)
-                    if failure then finish(failure); return end
-                    local success, png = pcall(emojiChooserPng, emojis, 512, 512)
-                    if success then finish(nil, {["public.png"]=png}) else finish(png) end
-                end)
+                cancelExport = emojiChooserExport(emojis, "png", layout, finish)
             end
         end)
         if not ok then
@@ -570,11 +583,31 @@ function emojiChooser()
         end
     end
 
+    menu = EmojiLayout.menu{
+        chooser = chooser,
+        images = function(emojis)
+            local images = {}
+            for i, emoji in ipairs(emojis) do images[i] = emojiChooserImage(emoji) end
+            return images
+        end,
+        export = function(layout, format, emojis) pasteImage(format == "png" and "PNG" or "WebP", layout, emojis) end,
+        back = refreshSort,
+    }
+
     local hotkeys = {
         shiftEnter = hs.hotkey.bind('shift', 'return', addCurrent),
-        webp = hs.hotkey.bind('cmd', 'return', function() pasteImage("WebP") end),
-        png = hs.hotkey.bind({'cmd', 'shift'}, 'return', function() pasteImage("PNG") end),
-        tab = hs.hotkey.bind('', 'tab', cycleSort),
+        webp = hs.hotkey.bind('cmd', 'return', function()
+            if menu.active then menu.pick("webp") else pasteImage("WebP") end
+        end),
+        png = hs.hotkey.bind({'cmd', 'shift'}, 'return', function()
+            if menu.active then menu.pick("png") else pasteImage("PNG") end
+        end),
+        layouts = hs.hotkey.bind('ctrl', 'return', function()
+            if menu.active then menu.close() else menu.open(currentEmojis()) end
+        end),
+        tab = hs.hotkey.bind('', 'tab', function()
+            if menu.active then menu.reroll() else cycleSort() end
+        end),
         backslash = hs.hotkey.bind('', '\\', removeLast),
         shiftTab = hs.hotkey.bind('shift', 'tab', removeLast)
     }
@@ -594,6 +627,8 @@ function emojiChooser()
     local function cleanup()
         closed = true
         deleteTap:stop()
+        menu.cleanup()
+        if cancelExport then cancelExport() end
         -- hs.alert("emojiChooser: cleanup")
 
         for _, hk in pairs(hotkeys) do hk:delete() end

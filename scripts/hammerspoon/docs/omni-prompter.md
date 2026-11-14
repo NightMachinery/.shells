@@ -63,18 +63,20 @@ Unicode name, including older joined sequences such as 🙂‍↔️.
   per key-down, including repeated presses with Shift held. Shift+Tab and
   backslash also remove the last selection.
 - Enter pastes the selected Unicode text, or the highlighted emoji when empty.
-- Cmd+Enter builds a lossless transparent WebP from native 512px artwork, with
-  its longest side at 512px,
-  and pastes the actual file. Telegram needs the file URL to recognize a sticker.
+- Cmd+Enter builds a lossless transparent WebP from native 512px artwork in
+  the Auto layout (see [Sticker layouts](#sticker-layouts)), with its longest
+  side at 512px, and pastes the actual file. Telegram needs the file URL to recognize a sticker.
   Purple reads the export marker and sends a transparent sticker whichever
   compression option is chosen. For older clients the chooser still ticks an
   English “Send as a document” checkbox when one appears, and says nothing when
   none does. It never presses Send.
-- Cmd+Shift+Enter copies and pastes a transparent PNG at 512px per emoji.
-  Telegram's photo mode flattens PNG transparency; send PNG as a document to
-  retain its original bytes.
-- Both image shortcuts use the multi-selection, or the highlighted emoji when
-  empty. Up to 128 emoji fit in one horizontal export.
+- Cmd+Shift+Enter copies and pastes a transparent PNG in the same layout, at
+  512px per emoji (at most 4096px on the long side). Telegram's photo mode
+  flattens PNG transparency; send PNG as a document to retain its original
+  bytes.
+- Ctrl+Enter lists the other layouts for the selection.
+- The image shortcuts use the multi-selection (up to 128 emoji), or the
+  highlighted emoji when empty.
 
 Install the emoji data repo, then run:
 
@@ -127,6 +129,60 @@ the first opening after a reload took 99–113 ms instead of about 1 s. The
 longest stall was about 0.19 s, the alias JSON decode, which cannot be split.
 Set `emojiChooserPrewarmDelay=false` before loading to turn it off.
 
+## Sticker layouts
+
+Telegram shows a sticker at most 512px wide, so a 1×N strip of emoji gets
+tinier with every emoji added. Both pickers therefore lay several emoji out
+in a compact grid by default, and Ctrl+Enter offers other arrangements.
+
+**Auto** is the default for Cmd+Enter and Cmd+Shift+Enter: a near-square grid
+whose short row is centred on top. Three emoji become one over two, five
+become two over three, and two stay side by side (512×245). Rows whose counts
+differ by an odd number interlock, half a cell apart.
+
+Every export trims each glyph's transparent margin before placing it, then
+crops the finished image to its visible pixels, so glyphs fill their cells
+and no empty border is left. Each glyph is resampled once (Lanczos), straight
+from its source to its final size; rotated glyphs get one extra rotation.
+
+Ctrl+Enter replaces the emoji list with layout rows. Each row has a 64px
+preview of the actual selection and the approximate size, such as
+`≈512×476, 245px cells`, flagged `small in Telegram` when the short side drops
+below 128px. Enter pastes the highlighted layout as WebP, Cmd+Shift+Enter as
+PNG, Tab re-rolls Jumble, Ctrl+Enter returns to the emoji list (restoring the
+query), and Shift+Backspace still removes the last pick and refreshes the
+previews. The last layout used is listed first. The layouts, with the
+selection sizes that offer them:
+
+- **Auto**, **Row** (one line), **Column** (one stack).
+- **Each**: one 512px sticker per emoji, pasted one after another,
+  `EmojiLayout.sequenceDelay` (0.6 s) apart. Purple accepts one WebP per paste
+  and adds each to its open send box as a separate sticker, not an album.
+- **Pages** (17 or more): Auto grids of up to 16, pasted the same way.
+- **Beehive** (5+): interlocked rows, alternating long and short.
+- **Daisy** (5+): the first emoji large in the middle, the rest around it.
+- **Marquee** (3 to 25): the first emoji as a hero over the rest.
+- **Heart**: emoji around the parametric heart outline up to 20, a filled
+  heart beyond.
+- **Orbit**: a ring up to 12, concentric rings around a centre beyond.
+- **Sunflower**: the golden-angle spiral.
+- **Pyramid** (3 to 28): rows shrinking upwards.
+- **Nautilus** (5 to 30): a growing spiral, first emoji largest.
+- **Jumble**: random cells of a sparse grid, each nudged, turned and resized
+  a little. The seed is shown in the row (`Jumble #3`) and Tab picks the next.
+
+Heart, Orbit and Sunflower repeat a short selection (to 6, 3 and 8 cells), so
+even one emoji makes a shape.
+
+The layout code is `core/emoji-layout.lua`: each layout turns N emoji into
+cells (position, size, rotation) in arbitrary units, which drive both the
+previews and the export. `bin/emoji-compose.py` (Homebrew Python with Pillow)
+does the trimming, placement and resampling, and `cwebp` encodes the result.
+Tests: `lua hammerspoon/tests/emoji-chooser-test.lua`,
+`lua hammerspoon/tests/telegram-emoji-test.lua` and
+`/opt/homebrew/bin/python3 -I hammerspoon/tests/emoji-compose-test.py`, run
+from `~/scripts`.
+
 ## Telegram premium emoji
 
 Hyper+Shift+A opens the cached premium library. Like Hyper+A, it switches the
@@ -134,7 +190,8 @@ input source to English while open and restores the previous one on close. Each 
 opt-in export feature supplies exact first-frame PNGs and a catalog under
 `~/Library/Caches/Purple/emoji-export/`. Until that feature is installed and
 enabled, saved clipboard entries work with Unicode preview images. No socket
-or client automation is invoked by opening this chooser.
+or client automation is invoked by opening this chooser; only an image export
+asks Purple to render (below).
 
 The catalog contract is version 1 with an `entries` array. IDs are decimal
 strings; entries include `alt`, `setTitle`, `setShortName`, `recentRank` and an
@@ -152,12 +209,29 @@ set titles, short names and aliases. `NIGHT_TELEGRAM_EMOJI_CATALOG` or the
 Hammerspoon setting `telegramEmoji.catalogPath` can select another export path.
 
 Cmd+Enter pastes a transparent WebP and Cmd+Shift+Enter pastes a transparent
-PNG of the selected previews, stacked horizontally in selection order. With no
-selection they use the highlighted entry. These exports use the actual cached
-128px custom artwork, without upscaling; long WebP stacks shrink to a longest
-side of 512px. No large-render requests or client automation are made. Missing
-custom icons use the same Unicode preview shown in the row. Normal Enter keeps
-pasting the original rich premium-emoji tags. Esc cancels a pending image export.
+PNG of the selection in the Auto layout, and Ctrl+Enter offers the others (see
+[Sticker layouts](#sticker-layouts)). With no selection they use the
+highlighted entry. The PNG uses each emoji's own source size per cell.
+
+The 128px catalog previews are too small for a sticker, so exports use
+Purple's largest real render of each emoji instead: 512px for vector (TGS)
+stickers, and the native size, often 100px, for raster (WebP) ones, which no
+request can improve. For each emoji, in order:
+
+1. A finished `large/<id>-<px>.png` in the export folder.
+2. An `emoji.render` request on the control socket named by the catalog's
+   `controlSocket` field, with the ID sent as a JSON string, as 64-bit IDs
+   exceed a double. At most three are in flight, each with its own 10 s
+   budget (`EmojiLayout.renderTimeout`), and `busy` replies are retried.
+   Three uncached emoji took 2.6 s on 2026-11-14.
+3. With automation off, an empty `requests/<id>` file, which Purple's
+   periodic scan picks up, within the same budget.
+4. The 128px preview, then the Unicode image.
+
+Shift+Enter also leaves the `requests/<id>` file for a pick without a large
+render, so Purple usually finishes it before the export asks. Esc cancels a
+pending export. Normal Enter keeps pasting the original rich premium-emoji
+tags.
 
 Copy one premium emoji from Telegram, open the picker and press Cmd+S to save
 it explicitly. The personal library is `~/.local/share/night-emoji/telegram.json`

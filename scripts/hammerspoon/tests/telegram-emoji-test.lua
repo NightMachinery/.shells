@@ -1,5 +1,6 @@
 -- Inert IDs and data; never reads a real clipboard, session or personal library.
 local env=setmetatable({telegramEmojiPrewarmDelay=false,hs={base64={encode=function(x)return x end,decode=function(x)return x end},fs={attributes=function()return 'file' end}},emojiChooserName=function()return 'heart eyes' end,hyper_bind_v2=function()end},{__index=_G})
+assert(loadfile('hammerspoon/core/emoji-layout.lua','t',env))()
 assert(loadfile('hammerspoon/core/telegram-emoji.lua','t',env))()
 local T=env.TelegramEmoji
 local tag='custom-emoji://1234567890123456789?6'
@@ -32,7 +33,7 @@ T.mergeMetadata(recent,{setTitle='Installed pack',setShortName='InstalledPack',i
 assert(T.packName(recent)=='Installed pack' and recent.icon=='/inert.png' and recent.recentRank==1)
 T.mergeMetadata(recent,{setTitle='Different pack'})
 assert(T.packName(recent)=='Installed pack','A duplicate must not overwrite known pack metadata')
-assert(T.placeholder(1,{state='missing'})=='Telegram premium emoji · 1 emoji · no Purple catalog yet · Cmd+S: save copied emoji')
+assert(T.placeholder(1,{state='missing'})=='Telegram premium emoji · 1 emoji · no Purple catalog yet · Cmd+S: save copied emoji · Ctrl+Enter: layouts')
 assert(T.placeholder(3,{state='invalid'}):find('3 emoji · Purple catalog unreadable',1,true))
 assert(T.placeholder(2,{state='ok',modified=0},86400*3):find('catalog 3d old',1,true))
 assert(not T.placeholder(2,{state='ok',modified=100},200):find('old',1,true))
@@ -104,6 +105,7 @@ env.ChooserSearch={
         chooser={complete=complete,rows={},selected=1}
         function chooser:placeholderText(t)self.placeholder=t end
         function chooser:selectedRowContents()return self.rows[self.selected] end
+        function chooser:selectedRow(n)if n then self.selected=n end;return self.selected end
         function chooser:hideCallback(fn)self.onHide=fn end
         function chooser:show()self.visible=true end
         function chooser:select()self.onHide();self.complete(self:selectedRowContents())end
@@ -174,34 +176,76 @@ assert(d[1]~=c[1] and d[1].searchText:find('personal',1,true),'Saved-library edi
 catalogBytes='cache-b';catalogRows.entries[1].setTitle='Changed pack'
 local e=T.rows(nil)
 assert(e[1].subText=='Changed pack' and e[1]~=d[1],'Catalog edits invalidate built entries and metadata')
--- Image shortcuts use the exact cached previews, including native hide order.
-local rendered,webpCallback
+-- Image shortcuts hand Purple's export folder and socket to emoji-compose.py,
+-- with the preview and Unicode images as fallbacks, in selection order.
+local composed,composeCallback,cancelled
+local L=env.EmojiLayout
+L.compose=function(items,built,format,callback)
+    composed={items=items,built=built,format=format};composeCallback=callback
+    return function()cancelled=true end
+end
 T.icon=function(path)return path end
 env.emojiChooserImage=function(emoji)return "unicode:"..emoji end
-env.emojiChooserImagesPng=function(images,side)
-    rendered={images=images,side=side};return "native-alpha-png"
-end
-env.emojiChooserWebpPng=function(png,callback)
-    assert(png=="native-alpha-png");webpCallback=callback
-end
+env.emojiChooserImagePath=function(emoji,px)return "/noto"..(px and ("-"..px) or "").."/"..emoji..".png" end
+local settings={}
+env.hs.settings={get=function(k)return settings[k] end,set=function(k,v)settings[k]=v end}
+env.hs.canvas={new=function()return {insertElement=function()end,imageFromCanvas=function()return 'thumb' end,delete=function()end} end}
+catalogBytes='cache-c'
+catalogRows={version=1,controlSocket='/inert/purple-control.sock',entries={{id="901",alt="😍",setTitle="One",sourcePx=512},{id="902",alt="🙂",setTitle="Two",sourcePx=100}}}
 keys={};env.telegramEmojiChooser()
 keys['shift:return'].fn();chooser.selected=2;keys['shift:return'].fn()
 local beforePaste=pasted
 keys['cmd shift:return'].fn()
-assert(clip['public.png']=='native-alpha-png' and pasted==beforePaste+1,'Cmd+Shift+Enter pastes a PNG after hide cleanup')
-assert(rendered.side==128 and #rendered.images==2 and rendered.images[1]:find('901%-128.png') and rendered.images[2]:find('902%-128.png'),'PNG stacks exact native custom previews in selection order')
+assert(composed.format=='png' and #composed.items==2 and #composed.built[1]==2,'PNG lays out the picks')
+local item=composed.items[1]
+assert(item.telegram.id=='901' and item.telegram.export=='/inert' and item.telegram.socket=='/inert/purple-control.sock')
+assert(item.fallback[1]:find('901%-128.png') and item.fallback[2]=='/noto-512/😍.png' and item.fallback[3]=='/noto/😍.png')
+assert(composed.items[2].telegram.id=='902','Selection order is kept')
+composeCallback(nil,{{['public.png']='composed-png'}})
+assert(clip['public.png']=='composed-png' and pasted==beforePaste+1,'Cmd+Shift+Enter pastes a PNG after hide cleanup')
 keys={};env.telegramEmojiChooser();chooser.selected=2
 beforePaste=pasted;keys['cmd:return'].fn()
-assert(pasted==beforePaste and rendered.side==128 and #rendered.images==1,'WebP encoding is asynchronous and never upscales')
-webpCallback(nil,{['public.file-url']='file:///inert.webp',['org.webmproject.webp']='webp',['public.png']='png',['org.nightmachinery.emoji-export']='marker'})
+assert(pasted==beforePaste and composed.format=='webp' and #composed.items==1,'WebP export is asynchronous')
+composeCallback(nil,{{['public.file-url']='file:///inert.webp',['org.webmproject.webp']='webp',['public.png']='png',['org.nightmachinery.emoji-export']='marker'}})
 assert(pasted==beforePaste+1 and clip['org.webmproject.webp']=='webp','Cmd+Enter pastes the encoded WebP payload')
 keys={};env.telegramEmojiChooser();keys['cmd:return'].fn()
 local beforeCancel=clip
+cancelled=false
 chooser.onHide();chooser.complete(nil)
-webpCallback(nil,{['public.png']='late result'})
+assert(cancelled,'Closing the chooser stops a running export')
+composeCallback(nil,{{['public.png']='late result'}})
 assert(clip==beforeCancel,'A cancelled chooser cannot publish a late image export')
-local five={}
-for i=1,5 do five[i]={emoji='😍',icon='exact-preview-'..i} end
-T.exportPng(five,'webp')
-assert(rendered.side==512/5 and #rendered.images==5,'Long WebP stacks shrink to the sticker cap instead of upscaling')
+-- Ctrl+Enter lists layouts; Enter exports the highlighted one, and Each
+-- pastes one sticker at a time.
+keys={};env.telegramEmojiChooser()
+chooser.query=function(self,q)if q then self.q=q end;return self.q or '' end
+keys['shift:return'].fn();chooser.selected=2;keys['shift:return'].fn()
+keys['ctrl:return'].fn()
+assert(chooser.rows[1].layout=='auto' and chooser.rows[1].image=='thumb' and chooser.placeholder:find('Layout for 2',1,true))
+chooser.selected=4;assert(chooser.rows[4].layout=='each')
+keys[':return'].fn()
+assert(composed.format=='webp' and #composed.built==2 and composed.items[2].telegram.id=='902')
+local sequence={}
+env.hs.timer={doAfter=function(_,fn)sequence[#sequence+1]=fn;return {stop=function()end} end}
+beforePaste=pasted
+composeCallback(nil,{{['org.webmproject.webp']='first'},{['org.webmproject.webp']='second'}})
+assert(clip['org.webmproject.webp']=='first' and pasted==beforePaste+1)
+table.remove(sequence,1)()
+assert(clip['org.webmproject.webp']=='second' and pasted==beforePaste+2 and #sequence==0)
+assert(recorded[1]=='901' and recorded[2]=='902')
+-- Shift+Enter asks Purple to render a pick that has no large image yet.
+local requestsMade={}
+env.hs.fs.attributes=function(path,mode)
+    if path=='/inert/requests' then return 'directory' end
+    if path=='/inert/large/901-512.png' then return 'file' end
+end
+env.io.open=function(path,how)
+    if how=='a' then requestsMade[#requestsMade+1]=path;return {close=function()end} end
+    local bytes=path=='/inert/catalog.json' and catalogBytes or libraryBytes
+    if bytes then return {read=function()return bytes end,close=function()end} end
+end
+keys={};env.telegramEmojiChooser()
+chooser.selected=1;keys['shift:return'].fn();chooser.selected=2;keys['shift:return'].fn()
+assert(#requestsMade==1 and requestsMade[1]=='/inert/requests/902','Only the emoji without a large render is requested')
+chooser.onHide()
 print('TELEGRAM_EMOJI_PAYLOAD_TESTS_PASSED')

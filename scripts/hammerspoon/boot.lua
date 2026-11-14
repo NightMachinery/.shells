@@ -96,6 +96,8 @@ local hammerspoonCoreFiles = {
     "core/popclick.lua",
     "core/system-keys.lua",
     "core/chooser-search.lua",
+    -- Before both emoji choosers, which build on its layouts.
+    "core/emoji-layout.lua",
     "core/choosers.lua",
     "core/telegram-emoji.lua",
     -- After alert/ and core/helpers.lua: it alerts through alert_gateway and

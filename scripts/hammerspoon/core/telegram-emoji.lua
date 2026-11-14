@@ -138,6 +138,7 @@ function T.catalogEntry(raw, folder)
     entry.setTitle=raw.setTitle or ""
     entry.setShortName=raw.setShortName or ""
     entry.recentRank=tonumber(raw.recentRank)
+    entry.sourcePx=math.tointeger(tonumber(raw.sourcePx))
     if raw.installed==false then entry.installed=false end
     local png=raw.png or ("png/"..raw.id.."-128.png")
     -- Existence is checked by T.icon on each opening, so a PNG written after
@@ -164,6 +165,8 @@ end
 
 -- Export is maintained by an opt-in Purple setting. Never discover sockets,
 -- inspect encrypted account caches, or wake the client to open this chooser.
+-- Only an image export asks Purple to render, through the control socket the
+-- catalog itself names (see T.exportItems).
 -- Built catalog entries are kept while the catalog bytes are unchanged, and
 -- the merged list while the saved library bytes are unchanged too. Both files
 -- are still read on every opening, so edits take effect at once.
@@ -181,6 +184,8 @@ local function buildCatalog(content,folder)
     if not (ok and type(catalog)=="table" and catalog.version==1 and type(catalog.entries)=="table") then
         return {content=content,state="invalid",entries={}}
     end
+    local socket=catalog.controlSocket
+    if not (type(socket)=="string" and #socket<1024 and socket:match("^/.+%.sock$")) then socket=nil end
     local entries,seen={},{}
     for index,raw in ipairs(catalog.entries) do
         local valid,entry=pcall(T.catalogEntry,raw,folder)
@@ -189,7 +194,7 @@ local function buildCatalog(content,folder)
             else entry.order=index;entries[#entries+1]=entry;seen[entry.id]=entry end
         end
     end
-    return {content=content,state="ok",entries=entries}
+    return {content=content,state="ok",entries=entries,socket=socket}
 end
 
 local function sortEntries(entries)
@@ -224,6 +229,7 @@ function T.entries()
         catalogCache=content and buildCatalog(content,path:match("^(.*)/[^/]+$")) or
             {content=nil,state="missing",entries={}}
         catalogCache.path=path
+        catalogCache.folder=path:match("^(.*)/[^/]+$")
     end
     local catalog=catalogCache
     status.state=catalog.state
@@ -331,20 +337,49 @@ function T.placeholder(count,status,now)
         if days>=1 then parts[#parts+1]="catalog "..days.."d old" end
     end
     parts[#parts+1]="Cmd+S: save copied emoji"
+    parts[#parts+1]="Ctrl+Enter: layouts"
     return table.concat(parts," · ")
 end
 
--- Export the existing preview artwork at native resolution. This never asks
--- Purple to render, writes requests, or upscales the 128px catalog previews.
-function T.exportPng(entries,format)
+-- Items for bin/emoji-compose.py: Purple's largest render of each emoji
+-- (512px for vector stickers, native size for rasters), asked for on demand,
+-- else the 128px preview, else the Unicode image. Uses the catalog that
+-- T.entries last read.
+function T.exportItems(entries)
     assert(#entries>0 and #entries<=128,"Choose between 1 and 128 emoji")
-    local images={}
+    local catalog=catalogCache or {}
+    local items={}
     for i,entry in ipairs(entries) do
-        images[i]=assert((entry.icon and T.icon(entry.icon)) or emojiChooserImage(entry.emoji),
-                         "No cached preview image for this premium emoji")
+        local fallback={}
+        if entry.icon then fallback[#fallback+1]=entry.icon end
+        fallback[#fallback+1]=emojiChooserImagePath(entry.emoji,512)
+        fallback[#fallback+1]=emojiChooserImagePath(entry.emoji)
+        items[i]={fallback=fallback}
+        if catalog.folder and catalog.state=="ok" then
+            items[i].telegram={id=entry.id,export=catalog.folder,socket=catalog.socket}
+        end
     end
-    local side=format=="webp" and math.min(128,512/#entries) or 128
-    return emojiChooserImagesPng(images,side)
+    return items
+end
+
+function T.export(entries,format,layout,callback)
+    return EmojiLayout.compose(T.exportItems(entries),EmojiLayout.build(layout or "auto",#entries),format,callback)
+end
+
+-- Picking an emoji with Shift+Enter leaves an empty requests/<id> file when
+-- no large render exists yet. Purple scans that folder in small batches, so
+-- the render is usually ready by the time the export asks for it.
+function T.prefetch(entry)
+    local catalog=catalogCache or {}
+    if not (catalog.folder and catalog.state=="ok" and entry.id and entry.id:match("^%d+$")) then return end
+    local large=catalog.folder.."/large/"..entry.id.."-"
+    for _,px in ipairs({entry.sourcePx or 512,512}) do
+        if hs.fs.attributes(large..px..".png","mode")=="file" then return end
+    end
+    if hs.fs.attributes(catalog.folder.."/requests","mode")~="directory" then return end
+    -- Append mode creates the file empty and never truncates or writes to it.
+    local file=io.open(catalog.folder.."/requests/"..entry.id,"a")
+    if file then file:close() end
 end
 
 local kAlertId="telegram-emoji-chooser"
@@ -356,7 +391,14 @@ function telegramEmojiChooser()
     local recent=ChooserSearch.recent("telegram-emoji")
     -- Shift+Enter collects several emoji for one rich paste, as in Hyper+A.
     local selected={}
-    local pendingImage,closed,generation=nil,false,0
+    -- pendingImages holds one pasteboard table per sticker, for Each/Pages.
+    local pendingImages,pendingEntries,closed,generation,cancelExport=nil,nil,false,0,nil
+    local menu -- The Ctrl+Enter layout menu, made once the chooser exists.
+    local function ids(entries)
+        local result={}
+        for i,entry in ipairs(entries) do result[i]=entry.id end
+        return result
+    end
     local function updateAlert()
         if #selected==0 then alert_gateway_dismiss(kAlertId);return end
         local text={}
@@ -366,23 +408,34 @@ function telegramEmojiChooser()
     local chooser=ChooserSearch.new(function(choice)
         -- hs.chooser may hide (and run cleanup) before delivering this choice.
         -- Only completion clears the tally, so cleanup cannot lose selections.
-        local entries=selected
+        local entries=pendingEntries or selected
         selected={}
         if not choice then return end
+        local images=pendingImages
+        pendingImages,pendingEntries=nil,nil
+        if choice.layout and not images then
+            -- A click on a layout row: the chooser is already gone, so export
+            -- and paste once ready.
+            local picked=menu.items
+            local ok,err=pcall(T.export,picked,"webp",choice.layout,function(failure,datas)
+                if failure then alert_gateway(tostring(failure),{color="warn"});return end
+                recent.record(ids(picked))
+                if hs.pasteboard.writeAllData(datas[1]) then doPaste();EmojiLayout.pasteRest(datas) end
+            end)
+            if not ok then alert_gateway(tostring(err),{color="warn"}) end
+            return
+        end
         if #entries==0 then entries={choice.entry} end
-        local imageData=pendingImage
-        pendingImage=nil
         local ok,err=pcall(function()
-            local data=imageData or (#entries==1 and T.payload(entries[1]) or T.combine(entries))
-            local restore=paste and not imageData
+            local data=images and images[1] or (#entries==1 and T.payload(entries[1]) or T.combine(entries))
+            local restore=paste and not images
             local previous=restore and hs.pasteboard.readAllData() or nil
             assert(hs.pasteboard.writeAllData(data),"Clipboard write failed")
             local written=hs.pasteboard.changeCount()
-            local ids={}
-            for i,entry in ipairs(entries) do ids[i]=entry.id end
-            recent.record(ids)
-            if paste or imageData then
+            recent.record(ids(entries))
+            if paste or images then
                 doPaste()
+                if images then EmojiLayout.pasteRest(images) end
                 if restore then
                     hs.timer.doAfter(0.5,function()
                         if hs.pasteboard.changeCount()==written then hs.pasteboard.writeAllData(previous) end
@@ -398,37 +451,68 @@ function telegramEmojiChooser()
         ChooserSearch.setChoices(chooser,rows,{stable=true})
     end
     local function addCurrent()
+        if menu.active then return end
         generation=generation+1
         local choice=chooser:selectedRowContents()
-        if choice and choice.entry then selected[#selected+1]=choice.entry;updateAlert() end
+        if choice and choice.entry then
+            selected[#selected+1]=choice.entry;updateAlert()
+            pcall(T.prefetch,choice.entry)
+        end
     end
     local function removeLast()
         generation=generation+1
-        if #selected>0 then table.remove(selected);updateAlert() end
+        if #selected>0 then
+            table.remove(selected);updateAlert()
+            if #selected>0 then menu.refresh({table.unpack(selected)}) end
+        end
     end
-    local function exportImage(format)
+    -- The picks, or else the highlighted emoji.
+    local function currentEntries()
+        if #selected>0 then return {table.unpack(selected)} end
         local choice=chooser:selectedRowContents()
-        if not choice then return end
-        local entries=#selected>0 and selected or {choice.entry}
+        return choice and choice.entry and {choice.entry} or {}
+    end
+    -- Export first, then select, so the paste lands in Telegram. Demand
+    -- renders can take a few seconds; Escape cancels them.
+    local function exportImage(format,layout,entries)
+        entries=entries or currentEntries()
+        if #entries==0 then return end
         generation=generation+1
         local current=generation
+        if cancelExport then cancelExport() end
         local ok,err=pcall(function()
-            local png=T.exportPng(entries,format)
-            if format=="png" then
-                pendingImage={["public.png"]=png};chooser:select()
-            else
-                emojiChooserWebpPng(png,function(failure,data)
-                    if closed or current~=generation then return end
-                    if failure then alert_gateway(tostring(failure),{color="warn"});return end
-                    pendingImage=data;chooser:select()
-                end)
-            end
+            cancelExport=T.export(entries,format,layout,function(failure,datas)
+                if closed or current~=generation then return end
+                cancelExport=nil
+                if failure then alert_gateway(tostring(failure),{color="warn"});return end
+                pendingImages,pendingEntries=datas,entries;chooser:select()
+            end)
         end)
         if not ok then alert_gateway(tostring(err),{color="warn"}) end
     end
+    menu=EmojiLayout.menu{
+        chooser=chooser,
+        images=function(entries)
+            local images={}
+            for i,entry in ipairs(entries) do
+                images[i]=(entry.icon and T.icon(entry.icon)) or emojiChooserImage(entry.emoji)
+            end
+            return images
+        end,
+        export=function(layout,format,entries)exportImage(format,layout,entries)end,
+        back=refresh,
+    }
     local hotkeys={
-        webp=hs.hotkey.bind("cmd","return",function()exportImage("webp")end),
-        png=hs.hotkey.bind({"cmd","shift"},"return",function()exportImage("png")end),
+        webp=hs.hotkey.bind("cmd","return",function()
+            if menu.active then menu.pick("webp") else exportImage("webp") end
+        end),
+        png=hs.hotkey.bind({"cmd","shift"},"return",function()
+            if menu.active then menu.pick("png") else exportImage("png") end
+        end),
+        layouts=hs.hotkey.bind("ctrl","return",function()
+            if menu.active then menu.close() else menu.open(currentEntries()) end
+        end),
+        tab=hs.hotkey.bind("","tab",function()if menu.active then menu.reroll() end end),
         save=hs.hotkey.bind("cmd","s",function()
             local ok,err=pcall(T.captureClipboard)
             if ok then refresh() else alert_gateway(tostring(err),{color="warn"}) end
@@ -448,6 +532,8 @@ function telegramEmojiChooser()
     local function cleanup()
         closed=true;generation=generation+1
         deleteTap:stop()
+        menu.cleanup()
+        if cancelExport then cancelExport();cancelExport=nil end
         for _,hotkey in pairs(hotkeys) do hotkey:delete() end
         alert_gateway_dismiss(kAlertId)
         inputLangPop()

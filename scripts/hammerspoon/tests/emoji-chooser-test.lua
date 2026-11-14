@@ -4,6 +4,7 @@ local block = assert(source:match('(local emojiData = {}.-)\n%-%-%- %* Wi%-Fi Ch
 local keys, tap, chooser, tally, clipboard, canvas, pasted = {}, nil, nil, nil, nil, nil, 0
 local aliasText, aliasDecodes = 'aliases', 0
 local imageLoads, prewarmTimers = 0, {}
+local settings = {}
 local data = {
     ['😀']={name='a recent', unicode_version='6.1'},
     ['🫪']={name='b newer', unicode_version='17.0'},
@@ -36,6 +37,7 @@ local env = setmetatable({
     },
     hs={
         fs={attributes=function()return 'file' end},
+        settings={get=function(k)return settings[k] end,set=function(k,v)settings[k]=v end},
         image={imageFromPath=function(path)imageLoads=imageLoads+1;return path end},
         timer={doAfter=function(delay,fn)prewarmTimers[#prewarmTimers+1]={delay=delay,fn=fn};return {stop=function()end} end},
         base64={decode=function(value)assert(value=='PNG');return 'png-bytes' end},
@@ -46,7 +48,9 @@ local env = setmetatable({
             function canvas:imageFromCanvas()return {encodeAsURLString=function()return 'data:image/png;base64,PNG' end}end
             function canvas:delete()self.deleted=true end
             return canvas
-        end},
+        end,matrix={translate=function()
+            local m={};function m:rotate()return self end;function m:translate()return self end;return m
+        end}},
         hotkey={bind=function(mod,key,fn)
             if type(mod)=='table' then mod=table.concat(mod,' ') end
             local hk={delete=function(self)self.deleted=true end}; keys[mod..':'..key]={fn=fn,hk=hk};return hk
@@ -57,7 +61,35 @@ local env = setmetatable({
     },
     emojiChooserPrewarmBatch=2,
 }, {__index=_G})
+assert(loadfile('hammerspoon/core/emoji-layout.lua','t',env))()
 assert(load(block,'emoji-chooser','t',env))()
+-- Layout math: pure functions, no Hammerspoon state.
+local L=env.EmojiLayout
+local function same(a,b)return table.concat(a,',')==table.concat(b,',') end
+assert(same(L.autoCounts(1),{1}) and same(L.autoCounts(2),{2}) and same(L.autoCounts(3),{1,2}))
+assert(same(L.autoCounts(5),{2,3}) and same(L.autoCounts(7),{1,3,3}) and same(L.autoCounts(9),{3,3,3}))
+local tri=L.build('auto',3)[1]
+assert(tri[1].x==0 and tri[2].x==-0.5 and tri[3].x==0.5,'Three is one centred over two')
+assert(math.abs(tri[2].y-tri[1].y-math.sqrt(3)/2)<1e-9,'Rows half a cell apart interlock')
+local quad=L.build('auto',4)[1]
+assert(quad[3].y-quad[1].y==1,'Aligned rows keep a full cell')
+local each=L.build('each',3)
+assert(#each==3 and each[2][1].i==2 and #each[2]==1,'Each is one sticker per emoji')
+local paged=L.build('pages',20)
+assert(#paged==2 and #paged[1]==16 and #paged[2]==4 and paged[2][1].i==17)
+local hearts,slots=L.build('heart',2)
+assert(slots==6 and #hearts[1]==6 and hearts[1][3].i==1,'Small selections repeat around the heart')
+assert(#L.build('heart',30)[1]==30,'A filled heart holds exactly the selection')
+assert(#L.build('orbit',19)[1]==19 and L.build('orbit',19)[1][1].x==0,'Past 12, rings around a centre')
+local j1,j2,j3=L.build('jumble',6,4)[1],L.build('jumble',6,4)[1],L.build('jumble',6,5)[1]
+assert(j1[1].x==j2[1].x and j1[1].rot==j2[1].rot and j1[1].x~=j3[1].x,'Jumble repeats per seed')
+local seen={};for _,c in ipairs(j1) do seen[c.i]=true end;assert(#seen==6,'Jumble places every emoji once')
+local function keys_(n)local t={};for _,m in ipairs(L.available(n)) do t[#t+1]=m.key end;return table.concat(t,',') end
+assert(keys_(1)=='auto,heart,orbit,sunflower')
+assert(keys_(3):find('marquee',1,true) and keys_(3):find('pyramid',1,true) and not keys_(3):find('beehive',1,true))
+assert(keys_(17):find('pages',1,true) and not keys_(26):find('marquee',1,true))
+assert(L.describe('row',7,L.build('row',7),7):find('small in Telegram',1,true))
+assert(L.describe('auto',3,L.build('auto',3),3):find('≈512×476',1,true))
 assert(#prewarmTimers==1 and prewarmTimers[1].delay==5 and imageLoads==0 and aliasDecodes==0,'Loading only schedules the prewarm')
 local prewarmed=false
 env.emojiChooserPrewarm(function()prewarmed=true end)
@@ -105,15 +137,20 @@ env.emojiChooser()
 keys['shift:return'].fn()
 keys['shift:return'].fn()
 local beforePaste=pasted
+local composed
+L.compose=function(items,built,format,callback)
+    composed={items=items,built=built,format=format}
+    callback(nil,{{['public.png']='png-bytes'}})
+end
 keys['cmd shift:return'].fn()
 assert(clipboard['public.png']=='png-bytes' and pasted==beforePaste+1)
-assert(canvas.frame.w==1024 and canvas.frame.h==512)
-assert(canvas.images[1].frame.x==0 and canvas.images[2].frame.x==512)
-assert(canvas.deleted and not tap.running,'PNG export releases canvas and chooser listeners')
-local webpCallback
-env.emojiChooserWebp=function(emojis,callback)
+assert(composed.format=='png' and #composed.items==2 and composed.items[1].path:find('noto%-18%.0%-512/emoji_u1f600%.png$'))
+assert(#composed.built==1 and #composed.built[1]==2 and composed.built[1][1].y==composed.built[1][2].y,'Two emoji sit side by side')
+assert(not tap.running,'PNG export releases chooser listeners')
+local webpCallback,webpLayout
+env.emojiChooserWebp=function(emojis,callback,layout)
     assert(#emojis==1 and emojis[1]=='😀')
-    webpCallback=callback
+    webpCallback,webpLayout=callback,layout
 end
 local documentRequests=0
 local documentMode=env.emojiChooserTelegramDocument
@@ -122,15 +159,70 @@ env.emojiChooser()
 beforePaste=pasted
 keys['cmd:return'].fn()
 assert(pasted==beforePaste,'WebP must wait for encoding')
-webpCallback(nil,{['public.file-url']='file:///emoji.webp',['org.webmproject.webp']='webp-bytes'})
+assert(webpLayout==nil,'Cmd+Enter uses the default Auto layout')
+webpCallback(nil,{{['public.file-url']='file:///emoji.webp',['org.webmproject.webp']='webp-bytes'}})
 assert(clipboard['public.file-url']=='file:///emoji.webp' and pasted==beforePaste+1)
 assert(documentRequests==1,'WebP should request Telegram document mode')
 env.emojiChooser()
 keys['cmd:return'].fn()
 beforePaste=pasted
 chooser.onHide()
-webpCallback(nil,{['public.file-url']='file:///cancelled.webp'})
+webpCallback(nil,{{['public.file-url']='file:///cancelled.webp'}})
 assert(pasted==beforePaste,'Cancelled chooser must not paste a late WebP result')
+-- Ctrl+Enter: layout rows with previews for the picks; Enter exports the
+-- highlighted layout; Ctrl+Enter again restores the emoji list and query.
+local exported
+env.emojiChooserWebp=function(emojis,callback,layout)exported={emojis=emojis,layout=layout,callback=callback} end
+env.emojiChooser()
+chooser.query=function(self,q)if q then self.q=q end;return self.q or '' end
+chooser.selected=1
+for _=1,3 do keys['shift:return'].fn() end
+chooser:query('smile')
+keys['ctrl:return'].fn()
+assert(chooser.rows[1].layout=='auto' and chooser.rows[1].image,'Layouts are listed with live previews')
+assert(chooser.rows[1].subText:find('512',1,true) and chooser:query()=='')
+assert(chooser.placeholder:find('Layout for 3 emoji',1,true))
+local rowCount=#chooser.rows
+keys['shift:return'].fn()
+assert(tally=='😀😀😀','Shift+Enter does not add a layout row as an emoji')
+chooser.selected=rowCount
+assert(chooser.rows[rowCount].layout=='jumble' and chooser.rows[rowCount].text=='Jumble #1')
+keys[':tab'].fn()
+assert(chooser.rows[rowCount].text=='Jumble #2' and chooser.selected==rowCount,'Tab re-rolls Jumble in place')
+chooser.selected=4
+assert(chooser.rows[4].layout=='each')
+keys[':return'].fn()
+assert(exported.layout=='each' and #exported.emojis==3)
+beforePaste=pasted
+local sequence={}
+env.hs.timer={doAfter=function(_,fn)sequence[#sequence+1]=fn;return {stop=function()end} end}
+exported.callback(nil,{{['org.webmproject.webp']='a'},{['org.webmproject.webp']='b'},{['org.webmproject.webp']='c'}})
+assert(clipboard['org.webmproject.webp']=='a' and pasted==beforePaste+1,'The first sticker pastes at once')
+table.remove(sequence,1)()
+assert(clipboard['org.webmproject.webp']=='b' and pasted==beforePaste+2)
+table.remove(sequence,1)()
+assert(clipboard['org.webmproject.webp']=='c' and pasted==beforePaste+3 and #sequence==0,'Each sticker is its own paste')
+assert(settings['emojiLayout.last.v1']=='each' and keys[':return'].hk.deleted)
+env.emojiChooser()
+chooser.query=function(self,q)if q then self.q=q end;return self.q or '' end
+chooser.selected=1
+keys['ctrl:return'].fn()
+assert(chooser.rows[1].layout=='auto' and #chooser.rows==4,'One emoji offers Auto and the repeating shapes')
+keys['ctrl:return'].fn()
+keys['shift:return'].fn();keys['shift:return'].fn();keys['shift:return'].fn()
+keys['ctrl:return'].fn()
+assert(chooser.placeholder:find('Layout for 3 emoji',1,true))
+keys['shift:tab'].fn()
+assert(tally=='😀😀' and chooser.placeholder:find('Layout for 2 emoji',1,true),'Removing a pick refreshes the previews')
+keys['ctrl:return'].fn()
+assert(chooser.rows[1].emoji and chooser:query()=='' and chooser.placeholder:find('Ctrl+Enter: layouts',1,true),'Ctrl+Enter returns to the emoji list')
+chooser.onHide()
+env.emojiChooser()
+chooser.query=function(self,q)if q then self.q=q end;return self.q or '' end
+for _=1,6 do keys['shift:return'].fn() end
+keys['ctrl:return'].fn()
+assert(chooser.rows[1].layout=='each','The last used layout is listed first')
+chooser.onHide()
 local presses,timers=0,{}
 local checkbox={setTimeout=function()end,attributeValue=function(_,key)
     return ({AXRole='AXCheckBox',AXTitle='Send as a document',AXValue=0})[key]
