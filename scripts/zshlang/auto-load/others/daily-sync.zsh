@@ -913,7 +913,10 @@ function h-daily-sync-resolve {
     run="$(h-daily-sync-run-dir)" @RET
     out="$(ec "ds-conflict-resolve ${(qq)repo} ${(qq)machine} ${(j: :)${(qq)@}}" | h-daily-sync-on "${machine}")"
     ec "${out}"
-    (( $# )) && ec "${machine} ${repo}: ${1} ${*[2,-1]}" >> "${run}/resolutions.log"
+    #: Only a call that changed something is recorded; a repeat says NOT-IN-PROGRESS.
+    if (( $# )) && [[ "${out}" != *(NOT-IN-PROGRESS|ERROR)* ]] ; then
+        ec "${machine} ${repo}: ${1} ${*[2,-1]}" >> "${run}/resolutions.log"
+    fi
     if [[ "${out}" == *RESOLVED\ * ]] ; then
         ec "RESOLVED ${machine} ${repo}: $(command sed -e 's/^[^:]*: //' "${run}/resolutions.log" 2>/dev/null | command tr '\n' ';' )" >> "${run}/conflicts.log"
         command rm -f -- "${run}/resolutions.log"
