@@ -1,5 +1,6 @@
 """Account setup must not share auth or overwrite existing profile data."""
 import json
+import os
 from pathlib import Path
 import tempfile
 import unittest
@@ -73,6 +74,19 @@ class AccountsTest(unittest.TestCase):
         with self.assertRaises(ValueError):
             prepare(self.account, self.shared)
         self.assertEqual(original.read_text(), "own history")
+
+    def test_config_rules_shared_and_dangling_links_dropped(self):
+        (self.shared / "config/rules").mkdir()
+        (self.shared / "config/rules/agents-md-01.md").write_text("synthetic rule")
+        prepare(self.account, self.shared)
+        self.assertTrue((self.account / "config/rules").is_symlink())
+        self.assertEqual((self.account / "config/rules/agents-md-01.md").read_text(), "synthetic rule")
+        (self.shared / "GEMINI.md").unlink()
+        (self.account / "AGENTS.md").symlink_to(self.temporary.name + "/elsewhere.md")
+        prepare(self.account, self.shared)
+        self.assertFalse(os.path.lexists(self.account / "GEMINI.md"))
+        # A link this setup did not make is not touched, dangling or not.
+        self.assertTrue((self.account / "AGENTS.md").is_symlink())
 
 
 if __name__ == "__main__":

@@ -12,7 +12,10 @@ import re
 
 SHARED = (
     "GEMINI.md", "AGENTS.md", "policies", "skills", "rules", "commands",
-    "config/hooks.json",
+    # ~/.gemini/config is agy's global customization root: agents-md-sync
+    # writes the global rules to config/rules, and the skill links live in
+    # config/skills.
+    "config/hooks.json", "config/rules", "config/skills",
     # Directory links preserve SQLite WAL/SHM siblings. Summary indexes and
     # cache/default_project_id.txt must remain account-local.
     "antigravity-cli/conversations", "antigravity-cli/brain",
@@ -64,10 +67,14 @@ def prepare(destination: Path, shared: Path) -> None:
     settings = cli / "settings.json"
     if cli.is_symlink() or settings.is_symlink():
         raise ValueError("refusing shared per-account state/settings symlinks")
-    links = []
+    links, stale = [], []
     for relative in SHARED:
         source, target = shared / relative, destination / relative
         if not source.exists():
+            # A link left pointing at a shared file that is gone (such as the
+            # retired GEMINI.md) is ours to drop; anything else stays.
+            if target.is_symlink() and os.readlink(target) == str(source):
+                stale.append(target)
             continue
         if target.is_symlink() and target.resolve() == source.resolve():
             continue
@@ -91,6 +98,8 @@ def prepare(destination: Path, shared: Path) -> None:
 
     destination.mkdir(parents=True, exist_ok=True, mode=0o700)
     cli.mkdir(exist_ok=True, mode=0o700)
+    for target in stale:
+        target.unlink()
     for source, target in links:
         target.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
         target.symlink_to(source)

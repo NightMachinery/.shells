@@ -25,8 +25,11 @@ for public code; email addresses and credentials remain outside the repository.
 
 `agy-account-prepare <name>` prepares new configuration/history links. New
 accounts are prepared on first launch; existing state is never rewritten by a
-normal launch. Setup links `GEMINI.md`, `AGENTS.md`, hooks, policies and skills
-when present, and synchronizes only the `statusLine` settings key. Other settings
+normal launch. Setup links the global rules (`config/rules`, written by
+`agents-md-sync`), hooks, policies and skills (`config/skills`) when present,
+drops a link it made to a shared file that no longer exists, and synchronizes
+only the `statusLine` settings key. Run it again for an existing account after
+a new shared path is added. Other settings
 remain per account. Existing independent files are refused for manual
 reconciliation, never moved or overwritten. Override the shared root with
 `AGY_SHARED_GEMINI_DIR` if needed.
