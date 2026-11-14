@@ -48,12 +48,23 @@ only has to follow them from `begin` to `ALL DONE`.
   machine with everyone's commits: local, peers, server, local again, then a
   fast-forward on the peers and the server, then the mirror pushes. A pull is a
   rebase, or a merge when tracked files are still modified. A conflict is
-  aborted and reported as `CONFLICT`; nothing is ever left half rebased. It
-  clones onto a peer a repository the peer lacks, and creates a missing mirror.
+  aborted and reported as `CONFLICT`. It clones onto a peer a repository the
+  peer lacks, and creates a missing mirror.
+- `daily-sync conflict <machine> <repo> [abort]`: repeats the conflicted pull on
+  that machine and keeps it open, then prints every conflicted hunk as three
+  parts (upstream, base, local) with a class and a suggested choice; see
+  Conflicts below. `abort` leaves the repository blocked and notifies.
+- `daily-sync resolve <machine> <repo> <file> <hunk>=<choice>...`: resolves the
+  hunks of one file by choice, so the agent never edits files on another
+  machine. Once no file is conflicted it continues the rebase, and prints the
+  next commit's hunks if that one conflicts too. A rebase the agent leaves open
+  is aborted when the metadata updater starts and at `finish`, so none
+  outlives the run.
 - `daily-sync metadata start`: starts `org-paper-metadata-updater` over the
-  clean notes repositories as the tmux job `daily-sync-metadata`, which wakes
-  the agent through `paseo send` when it finishes, and arms a fallback
-  heartbeat.
+  clean notes repositories as the tmux job `daily-sync-metadata`. When it
+  finishes, the job runs the review that `daily-sync next` would print and
+  sends it to the agent through `paseo send`. An hourly heartbeat is the
+  fallback.
 - `daily-sync next`: where the run stands and what to do. While the updater
   runs it says so; once it is done it prints exit codes, counts, today's
   failures sorted by cause (with the number of earlier daily logs showing the
@@ -69,16 +80,55 @@ The agent harness cuts a command off after about 30 seconds, and a model
 handles a cut-off command badly: in the first test it never saw the output.
 So `begin`, `status`, `converge` and `finish` run as the tmux job
 `daily-sync-step`. A call waits up to `daily_sync_step_wait` (default 20)
-seconds, then prints `STILL WORKING` and says to run `daily-sync next`, which
-picks the result up once it is there. Set `daily_sync_inner=y` to run a step
-in the foreground instead.
+seconds. Past that it prints `WORKING` and the agent ends its turn; the job
+sends the step's output to the agent through `paseo send` when it is done,
+so the agent never polls. Exactly one of the two delivers it, whichever
+creates `step.claim` first. If the send fails, the next `daily-sync next`
+prints the output. Outside Paseo the call prints `STILL WORKING` and says to
+run `daily-sync next` instead. Set `daily_sync_inner=y` to run a step in the
+foreground.
+
+The agent is the caller's `PASEO_AGENT_ID`; `begin` records it in the run
+directory for the jobs.
+
+## Updates are self-contained
+
+The model this job is meant for keeps poor track of earlier turns. So every
+hint, whether printed or sent as a message, ends with the run so far (commits
+made through `daily-sync git ... commit-own`, files held back, conflicts
+resolved or left blocked, unreachable machines), the five steps of the run
+with the current one marked, and the `NEXT` line. The reports are written
+from that, not from memory.
+
+## Conflicts
+
+`daily-sync conflict` asks git for `zdiff3` markers, so each hunk carries its
+base. The classes:
+
+- `SAME-IGNORING-WHITESPACE`: the two sides differ only in whitespace; take
+  upstream.
+- `UPSTREAM-ONLY-WHITESPACE`, `LOCAL-ONLY-WHITESPACE`: one side changed only
+  whitespace; take the other side.
+- `BOTH-ONLY-ADDED`: neither side changed or deleted a base line; take `both`.
+- `ONE-EDITED-OTHER-ADDED`: one side changed or deleted base lines, the other
+  only added; `both` is still right.
+- `BOTH-EDITED`: both sides changed or deleted base lines; a judgement call.
+- `BASE-NOT-SHOWN`: the markers carry no base; a judgement call.
+
+`both` is upstream's lines, minus the base lines local deleted, followed by
+the lines local added. A line local added counts as already present only when
+it matches as part of a run that holds a real line. A blank line, a short
+line or bare org markup such as `#+begin_verse` proves nothing alone, so a
+copy of it elsewhere does not swallow local's. `both-local-first` puts local's
+additions first. The result is never lossy, but can be untidy: an extra blank
+line, or a stub left by an editor in a file both sides created.
 
 ## State
 
-A run keeps its state in `~/.agents/runs/daily-sync/<date>/`: `stage`, the ids
-of its heartbeats, `converge.log`, `held`, the updater's `rc-*` files and
-`DONE`, the pending slow step (`step.*`), and `stderr.log` with the stderr of
-every generated script. Set
+A run keeps its state in `~/.agents/runs/daily-sync/<date>/`: `stage`, `agent`,
+the ids of its heartbeats, `converge.log`, `status.log`, `held`, `commits.log`,
+`conflicts.log`, the updater's `rc-*` files and `DONE`, the pending slow step
+(`step.*`), and `stderr.log` with the stderr of every generated script. Set
 `daily_sync_trace=y` to add an xtrace to that log.
 
 The watchdog heartbeat fires every ten minutes while the agent should be
