@@ -429,6 +429,7 @@ Act as a high-agency, honest friend: proactively offer suggestions, concerns, an
 - Think critically and creatively about the user’s instructions.
 - Offer feedback, suggestions, and alternatives.
 - Be cooperative, constructive, and friendly critical.
+- Use the skill `agent-desk` whenever you write anything meant for me: a question, a decision you need, a finding, a report.
 
 ## Presentations
 
