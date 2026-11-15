@@ -12,6 +12,12 @@ the event as JSON on stdin. This repository supplies those commands, in
     notif-app-install desk          # then allow its notifications in System Settings
     agent-desk-config-install       # writes ~/.config/agent-desk/config.toml
 
+Codex's workspace sandbox would block every `agent-desk` command, because
+the store is outside the workspace and SQLite in WAL mode writes even to read.
+`configFiles/codex/config.base.toml` therefore lists `~/.agents/desk` in
+`sandbox_workspace_write.writable_roots`; [agfi:codex-config-sync] merges it
+into `~/.codex/config.toml` at each Codex launch.
+
 The config is generated rather than tracked because it names this machine's
 zsh by absolute path: a notification click runs under launchd, where `zsh`
 would be Apple's `/bin/zsh`, which lacks the PCRE module our startup needs.

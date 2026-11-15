@@ -26,3 +26,9 @@ js_repl = false
 [tui]
 status_line = ["model-with-reasoning", "current-dir", "context-used", "five-hour-limit", "weekly-limit"]
 session_picker_view = "dense"
+
+# agent-desk's store (github.com/NightMachinery/agent-desk): SQLite in WAL mode
+# must write even to read, so the workspace sandbox otherwise blocks every
+# command. The store is append-only. See docs/agent-desk.md.
+[sandbox_workspace_write]
+writable_roots = ["~/.agents/desk"]
