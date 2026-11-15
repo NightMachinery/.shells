@@ -42,7 +42,26 @@ print('Cached chooser index and bounded native result tests passed')
 ChooserSearch.setDynamic(bounded,function(q) if q=='paper 4998' then return {{text='Typed '..q}} end end)
 callback('paper 4998');assert(#shown==2 and shown[1].text=='Typed paper 4998' and shown[2]==big[4998])
 callback('paper 4997');assert(#shown==1,'No dynamic row when the function returns nil')
+ChooserSearch.setDynamic(bounded,function() return {big[4998]} end)
+callback('paper 4998');assert(#shown==1 and shown[1]==big[4998],'Reusing an existing row does not duplicate it')
 ChooserSearch.setDynamic(bounded,nil);callback('paper 4998');assert(#shown==1)
+local keyed=ChooserSearch.new(function()end)
+local presets={
+    {text='Text MY HI',layout='text:MY HI'},
+    {text='Text HI',layout='text:HI'},
+    {text='Heart',layout='heart'},
+}
+ChooserSearch.setChoices(keyed,presets)
+ChooserSearch.setDynamic(keyed,function(q)
+    if q=='hi' then return {{text='Text HI',layout='text:HI'}} end
+    if q=='heart' then return {{text='Text HEART',layout='text:HEART'}} end
+end,'layout')
+callback('hi');assert(#shown==2 and shown[1].layout=='text:HI' and shown[2].layout=='text:MY HI','Dynamic key promotes matching row without duplicating it')
+callback('heart');assert(#shown==2 and shown[1].layout=='text:HEART' and shown[2].layout=='heart','Different layout keys are both kept')
+ChooserSearch.setDynamic(keyed,function() return {{text='Fresh',id='a'}} end,function(r) return r.id end)
+ChooserSearch.setChoices(keyed,{{text='Saved',id='a'},{text='Other',id='b'}})
+callback('');assert(#shown==2 and shown[1].text=='Fresh' and shown[2].text=='Other','Function key deduplicates matching rows')
+ChooserSearch.setDynamic(keyed,nil);callback('');assert(#shown==2 and shown[1].text=='Saved','Clearing dynamic removes its key deduplicator')
 print('Dynamic rows computed from the query come first')
 
 local prefs,reads,writes={},0,0

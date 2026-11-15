@@ -187,14 +187,29 @@ local function bindKeys(state)
     end
 end
 -- Rows computed from the live query (S.setDynamic), listed before the
--- filtered ones: a row that offers to act on whatever was typed.
+-- filtered ones: a row that offers to act on whatever was typed. Deduplicates
+-- matching rows by identity and optional dynamicKey so promoting a static row
+-- never shows it twice.
 local function withDynamic(state,query,rows)
     if not state.dynamic then return rows end
     local extra=state.dynamic(query or "")
     if not extra or #extra==0 then return rows end
-    local result={}
-    for _,row in ipairs(extra) do result[#result+1]=row end
-    for _,row in ipairs(rows) do result[#result+1]=row end
+    local result,seenRows,seenKeys={},{},{}
+    local keyFn=state.dynamicKey
+    for _,row in ipairs(extra) do
+        local key=keyFn and keyFn(row)
+        if not seenRows[row] and (key==nil or not seenKeys[key]) then
+            result[#result+1]=row
+            seenRows[row]=true
+            if key~=nil then seenKeys[key]=true end
+        end
+    end
+    for _,row in ipairs(rows) do
+        local key=keyFn and keyFn(row)
+        if not seenRows[row] and (key==nil or not seenKeys[key]) then
+            result[#result+1]=row
+        end
+    end
     return result
 end
 local function create(completion,fields,options,remote)
@@ -292,10 +307,19 @@ function S.setChoices(chooser, choices, options)
     return chooser
 end
 
--- fn(query) returns rows to list first, or nil; nil fn removes it. Takes
--- effect at the next setChoices or keystroke.
-function S.setDynamic(chooser,fn)
-    assert(stateFor(chooser),"ChooserSearch.new must create the chooser").dynamic=fn
+-- fn(query) returns rows to list first, or nil; nil fn removes it. Optional
+-- key (field name or fn(row)) deduplicates matching filtered rows. Takes effect
+-- at the next setChoices or keystroke.
+function S.setDynamic(chooser,fn,key)
+    local state=assert(stateFor(chooser),"ChooserSearch.new must create the chooser")
+    state.dynamic=fn
+    if not fn then
+        state.dynamicKey=nil
+    elseif type(key)=="string" then
+        state.dynamicKey=function(row) return row[key] end
+    else
+        state.dynamicKey=key
+    end
     return chooser
 end
 

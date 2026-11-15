@@ -2325,10 +2325,13 @@ Punctuation has no pattern meaning and matching preserves source order.
 This policy covers bookmarks, Omni Prompt, emoji, and Wi-Fi choosers.
 History, tag lookup, and autocomplete retain custom query-provider behavior.
 
-`ChooserSearch.setDynamic(chooser, fn)` adds rows computed from the live
-query: `fn(query)` returns rows to list before the filtered ones, or nil. The
-emoji layout menu uses it to offer spelling whatever word is typed. Pass nil
-to remove it; it takes effect at the next keystroke or `setChoices`.
+`ChooserSearch.setDynamic(chooser, fn[, key])` adds rows computed from the live
+query: `fn(query)` returns rows to list before the filtered ones, or nil.
+Identical row tables and rows matching the optional `key` (a field name or
+`fn(row)`) are omitted from the filtered list so promoted presets do not
+appear twice. The emoji layout menu uses this with `"layout"` to offer
+spelling whatever word is typed without duplicating preset or remembered words.
+Pass nil to remove it; it takes effect at the next keystroke or `setChoices`.
 
 Hammerspoon's `chooser:query(value)` changes the input without firing its query
 callback. When changing a query programmatically, call `setChoices` again to
