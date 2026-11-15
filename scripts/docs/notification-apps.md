@@ -1,6 +1,6 @@
 # Dedicated macOS notification apps
 
-Night Mail, Agent Bells, and Agent Done use separate signed application bundles,
+Night Mail, Agent Bells, Agent Done and Agent Desk use separate signed application bundles,
 with their own icons, notification permissions, alert styles, and dismissal
 boundaries. They share `macos/notification-apps/build.py`, the launcher, and the icon renderer.
 The system/Homebrew terminal-notifier installation is untouched.
@@ -15,7 +15,10 @@ The system/Homebrew terminal-notifier installation is untouched.
 - `notif-app-install done` installs `~/Applications/Agent Done.app`, used by
   `agent-done` for clickable report notifications. Its first alert also installs
   it when missing. Its original emerald icon shows a report with a checkmark.
-- `notif-app-install <mail|agents|done> --check` verifies
+- `notif-app-install desk` installs `~/Applications/Agent Desk.app`, used by
+  agent-desk for questions and notices; its amber icon shows an inbox tray. See
+  [agent-desk.md](agent-desk.md).
+- `notif-app-install <mail|agents|done|desk> --check` verifies
   the signature and build inputs, and queries macOS notification authorization.
   Checks run through LaunchServices in the Aqua login session and use a result
   receipt, so a successful `open` launch is not mistaken for permission success.

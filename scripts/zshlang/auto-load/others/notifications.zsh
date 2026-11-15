@@ -1,5 +1,5 @@
 function notif-app-install {
-    : "builds dedicated macOS notification apps: notif-app-install [agents|mail|done] [--check]"
+    : "builds dedicated macOS notification apps: notif-app-install [agents|mail|done|desk] [--check]"
     local profile="${1:-agents}" night_dir="${NIGHTDIR:-${HOME}/scripts}"
     (( $# )) && shift
     ensure-cmd python3 @RET
@@ -13,6 +13,7 @@ function h-notif-os-command {
         agents) app_file="${HOME}/Applications/Agent Bells.app/Contents/MacOS/terminal-notifier" ;;
         mail) app_file="${HOME}/Applications/Night Mail.app/Contents/MacOS/terminal-notifier" ;;
         done) app_file="${HOME}/Applications/Agent Done.app/Contents/MacOS/terminal-notifier" ;;
+        desk) app_file="${HOME}/Applications/Agent Desk.app/Contents/MacOS/terminal-notifier" ;;
         '') ensure-cmd terminal-notifier @RET; REPLY="${commands[terminal-notifier]}"; return 0 ;;
         *) ecerr "$0: unknown notif_app: $app"; return 1 ;;
     esac

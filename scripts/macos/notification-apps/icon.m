@@ -5,6 +5,7 @@ int main(int argc, const char *argv[]) {
     @autoreleasepool {
         BOOL mail = [@(argv[1]) isEqualToString:@"mail"];
         BOOL done = [@(argv[1]) isEqualToString:@"done"];
+        BOOL desk = [@(argv[1]) isEqualToString:@"desk"];
         NSBitmapImageRep *bitmap = [[NSBitmapImageRep alloc]
             initWithBitmapDataPlanes:NULL pixelsWide:1024 pixelsHigh:1024
             bitsPerSample:8 samplesPerPixel:4 hasAlpha:YES isPlanar:NO
@@ -13,6 +14,7 @@ int main(int argc, const char *argv[]) {
         NSGraphicsContext.currentContext = [NSGraphicsContext graphicsContextWithBitmapImageRep:bitmap];
         NSColor *color = mail ? [NSColor colorWithCalibratedRed:0.12 green:0.43 blue:0.87 alpha:1]
                              : done ? [NSColor colorWithCalibratedRed:0.08 green:0.53 blue:0.38 alpha:1]
+                             : desk ? [NSColor colorWithCalibratedRed:0.85 green:0.47 blue:0.09 alpha:1]
                              : [NSColor colorWithCalibratedRed:0.42 green:0.25 blue:0.72 alpha:1];
         [color setFill];
         [[NSBezierPath bezierPathWithRoundedRect:NSMakeRect(48,48,928,928) xRadius:210 yRadius:210] fill];
@@ -37,6 +39,22 @@ int main(int argc, const char *argv[]) {
             [lines moveToPoint:NSMakePoint(380,410)];
             [lines lineToPoint:NSMakePoint(470,320)];
             [lines lineToPoint:NSMakePoint(644,490)];
+        } else if (desk) {
+            // An inbox tray: a box whose top edge dips where items come in.
+            [lines moveToPoint:NSMakePoint(232,560)];
+            [lines lineToPoint:NSMakePoint(232,300)];
+            [lines lineToPoint:NSMakePoint(792,300)];
+            [lines lineToPoint:NSMakePoint(792,560)];
+            [lines lineToPoint:NSMakePoint(640,560)];
+            [lines lineToPoint:NSMakePoint(600,470)];
+            [lines lineToPoint:NSMakePoint(424,470)];
+            [lines lineToPoint:NSMakePoint(384,560)];
+            [lines lineToPoint:NSMakePoint(232,560)];
+            [lines moveToPoint:NSMakePoint(512,780)];
+            [lines lineToPoint:NSMakePoint(512,600)];
+            [lines moveToPoint:NSMakePoint(440,672)];
+            [lines lineToPoint:NSMakePoint(512,600)];
+            [lines lineToPoint:NSMakePoint(584,672)];
         } else {
             [lines moveToPoint:NSMakePoint(270,650)];
             [lines lineToPoint:NSMakePoint(430,512)];
