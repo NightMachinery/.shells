@@ -27,6 +27,8 @@ zstyle ':fzf-tab:*' default-color $'\033[38;5;24m'
 #: prefix. Scoped to fzf-tab's own run, so plain zsh completion is unchanged.
 #: See the same line in =~/.zshrc= for why.
 zstyle -e ':completion:*' menu '(( IN_FZF_TAB )) && reply=(yes)'
+#: Start fzf's query from what was typed, not from the candidates' shared prefix.
+zstyle ':fzf-tab:*' query-string input
 ##
 FZF_TAB_GROUP_COLORS=(
     $'\033[38;5;24m' $'\033[32m' $'\033[33m' $'\033[35m' $'\033[31m' $'\033[38;5;27m' $'\033[36m' \

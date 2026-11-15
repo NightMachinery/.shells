@@ -546,6 +546,9 @@ function nightsh-load-zshrc() {
   #: (=IN_FZF_TAB=), so Alt+/ (plain zsh completion) still inserts the prefix
   #: rather than the first match.
   zstyle -e ':completion:*' menu '(( IN_FZF_TAB )) && reply=(yes)'
+  #: Start fzf's query from what was typed, not from the candidates' shared
+  #: prefix (the default is =prefix input first=).
+  zstyle ':fzf-tab:*' query-string input
   ##
   FZF_TAB_GROUP_COLORS=(
     $'\033[38;5;24m' $'\033[32m' $'\033[33m' $'\033[35m' $'\033[31m' $'\033[38;5;27m' $'\033[36m' \
