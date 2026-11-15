@@ -199,7 +199,7 @@ make one flower with identical petals rather than alternating ones:
   corners (2 to 5).
 - **Crown**: the first under an arc of the rest (3 to 16).
 - **Saturn**: the first as a planet, the rest on a wide tilted ring passing
-  behind and in front of it (15 to 19; fewer cells read as scattered emoji
+  behind and in front of it (11 to 19; fewer cells read as scattered emoji
   rather than a ring).
 - **Frame**: the first inside a square border of the rest (17 to 33).
 

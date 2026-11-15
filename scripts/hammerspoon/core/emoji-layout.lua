@@ -544,7 +544,7 @@ L.modes = {
     {key="lead", name="Lead", note="first large, the rest along the top and left", repeatTo=5, max=20, hero=true, build=lead},
     {key="quad", name="Quad", note="first filling it, up to four on its corners", repeatTo=2, max=5, hero=true, build=quad},
     {key="crown", name="Crown", note="first under an arc of the rest", repeatTo=3, max=16, hero=true, build=crown},
-    {key="saturn", name="Saturn", note="first as a planet, the rest its ring", repeatTo=15, max=19, hero=true, build=saturn},
+    {key="saturn", name="Saturn", note="first as a planet, the rest its ring", repeatTo=11, max=19, hero=true, build=saturn},
     {key="frame", name="Frame", note="first inside a border of the rest", repeatTo=17, max=33, hero=true, build=frame},
 }
 

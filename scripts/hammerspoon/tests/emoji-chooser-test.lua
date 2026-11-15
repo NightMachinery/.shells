@@ -128,7 +128,7 @@ local flat,jit=L.build('jumble-flat',6,4)[1],L.build('jumble',6,4)[1]
 for k=1,6 do
     assert(flat[k].i==jit[k].i and flat[k].x==math.floor(jit[k].x+0.5) and flat[k].s==1 and not flat[k].rot)
 end
-assert(#L.build('saturn',2)[1]==15,'A ring needs 14 cells to read as one')
+assert(#L.build('saturn',2)[1]==11,'A ring needs 10 cells to read as one')
 assert(L.seeded('jumble-flat') and not L.seeded('heart') and not L.seeded('nope'))
 -- Text: one emoji per letter, stripes when the selection is longer than the word.
 assert(L.textWord(' hi ')=='HI' and L.textWord('i ♥ u')=='I ♥ U' and not L.textWord('a#b') and not L.textWord(''))
