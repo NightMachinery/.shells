@@ -156,7 +156,9 @@ PNG, Tab re-rolls Jumble, Ctrl+Enter returns to the emoji list (restoring the
 query), and Shift+Backspace still removes the last pick and refreshes the
 previews. The last layout used is listed first. Every shape is offered for any
 selection: a short one repeats to a minimum that suits the shape (shown as
-`repeated to N` in the row). The layouts:
+`repeated to N` in the row), and a shape of fixed size (a board, a flake, a
+tree, a pixel heart) cycles the selection over its extra cells. Shapes stop
+being offered where their cells would get too small to read. The layouts:
 
 - **Auto**, **Row** (one line), **Column** (one stack). Row and Column repeat
   to 3.
@@ -165,27 +167,59 @@ selection: a short one repeats to a minimum that suits the shape (shown as
   and adds each to its open send box as a separate sticker, not an album.
 - **Pages** (17 or more): Auto grids of up to 16, pasted the same way.
 - **Beehive**: interlocked rows, alternating long and short (repeats to 7).
-- **Daisy**: the first emoji large in the middle, the rest around it
-  (repeats to 7).
-- **Marquee**: the first emoji as a hero over the rest (repeats to 4).
-- **Heart**: emoji around the parametric heart outline up to 20, a filled
-  heart beyond.
-- **Orbit**: a ring up to 12, concentric rings around a centre beyond.
-- **Sunflower**: the golden-angle spiral.
 - **Pyramid**: rows shrinking upwards (repeats to 6).
+- **Orbit**: a ring up to 12, concentric rings around a centre beyond
+  (repeats to 3).
+- **Heart**: a pixel heart on a square lattice, an outline of 10, then filled
+  hearts of 16 to 129 cells. Being a lattice, glyphs never overlap.
+- **Chessboard**: alternating squares from 4×4 up, the bottom-right one left
+  empty for Telegram's timestamp. Two emoji fill both colours.
 - **Nautilus**: a growing spiral, first emoji largest (repeats to 8).
 - **Jumble**: random cells of a sparse grid, each nudged, turned and resized
   a little (repeats to 5). The seed is shown in the row (`Jumble #3`) and Tab
-  picks the next.
+  picks the next. **Jumble-No-Jitter** takes the same cells for a seed,
+  upright and on the grid.
 
-Heart, Orbit and Sunflower repeat to 6, 3 and 8. Daisy and Marquee keep the
-first emoji as the hero and cycle only the rest, so two emoji make one flower
-with six identical petals rather than alternating ones.
+Hero layouts make the first emoji large and cycle only the rest, so two emoji
+make one flower with identical petals rather than alternating ones:
+
+- **Daisy**: the first in the middle, petals around (repeats to 7).
+- **Sunflower**: a disc of seeds (all the first emoji, on the golden-angle
+  spiral) inside a ring of larger petals (repeats to 21). 🟤 then 🟡 makes a
+  sunflower.
+- **Snowflake**: the first in the middle, six arms with barbed tips (31 to
+  61 cells). Each ring of six cells shares an emoji while the selection
+  allows, so the flake stays symmetric.
+- **Pine**: the first as a larger star on top, tiers of interlocked rows and
+  a trunk (11 to 58 cells).
+- **Marquee**: the first over rows of the rest (repeats to 4).
+- **Lead**: the first in the bottom-right, the rest along the top and left
+  edges (5 to 20).
+- **Quad**: the first filling the sticker, up to four small ones over its
+  corners (2 to 5).
+- **Crown**: the first under an arc of the rest (3 to 16).
+- **Saturn**: the first as a planet, the rest on a tilted ring passing behind
+  and in front of it (6 to 13).
+- **Frame**: the first inside a square border of the rest (17 to 33).
+
+**Text** spells a word with one emoji per pixel of a 5-row font (A to Z, 0 to
+9, `♥ ! ?`; M and W are 5 wide so they stay distinct). Type the word in the
+layout menu and a `Text WORD` row appears first. Each letter is one emoji,
+cycling the selection; with more emoji than letters each pixel row is one
+emoji (stripes). Long words wrap onto up to three lines, whichever gives the
+largest pixels, so `HELLO` becomes `HEL` over `LO`. Past about nine letters
+the pixels drop under 30px. The word travels in the layout key (`text:HI`),
+so last-used and history keep it. Preset words are listed in the menu from
+the private file `~/witching/emoji/words.txt` (one per line, `#` comments)
+when it exists, and from the Hammerspoon setting `emojiLayout.words.v1`.
+
+The tests check that no two glyph boxes intersect in any layout for 1 to 128
+emoji, except Jumble, Quad and Saturn, which overlap on purpose.
 
 ### Recent sticker sets (Hyper+Ctrl+A)
 
 Every image export of several emoji, or of one emoji in a layout other than
-Auto, is remembered with its layout (and Jumble seed), newest first, up to
+Auto, is remembered with its layout (and Jumble seed, or the word for Text), newest first, up to
 60. Hyper+Ctrl+A lists them with a preview in the saved layout, the layout
 name, the count and the age.
 

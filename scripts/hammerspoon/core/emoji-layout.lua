@@ -97,41 +97,36 @@ local function shuffle(list, rand)
     return list
 end
 
-local function heart(n)
-    if n <= 20 then
-        -- The classic parametric heart, starting at its bottom tip.
-        return {pathCells(n, function(t)
-            t = t + math.pi
-            return 16 * math.sin(t)^3,
-                -(13 * math.cos(t) - 5 * math.cos(2*t) - 2 * math.cos(3*t) - math.cos(4*t))
-        end, 0.9)}
-    end
-    -- Filled: a hexagonal grid inside (x^2+y^2-1)^3 - x^2 y^3 <= 0, coarse
-    -- enough to hold n; the shallowest surplus points are dropped.
-    local function points(d)
-        local found, row = {}, 0
-        for y = 1.3, -1.1, -d * SQ3 do
-            local offset = row % 2 == 1 and d / 2 or 0
-            for x = -1.2 + offset, 1.2, d do
-                local a = x*x + y*y - 1
-                local depth = a*a*a - x*x*y*y*y
-                if depth <= 0 then found[#found+1] = {x=x, y=-y, depth=depth} end
-            end
-            row = row + 1
+-- Rows of a bitmap joined by "/", X lit: one s=1 cell per lit pixel on a
+-- square lattice, in reading order, so glyph boxes never intersect.
+local function bitmapCells(bitmap)
+    local cells, y = {}, 0
+    for row in bitmap:gmatch("[^/]+") do
+        for x = 1, #row do
+            if row:sub(x, x) == "X" then cells[#cells+1] = {i=#cells+1, x=x - 1, y=y, s=1} end
         end
-        return found
+        y = y + 1
     end
-    local d, found = 0.6, nil
-    repeat found = points(d); d = d * 0.98 until #found >= n
-    d = d / 0.98
-    local order = {}
-    for k = 1, #found do order[k] = k end
-    table.sort(order, function(a, b) return found[a].depth < found[b].depth end)
-    local keep = {}
-    for k = 1, n do keep[order[k]] = true end
-    local cells = {}
-    for k, p in ipairs(found) do
-        if keep[k] then cells[#cells+1] = {i=#cells+1, x=p.x, y=p.y, s=d} end
+    return cells
+end
+
+-- Pixel hearts: an outline of 10, then filled ones. The smallest that holds
+-- the selection; the surplus cycles. A curve or a hex mask let neighbours
+-- overlap in the cleft and lost the notch once filled.
+local hearts = {
+    ".X.X./X.X.X/X...X/.X.X./..X..",
+    ".X.X./XXXXX/XXXXX/.XXX./..X..",
+    ".XX.XX./XXXXXXX/XXXXXXX/.XXXXX./..XXX../...X...",
+    ".XX...XX./XXXX.XXXX/XXXXXXXXX/XXXXXXXXX/.XXXXXXX./..XXXXX../...XXX.../....X....",
+    ".XXX...XXX./XXXXX.XXXXX/XXXXXXXXXXX/XXXXXXXXXXX/XXXXXXXXXXX/.XXXXXXXXX./..XXXXXXX../...XXXXX.../....XXX..../.....X.....",
+    "..XXX...XXX../.XXXXX.XXXXX./XXXXXXXXXXXXX/XXXXXXXXXXXXX/XXXXXXXXXXXXX/XXXXXXXXXXXXX/.XXXXXXXXXXX./..XXXXXXXXX../...XXXXXXX.../....XXXXX..../.....XXX...../......X......",
+    "..XXXX...XXXX../.XXXXXX.XXXXXX./XXXXXXXXXXXXXXX/XXXXXXXXXXXXXXX/XXXXXXXXXXXXXXX/XXXXXXXXXXXXXXX/.XXXXXXXXXXXXX./..XXXXXXXXXXX../...XXXXXXXXX.../....XXXXXXX..../.....XXXXX...../......XXX....../.......X.......",
+}
+local function heart(slots)
+    local cells
+    for _, bitmap in ipairs(hearts) do
+        cells = bitmapCells(bitmap)
+        if #cells >= slots then break end
     end
     return {cells}
 end
@@ -162,11 +157,30 @@ local function orbit(n)
     return {cells}
 end
 
-local function sunflower(n)
+-- A disc of seeds on the golden-angle spiral, all the first emoji, inside a
+-- ring of larger petals cycling the rest. The petal count keeps petals about
+-- 1.45 times the seeds.
+local function sunflower(slots)
+    local sig, best = 1.25, nil
+    for petals = 8, math.max(8, slots - 4) do
+        local seeds = math.max(1, slots - petals)
+        local disc = math.sqrt(seeds - 0.5) + sig / 2
+        local k = 0.95 * math.sin(math.pi / petals)
+        local radius = (disc + 0.06) / (1 - k)
+        local size = 2 * radius * k
+        local score = math.abs(math.log(size / (1.45 * sig)))
+        if not best or score < best.score then
+            best = {score=score, petals=petals, seeds=seeds, radius=radius, size=size}
+        end
+    end
     local cells = {}
-    for k = 0, n - 1 do
+    for k = 0, best.seeds - 1 do
         local a, r = math.rad(k * 137.508), math.sqrt(k + 0.5)
-        cells[k+1] = {i=k+1, x=r * math.sin(a), y=-r * math.cos(a), s=1.5}
+        cells[#cells+1] = {i=1, x=r * math.sin(a), y=-r * math.cos(a), s=sig}
+    end
+    for j = 0, best.petals - 1 do
+        local a = 2 * math.pi * j / best.petals
+        cells[#cells+1] = {i=j + 2, x=best.radius * math.sin(a), y=-best.radius * math.cos(a), s=best.size}
     end
     return {cells}
 end
@@ -255,8 +269,9 @@ local function pyramid(n)
 end
 
 -- Random cells of a sparse grid that leaves no row or column empty, each
--- nudged, turned and resized a little. Tab picks another seed.
-local function jumble(n, seed)
+-- nudged, turned and resized a little unless flat. Tab picks another seed;
+-- flat keeps the same cells for a seed, since the jitter is drawn last.
+local function jumble(n, seed, _, flat)
     local rand = L.random(seed)
     local g = math.ceil(math.sqrt(1.35 * n))
     local chosen
@@ -278,9 +293,199 @@ local function jumble(n, seed)
     shuffle(order, rand)
     local cells = {}
     for k, slot in ipairs(chosen) do
-        cells[k] = {i=order[k], x=slot % g + rand(-0.12, 0.12), y=slot // g + rand(-0.12, 0.12),
-                    s=rand(0.85, 1.1), rot=rand(-15, 15)}
+        if flat then
+            cells[k] = {i=order[k], x=slot % g, y=slot // g, s=1}
+        else
+            cells[k] = {i=order[k], x=slot % g + rand(-0.12, 0.12), y=slot // g + rand(-0.12, 0.12),
+                        s=rand(0.85, 1.1), rot=rand(-15, 15)}
+        end
     end
+    return {cells}
+end
+
+-- Alternating squares with the bottom-right one empty, for the timestamp.
+-- Two emoji fill the whole board, one per colour. Assigns its own emoji.
+local function chessboard(slots, _, n)
+    local r, c = 4, 4
+    while (r * c) // 2 < slots do
+        if c <= r then c = c + 1 else r = r + 1 end
+    end
+    local cells, k = {}, 0
+    for y = 0, r - 1 do
+        for x = 0, c - 1 do
+            local dark = (x + y) % 2 == (r + c - 1) % 2
+            if n == 2 then
+                cells[#cells+1] = {i=dark and 1 or 2, x=x, y=y, s=1}
+            elseif dark then
+                k = k + 1
+                cells[#cells+1] = {i=(k - 1) % n + 1, x=x, y=y, s=1}
+            end
+        end
+    end
+    return {cells}
+end
+
+-- Six arms of L cells round the first emoji, with barb pairs at the arm
+-- positions in B. Cells come in groups of six, one emoji per group while
+-- the selection allows, so the flake stays symmetric. Assigns its own emoji.
+local snowflakes = {
+    {L=2, B={2}}, {L=3, B={3}}, {L=4, B={4}}, {L=3, B={2, 3}}, {L=4, B={2, 4}}, {L=4, B={2, 3, 4}},
+}
+local function snowflake(slots, _, n)
+    local shape = snowflakes[#snowflakes]
+    for _, candidate in ipairs(snowflakes) do
+        if 1 + 6 * candidate.L + 12 * #candidate.B >= slots then shape = candidate; break end
+    end
+    local function u(k)
+        local a = math.rad(60 * (k % 6))
+        return math.sin(a), -math.cos(a)
+    end
+    local groups = {}
+    for j = 1, shape.L do
+        local group = {}
+        for k = 0, 5 do
+            local ux, uy = u(k)
+            group[#group+1] = {x=j * ux, y=j * uy, s=1}
+        end
+        groups[#groups+1] = group
+    end
+    for _, j in ipairs(shape.B) do
+        for _, side in ipairs({1, -1}) do
+            local group = {}
+            for k = 0, 5 do
+                local ux, uy = u(k)
+                local vx, vy = u(k + side)
+                group[#group+1] = {x=j * ux + 0.85 * vx, y=j * uy + 0.85 * vy, s=0.7}
+            end
+            groups[#groups+1] = group
+        end
+    end
+    -- Splitting each group of six into f parts (every 6/f-th cell) keeps
+    -- 6/f-fold symmetry with f times as many distinct emoji.
+    local rest, f = n - 1, 6
+    for _, parts in ipairs({1, 2, 3}) do
+        if rest <= parts * #groups then f = parts; break end
+    end
+    local cells = {{i=1, x=0, y=0, s=1}}
+    for g, group in ipairs(groups) do
+        for k, cell in ipairs(group) do
+            local part = (g - 1) * f + (k - 1) % f
+            cell.i = rest < 1 and 1 or part % rest + 2
+            cells[#cells+1] = cell
+        end
+    end
+    return {cells}
+end
+
+-- Foliage tiers of consecutive row counts, each starting one below where the
+-- last ended, so {3, 3} is rows 1 2 3 2 3 4; the first emoji is the star on
+-- top, then a trunk. The smallest tree that holds the selection.
+local pines = {{4}, {3, 3}, {3, 4}, {4, 4}, {4, 5}, {5, 5}, {4, 4, 4}}
+local function pineCounts(tiers)
+    local counts, start = {}, 1
+    for _, length in ipairs(tiers) do
+        for row = start, start + length - 1 do counts[#counts+1] = row end
+        start = counts[#counts] - 1
+    end
+    local base = counts[#counts]
+    local trunk = base <= 4 and {1} or base <= 6 and {1, 1} or {2, 2}
+    for _, count in ipairs(trunk) do counts[#counts+1] = count end
+    return counts
+end
+local function pine(slots)
+    local counts
+    for _, tiers in ipairs(pines) do
+        counts = pineCounts(tiers)
+        local total = 0
+        for _, count in ipairs(counts) do total = total + count end
+        if total >= slots then break end
+    end
+    local cells = L.rowCells(counts)
+    cells[1].s, cells[1].y = 1.25, cells[1].y - 0.2
+    return {cells}
+end
+
+-- Hero layouts: the first emoji large, p = slots - 1 small ones.
+
+-- Hero in the bottom-right, small cells along the top and left edges.
+local function lead(slots)
+    local p = slots - 1
+    local k = p // 2 + 1
+    local cells = {{i=1, x=k / 2, y=k / 2, s=k - 1}}
+    for x = (p % 2 == 1 and 0 or 1), k - 1 do cells[#cells+1] = {i=#cells+1, x=x, y=0, s=1} end
+    for y = 1, k - 1 do cells[#cells+1] = {i=#cells+1, x=0, y=y, s=1} end
+    return {cells}
+end
+
+-- Hero filling the sticker, small ones tucked over its corners: a badge,
+-- ears, or three with the timestamp corner free.
+local function quad(slots)
+    local cells = {{i=1, x=0, y=0, s=1.6}}
+    local corners = {{1, -1}, {-1, -1}, {-1, 1}, {1, 1}}
+    for k = 1, math.min(4, slots - 1) do
+        cells[#cells+1] = {i=k+1, x=0.746 * corners[k][1], y=0.746 * corners[k][2], s=0.509}
+    end
+    return {cells}
+end
+
+-- Small cells on an arc over the hero.
+local function crown(slots)
+    local p = slots - 1
+    local delta = p > 1 and math.min(math.rad(210) / (p - 1), math.rad(43.2)) or math.rad(43.2)
+    local s = math.min(1.9 * math.sin(delta / 2), 0.7)
+    local cells = {{i=1, x=0, y=0, s=0.9 * (2 - s)}}
+    for k = 0, p - 1 do
+        local a = (k - (p - 1) / 2) * delta
+        cells[#cells+1] = {i=k+2, x=math.sin(a), y=-math.cos(a), s=s}
+    end
+    return {cells}
+end
+
+-- A tilted ring passing behind and in front of the hero. Only the visible
+-- stretches of the ring get cells; later cells are drawn on top, so the list
+-- runs back cells, hero, front cells.
+local function saturn(slots)
+    local p = slots - 1
+    local tilt, samples = math.rad(-18), 720
+    local points, length = {}, 0
+    for k = 0, samples - 1 do
+        local t = 2 * math.pi * k / samples
+        local lx, ly = 0.82 * math.cos(t), 0.27 * math.sin(t)
+        local x = lx * math.cos(tilt) - ly * math.sin(tilt)
+        local y = lx * math.sin(tilt) + ly * math.cos(tilt)
+        local front = ly > 0
+        if front or math.sqrt(x * x + y * y) >= 0.6 then
+            local last = points[#points]
+            if last and last.k == k - 1 then length = length + math.sqrt((x - last.x)^2 + (y - last.y)^2) end
+            points[#points+1] = {k=k, x=x, y=y, front=front, at=length}
+        end
+    end
+    local step = length / p
+    local s = math.min(0.9 * step, 0.34)
+    local back, front, j = {}, {}, 1
+    for k = 1, p do
+        local target = (k - 0.5) * step
+        while points[j+1] and points[j+1].at <= target do j = j + 1 end
+        local point = points[j]
+        local cell = {i=k+1, x=point.x, y=point.y, s=s}
+        if point.front then front[#front+1] = cell else back[#back+1] = cell end
+    end
+    local cells = back
+    cells[#cells+1] = {i=1, x=0, y=0, s=1}
+    for _, cell in ipairs(front) do cells[#cells+1] = cell end
+    return {cells}
+end
+
+-- The hero inside a square border of small cells, clockwise from top-left.
+local function frame(slots)
+    local p, k = slots - 1, 5
+    while 4 * (k - 1) < p do k = k + 1 end
+    local cells = {{i=1, x=(k - 1) / 2, y=(k - 1) / 2, s=k - 2}}
+    local function add(x, y) cells[#cells+1] = {i=#cells+1, x=x, y=y, s=1} end
+    for x = 0, k - 2 do add(x, 0) end
+    for y = 0, k - 2 do add(k - 1, y) end
+    for x = k - 1, 1, -1 do add(x, k - 1) end
+    for y = k - 1, 1, -1 do add(0, y) end
     return {cells}
 end
 
@@ -294,7 +499,11 @@ end
 
 -- Every shape takes any selection: repeatTo cycles a short one to at least
 -- that many cells, and hero layouts keep the first emoji for their first cell
--- and cycle the rest. Only Each and Pages, which split stickers, need min.
+-- and cycle the rest. Only Each and Pages, which split stickers, need min;
+-- max is where cells get too small to read. A shape of fixed size may return
+-- more cells than asked, which cycle too. build(slots, seed, n) gets the real
+-- selection size as n; assigns=true layouts number their cells 1..n
+-- themselves.
 L.modes = {
     {key="auto", name="Auto", note="grid, short row centred on top",
      build=function(n) return {L.rowCells(L.autoCounts(n))} end},
@@ -316,17 +525,210 @@ L.modes = {
     {key="beehive", name="Beehive", note="interlocked rows", repeatTo=7, build=beehive},
     {key="daisy", name="Daisy", note="first in the middle, petals around", repeatTo=7, hero=true, build=daisy},
     {key="marquee", name="Marquee", note="first as a hero over the rest", repeatTo=4, hero=true, build=marquee},
-    {key="heart", name="Heart", note="outline, filled past 20", repeatTo=6, build=heart},
+    {key="heart", name="Heart", note="outline to 10, filled past", repeatTo=10, build=heart},
     {key="orbit", name="Orbit", note="ring, or rings past 12", repeatTo=3, build=orbit},
-    {key="sunflower", name="Sunflower", note="golden-angle spiral", repeatTo=8, build=sunflower},
+    {key="sunflower", name="Sunflower", note="first as the seeds, petals around", repeatTo=21, max=80, hero=true, build=sunflower},
     {key="pyramid", name="Pyramid", note="rows shrinking upwards", repeatTo=6, build=pyramid},
     {key="nautilus", name="Nautilus", note="growing spiral, first largest", repeatTo=8, build=nautilus},
-    {key="jumble", name="Jumble", note="random; Tab re-rolls", repeatTo=5, build=jumble},
+    {key="jumble", name="Jumble", note="random; Tab re-rolls", repeatTo=5, seeded=true, build=jumble},
+    {key="jumble-flat", name="Jumble-No-Jitter", note="random cells, upright; Tab re-rolls", repeatTo=5,
+     seeded=true, build=function(n, seed) return jumble(n, seed, nil, true) end},
+    {key="chessboard", name="Chessboard", note="alternating squares; two fill both colours",
+     repeatTo=8, max=50, assigns=true, build=chessboard},
+    {key="snowflake", name="Snowflake", note="first in the middle, six barbed arms",
+     repeatTo=31, max=61, hero=true, assigns=true, build=snowflake},
+    {key="pine", name="Pine", note="first as the star, tiers and a trunk", repeatTo=11, max=58, hero=true, build=pine},
+    {key="lead", name="Lead", note="first large, the rest along the top and left", repeatTo=5, max=20, hero=true, build=lead},
+    {key="quad", name="Quad", note="first filling it, up to four on its corners", repeatTo=2, max=5, hero=true, build=quad},
+    {key="crown", name="Crown", note="first under an arc of the rest", repeatTo=3, max=16, hero=true, build=crown},
+    {key="saturn", name="Saturn", note="first as a planet, the rest its ring", repeatTo=6, max=13, hero=true, build=saturn},
+    {key="frame", name="Frame", note="first inside a border of the rest", repeatTo=17, max=33, hero=true, build=frame},
 }
+
+-- ** Text
+-- "text:WORD" spells WORD with one emoji per pixel of a bitmap font, so the
+-- word travels inside the layout key: history, last used and export need
+-- nothing extra. Words are typed in the layout menu, or preset in the private
+-- ~/witching/emoji/words.txt (one per line, # comments) or the local setting
+-- emojiLayout.words.v1, so personal names stay out of this repository.
+L.wordsFile = os.getenv("HOME") .. "/witching/emoji/words.txt"
+-- A 5-row font, mostly 3 wide; M and W are 5 and N and Q 4, since at 3 wide
+-- round dots blur M, N and H together. Rows are joined by "/", X is lit.
+L.fontHeight = 5
+L.font = {}
+for c, rows in pairs({
+    A=".X./X.X/XXX/X.X/X.X", B="XX./X.X/XX./X.X/XX.", C=".XX/X../X../X../.XX",
+    D="XX./X.X/X.X/X.X/XX.", E="XXX/X../XX./X../XXX", F="XXX/X../XX./X../X..",
+    G=".XX/X../X.X/X.X/.XX", H="X.X/X.X/XXX/X.X/X.X", I="X/X/X/X/X",
+    J="..X/..X/..X/X.X/.X.", K="X.X/X.X/XX./X.X/X.X", L="X../X../X../X../XXX",
+    M="X...X/XX.XX/X.X.X/X...X/X...X", N="X..X/XX.X/X.XX/X..X/X..X",
+    O=".X./X.X/X.X/X.X/.X.", P="XX./X.X/XX./X../X..", Q=".XX./X..X/X..X/X.X./.X.X",
+    R="XX./X.X/XX./X.X/X.X", S=".XX/X../.X./..X/XX.", T="XXX/.X./.X./.X./.X.",
+    U="X.X/X.X/X.X/X.X/XXX", V="X.X/X.X/X.X/.X./.X.",
+    W="X...X/X...X/X.X.X/XX.XX/X...X", X="X.X/X.X/.X./X.X/X.X",
+    Y="X.X/X.X/.X./.X./.X.", Z="XXX/..X/.X./X../XXX",
+    ["0"]="XXX/X.X/X.X/X.X/XXX", ["1"]=".X./XX./.X./.X./XXX", ["2"]="XXX/..X/XXX/X../XXX",
+    ["3"]="XXX/..X/XXX/..X/XXX", ["4"]="X.X/X.X/XXX/..X/..X", ["5"]="XXX/X../XXX/..X/XXX",
+    ["6"]="XXX/X../XXX/X.X/XXX", ["7"]="XXX/..X/..X/..X/..X", ["8"]="XXX/X.X/XXX/X.X/XXX",
+    ["9"]="XXX/X.X/XXX/..X/XXX", ["♥"]=".X.X./XXXXX/XXXXX/.XXX./..X..",
+    ["!"]="X/X/X/./X", ["?"]="XX./..X/.X./.../.X.",
+}) do
+    local list = {}
+    for row in rows:gmatch("[^/]+") do list[#list+1] = row end
+    L.font[c] = list
+end
+L.textMax = 24
+
+local function chars(text)
+    local list = {}
+    for _, code in utf8.codes(text) do list[#list+1] = utf8.char(code) end
+    return list
+end
+
+-- The canonical word for text, or nil when the font cannot draw it.
+function L.textWord(text)
+    text = tostring(text or "")
+    if not utf8.len(text) then return nil end
+    local word = text:upper():gsub("%s+", " "):match("^%s*(.-)%s*$")
+    if word == "" or utf8.len(word) > L.textMax then return nil end
+    for _, c in ipairs(chars(word)) do
+        if c ~= " " and not L.font[c] then return nil end
+    end
+    return word
+end
+
+-- Columns of a line: glyphs one column apart, a space two columns.
+local function textWidth(list)
+    local w = 0
+    for _, c in ipairs(list) do w = w + (c == " " and 2 or #L.font[c][1]) + 1 end
+    return math.max(0, w - 1)
+end
+
+-- Splits into 1 to 3 lines, scoring each split by the pixel size it allows
+-- in a square sticker, 1 / max(width, height). Only at spaces when there are
+-- any. A line is added only for a 25% gain; ties keep fewer lines, then the
+-- narrower split, then the longer first line.
+local function textLines(word)
+    local list, h = chars(word), L.fontHeight
+    local spaces = word:find(" ", 1, true) ~= nil
+    local function trim(part)
+        while part[1] == " " do table.remove(part, 1) end
+        while part[#part] == " " do table.remove(part) end
+        return part
+    end
+    local function slice(a, b) return trim({table.unpack(list, a, b)}) end
+    local function candidates(count, from)
+        if count == 1 then return {{slice(from, #list)}} end
+        local result = {}
+        for cut = from, #list - 1 do
+            if not spaces or list[cut + 1] == " " then
+                local head = slice(from, cut)
+                if #head > 0 then
+                    for _, rest in ipairs(candidates(count - 1, cut + 1)) do
+                        if #rest[1] > 0 then result[#result+1] = {head, table.unpack(rest)} end
+                    end
+                end
+            end
+        end
+        return result
+    end
+    local best, bestScore
+    for count = 1, 3 do
+        local winner, score, winnerWidth
+        for _, lines in ipairs(candidates(count, 1)) do
+            local w = 0
+            for _, line in ipairs(lines) do w = math.max(w, textWidth(line)) end
+            local value = 1 / math.max(w, (h + 1) * count - 1)
+            local tie = score and math.abs(value - score) < 1e-12
+            if not score or value > score + 1e-12
+                or (tie and (w < winnerWidth or (w == winnerWidth and #lines[1] > #winner[1]))) then
+                winner, score, winnerWidth = lines, value, w
+            end
+        end
+        if winner and (not bestScore or score >= 1.25 * bestScore) then best, bestScore = winner, score end
+    end
+    return best or {list}
+end
+
+-- One cell per lit pixel, lines centred and one blank row apart. Each letter
+-- is one emoji, cycling through the selection. With more emoji than letters,
+-- each pixel row is one emoji (stripes), and with more than rows, each pixel.
+function L.textCells(word, n)
+    local h = L.fontHeight
+    local cells, top, letter = {}, 0, 0
+    for _, line in ipairs(textLines(word)) do
+        local glyphs, x = {}, 0
+        for _, c in ipairs(line) do
+            if c ~= " " then
+                letter = letter + 1
+                glyphs[#glyphs+1] = {rows=L.font[c], x=x, letter=letter}
+            end
+            x = x + (c == " " and 2 or #L.font[c][1]) + 1
+        end
+        local width = x - 1
+        for y = 1, h do
+            for _, glyph in ipairs(glyphs) do
+                local row = glyph.rows[y]
+                for dx = 1, #row do
+                    if row:sub(dx, dx) == "X" then
+                        cells[#cells+1] = {i=glyph.letter, x=glyph.x + dx - 1 - (width - 1) / 2, y=top + y - 1, s=1}
+                    end
+                end
+            end
+        end
+        top = top + h + 1
+    end
+    n = n or letter
+    for k, cell in ipairs(cells) do
+        if n <= letter then cell.i = (cell.i - 1) % n + 1
+        elseif n <= top - 1 then cell.i = math.floor(cell.y + 0.5) % n + 1
+        else cell.i = (k - 1) % n + 1 end
+    end
+    return cells
+end
+
+local textModes = {}
+local function textMode(key, word)
+    if not textModes[key] then
+        local cells = L.textCells(word)
+        textModes[key] = {key=key, name="Text " .. word, note="the word in emoji, a letter per emoji",
+            word=word, repeatTo=#cells, assigns=true,
+            build=function(_, _, n) return {L.textCells(word, n)} end}
+    end
+    return textModes[key]
+end
 
 function L.mode(key)
     for _, mode in ipairs(L.modes) do if mode.key == key then return mode end end
+    local word = type(key) == "string" and L.textWord(key:match("^text:(.+)$"))
+    if word then return textMode("text:" .. word, word) end
     error("Unknown emoji layout: " .. tostring(key))
+end
+
+-- Whether a layout's cells depend on the seed, which Tab re-rolls.
+function L.seeded(key)
+    local ok, mode = pcall(L.mode, key)
+    return ok and mode.seeded or false
+end
+
+function L.words()
+    local result, seen, texts = {}, {}, {}
+    local file = io.open(L.wordsFile, "r")
+    if file then
+        local data = file:read("a") or ""
+        file:close()
+        for line in data:gmatch("[^\n]+") do
+            local text = line:gsub("#.*$", "")
+            if text:find("%S") then texts[#texts+1] = text end
+        end
+    end
+    local saved = hs.settings.get("emojiLayout.words.v1")
+    for _, text in ipairs(type(saved) == "table" and saved or {}) do texts[#texts+1] = text end
+    for _, text in ipairs(texts) do
+        local word = L.textWord(text)
+        if word and not seen[word] then seen[word] = true; result[#result+1] = word end
+    end
+    return result
 end
 
 function L.available(n)
@@ -342,10 +744,13 @@ function L.build(key, n, seed)
     assert(n >= 1 and n <= 128, "Choose between 1 and 128 emoji")
     local mode = L.mode(key)
     local slots = math.max(n, mode.repeatTo or 0)
-    local result = mode.build(slots, seed or L.jumbleSeed)
+    local result = mode.build(slots, seed or L.jumbleSeed, n)
+    if not mode.separate then slots = math.max(slots, #result[1]) end
     for _, cells in ipairs(result) do
         for _, cell in ipairs(cells) do
-            if mode.hero and n > 1 then
+            if mode.assigns then
+                assert(cell.i >= 1 and cell.i <= n, "Layout assigned an emoji out of range")
+            elseif mode.hero and n > 1 then
                 cell.i = cell.i == 1 and 1 or (cell.i - 2) % (n - 1) + 2
             else
                 cell.i = (cell.i - 1) % n + 1
@@ -371,7 +776,8 @@ function L.describe(key, n, built, slots)
         parts[#parts+1] = string.format("≈%d×%d, %dpx cells", pw, ph, math.floor(size * gap * scale + 0.5))
         if math.min(pw, ph) < 128 then parts[#parts+1] = "small in Telegram" end
     end
-    if slots > n then parts[#parts+1] = "repeated to " .. slots end
+    if mode.word then parts[#parts+1] = #built[1] .. " cells"
+    elseif slots > n then parts[#parts+1] = "repeated to " .. slots end
     return table.concat(parts, " · ")
 end
 
@@ -418,15 +824,36 @@ function L.thumbnail(images, key, built, size)
 end
 
 -- Chooser rows for the Ctrl+Enter menu, last used first.
+function L.row(images, n, mode)
+    local built, slots = L.build(mode.key, n, L.jumbleSeed)
+    local name = mode.seeded and (mode.name .. " #" .. L.jumbleSeed) or mode.name
+    local row = {text=name, subText=L.describe(mode.key, n, built, slots), layout=mode.key,
+                 searchText=mode.name .. " " .. mode.note}
+    local ok, image = pcall(L.thumbnail, images, mode.key, built)
+    if ok then row.image = image end
+    return row
+end
+
+-- The menu's row for whatever is typed, when the font can spell it.
+function L.textRow(images, n, query)
+    local word = L.textWord(query)
+    if not word then return nil end
+    local row = L.row(images, n, L.mode("text:" .. word))
+    row.searchText = query
+    return row
+end
+
 function L.choices(images, n)
     local rows, last = {}, hs.settings.get(kLastKey)
-    for _, mode in ipairs(L.available(n)) do
-        local built, slots = L.build(mode.key, n, L.jumbleSeed)
-        local name = mode.key == "jumble" and (mode.name .. " #" .. L.jumbleSeed) or mode.name
-        local row = {text=name, subText=L.describe(mode.key, n, built, slots), layout=mode.key,
-                     searchText=mode.name .. " " .. mode.note}
-        local ok, image = pcall(L.thumbnail, images, mode.key, built)
-        if ok then row.image = image end
+    local modes = L.available(n)
+    for _, word in ipairs(L.words()) do modes[#modes+1] = L.mode("text:" .. word) end
+    if type(last) == "string" and last:match("^text:") and pcall(L.mode, last) then
+        local seen = false
+        for _, mode in ipairs(modes) do if mode.key == L.mode(last).key then seen = true end end
+        if not seen then modes[#modes+1] = L.mode(last) end
+    end
+    for _, mode in ipairs(modes) do
+        local row = L.row(images, n, mode)
         if mode.key == last then table.insert(rows, 1, row) else rows[#rows+1] = row end
     end
     return rows
@@ -530,10 +957,16 @@ function L.menu(o)
     local enter
     local function show(keepRow)
         local row = keepRow and o.chooser:selectedRow() or 1
-        ChooserSearch.setChoices(o.chooser, L.choices(o.images(m.items), #m.items))
+        local images = o.images(m.items)
+        -- Typing a word offers it as a Text layout above the matching rows.
+        ChooserSearch.setDynamic(o.chooser, function(query)
+            local textRow = L.textRow(images, #m.items, query)
+            return textRow and {textRow} or nil
+        end)
+        ChooserSearch.setChoices(o.chooser, L.choices(images, #m.items))
         o.chooser:selectedRow(row)
-        o.chooser:placeholderText("Layout for " .. #m.items .. " emoji · Enter: WebP · " ..
-            "Cmd+Shift+Enter: PNG · Tab: re-roll Jumble · Ctrl+Enter: back")
+        o.chooser:placeholderText("Layout for " .. #m.items .. " emoji · type a word to spell it · " ..
+            "Enter: WebP · Cmd+Shift+Enter: PNG · Tab: re-roll · Ctrl+Enter: back")
     end
     function m.open(items)
         if #items == 0 then return end
@@ -567,6 +1000,7 @@ function L.menu(o)
         o.export(row.layout, format, m.items)
     end
     function m.cleanup()
+        if m.active then ChooserSearch.setDynamic(o.chooser, nil) end
         m.active = false
         if enter then enter:delete(); enter = nil end
     end
@@ -575,12 +1009,12 @@ end
 
 -- Recent sticker sets for Hyper+Ctrl+A: every image export of several emoji,
 -- or of one in a layout other than Auto. Items are {emoji=...} for Unicode
--- and {id=..., emoji=...} for Telegram premium emoji; Jumble keeps its seed.
+-- and {id=..., emoji=...} for Telegram premium emoji; seeded layouts keep their seed.
 local kHistoryKey = "emojiLayout.history.v1"
 L.historyLimit = L.historyLimit or 60
 
 local function historyKey(items, layout, seed)
-    local parts = {layout, layout == "jumble" and tostring(seed) or ""}
+    local parts = {layout, L.seeded(layout) and tostring(seed) or ""}
     for _, item in ipairs(items) do parts[#parts+1] = item.id or item.emoji end
     return table.concat(parts, "\31")
 end
@@ -604,7 +1038,7 @@ function L.record(entries, layout, seed)
     for i, entry in ipairs(entries) do
         items[i] = {emoji=entry.emoji, id=not entry.unicode and entry.id or nil}
     end
-    seed = layout == "jumble" and (seed or L.jumbleSeed) or nil
+    seed = L.seeded(layout) and (seed or L.jumbleSeed) or nil
     local key = historyKey(items, layout, seed)
     local history = {{items=items, layout=layout, seed=seed, time=os.time()}}
     for _, entry in ipairs(L.history()) do

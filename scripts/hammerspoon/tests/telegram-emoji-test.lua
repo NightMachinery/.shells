@@ -1,6 +1,7 @@
 -- Inert IDs and data; never reads a real clipboard, session or personal library.
 local env=setmetatable({telegramEmojiPrewarmDelay=false,hs={base64={encode=function(x)return x end,decode=function(x)return x end},fs={attributes=function()return 'file' end}},emojiChooserName=function()return 'heart eyes' end,hyper_bind_v2=function()end},{__index=_G})
 assert(loadfile('hammerspoon/core/emoji-layout.lua','t',env))()
+env.EmojiLayout.wordsFile='/nonexistent/words.txt'  -- Not the private list on this machine.
 assert(loadfile('hammerspoon/core/telegram-emoji.lua','t',env))()
 local T=env.TelegramEmoji
 local tag='custom-emoji://1234567890123456789?6'
@@ -122,6 +123,7 @@ env.ChooserSearch={
         return chooser
     end,
     setChoices=function(c,rows)c.rows=rows end,
+    setDynamic=function(c,fn)c.dynamic=fn end,
     onHide=function(c,fn)c:hideCallback(fn) end,
 }
 env.emojiChooserAliases=function()return {} end
