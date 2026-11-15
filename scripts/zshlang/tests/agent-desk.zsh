@@ -58,8 +58,40 @@
     payload ask blocked true | agent-desk-dismiss || exit 1
     check dismiss "$(<"${fixture}/removed")" desk:agent-desk-01JEXAMPLE0000000000000001
 
+    # A done report opens the report itself.
+    function h-agent-done-open-report { print -r -- "$1" > "${fixture}/opened"; }
+    print -r -- '* fabricated report' > "${fixture}/report.org"
+    command jq --null-input --compact-output --arg r "${fixture}/report.org" '
+        { action: "open", display_id: "d-k2m9", path: "example-proj/rerun-nov/coord", local: true,
+          event: { id: "01JEXAMPLE0000000000000002", kind: "done", meta: { report: $r } } }' |
+        agent-desk-open || exit 1
+    check open-report "$(<"${fixture}/opened")" "${fixture}/report.org"
+
+    # agent-done's hooks, against a fake agent-desk that logs its calls.
+    command mkdir -p "${fixture}/bin"
+    print -r -- '#!/bin/sh
+printf "%s|" "$@" >> "$FAKE_DESK_LOG"; printf "\n" >> "$FAKE_DESK_LOG"
+case "$1" in
+  show) printf "%s\n" "{\"needs_you\":[{\"items\":[{\"display_id\":\"q-7f3a\",\"event\":{\"level\":\"blocked\",\"title\":\"Which split?\"}},{\"display_id\":\"q-b2c4\",\"event\":{\"level\":\"default\",\"title\":\"Drop it?\"}}]}]}" ;;
+  done) cat >> "$FAKE_DESK_LOG"; echo d-k2m9 ;;
+esac' > "${fixture}/bin/agent-desk"
+    command chmod +x "${fixture}/bin/agent-desk"
+    local -x FAKE_DESK_LOG="${fixture}/desk-calls"
+    (
+        path=( "${fixture}/bin" "${path[@]}" )
+        rehash
+        check desk-open "$(h-agent-done-desk-open)" 'q-7f3a  Which split?'
+        agent_done_summary='All six figures regenerated.' h-agent-done-desk-file 'Figures done' "${fixture}/report.org" >/dev/null || exit 1
+    ) || exit 1
+    check desk-file "$(command tail -n 2 "${FAKE_DESK_LOG}")" "done|--title|Figures done|--report|${fixture}/report.org|"$'\nAll six figures regenerated.'
+
     XDG_CONFIG_HOME="${fixture}/config" agent-desk-config-install >/dev/null || exit 1
     [[ "$(<"${fixture}/config/agent-desk/config.toml")" == *"-c agent-desk-notify"* ]] || exit 1
     XDG_CONFIG_HOME="${fixture}/config" agent-desk-config-install 2>/dev/null && exit 1
+    # A config naming a notifier is what lets agent-done skip its own card.
+    AGENT_DESK_CONFIG="${fixture}/config/agent-desk/config.toml" h-agent-desk-notifies-p || exit 1
+    AGENT_DESK_CONFIG="${fixture}/none.toml" h-agent-desk-notifies-p && exit 1
+    print -r -- 'open_command = "x"' > "${fixture}/open-only.toml"
+    AGENT_DESK_CONFIG="${fixture}/open-only.toml" h-agent-desk-notifies-p && exit 1
     print -r -- 'agent-desk: all checks passed'
 )

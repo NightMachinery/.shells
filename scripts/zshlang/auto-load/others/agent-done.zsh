@@ -575,6 +575,15 @@ function h-agent-done-report {
         print -r -- "- Ended: $(LC_ALL=C command date '+[%Y-%m-%d %a %H:%M]')"
         h-agent-done-org-field 'Report' "${out/#${HOME}/~}"
         test -n "${copy}" && h-agent-done-org-field 'Copy' "${copy/#${HOME}/~}"
+        if test -n "${ids[desk_open]-}" ; then
+            print -r --
+            print -r -- '* Open questions on agent-desk'
+            print -r -- 'Asked with --blocked and still unanswered; answering one types it into this session:'
+            local line
+            for line in "${(@f)ids[desk_open]}" ; do
+                print -r -- "- ${line}"
+            done
+        fi
         print -r --
         print -r -- '* Resume'
         h-agent-done-resume-help "${agent}" "${id}" "${transcript}" "${cwd}" "${paseo}"
@@ -1018,6 +1027,13 @@ work is actually finished. --dry-run writes the report and kills nothing."
     test -z "${bg_short}" || agent_done_ids[background]="${bg_short}"
     test -z "${pane}" || agent_done_ids[pane]="${pane}"
 
+    #: Questions this session filed on agent-desk and nobody has answered: the
+    #: report names them, so whoever reads it knows what is still pending.
+    #: See =docs/agent-desk.md=.
+    if (( ${+functions[h-agent-done-desk-open]} )) ; then
+        agent_done_ids[desk_open]="$(h-agent-done-desk-open 2>/dev/null)" || agent_done_ids[desk_open]=''
+    fi
+
     local dir report script
     dir="$(h-agent-done-dir)" @TRET
     mkdir -p -- "${dir}" @RET
@@ -1056,6 +1072,8 @@ work is actually finished. --dry-run writes the report and kills nothing."
         else
             ec "would kill: pid=${pid:-<unknown>} pane=${pane:-<none>} tty=${tty:-<none>} socket=${socket:-<none>}"
         fi
+        (( ${+functions[h-agent-done-desk-file]} && ${+commands[agent-desk]} )) &&
+            ec "would file a done report on agent-desk, if this session may write there"
         ec "would forget this session's /auto-continue registration, if it has one"
         ec "report: ${report}"
         local copy
@@ -1087,6 +1105,18 @@ work is actually finished. --dry-run writes the report and kills nothing."
         ecgray "$0: unpinned Paseo agent ${paseo_uuid}"
     fi
 
+    #: Filed on agent-desk before anything ends: the Paseo archive and the
+    #: background stop below take this shell with them. agent-desk raises its
+    #: own notification for a done report, whose click opens this report, so
+    #: when it took the report and has a notifier, the Agent Done card below
+    #: would be a duplicate.
+    local desk_filed=n
+    if (( ${+functions[h-agent-done-desk-file]} )) &&
+        h-agent-done-desk-file "${name}" "${report}" >/dev/null 2>&1 &&
+        h-agent-desk-notifies-p ; then
+        desk_filed=y
+    fi
+
     #: A session ending on purpose is finished, and must not be typed into at
     #: the next reset because it once asked to be ([agfi:agent-auto-continue-off]).
     #: Guarded, since that file is independent of this one; and quiet when
@@ -1103,14 +1133,14 @@ work is actually finished. --dry-run writes the report and kills nothing."
 
     if test -n "${bg_short}" ; then
         #: Announced first, then stopped: the stop takes this shell with it.
-        h-agent-done-announce "${agent}" 'background session' "${name}" "${report}"
+        bool "${desk_filed}" || h-agent-done-announce "${agent}" 'background session' "${name}" "${report}"
         ec "ending background ${agent}${name:+ (${name})} ${bg_short}; report: ${report}"
         h-claude-code-bg-home-run "${bg_home}" stop "${bg_short}" >/dev/null 2>&1 || true
         return 0
     fi
 
     if test -n "${paseo_uuid}" ; then
-        h-agent-done-announce "${agent}" 'Paseo agent' "${name}" "${report}"
+        bool "${desk_filed}" || h-agent-done-announce "${agent}" 'Paseo agent' "${name}" "${report}"
         ec "archiving Paseo agent ${paseo_uuid}${name:+ (${name})}; report: ${report}"
         #: Detached, like the watcher below: the archive interrupts the turn
         #: that is running this, and this shell goes with it.

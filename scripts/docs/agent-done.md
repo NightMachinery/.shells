@@ -268,6 +268,20 @@ click action, with “Could not archive session” and “Report saved · View r
 on the card. See [notification-apps.md](notification-apps.md) for setup and
 permission checks.
 
+### agent-desk
+
+Where [agent-desk](agent-desk.md) is installed, the report gains a section
+"Open questions on agent-desk" listing the session's unanswered blocked
+questions, found with [agfi:h-agent-done-desk-open]. Then
+[agfi:h-agent-done-desk-file] files the session's end as a done event, with
+the summary and the report path, which also sets the node's status to
+"Finished; see report.". When the desk accepts it and its config names a
+`notify_command` ([agfi:h-agent-desk-notifies-p]), a background or Paseo
+session skips its own Agent Done card: the Agent Desk card is the one
+notification, and clicking it opens the same report. A session the desk
+refuses (a worker with a parent agent) keeps the Agent Done card. Neither step
+refuses or ends anything.
+
 `--dry-run` resolves the target, saves a report, and prints what it resolved.
 It does not arm a watcher, change tmux options, unregister auto-continue, or
 terminate anything.

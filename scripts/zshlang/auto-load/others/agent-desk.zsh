@@ -31,7 +31,8 @@ open_command = \"'${zsh_path}' -c agent-desk-open\"" > "${file}" @RET
 
 function h-agent-desk-fields {
     #: The payload on stdin into `agent_desk_f': id, display, title, path,
-    #: kind, level, the binary, and whether the event is from this host.
+    #: kind, level, the binary, whether the event is from this host, its host,
+    #: and a done report's report file.
     ##
     local json
     json="$(command cat)" @RET
@@ -41,9 +42,10 @@ function h-agent-desk-fields {
     f=( "${(@ps:\t:)$(print -r -- "${json}" | command jq --raw-output '
         [ (.event.id // ""), (.display_id // ""), ((.event.title // "") | gsub("[\t\n\r]"; " ")),
           (.path // ""), (.event.kind // ""), (.event.level // ""), (.agent_desk // ""),
-          (.local | tostring), (.event.host // "") ] | @tsv')}" ) @RET
+          (.local | tostring), (.event.host // ""), (.event.meta.report // "") ] | @tsv')}" ) @RET
     agent_desk_f=( id "${f[1]-}" display "${f[2]-}" title "${f[3]-}" path "${f[4]-}"
-        kind "${f[5]-}" level "${f[6]-}" bin "${f[7]-}" local "${f[8]-}" host "${f[9]-}" )
+        kind "${f[5]-}" level "${f[6]-}" bin "${f[7]-}" local "${f[8]-}" host "${f[9]-}"
+        report "${f[10]-}" )
     test -n "${agent_desk_f[id]}${agent_desk_f[path]}"
 }
 
@@ -98,10 +100,15 @@ function agent-desk-dismiss {
 }
 
 function agent-desk-open {
-    : "open_command: opens the inbox scoped to the item's node in a new kitty window"
+    : "open_command: opens a done report, or else the inbox scoped to the item's node in a new kitty window"
     ##
     h-agent-desk-fields || return $?
     local -A f=( "${(@kv)agent_desk_f}" )
+    #: A done report opens the report itself, as Agent Done's card did.
+    if [[ "${f[kind]}" == done && -n "${f[report]}" && -e "${f[report]}" ]] ; then
+        h-agent-done-open-report "${f[report]}"
+        return $?
+    fi
     local bin="${f[bin]:-agent-desk}" sock
     if sock="$(kitty-socket-get 2>/dev/null)" &&
         command kitty @ --to "${sock}" launch --type=os-window --title "agent-desk: ${f[path]}" \
@@ -113,4 +120,36 @@ function agent-desk-open {
         notif_body="No kitty to open it in. Run: agent-desk inbox ${f[path]}" \
         notif "agent-desk inbox ${f[path]}" >/dev/null 2>&1
     return 1
+}
+
+##
+#: agent-done's use of the desk ([agfi:agent-done]): the report lists the
+#: session's unanswered blocked questions, and the session's end is filed as a
+#: done event. Neither refuses or removes anything.
+##
+function h-agent-done-desk-open {
+    : "the open blocked questions of this session's node, one \"<id>  <title>\" per line"
+    ##
+    (( ${+commands[agent-desk]} )) || return 1
+    ensure-cmd jq @RET
+    command agent-desk show --mine --format json 2>/dev/null | command jq --raw-output '
+        .needs_you[].items[] | select(.event.level == "blocked") | "\(.display_id)  \(.event.title)"'
+}
+
+function h-agent-desk-notifies-p {
+    : "agent-desk on this machine has a notify_command, so its events raise cards"
+    #: The same file the core reads (config.Path in the agent-desk core).
+    ##
+    local file="${AGENT_DESK_CONFIG:-${XDG_CONFIG_HOME:-${HOME}/.config}/agent-desk/config.toml}"
+    test -r "${file}" && command grep -Eq '^[[:space:]]*notify_command[[:space:]]*=[[:space:]]*"[^"]' "${file}"
+}
+
+function h-agent-done-desk-file {
+    : "usage: h-agent-done-desk-file <title> <report>; files the session's end on agent-desk; fails when it is not installed or refuses (a worker)"
+    #: The summary comes from `agent_done_summary', as for the report.
+    ##
+    local title="${1}" report="${2}"
+    (( ${+commands[agent-desk]} )) || return 1
+    print -r -- "${agent_done_summary-}" |
+        command agent-desk done --title "${title:-Session finished}" --report "${report}"
 }

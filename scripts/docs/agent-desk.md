@@ -31,8 +31,12 @@ would be Apple's `/bin/zsh`, which lacks the PCRE module our startup needs.
 - [agfi:agent-desk-dismiss] (`dismiss_command`): when a question is answered
   or an item is marked read, removes its notification with
   [agfi:notif-os-remove].
-- [agfi:agent-desk-open] (`open_command`): opens a new kitty window running
-  `agent-desk inbox <path>`, scoped to the item's node.
+- [agfi:agent-desk-open] (`open_command`): opens a done report's report file
+  with [agfi:h-agent-done-open-report], as Agent Done's card does; anything
+  else opens a new kitty window running `agent-desk inbox <path>`, scoped to
+  the item's node.
+- `agent-done` lists open blocked questions in its report and files the
+  session's end on the desk; see "agent-desk" in [agent-done.md](agent-done.md).
 
 The core runs `notify_command` and `dismiss_command` detached, so a slow
 notifier never holds up an agent; their output goes to
