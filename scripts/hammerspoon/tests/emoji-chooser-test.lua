@@ -94,7 +94,7 @@ local tail='beehive,daisy,marquee,heart,orbit,sunflower,pyramid,nautilus,jumble,
 assert(keys_(1)=='auto,row,column,'..tail,'Every shape is offered for one emoji, by repeating it')
 assert(keys_(3)=='auto,row,column,each,'..tail)
 assert(keys_(17):find('pages',1,true) and keys_(60):find('marquee',1,true) and not keys_(16):find('pages',1,true))
-assert(not keys_(6):find('quad',1,true) and not keys_(14):find('saturn',1,true),'Shapes stop where cells get too small')
+assert(not keys_(6):find('quad',1,true) and not keys_(20):find('saturn',1,true),'Shapes stop where cells get too small')
 -- Chessboard: the bottom-right square stays empty; two emoji fill both colours.
 local board=L.build('chessboard',3)[1]
 assert(#board==8,'A 4x4 board has eight dark squares')
@@ -112,13 +112,13 @@ local tree,treeSlots=L.build('pine',3)
 assert(treeSlots==11 and tree[1][1].i==1 and tree[1][1].s==1.25 and tree[1][2].i==2 and tree[1][3].i==3)
 for _,c in ipairs(tree[1]) do if c~=tree[1][1] then assert(c.i~=1,'Only the star is the first emoji') end end
 -- Hero layouts place exactly the selection once past their minimum.
-for _,case in ipairs({{'lead',6},{'lead',9},{'quad',4},{'crown',8},{'saturn',9},{'frame',17},{'sunflower',30}}) do
+for _,case in ipairs({{'lead',6},{'lead',9},{'quad',4},{'crown',8},{'saturn',16},{'frame',17},{'sunflower',30}}) do
     local built,n=L.build(case[1],case[2]),case[2]
     assert(#built[1]==n,case[1]..' fits '..n)
     local seen={};for _,c in ipairs(built[1]) do seen[c.i]=true end
     for i=1,n do assert(seen[i] or case[1]=='sunflower',case[1]..' shows every emoji') end
 end
-local ring=L.build('saturn',9)[1]
+local ring=L.build('saturn',16)[1]
 local heroAt;for k,c in ipairs(ring) do if c.i==1 then heroAt=k end end
 assert(heroAt>1 and heroAt<#ring,'Saturn draws back cells, then the planet, then front cells')
 local sun=L.build('sunflower',2)[1]
@@ -128,6 +128,7 @@ local flat,jit=L.build('jumble-flat',6,4)[1],L.build('jumble',6,4)[1]
 for k=1,6 do
     assert(flat[k].i==jit[k].i and flat[k].x==math.floor(jit[k].x+0.5) and flat[k].s==1 and not flat[k].rot)
 end
+assert(#L.build('saturn',2)[1]==15,'A ring needs 14 cells to read as one')
 assert(L.seeded('jumble-flat') and not L.seeded('heart') and not L.seeded('nope'))
 -- Text: one emoji per letter, stripes when the selection is longer than the word.
 assert(L.textWord(' hi ')=='HI' and L.textWord('i ♥ u')=='I ♥ U' and not L.textWord('a#b') and not L.textWord(''))

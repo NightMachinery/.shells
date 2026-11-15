@@ -198,8 +198,9 @@ make one flower with identical petals rather than alternating ones:
 - **Quad**: the first filling the sticker, up to four small ones over its
   corners (2 to 5).
 - **Crown**: the first under an arc of the rest (3 to 16).
-- **Saturn**: the first as a planet, the rest on a tilted ring passing behind
-  and in front of it (6 to 13).
+- **Saturn**: the first as a planet, the rest on a wide tilted ring passing
+  behind and in front of it (15 to 19; fewer cells read as scattered emoji
+  rather than a ring).
 - **Frame**: the first inside a square border of the rest (17 to 33).
 
 **Text** spells a word with one emoji per pixel of a 5-row font (A to Z, 0 to

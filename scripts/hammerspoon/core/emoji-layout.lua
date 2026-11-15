@@ -444,13 +444,16 @@ end
 -- A tilted ring passing behind and in front of the hero. Only the visible
 -- stretches of the ring get cells; later cells are drawn on top, so the list
 -- runs back cells, hero, front cells.
+-- Wide, like Saturn's: a tight ring ran across the planet's face and showed
+-- only slivers behind it.
+L.saturnRing = L.saturnRing or {a=1.15, b=0.32}
 local function saturn(slots)
     local p = slots - 1
     local tilt, samples = math.rad(-18), 720
     local points, length = {}, 0
     for k = 0, samples - 1 do
         local t = 2 * math.pi * k / samples
-        local lx, ly = 0.82 * math.cos(t), 0.27 * math.sin(t)
+        local lx, ly = L.saturnRing.a * math.cos(t), L.saturnRing.b * math.sin(t)
         local x = lx * math.cos(tilt) - ly * math.sin(tilt)
         local y = lx * math.sin(tilt) + ly * math.cos(tilt)
         local front = ly > 0
@@ -541,7 +544,7 @@ L.modes = {
     {key="lead", name="Lead", note="first large, the rest along the top and left", repeatTo=5, max=20, hero=true, build=lead},
     {key="quad", name="Quad", note="first filling it, up to four on its corners", repeatTo=2, max=5, hero=true, build=quad},
     {key="crown", name="Crown", note="first under an arc of the rest", repeatTo=3, max=16, hero=true, build=crown},
-    {key="saturn", name="Saturn", note="first as a planet, the rest its ring", repeatTo=6, max=13, hero=true, build=saturn},
+    {key="saturn", name="Saturn", note="first as a planet, the rest its ring", repeatTo=15, max=19, hero=true, build=saturn},
     {key="frame", name="Frame", note="first inside a border of the rest", repeatTo=17, max=33, hero=true, build=frame},
 }
 
