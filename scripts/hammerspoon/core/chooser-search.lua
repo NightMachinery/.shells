@@ -186,6 +186,17 @@ local function bindKeys(state)
         end
     end
 end
+-- Rows computed from the live query (S.setDynamic), listed before the
+-- filtered ones: a row that offers to act on whatever was typed.
+local function withDynamic(state,query,rows)
+    if not state.dynamic then return rows end
+    local extra=state.dynamic(query or "")
+    if not extra or #extra==0 then return rows end
+    local result={}
+    for _,row in ipairs(extra) do result[#result+1]=row end
+    for _,row in ipairs(rows) do result[#result+1]=row end
+    return result
+end
 local function create(completion,fields,options,remote)
     options=options or {}
     local caller=debug.getinfo(3,"Sl") or {}
@@ -206,7 +217,7 @@ local function create(completion,fields,options,remote)
     if not remote then
         S.onQueryChanged(chooser,function(query)
             local current=reference[1]
-            if current then current:choices(S.filter(state.choices,query,state.fields,state.index,state.limit)) end
+            if current then current:choices(withDynamic(state,query,S.filter(state.choices,query,state.fields,state.index,state.limit))) end
         end)
     end
     return chooser
@@ -277,7 +288,14 @@ function S.setChoices(chooser, choices, options)
         end
         state.index[i]=cached.text
     end
-    chooser:choices(S.filter(state.choices, chooser:query(), state.fields,state.index,state.limit))
+    chooser:choices(withDynamic(state,chooser:query(),S.filter(state.choices, chooser:query(), state.fields,state.index,state.limit)))
+    return chooser
+end
+
+-- fn(query) returns rows to list first, or nil; nil fn removes it. Takes
+-- effect at the next setChoices or keystroke.
+function S.setDynamic(chooser,fn)
+    assert(stateFor(chooser),"ChooserSearch.new must create the chooser").dynamic=fn
     return chooser
 end
 

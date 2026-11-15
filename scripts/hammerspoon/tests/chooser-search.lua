@@ -39,6 +39,11 @@ callback('paper 4999');assert(#shown==1 and shown[1]==big[4999])
 big[4999].text='Changed'
 ChooserSearch.setChoices(bounded,big);callback('changed 4999');assert(#shown==1)
 print('Cached chooser index and bounded native result tests passed')
+ChooserSearch.setDynamic(bounded,function(q) if q=='paper 4998' then return {{text='Typed '..q}} end end)
+callback('paper 4998');assert(#shown==2 and shown[1].text=='Typed paper 4998' and shown[2]==big[4998])
+callback('paper 4997');assert(#shown==1,'No dynamic row when the function returns nil')
+ChooserSearch.setDynamic(bounded,nil);callback('paper 4998');assert(#shown==1)
+print('Dynamic rows computed from the query come first')
 
 local prefs,reads,writes={},0,0
 hs.settings={get=function(k)reads=reads+1;return prefs[k]end,set=function(k,v)writes=writes+1;prefs[k]=v end}
