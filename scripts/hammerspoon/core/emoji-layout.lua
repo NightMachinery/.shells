@@ -850,14 +850,19 @@ function L.choices(images, n)
     local rows, last = {}, hs.settings.get(kLastKey)
     local modes = L.available(n)
     for _, word in ipairs(L.words()) do modes[#modes+1] = L.mode("text:" .. word) end
-    if type(last) == "string" and last:match("^text:") and pcall(L.mode, last) then
-        local seen = false
-        for _, mode in ipairs(modes) do if mode.key == L.mode(last).key then seen = true end end
-        if not seen then modes[#modes+1] = L.mode(last) end
+    local lastKey = last
+    if type(last) == "string" and last:match("^text:") then
+        local ok, lastMode = pcall(L.mode, last)
+        if ok then
+            lastKey = lastMode.key
+            local seen = false
+            for _, mode in ipairs(modes) do if mode.key == lastKey then seen = true; break end end
+            if not seen then modes[#modes+1] = lastMode end
+        end
     end
     for _, mode in ipairs(modes) do
         local row = L.row(images, n, mode)
-        if mode.key == last then table.insert(rows, 1, row) else rows[#rows+1] = row end
+        if mode.key == lastKey then table.insert(rows, 1, row) else rows[#rows+1] = row end
     end
     return rows
 end
@@ -961,12 +966,21 @@ function L.menu(o)
     local function show(keepRow)
         local row = keepRow and o.chooser:selectedRow() or 1
         local images = o.images(m.items)
+        local choices = L.choices(images, #m.items)
+        local byLayout = {}
+        for _, choice in ipairs(choices) do
+            if choice.layout then byLayout[choice.layout] = choice end
+        end
         -- Typing a word offers it as a Text layout above the matching rows.
+        -- Reuse any preset row of the same key and deduplicate by layout so
+        -- typing a hardcoded or remembered word promotes it without duplicating it.
         ChooserSearch.setDynamic(o.chooser, function(query)
-            local textRow = L.textRow(images, #m.items, query)
+            local word = L.textWord(query)
+            if not word then return nil end
+            local textRow = byLayout["text:" .. word] or L.textRow(images, #m.items, query)
             return textRow and {textRow} or nil
-        end)
-        ChooserSearch.setChoices(o.chooser, L.choices(images, #m.items))
+        end, "layout")
+        ChooserSearch.setChoices(o.chooser, choices)
         o.chooser:selectedRow(row)
         o.chooser:placeholderText("Layout for " .. #m.items .. " emoji · type a word to spell it · " ..
             "Enter: WebP · Cmd+Shift+Enter: PNG · Tab: re-roll · Ctrl+Enter: back")
