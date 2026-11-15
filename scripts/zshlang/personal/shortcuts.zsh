@@ -247,7 +247,10 @@ function cdtmp {
     local name="$*"
     local cd_engine="${cdtmp_engine:-cd-mkdir}"
 
-    reval-ecgray "${cd_engine}" ~tmp/"${name}_cdtmp_$(uuidm)"
+    local dest
+    dest="${name}_cdtmp_$(uuidm)" @TRET
+
+    reval-ecgray "${cd_engine}" ~tmp/"${dest}" @RET
 }
 ##
 function servers-list-for-telegram {
