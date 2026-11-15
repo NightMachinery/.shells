@@ -6,6 +6,29 @@ The root of this git repo is at `~/` as it contains some dotfiles. But we only w
 
 - When you want to push changes that another computer pulls, ensures the sync happens through the same git remote.
 
+## Private Data: `~/witching`
+
+This repository is public. Personal data and scripts that should not be
+published go in `~/witching`, a private GitHub repository
+(`NightMachinery/witching`) cloned on each Mac. People's names, personal word
+lists and private helpers belong there, not here.
+
+Keep the code here public and generic, and load the private part as an
+optional **mix-in**: a file in `~/witching` that public code reads only when
+it exists. For example, the emoji sticker layouts read
+`~/witching/emoji/words.txt` for the words they offer to spell. So:
+
+- Put the mechanism here and the personal data there. A Mac without the clone
+  (or a stranger reading this repository) gets working code minus the
+  personal parts, never an error.
+- Check for the file and fall back quietly; do not hard-code the private
+  content as a default.
+- Commit and push `~/witching` like the other shared repositories, and pull
+  it on the other Mac with `--ff-only`.
+
+Credentials still go to `~/.privateShell` (append-only, see the global rules),
+not to `~/witching`.
+
 ## Zsh
 
 Read `./PE/Zsh.org`. When you think of something that needs to be in this file, suggest it to me, but don't edit the file yourself unless I tell you to.
