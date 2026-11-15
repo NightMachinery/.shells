@@ -203,16 +203,23 @@ make one flower with identical petals rather than alternating ones:
   rather than a ring).
 - **Frame**: the first inside a square border of the rest (17 to 33).
 
-**Text** spells a word with one emoji per pixel of a 5-row font (A to Z, 0 to
-9, `♥ ! ?`; M and W are 5 wide so they stay distinct). Type the word in the
-layout menu and a `Text WORD` row appears first. Each letter is one emoji,
-cycling the selection; with more emoji than letters each pixel row is one
-emoji (stripes). Long words wrap onto up to three lines, whichever gives the
-largest pixels, so `HELLO` becomes `HEL` over `LO`. Past about nine letters
-the pixels drop under 30px. The word travels in the layout key (`text:HI`),
-so last-used and history keep it. Preset words are listed in the menu from
-the private file `~/witching/emoji/words.txt` (one per line, `#` comments)
-when it exists, and from the Hammerspoon setting `emojiLayout.words.v1`.
+**Text** spells a word with one emoji per pixel: pure ASCII/symbol text (A to Z,
+0 to 9, `♥ ! ?`) uses a 5-row bitmap font (`M` and `W` are 5 wide so they stay
+distinct), while Arabic/Persian text (including ZWNJ, Persian digits and mixed
+symbols such as `کتاب ♥`) uses macOS CoreText via `native/text-bitmap` with
+unantialiased 12pt Tahoma. Type the word in the layout menu and a `Text WORD`
+row appears first. Each letter (in logical reading order for RTL scripts) is one
+emoji, cycling the selection; with more emoji than letters each pixel row is
+one emoji (stripes), and with more emoji than rows each pixel cycles. Long
+text wraps onto up to three lines, whichever gives the largest pixels (ASCII
+can wrap inside a word when there are no spaces, whereas CoreText text wraps
+only at spaces with a 2px line gap so cursive words stay joined). Past about
+nine letters the pixels drop under 30px. The word travels in the layout key
+(`text:HI`, `text:کتاب`), so last-used and history keep it. Preset words are
+listed in the menu from the private file `~/witching/emoji/words.txt` (one per
+line, `#` comments) when it exists, and from the Hammerspoon setting
+`emojiLayout.words.v1`. Typing a preset or remembered word promotes that existing
+`Text WORD` row first rather than duplicating it.
 
 The tests check that no two glyph boxes intersect in any layout for 1 to 128
 emoji, except Jumble, Quad and Saturn, which overlap on purpose.
@@ -241,7 +248,8 @@ cells (position, size, rotation) in arbitrary units, which drive both the
 previews and the export. `bin/emoji-compose.py` (Homebrew Python with Pillow)
 does the trimming, placement and resampling, and `cwebp` encodes the result.
 Tests: `lua hammerspoon/tests/emoji-chooser-test.lua`,
-`lua hammerspoon/tests/telegram-emoji-test.lua` and
+`lua hammerspoon/tests/telegram-emoji-test.lua`,
+`lua hammerspoon/tests/text-bitmap-test.lua` and
 `/opt/homebrew/bin/python3 -I hammerspoon/tests/emoji-compose-test.py`, run
 from `~/scripts`.
 

@@ -549,11 +549,13 @@ L.modes = {
 }
 
 -- ** Text
--- "text:WORD" spells WORD with one emoji per pixel of a bitmap font, so the
--- word travels inside the layout key: history, last used and export need
--- nothing extra. Words are typed in the layout menu, or preset in the private
--- ~/witching/emoji/words.txt (one per line, # comments) or the local setting
--- emojiLayout.words.v1, so personal names stay out of this repository.
+-- "text:WORD" spells WORD with one emoji per pixel of a font, so the word
+-- travels inside the layout key: history, last used and export need nothing
+-- extra. Pure ASCII/symbol text uses the 5-row font below; Arabic/Persian (or
+-- mixed) text uses CoreText Tahoma bitmaps via native/text-bitmap. Words are
+-- typed in the layout menu, or preset in ~/witching/emoji/words.txt (one per
+-- line, # comments) or the local setting emojiLayout.words.v1, so personal
+-- names stay out of this repository.
 L.wordsFile = os.getenv("HOME") .. "/witching/emoji/words.txt"
 -- A 5-row font, mostly 3 wide; M and W are 5 and N and Q 4, since at 3 wide
 -- round dots blur M, N and H together. Rows are joined by "/", X is lit.
@@ -588,15 +590,172 @@ local function chars(text)
     return list
 end
 
--- The canonical word for text, or nil when the font cannot draw it.
+local function isFontWord(word)
+    for _, c in ipairs(chars(word)) do
+        if c ~= " " and not L.font[c] then return false end
+    end
+    return true
+end
+
+local function isBitmapCodepoint(cp)
+    return cp == 0x200C or cp == 0x200D
+        or (cp >= 0x0600 and cp <= 0x06FF)
+        or (cp >= 0x0750 and cp <= 0x077F)
+        or (cp >= 0x0870 and cp <= 0x08FF)
+        or (cp >= 0xFB50 and cp <= 0xFDFF)
+        or (cp >= 0xFE70 and cp <= 0xFEFF)
+end
+
+local textBitmapDir
+do
+    local src = debug and debug.getinfo and debug.getinfo(1, "S").source
+    if type(src) == "string" and src:sub(1, 1) == "@" then
+        local base = src:sub(2):match("^(.-)/?core/emoji%-layout%.lua$")
+        if base then textBitmapDir = (base == "" and "." or base) .. "/native/text-bitmap" end
+    end
+    if not textBitmapDir and type(nightdir) == "string" then
+        textBitmapDir = nightdir .. "/hammerspoon/native/text-bitmap"
+    end
+end
+
+local textBitmapLoadFailed = false
+local function readFileBytes(path)
+    if type(io) ~= "table" or type(io.open) ~= "function" then return nil end
+    local ok, file = pcall(io.open, path, "rb")
+    if not ok or not file then return nil end
+    local data = file:read("*a")
+    file:close()
+    return data
+end
+
+local function safeGetenv(name)
+    if type(os) == "table" and type(os.getenv) == "function" then
+        return os.getenv(name)
+    end
+    return nil
+end
+
+local function textBitmapKey(data)
+    if type(hs) == "table" and hs.hash and type(hs.hash.SHA256) == "function" then
+        return hs.hash.SHA256(data)
+    end
+    local a, b = 2166136261, 5381
+    for i = 1, #data do
+        local byte = data:byte(i)
+        a = ((a + byte) * 65521) % 4294967296
+        b = (b * 33 + byte) % 4294967296
+    end
+    return string.format("%08x%08x-%d", a, b, #data)
+end
+
+local function findLuaIncludeDir()
+    if type(hs) == "table" and hs.processInfo and hs.processInfo.bundlePath then
+        local dir = hs.processInfo.bundlePath .. "/Contents/Frameworks/LuaSkin.framework/Headers"
+        if hs.fs and type(hs.fs.attributes) == "function" and hs.fs.attributes(dir .. "/lua.h", "mode") == "file" then
+            return dir
+        end
+        if readFileBytes(dir .. "/lua.h") then return dir end
+        return dir
+    end
+    for _, dir in ipairs({
+        "/opt/homebrew/include/lua",
+        "/usr/local/include/lua",
+        "/opt/homebrew/include/lua5.4",
+        "/usr/local/include/lua5.4",
+    }) do
+        if readFileBytes(dir .. "/lua.h") then return dir end
+    end
+    return nil
+end
+
+-- Compiles and loads the CoreText text rasterizer on demand, caching the .so
+-- by source + header path so neither Hammerspoon nor tests rebuild each run.
+function L.loadTextBitmap(force)
+    if force then
+        L.textBitmap = nil
+        textBitmapLoadFailed = false
+    end
+    if L.textBitmap then return L.textBitmap end
+    if textBitmapLoadFailed then return nil end
+    if not textBitmapDir or type(package) ~= "table" or type(package.loadlib) ~= "function" then
+        textBitmapLoadFailed = true
+        return nil
+    end
+    local modSrc = readFileBytes(textBitmapDir .. "/module.m")
+    local buildScript = readFileBytes(textBitmapDir .. "/build.sh")
+    local includeDir = findLuaIncludeDir()
+    if not modSrc or not buildScript or not includeDir then
+        textBitmapLoadFailed = true
+        return nil
+    end
+    local key = textBitmapKey(modSrc .. "\0" .. buildScript .. "\0" .. includeDir)
+    local inHammerspoon = type(hs) == "table" and hs.processInfo and hs.processInfo.bundlePath
+        and type(hs.execute) == "function"
+    local cacheDir = inHammerspoon
+        and ((safeGetenv("HOME") or "/tmp") .. "/Library/Caches/org.hammerspoon.Hammerspoon/text-bitmap")
+        or ("/tmp/night-emoji-text-bitmap-" .. (safeGetenv("USER") or "user"))
+    local binary = cacheDir .. "/" .. key .. ".so"
+    local cached = inHammerspoon and hs.fs and type(hs.fs.attributes) == "function"
+        and hs.fs.attributes(binary, "mode") == "file"
+    if not cached and not inHammerspoon then
+        cached = readFileBytes(binary) ~= nil
+    end
+    if not cached then
+        local buildCmd = string.format("/bin/sh %q %q %q", textBitmapDir .. "/build.sh", includeDir, binary)
+        local ok
+        if inHammerspoon then
+            local _, status = hs.execute(buildCmd)
+            ok = status == true
+        elseif type(os) == "table" and type(os.execute) == "function" then
+            local res = os.execute(buildCmd .. " >/dev/null 2>&1")
+            ok = res == true or res == 0
+        end
+        if not ok then
+            textBitmapLoadFailed = true
+            return nil
+        end
+    end
+    local init = package.loadlib(binary, "luaopen_text_bitmap")
+    if not init then
+        textBitmapLoadFailed = true
+        return nil
+    end
+    L.textBitmap = init()
+    return L.textBitmap
+end
+
+local bitmapLineCache, bitmapLineCount, bitmapCacheMod = {}, 0, nil
+local function rasterBitmapLine(tb, text)
+    if bitmapCacheMod ~= tb then
+        bitmapLineCache, bitmapLineCount, bitmapCacheMod = {}, 0, tb
+    end
+    local cached = bitmapLineCache[text]
+    if cached then return cached end
+    local cells, width, height, letters = tb.rasterize(text, "Tahoma", 12)
+    local entry = {text=text, cells=cells, width=width, height=height, letters=letters}
+    if bitmapLineCount >= 256 then
+        bitmapLineCache, bitmapLineCount = {}, 0
+    end
+    bitmapLineCache[text] = entry
+    bitmapLineCount = bitmapLineCount + 1
+    return entry
+end
+
+-- The canonical word for text, or nil when neither the 5-row font nor CoreText can draw it.
 function L.textWord(text)
     text = tostring(text or "")
     if not utf8.len(text) then return nil end
-    local word = text:upper():gsub("%s+", " "):match("^%s*(.-)%s*$")
+    local word = text:gsub("[a-z]", string.upper):gsub("%s+", " "):match("^%s*(.-)%s*$")
     if word == "" or utf8.len(word) > L.textMax then return nil end
-    for _, c in ipairs(chars(word)) do
-        if c ~= " " and not L.font[c] then return nil end
+    if isFontWord(word) then return word end
+    for _, code in utf8.codes(word) do
+        local c = utf8.char(code)
+        if c ~= " " and not L.font[c] and not isBitmapCodepoint(code) then return nil end
     end
+    local tb = L.loadTextBitmap()
+    if not tb then return nil end
+    local raster = rasterBitmapLine(tb, word)
+    if not raster or #raster.cells == 0 then return nil end
     return word
 end
 
@@ -653,10 +812,7 @@ local function textLines(word)
     return best or {list}
 end
 
--- One cell per lit pixel, lines centred and one blank row apart. Each letter
--- is one emoji, cycling through the selection. With more emoji than letters,
--- each pixel row is one emoji (stripes), and with more than rows, each pixel.
-function L.textCells(word, n)
+local function fontCells(word)
     local h = L.fontHeight
     local cells, top, letter = {}, 0, 0
     for _, line in ipairs(textLines(word)) do
@@ -681,11 +837,87 @@ function L.textCells(word, n)
         end
         top = top + h + 1
     end
+    return cells, letter, math.max(0, top - 1)
+end
+
+-- Splits non-ASCII text strictly at spaces into 1..3 lines with a 2px gap,
+-- applying the same 25% square-fit gain rule without breaking joined words.
+local function bitmapLines(tb, word)
+    local tokens, gap = {}, 2
+    for tok in word:gmatch("[^ ]+") do tokens[#tokens+1] = tok end
+    if #tokens == 0 then return {} end
+    local function sliceRaster(a, b)
+        return rasterBitmapLine(tb, table.concat(tokens, " ", a, b))
+    end
+    local function candidates(count, from)
+        if count == 1 then return {{sliceRaster(from, #tokens)}} end
+        local result = {}
+        for cut = from, #tokens - count + 1 do
+            local head = sliceRaster(from, cut)
+            for _, rest in ipairs(candidates(count - 1, cut + 1)) do
+                result[#result+1] = {head, table.unpack(rest)}
+            end
+        end
+        return result
+    end
+    local best, bestScore
+    for count = 1, math.min(3, #tokens) do
+        local winner, score, winnerWidth, winnerFirstLen
+        for _, lines in ipairs(candidates(count, 1)) do
+            local w, totalH = 0, gap * (count - 1)
+            for _, line in ipairs(lines) do
+                w = math.max(w, line.width)
+                totalH = totalH + line.height
+            end
+            local value = 1 / math.max(1, w, totalH)
+            local firstLen = utf8.len(lines[1].text) or #lines[1].text
+            local tie = score and math.abs(value - score) < 1e-12
+            if not score or value > score + 1e-12
+                or (tie and (w < winnerWidth or (w == winnerWidth and firstLen > winnerFirstLen))) then
+                winner, score, winnerWidth, winnerFirstLen = lines, value, w, firstLen
+            end
+        end
+        if winner and (not bestScore or score >= 1.25 * bestScore) then best, bestScore = winner, score end
+    end
+    return best or {rasterBitmapLine(tb, word)}
+end
+
+local function bitmapCells(word)
+    local tb = L.loadTextBitmap()
+    if not tb then return {}, 0, 0 end
+    local cells, top, letter, gap = {}, 0, 0, 2
+    for _, line in ipairs(bitmapLines(tb, word)) do
+        for _, px in ipairs(line.cells) do
+            cells[#cells+1] = {
+                i = letter + px.letter,
+                x = px.x - (line.width - 1) / 2,
+                y = top + px.y,
+                s = 1,
+            }
+        end
+        letter = letter + line.letters
+        top = top + line.height + gap
+    end
+    return cells, letter, math.max(0, top - gap)
+end
+
+-- One cell per lit pixel, lines centred. Each letter is one emoji, cycling
+-- through the selection. With more emoji than letters, each pixel row is one
+-- emoji (stripes), and with more than rows, each pixel.
+function L.textCells(word, n)
+    local cells, letter, totalHeight
+    if isFontWord(word) then
+        cells, letter, totalHeight = fontCells(word)
+    else
+        cells, letter, totalHeight = bitmapCells(word)
+    end
     n = n or letter
-    for k, cell in ipairs(cells) do
-        if n <= letter then cell.i = (cell.i - 1) % n + 1
-        elseif n <= top - 1 then cell.i = math.floor(cell.y + 0.5) % n + 1
-        else cell.i = (k - 1) % n + 1 end
+    if n > 0 then
+        for k, cell in ipairs(cells) do
+            if n <= letter then cell.i = (cell.i - 1) % n + 1
+            elseif n <= totalHeight then cell.i = math.floor(cell.y + 0.5) % n + 1
+            else cell.i = (k - 1) % n + 1 end
+        end
     end
     return cells
 end

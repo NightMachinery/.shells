@@ -2,6 +2,7 @@
 local env=setmetatable({telegramEmojiPrewarmDelay=false,hs={base64={encode=function(x)return x end,decode=function(x)return x end},fs={attributes=function()return 'file' end}},emojiChooserName=function()return 'heart eyes' end,hyper_bind_v2=function()end},{__index=_G})
 assert(loadfile('hammerspoon/core/emoji-layout.lua','t',env))()
 env.EmojiLayout.wordsFile='/nonexistent/words.txt'  -- Not the private list on this machine.
+assert(env.EmojiLayout.loadTextBitmap(),'Native CoreText text bitmap module should load before io mocks')
 assert(loadfile('hammerspoon/core/telegram-emoji.lua','t',env))()
 local T=env.TelegramEmoji
 local tag='custom-emoji://1234567890123456789?6'
@@ -328,4 +329,63 @@ chooser.selected=1;keys['cmd:delete'].fn()
 assert(#chooser.rows==before-1 and #settings['emojiLayout.history.v1']==before-1,'Cmd+Backspace forgets a set')
 chooser.onHide()
 for _,binding in pairs(keys) do assert(binding.hk.deleted) end
+-- Hyper+Ctrl+A -> Ctrl+Enter with real ChooserSearch: typing a preset or
+-- remembered text word promotes it once instead of duplicating it.
+local realChooser
+env.hs.chooser={new=function(complete)
+    realChooser={complete=complete,rows={},q=''}
+    function realChooser:placeholderText(t)self.placeholder=t end
+    function realChooser:selectedRow(n)if n then self.selected=n end;return self.selected or 1 end
+    function realChooser:selectedRowContents(n)return self.rows[n or self:selectedRow()] or {} end
+    function realChooser:hideCallback(fn)self.onHide=fn end
+    function realChooser:queryChangedCallback(fn)self.onChange=fn end
+    function realChooser:query(q)if q~=nil then self.q=q end;return self.q end
+    function realChooser:choices(rows)self.rows=rows;return self end
+    function realChooser:show()self.visible=true end
+    return realChooser
+end}
+assert(loadfile('hammerspoon/core/chooser-search.lua','t',env))()
+settings['emojiLayout.words.v1']={'HI','MY HI'}
+settings['emojiLayout.last.v1']='text:MY HI'
+keys={};env.emojiStickerHistoryChooser()
+keys['ctrl:return'].fn()
+local function typeQuery(q)realChooser:query(q);realChooser.onChange(q)end
+local function countLayout(key)
+    local count=0
+    for _,row in ipairs(realChooser.rows) do if row.layout==key then count=count+1 end end
+    return count
+end
+typeQuery('hi')
+assert(realChooser.rows[1].layout=='text:HI' and countLayout('text:HI')==1,'Typing a preset word promotes it without duplicating it')
+assert(realChooser.rows[2].layout=='text:MY HI','Other matching preset words still follow')
+typeQuery('  hi  ')
+assert(realChooser.rows[1].layout=='text:HI' and countLayout('text:HI')==1,'Whitespace-padded queries also deduplicate')
+typeQuery('h')
+assert(realChooser.rows[1].layout=='text:H' and countLayout('text:HI')==1 and countLayout('text:MY HI')==1,'Partial prefixes still show matching presets below')
+typeQuery('heart')
+assert(realChooser.rows[1].layout=='text:HEART' and countLayout('heart')==1,'Built-in shape layouts with the same name remain available')
+keys['ctrl:return'].fn()
+assert(realChooser.rows[1].entries,'Returning to the history list restores sets without dynamic rows')
+realChooser.onHide()
+settings['emojiLayout.last.v1']='text:love'
+keys={};env.emojiStickerHistoryChooser()
+keys['ctrl:return'].fn()
+assert(realChooser.rows[1].layout=='text:LOVE','Remembered text layout stays first regardless of case')
+typeQuery('love')
+assert(realChooser.rows[1].layout=='text:LOVE' and countLayout('text:LOVE')==1,'Typing the remembered text word does not duplicate it')
+realChooser.onHide()
+settings['emojiLayout.words.v1']={'کتاب','سلام'}
+settings['emojiLayout.last.v1']='text:کتاب'
+keys={};env.emojiStickerHistoryChooser()
+keys['ctrl:return'].fn()
+assert(realChooser.rows[1].layout=='text:کتاب','Remembered Farsi text layout stays first')
+typeQuery('کتاب')
+assert(realChooser.rows[1].layout=='text:کتاب' and countLayout('text:کتاب')==1,'Typing a Farsi preset/remembered word promotes it without duplicating it')
+typeQuery('  کتاب  ')
+assert(realChooser.rows[1].layout=='text:کتاب' and countLayout('text:کتاب')==1,'Whitespace-padded Farsi queries also deduplicate')
+typeQuery('پژواک')
+assert(realChooser.rows[1].layout=='text:پژواک' and countLayout('text:پژواک')==1,'Typed Farsi words become a text layout option')
+local wordBuilt=L.build('text:کتاب',4)
+assert(#wordBuilt==1 and #wordBuilt[1]>=25,'Built Farsi layout produces cell placements')
+realChooser.onHide()
 print('TELEGRAM_EMOJI_PAYLOAD_TESTS_PASSED')
