@@ -17,6 +17,7 @@ import unicodedata
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import quote, unquote, urlsplit
 import xml.etree.ElementTree as ET
+from podcast_dates import append_upload_date
 
 VIDEO = re.compile(r"^[A-Za-z0-9_-]{11}$")
 PLAYLIST = re.compile(r"^[A-Za-z0-9_-]{10,100}$")
@@ -309,7 +310,7 @@ class Catalog:
                 return
             item = ET.SubElement(channel, "item")
             ET.SubElement(item, "title").text = info.get("title") or path.stem
-            ET.SubElement(item, "description").text = info.get("description") or ""
+            ET.SubElement(item, "description").text = append_upload_date(info.get("description"), info.get("upload_date"))
             # Match the CLI's raw (unescaped) URL when generating its GUID, so
             # rebuilding the feed later does not make this item look new again.
             ET.SubElement(item, "guid", isPermaLink="false").text = hashlib.md5(f"{unquote(self.base_url)}/{path.name}|{path.stat().st_mtime}".encode()).hexdigest()

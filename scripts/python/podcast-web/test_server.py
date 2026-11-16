@@ -8,6 +8,7 @@ import time
 import unittest
 from unittest.mock import patch
 import xml.etree.ElementTree as ET
+from podcast_dates import append_upload_date, format_upload_date
 
 spec = importlib.util.spec_from_file_location("podcast_web", Path(__file__).with_name("server.py"))
 web = importlib.util.module_from_spec(spec)
@@ -86,7 +87,7 @@ class CatalogTests(unittest.TestCase):
         feed.write_text('<rss version="2.0"><channel><title>Keep me</title><item><title>Old</title><guid>stable-guid</guid><enclosure url="https://example.com/old.m4a"/></item></channel></rss>')
         audio = self.catalog.audio / f"New title [{ID}].m4a"
         audio.write_bytes(b"fixture")
-        info = {"id": ID, "title": "New title", "description": "<b>Text</b>", "duration": 123}
+        info = {"id": ID, "title": "New title", "description": "<b>Text</b>", "duration": 123, "upload_date": "20260304"}
         self.catalog.add_to_feed(info, audio)
         once = feed.read_bytes()
         self.catalog.add_to_feed(info, audio)
@@ -95,6 +96,53 @@ class CatalogTests(unittest.TestCase):
         self.assertEqual(tree.findtext("./channel/title"), "Keep me")
         self.assertEqual(tree.findtext("./channel/item/guid"), "stable-guid")
         self.assertEqual(len(tree.findall("./channel/item")), 2)
+        self.assertTrue(tree.findall("./channel/item")[1].findtext("description").endswith("1404/Esfand12/13 Wednesday 4/March3/2026"))
+
+    def test_original_date_format_and_no_invented_dates(self):
+        self.assertEqual(format_upload_date("20260304"), "1404/Esfand12/13 Wednesday 4/March3/2026")
+        self.assertEqual(format_upload_date("2024-03-20"), "1403/Farvardin1/1 Wednesday 20/March3/2024")
+        once = append_upload_date("Description", "20260304")
+        self.assertEqual(append_upload_date(once, "20260304"), once)
+        self.assertEqual(append_upload_date("Description", None), "Description")
+        self.assertEqual(append_upload_date("Description", "2024"), "Description")
+        self.assertEqual(append_upload_date("Description", "20260230"), "Description")
+
+    def test_cli_metadata_and_feed_use_original_date_not_fake_date(self):
+        import importlib.util
+        import sys
+        parent = Path(__file__).resolve().parents[1]
+        sys.path.insert(0, str(parent))
+        cli_spec = importlib.util.spec_from_file_location("podcaster_cli", parent / "podcaster.py")
+        cli = importlib.util.module_from_spec(cli_spec)
+        cli_spec.loader.exec_module(cli)
+        episode = {"url": "https://example.com/test.m4a", "title": "Test", "description": "Original", "upload_date": "20260304", "date": 1, "file_path": "test.m4a", "size": 10, "duration": 20}
+        feed = self.root / "cli.rss"
+        cli.generate_rss_feed([dict(episode), dict(episode, url="https://example.com/second.m4a")], title="Test", description="Test", author="Test", album_art_url=None, output_path=str(feed), link_url="https://example.com", fake_dates=True)
+        for item in ET.parse(feed).findall("./channel/item"):
+            self.assertTrue(item.findtext("description").endswith("1404/Esfand12/13 Wednesday 4/March3/2026"))
+            self.assertNotEqual(item.findtext("pubDate"), "Wed, 04 Mar 2026 00:00:00 GMT")
+
+    def test_backfill_changes_only_descriptions_and_is_idempotent(self):
+        import backfill_descriptions
+        audio = self.catalog.audio / "original.m4a"
+        audio.write_bytes(b"fixture")
+        feed = self.catalog.audio / "feed.rss"
+        feed.write_text('<rss><channel><item><title>Original</title><description>Keep this text</description><guid>stable-id</guid><pubDate>Mon, 01 Jan 2024 00:00:00 GMT</pubDate><enclosure url="https://example.com/original.m4a" length="7" type="audio/mp4"/></item></channel></rss>')
+        with patch.object(backfill_descriptions, "File", return_value={"date": ["20260304"]}):
+            preview = backfill_descriptions.backfill(self.catalog.audio)
+            self.assertEqual(preview["updated"], 1)
+            self.assertNotIn("Original upload date", feed.read_text())
+            result = backfill_descriptions.backfill(self.catalog.audio, apply=True)
+            self.assertEqual(result["updated"], 1)
+            once = feed.read_bytes()
+            self.assertEqual(backfill_descriptions.backfill(self.catalog.audio, apply=True)["unchanged"], 1)
+            self.assertEqual(feed.read_bytes(), once)
+        item = ET.parse(feed).find("./channel/item")
+        self.assertEqual(item.findtext("guid"), "stable-id")
+        self.assertEqual(item.findtext("pubDate"), "Mon, 01 Jan 2024 00:00:00 GMT")
+        self.assertEqual(item.find("enclosure").get("length"), "7")
+        self.assertTrue(item.findtext("description").startswith("Keep this text\n\nOriginal upload date:"))
+        self.assertTrue(feed.with_name("feed.before-upload-dates.rss").exists())
 
     def test_channel_without_playlist_tab_and_manual_playlist(self):
         def extract(url):

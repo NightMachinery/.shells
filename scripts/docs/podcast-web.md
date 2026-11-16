@@ -11,8 +11,8 @@ Open **Download queue** near the top to see the current download, waiting episod
 in order, and recent completed/failed jobs. The queue includes episodes hidden
 by list filters. Failed jobs have a retry button; finished jobs link to their audio.
 
-Run it in the Python environment that already runs `podcaster.py` (`yt-dlp`
-and FFmpeg are required):
+Run it in the Python environment that already runs `podcaster.py` (`yt-dlp`,
+`jdatetime` and FFmpeg are required):
 
 ```sh
 python python/podcast-web/build.py
@@ -66,3 +66,29 @@ python -m unittest discover -s python/podcast-web -v
 
 It covers archive persistence, catalog refresh failure, download deduplication,
 shared locking, existing audio matching, feed updates and browser request checks.
+
+Episode descriptions end with the original upload date in the same named-month
+layout as [agfi:now], for example:
+
+```text
+Original upload date: 1404/Esfand12/13 Wednesday 4/March3/2026
+```
+
+Both the web downloader and CLI use `python/podcast_dates.py`. The web source has
+an internal symlink to that helper, which the server deploy dereferences. Include
+`podcast_dates.py` in the server's watched files so changing it restarts the service.
+The original date comes from YouTube's `upload_date` or the audio's embedded date,
+never from its download time. Date-only metadata is printed without an invented
+clock time. Unknown dates leave the description unchanged. Rebuilding a feed
+replaces the existing suffix rather than duplicating it.
+
+Existing RSS descriptions can be updated without modifying audio, episode GUIDs,
+publication dates or feed order:
+
+```sh
+python python/podcast-web/backfill_descriptions.py --audio-dir "$AUDIO_DIR"
+python python/podcast-web/backfill_descriptions.py --audio-dir "$AUDIO_DIR" --apply
+```
+
+The first command previews counts. The second takes the downloader's shared lock,
+keeps a `feed.before-upload-dates.rss` backup, and updates the feed atomically.

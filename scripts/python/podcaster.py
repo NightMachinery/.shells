@@ -21,9 +21,10 @@ Dependencies:
     - iterfzf
     - tqdm
     - pynight (custom module)
+    - jdatetime
 
 Install dependencies with:
-    pip install -U feedgen Pillow mutagen yt-dlp iterfzf tqdm
+    pip install -U feedgen Pillow mutagen yt-dlp iterfzf tqdm jdatetime
 """
 
 import os
@@ -36,6 +37,7 @@ import email.utils
 import re
 import fcntl
 from urllib.parse import urlparse, parse_qs
+from podcast_dates import append_upload_date, parse_upload_date
 
 from mutagen import File as MutagenFile
 from mutagen.id3 import ID3, APIC
@@ -412,6 +414,7 @@ def extract_audio_metadata(*, file_path: str) -> Dict[str, Any]:
             "size": os.path.getsize(file_path),
             "author": audio.get("artist", [None])[0],
             "description": audio.get("description", [None])[0],
+            "upload_date": parse_upload_date(audio.get("date", [None])[0]),
         }
         logging.debug(f"Extracted metadata for {file_path}: {metadata}")
         return metadata
@@ -587,7 +590,7 @@ def generate_rss_feed(
         guid_hash = hashlib.md5(guid_str.encode("utf-8")).hexdigest()
         fe.guid(guid_hash, permalink=False)
         fe.title(ep["title"])
-        fe.description(ep.get("description", "No description available."))
+        fe.description(append_upload_date(ep.get("description", "No description available."), ep.get("upload_date")))
         audio_format = os.path.splitext(ep["file_path"])[1][1:].lower()
         mime_type = MIME_TYPES.get(audio_format, "audio/mpeg")
         fe.enclosure(ep["url"], str(ep["size"]), mime_type)
