@@ -117,41 +117,42 @@ function ugfz-o0() {
 ##
 function ugfz() {
     local opts=("${@[1,-2]}") INITIAL_QUERY="${@[-1]}"
-    local input
-    input="$(cat)" @RET
 
-    local tmp
-    tmp="$(gmktemp)" @RET
-    ecn "$input" > "$tmp"
-
-    local ugrep_opts=("$ugrep_opts[@]")
+    local uopts=("$ugrep_opts[@]")
     ## Add line numbers to output:
     # opts+=( --delimiter ':' --with-nth 2..)
     # ugrep_opts+="--format='%n:%O%~'"
     ##
     if isI ; then
-        ugrep_opts+='--color=always' # gets stripped by fzf if interactive
+        uopts+='--color=always' # gets stripped by fzf if interactive
     else
-        ugrep_opts+='--color=never'
+        uopts+='--color=never'
     fi
     if true || ! isDbg ; then
         # @warn @untested Not adding this might break an otherwise fine execution
-        ugrep_opts+='--no-messages'
+        uopts+='--no-messages'
     fi
 
-    RG_PREFIX="cat $(gq "$tmp") | ugrep $ugrep_opts[*] -e"
-
-    local FZF_DEFAULT_COMMAND="$RG_PREFIX $(gq "${INITIAL_QUERY}")" # Not exported as we are just feeding fzf on stdin ourselves
     if isI ; then
-        if test -n "$INITIAL_QUERY" ; then
-            opts+=( --query "$INITIAL_QUERY " )
-        fi
+        local tmp
+        tmp="$(gmktemp)" @RET
+        {
+            command cat > "$tmp" @RET
 
-        { eval "$FZF_DEFAULT_COMMAND" ; true } |
-            FZF_SIMPLE_PREVIEW='cat {f}' \
-                fz --bind "change:reload:$RG_PREFIX {q} || true" ${opts[@]}  --ansi --disabled
+            local RG_PREFIX="ugrep $uopts[*] -e"
+            local FZF_DEFAULT_COMMAND="$RG_PREFIX $(gq "${INITIAL_QUERY}") $(gq "$tmp")" # Not exported as we are just feeding fzf on stdin ourselves
+            if test -n "$INITIAL_QUERY" ; then
+                opts+=( --query "$INITIAL_QUERY " )
+            fi
+
+            { eval "$FZF_DEFAULT_COMMAND" ; true } |
+                FZF_SIMPLE_PREVIEW='cat {f}' \
+                    fz --bind "change:reload:$RG_PREFIX {q} $(gq "$tmp") || true" ${opts[@]}  --ansi --disabled
+        } always {
+            command rm -f -- "$tmp"
+        }
     else
-        eval "$FZF_DEFAULT_COMMAND" | {
+        command ugrep "${uopts[@]}" -e "${INITIAL_QUERY}" | {
             sponge || true # no idea why sometimes this can fail 141
         } || {
             ecerr "$0: failed ${(@j.|.)pipestatus}"
