@@ -141,7 +141,7 @@ def quota_error(record):
 
 def quota_failure(record):
     """Account exhaustion elsewhere must not resume an intentionally idle agent."""
-    if record.get('archivedAt') or record.get('lastStatus') != 'error':
+    if record.get('archivedAt') or record.get('lastStatus') not in ('error', 'closed'):
         return None
     if not quota_error(record):
         return None
@@ -264,9 +264,14 @@ def limit_failure(record, binding):
 
 def failure_of(snapshot, record, state, transcript_fn):
     """The current failed turn's identity, or None when nothing should resume."""
-    if snapshot.get('Status') == 'error':
-        return quota_failure(record)
-    if snapshot.get('Status') == 'idle' and state['binding']['agent'] in ('claude', 'codex') \
+    status = snapshot.get('Status')
+    # Idle runtime cleanup reports the persisted agent as closed. Its last
+    # quota failure still counts; loading the runtime is not a new turn.
+    if status in ('error', 'closed'):
+        failure = quota_failure(record)
+        if failure or status == 'error':
+            return failure
+    if status in ('idle', 'closed') and state['binding']['agent'] in ('claude', 'codex') \
             and not record.get('archivedAt'):
         return transcript_fn(record, state['binding'])
     return None

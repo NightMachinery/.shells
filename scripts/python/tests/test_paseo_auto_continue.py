@@ -69,6 +69,28 @@ class PaseoAutoContinueTests(unittest.TestCase):
         self.tick()
         self.assertEqual(len(self.sent), 1)
 
+    def test_collected_error_continues_once_after_recovery(self):
+        self.assertEqual(self.tick(quota=False), 'waiting for quota recovery')
+        self.snapshot['Status'] = self.record['lastStatus'] = 'closed'
+        self.assertEqual(self.tick(quota=False), 'waiting for quota recovery')
+        self.assertIn('sent', self.tick())
+        self.tick()
+        self.assertEqual(len(self.sent), 1)
+
+    def test_collection_does_not_repeat_claimed_error(self):
+        self.tick()
+        self.snapshot['Status'] = self.record['lastStatus'] = 'closed'
+        self.tick()
+        self.assertEqual(len(self.sent), 1)
+
+    def test_collected_agent_without_quota_failure_stays_stopped(self):
+        self.snapshot['Status'] = self.record['lastStatus'] = 'closed'
+        for error in (None, 'Network connection failed'):
+            with self.subTest(error=error):
+                self.record['lastError'] = error
+                self.tick()
+                self.assertFalse(self.sent)
+
     def test_idle_agent_never_continues(self):
         self.snapshot['Status'] = 'idle'
         self.record['lastStatus'] = 'idle'
@@ -462,6 +484,42 @@ class ClaudeLimitTests(unittest.TestCase):
         self.assertEqual(len(self.sent), 1)
         self.assertEqual(self.sent[0][:3], ['paseo', 'send', 'agent-id'])
 
+    def test_collected_claude_agent_after_limit_continues_once(self):
+        self.write(self.limit())
+        self.snapshot['Status'] = self.record['lastStatus'] = 'closed'
+        self.assertIn('sent', self.tick())
+        self.tick()
+        self.assertEqual(len(self.sent), 1)
+
+    def test_collected_claude_agent_keeps_eligibility_checks(self):
+        self.snapshot['Status'] = self.record['lastStatus'] = 'closed'
+        self.write(self.limit())
+        self.snapshot['PendingPermissions'] = ['permission']
+        self.tick()
+        self.assertFalse(self.sent)
+        self.snapshot['PendingPermissions'] = []
+        self.record['archivedAt'] = 'archived'
+        self.tick()
+        self.assertFalse(self.sent)
+        self.record.pop('archivedAt')
+        self.write(self.limit(), {'type': 'user', 'message': {'content': 'Continue'}})
+        self.tick()
+        self.assertFalse(self.sent)
+
+    def test_collected_claude_turn_change_during_quota_check_skips(self):
+        self.snapshot['Status'] = self.record['lastStatus'] = 'closed'
+        self.write(self.limit())
+
+        def quota(*_):
+            self.write(self.limit(), {'type': 'user', 'message': {'content': 'Continue'}})
+            return True
+
+        status = mod.tick(self.path, inspect_fn=lambda *_: self.snapshot,
+                          stored_fn=lambda *_: self.record, quota_fn=quota,
+                          send_fn=self.sent.append, transcript_fn=lambda *_: self.failure())
+        self.assertEqual(status, 'agent changed during quota check; skipped')
+        self.assertFalse(self.sent)
+
     def test_second_limit_stop_continues_again(self):
         self.write(self.limit('limit-1'))
         self.tick()
@@ -470,7 +528,7 @@ class ClaudeLimitTests(unittest.TestCase):
         self.tick()
         self.assertEqual(len(self.sent), 2)
 
-    def test_idle_codex_agent_resumes_on_its_logged_limit(self):
+    def assert_codex_agent_resumes_on_its_logged_limit(self):
         # Codex also records a limit stop only in its own log; the watcher reads it.
         config = {'agents': {'providers': {'codex-x': {'extends': 'codex'}}}}
         (self.home / 'config.json').write_text(json.dumps(config))
@@ -484,6 +542,13 @@ class ClaudeLimitTests(unittest.TestCase):
         self.tick(transcript_fn=codex_log)
         self.assertEqual(set(seen), {'codex'})
         self.assertTrue(self.sent)
+
+    def test_idle_codex_agent_resumes_on_its_logged_limit(self):
+        self.assert_codex_agent_resumes_on_its_logged_limit()
+
+    def test_collected_codex_agent_resumes_on_its_logged_limit(self):
+        self.snapshot['Status'] = self.record['lastStatus'] = 'closed'
+        self.assert_codex_agent_resumes_on_its_logged_limit()
 
     def test_running_claude_agent_never_continues(self):
         self.write(self.limit())

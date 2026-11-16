@@ -59,7 +59,8 @@ require explicit re-registration.
 
 The worker watches that agent's persisted error state. It only checks account
 usage after that agent's own failed turn contains a quota/rate-limit error.
-An idle or running agent, a permission request, an unrelated network error,
+An agent with no quota-failed turn, a running agent, a permission request,
+an unrelated network error,
 or another session exhausting the account does not trigger a continuation.
 
 Where the failed turn is recorded depends on the provider. An error status
@@ -121,21 +122,20 @@ returns. The idle worker exits at its next check; it is not killed. A reboot
 stops workers, and another `on` starts the worker again. No daemon restart is
 needed.
 
-### Known limitation: collected idle runtimes
+### Collected idle runtimes
 
 Paseo can unload an agent runtime after an hour of inactivity and report the
-stored agent as `closed`. The watcher's `failure_of()` currently recognizes
-only `idle` and `error`, so it stops checking that agent's quota even when
-the transcript still ends with a usage-limit error. The worker keeps printing
-`waiting for a quota-failed turn`. Once Paseo loads the agent again, the next
-poll can detect the failed turn and resume it. A late continuation can
-therefore come from runtime cleanup rather than a late quota reset.
+stored agent as `closed`. The watcher recognizes its persisted quota error
+or the last quota-failed turn in the Claude/Codex transcript, just as it does
+for a loaded runtime. Quota recovery can therefore resume the agent without
+opening it in Paseo first. An archived agent or a later conversation turn
+still prevents continuation, and an already claimed failure is not sent again.
 
 To diagnose this, compare `Collected idle agent runtime` and
 `Agent resumed from persistence` in the daemon log with the worker's
-scrollback and the provider transcript. The watcher needs to recognize
-resumable stored agents while retaining its archive, permission and
-same-failed-turn checks.
+scrollback and the provider transcript. Workers started before this fix
+must be restarted to load the new Python code; preserve their registration
+files so claimed failures remain claimed.
 
 The watcher supports local Claude default/work subscription profiles and
 Codex account quota. It does not automatically choose another provider or
