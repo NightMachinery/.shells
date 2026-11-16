@@ -5,10 +5,11 @@
 <meta name="color-scheme" content="light dark">
 <title>Podcast library</title>
 <script src="theme.js?v=6924a29d93bf"></script>
-<link rel="stylesheet" href="style.css?v=2384fa203e5b">
+<link rel="stylesheet" href="style.css?v=8d42f2b2f93f">
 <body>
 <main>
   <header><div class="header-top"><div class="eyebrow">YOUR LISTENING LIBRARY</div><label class="theme-control" for="theme">Theme <select id="theme"><option value="light">Light</option><option value="dark">Dark</option></select></label></div><h1 id="title">Podcast library</h1><p>Find an older conversation. Keep the ones you want.</p><div class="header-actions"><a id="feed" href="#">Podcast feed ↗</a><button id="refresh">Refresh catalog</button></div></header>
+  <details id="download-queue" class="download-queue"><summary><h2>Download queue <span id="queue-count"></span></h2></summary><p id="queue-status" role="status"></p><ol id="queue-active"></ol><details id="queue-history"><summary>Recent downloads <span id="queue-history-count"></span></summary><div id="queue-recent"></div></details></details>
   <section class="controls" aria-label="Browse episodes">
     <label class="search-label" for="search">Search episodes</label><input id="search" type="search" placeholder="Search titles in Persian or English…" autocomplete="off">
     <div class="selectors"><label>Playlist<select id="playlist"><option value="uploads">All episodes</option><option value="downloaded">Downloaded library</option></select></label><label>Order<select id="sort"><option value="new">Newest first</option><option value="old">Oldest first</option><option value="playlist">Playlist order</option><option value="title">Title</option></select></label></div>
@@ -24,6 +25,6 @@
   <details class="playlists"><summary><h2>Playlists <span id="playlist-count"></span></h2></summary><p class="playlist-help">Browse the channel’s public playlists, or add one using its YouTube link.</p><form id="add-playlist"><label for="playlist-url">YouTube playlist URL</label><div class="playlist-input"><input id="playlist-url" type="url" placeholder="https://www.youtube.com/playlist?list=…" required><button type="submit">Add playlist</button></div></form><div id="playlists"></div></details>
   <footer>Archive hides an episode from this list. Restore it any time by turning off “Hide archived”. Audio files and your podcast feed are kept.</footer>
 </main>
-<script src="app.js?v=3f9727217e12"></script>
+<script src="app.js?v=6da12ce4dd56"></script>
 </body>
 </html>

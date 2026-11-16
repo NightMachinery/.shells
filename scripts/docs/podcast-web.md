@@ -7,6 +7,10 @@ downloaded or archived episode affects the list only, not the audio or RSS feed.
 The header has Light and Dark themes. Light is the default; the browser remembers
 your choice and applies it before rendering the page.
 
+Open **Download queue** near the top to see the current download, waiting episodes
+in order, and recent completed/failed jobs. The queue includes episodes hidden
+by list filters. Failed jobs have a retry button; finished jobs link to their audio.
+
 Run it in the Python environment that already runs `podcaster.py` (`yt-dlp`
 and FFmpeg are required):
 
