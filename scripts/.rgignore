@@ -1,0 +1,5 @@
+!TASKS.org
+node_modules/
+vendor/
+__pycache__/
+.pytest_cache/

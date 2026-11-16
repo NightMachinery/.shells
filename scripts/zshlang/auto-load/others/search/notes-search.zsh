@@ -58,7 +58,7 @@ function agfi {
     # f="$(ec "$f" | sdlit . '\.')" # not worth the perf hit, though I haven't benchmarked
 
     local -x FZF_DEFAULT_OPTS="$FZF_DEFAULT_OPTS --height 50% --select-1"
-    local q
+    local rg_q
     ##
     # local word_break='\W'
     # using '\b' doesn't work with names such as 'ntl.', but using '\W' breaks ugrep:
@@ -66,19 +66,40 @@ function agfi {
     # best is to just use 'ntl' instead of 'ntl.', as the dotted versions are matched as well
     local word_break='\b'
     ##
-    if ! isI || test -n "$prefix_mode" ; then
-        q=":\s*${word_break}function\s+${f}|:\s*${word_break}${f}[^:]*\s*\(\)|:\s*alias[^:=]*\s*${word_break}$f|:\s*alifn[^:=]*\s*${word_break}$f "
+    if test -z "$f" ; then
+        rg_q="^\s*(function\s+|[^:\s()]+\s*\(\)|(?:alias|alifn)[^\s:=]*(?:\s+-[gs])?\s+)"
+    elif ! isI || test -n "$prefix_mode" ; then
+        rg_q="^\s*(${word_break}function\s+${f}|${word_break}${f}[^\s.:()]*\s*\(\)|(?:alias|alifn)[^\s:=]*(?:\s+-[gs])?\s+${word_break}${f})"
     else
-        q=":\s*${word_break}function\s+${f}${word_break}|:\s*${word_break}${f}${word_break}\s*\(\)|:\s*alias[^:=]*\s*${word_break}$f${word_break}|:\s*alifn[^:=]*\s*${word_break}$f${word_break} "
+        rg_q="^\s*(${word_break}function\s+${f}${word_break}|${word_break}${f}${word_break}\s*\(\)|(?:alias|alifn)[^\s:=]*(?:\s+-[gs])?\s+${word_break}${f}${word_break})"
     fi
 
-    isDbg && ec-copy "$q"
-    local ntsearch_lines_nw=y ntsearch_lines_fe=y fzp_ug=y ntsearch_lines_nnp="${ntsearch_lines_nnp:-y}" ntsearch_query_fzf="$q"
+    isDbg && ec-copy "$rg_q"
+    ensure-array ntsearch_rg_opts @RET
+    local ntsearch_rg_opts=(
+        "$ntsearch_rg_opts[@]"
+        --iglob '!*.org'
+        --iglob '!*.org_archive'
+        --iglob '!*.md'
+        --iglob '!*.markdown'
+        --iglob '!*.txt'
+        --iglob '!*.json'
+        --iglob '!*.jsonl'
+        --iglob '!*.csv'
+        --iglob '!*.tsv'
+        --iglob '!*.html'
+        --iglob '!*.svg'
+        --iglob '!*.xml'
+        --iglob '!*.tex'
+        --iglob '!*.bib'
+        --iglob '!*.lock'
+    )
+    local ntsearch_lines_nw=y ntsearch_lines_fe=y fzp_ug='' ntsearch_lines_nnp="${ntsearch_lines_nnp:-y}" ntsearch_query_fzf='' ntsearch_sort="${ntsearch_sort:-none}"
     if isI ; then
         # We need to run this without piping in the interactive case, or else jumping to editor will break
-        agsi
+        agsi "$rg_q"
     else
-        agsi | sd '\n' '\n\n' # improves readability
+        agsi "$rg_q" | LC_ALL=C sort | sd '\n' '\n\n' # improves readability
     fi
 }
 noglobfn agfi
@@ -415,10 +436,14 @@ function ntsearch_() {
 
 function ntsearch_fd_h {
     ensure-array ntsearch_rg_opts @RET
-    local ntsearch_rg_opts=(--no-ignore-global "$ntsearch_rg_opts[@]")
+    local sort_mode="${ntsearch_sort:-path}"
+    local ntsearch_rg_opts=(--no-require-git --no-ignore-global "$ntsearch_rg_opts[@]")
+    if test -n "$sort_mode" && [[ "$sort_mode" != none ]] ; then
+        ntsearch_rg_opts+=(--sort "$sort_mode")
+    fi
 
     print -nr -- "${(@pj.\0.)files}" \
-        | gxargs -0 rg --no-binary --smart-case --engine auto --no-messages --with-filename --line-number --sort path "$ntsearch_rg_opts[@]" "$@" -- "$query_rg" \
+        | gxargs -0 rg --no-binary --smart-case --engine auto --no-messages --with-filename --line-number "$ntsearch_rg_opts[@]" "$@" -- "$query_rg" \
         | prefixer --skip-empty -r "$nightNotes" -i $'\n' -o "$osep"
     # no-messages suppresses IO errors
     # xargs is needed to avoid argument list too long error
