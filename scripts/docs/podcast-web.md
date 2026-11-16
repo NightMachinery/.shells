@@ -4,6 +4,8 @@
 history and playlists. It queues older episodes for download, links existing
 audio files, and saves reversible archive choices on the server. Hiding a
 downloaded or archived episode affects the list only, not the audio or RSS feed.
+The header has Light and Dark themes. Light is the default; the browser remembers
+your choice and applies it before rendering the page.
 
 Run it in the Python environment that already runs `podcaster.py` (`yt-dlp`
 and FFmpeg are required):
@@ -17,7 +19,7 @@ python python/podcast-web/server.py --channel CHANNEL_ID \
 ```
 
 The server binds `127.0.0.1:8812`; `PORT` overrides it. Serve `index.html`,
-`app.js`, and `style.css` behind an authenticated reverse proxy, and strip
+`app.js`, `theme.js`, and `style.css` behind an authenticated reverse proxy, and strip
 the page's `/api` prefix when proxying to this server. JSON mutations require
 same-origin browser requests with `X-Podcast-Action: 1`. Authentication belongs
 to the private page's proxy, as with other private HTML reports.

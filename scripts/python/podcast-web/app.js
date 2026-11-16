@@ -1,5 +1,11 @@
 'use strict';
 const $ = id => document.getElementById(id);
+$('theme').value = document.documentElement.dataset.theme || 'light';
+$('theme').onchange = () => {
+  const theme = $('theme').value;
+  document.documentElement.dataset.theme = theme;
+  try { localStorage.setItem('podcast-web-theme', theme); } catch {}
+};
 const state = {data:null, page:0, size:40, selected:new Set(), visible:[], pending:0, loading:false};
 const preferences = ['hide-downloaded','hide-archived','playlist','sort','search'];
 const normalize = s => String(s||'').normalize('NFKC').replace(/ي/g,'ی').replace(/ك/g,'ک').toLocaleLowerCase().replace(/[\u200c\u200d]/g,'');
