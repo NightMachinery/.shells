@@ -91,10 +91,12 @@ still current and no permission request or user continuation appeared. It
 then records that turn as claimed and calls:
 
 ```sh
-paseo send AGENT_UUID 'Continue. ...' --home DAEMON_HOME --no-wait --json
+paseo send AGENT_UUID 'Continue.' --home DAEMON_HOME --no-wait --json
 ```
 
-The message asks a finished task to turn auto-continue off. One failed turn
+The message is plain `Continue.`: only a turn that failed on the limit is
+resumed, so the run was interrupted, and an "if finished, turn yourself off"
+clause would only invite an agent to stop a run that is half done. One failed turn
 gets at most one automatic send, including across watcher restarts. If a send
 fails or times out, its outcome may be uncertain, so the watcher disables
 itself rather than sending again. Inspect the agent before explicitly arming

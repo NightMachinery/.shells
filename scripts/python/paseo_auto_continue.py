@@ -519,7 +519,10 @@ def tick(path, *, inspect_fn=inspect, stored_fn=stored_agent, quota_fn=quota, se
                     state.update(claimed_failure=failure, status='sending continuation')
                     atomic_write(path, state)
                     try:
-                        send_fn(['paseo', 'send', state['agent_id'], 'Continue. If the task is already finished, say so briefly and run: zsh -c agent-auto-continue-off',
+                        # Only a turn that failed on the limit is resumed, so the run was
+                        # interrupted: no "turn yourself off if finished" clause, which
+                        # agents read as "off once this batch is done".
+                        send_fn(['paseo', 'send', state['agent_id'], 'Continue.',
                                  '--home', state['home'], '--no-wait', '--json'])
                     except Exception:
                         # A timeout can mean Paseo accepted the send. Never retry

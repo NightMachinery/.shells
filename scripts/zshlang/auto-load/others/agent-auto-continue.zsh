@@ -51,10 +51,12 @@ typeset -g agent_auto_continue_session_prefix="${agent_auto_continue_session_pre
 #: session that finished an hour earlier is left alone.
 #: See [agfi:h-agent-auto-continue-eligible-p].
 typeset -g agent_auto_continue_activity_slack_s="${agent_auto_continue_activity_slack_s:-120}"
-#: What gets typed. Self-limiting: a session that was resumed although its task
-#: was already finished is asked to take itself off the list, so a wrong resume
-#: happens once rather than at every reset.
-typeset -g agent_auto_continue_text="${agent_auto_continue_text:-Continue. If the task is already finished, say so briefly and run: zsh -c agent-auto-continue-off}"
+#: What gets typed. Self-limiting: the activity gate can resume a session that
+#: had finished just before the limit hit, so such a session is asked to take
+#: itself off the list, and a wrong resume happens once rather than at every
+#: reset. The condition is strict on purpose: agents read a loose "if the task
+#: is finished" as "once this batch of requests is done" and stranded runs.
+typeset -g agent_auto_continue_text="${agent_auto_continue_text:-Continue. Only if nothing at all remains of your work (no open items, nothing waiting on other agents or on me), say so briefly and run: zsh -c agent-auto-continue-off}"
 ##
 #: Naming
 ##

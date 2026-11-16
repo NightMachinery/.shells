@@ -250,9 +250,12 @@ every later cycle. Three things close that:
   [agfi:agent-auto-continue-off] for the session it ends.
 
 And one safety net: the text typed is `agent_auto_continue_text`, which by
-default asks the session to say so briefly and run `agent-auto-continue-off`
-if the task is already finished. A wrong resume that slips past the gate then
-happens once, not at every reset.
+default asks the session to run `agent-auto-continue-off` only if nothing at
+all remains of its work, including items waiting on other agents or on the
+user. A wrong resume that slips past the gate then happens once, not at every
+reset. The condition is strict because the looser "if the task is already
+finished" was read as "once this batch of requests is done", and a coordinator
+switched itself off with half its run still ahead.
 
 Trade-offs, stated: the gate is a heuristic. A session that finished a few
 minutes before the limit hit is still resumed, and pays one short reply; a
