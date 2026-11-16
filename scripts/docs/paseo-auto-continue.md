@@ -121,6 +121,22 @@ returns. The idle worker exits at its next check; it is not killed. A reboot
 stops workers, and another `on` starts the worker again. No daemon restart is
 needed.
 
+### Known limitation: collected idle runtimes
+
+Paseo can unload an agent runtime after an hour of inactivity and report the
+stored agent as `closed`. The watcher's `failure_of()` currently recognizes
+only `idle` and `error`, so it stops checking that agent's quota even when
+the transcript still ends with a usage-limit error. The worker keeps printing
+`waiting for a quota-failed turn`. Once Paseo loads the agent again, the next
+poll can detect the failed turn and resume it. A late continuation can
+therefore come from runtime cleanup rather than a late quota reset.
+
+To diagnose this, compare `Collected idle agent runtime` and
+`Agent resumed from persistence` in the daemon log with the worker's
+scrollback and the provider transcript. The watcher needs to recognize
+resumable stored agents while retaining its archive, permission and
+same-failed-turn checks.
+
 The watcher supports local Claude default/work subscription profiles and
 Codex account quota. It does not automatically choose another provider or
 account, and it cannot recover an error that Paseo fails to persist as a
