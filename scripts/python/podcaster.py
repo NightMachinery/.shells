@@ -34,6 +34,7 @@ import datetime
 from typing import List, Optional, Dict, Any, Iterable
 import email.utils
 import re
+import fcntl
 from urllib.parse import urlparse, parse_qs
 
 from mutagen import File as MutagenFile
@@ -897,7 +898,13 @@ def main():
     if args.command == "local":
         handle_local_mode(args)
     elif args.command == "yt":
-        handle_yt_mode(args)
+        # The web library shares this feed and download archive. Serialize both
+        # writers for the whole download/update, not only the final file rename.
+        base_dir = os.path.expanduser(args.base_dir)
+        os.makedirs(base_dir, exist_ok=True)
+        with open(os.path.join(base_dir, ".podcaster.lock"), "a") as lock:
+            fcntl.flock(lock, fcntl.LOCK_EX)
+            handle_yt_mode(args)
     else:
         logging.error("Unknown command.")
         sys.exit(1)
