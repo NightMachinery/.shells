@@ -134,14 +134,14 @@ assert(L.seeded('jumble-flat') and not L.seeded('heart') and not L.seeded('nope'
 assert(L.textWord(' hi ')=='HI' and L.textWord('i ♥ u')=='I ♥ U' and not L.textWord('a#b') and not L.textWord(''))
 assert(L.mode('text:hi').key=='text:HI' and not pcall(L.mode,'text:#'))
 local hi=L.build('text:hi',2)[1]
-assert(#hi==16,'H is 11 pixels and I 5')
+assert(#hi==13,'In the default 4-row font H is 9 pixels and I 4')
 for k,c in ipairs(hi) do assert(c.i==(c.x<1 and 1 or 2),'H is the first emoji, I the second') end
 local striped=L.build('text:z',3)[1]
 for _,c in ipairs(striped) do assert(c.i==c.y%3+1,'Rows stripe through a longer selection') end
 local two=L.build('text:radio',1)[1]
 local width=0;for _,c in ipairs(two) do width=math.max(width,2*math.abs(c.x)+1) end
 assert(width==9,'RADIO wraps as RA over DIO, the narrower of the equal splits')
-assert(L.describe('text:hi',2,L.build('text:hi',2),16):find('16 cells',1,true))
+assert(L.describe('text:hi',2,L.build('text:hi',2),13):find('13 cells',1,true))
 -- No two glyph boxes may intersect, except where a layout overlaps on purpose.
 local overlapping={jumble=true,quad=true,saturn=true}
 local lattice={row=true,column=true,heart=true,chessboard=true,['jumble-flat']=true,lead=true,frame=true}

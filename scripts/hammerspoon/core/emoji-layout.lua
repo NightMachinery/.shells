@@ -551,36 +551,101 @@ L.modes = {
 -- ** Text
 -- "text:WORD" spells WORD with one emoji per pixel of a font, so the word
 -- travels inside the layout key: history, last used and export need nothing
--- extra. Pure ASCII/symbol text uses the 5-row font below; Arabic/Persian (or
--- mixed) text uses CoreText Tahoma bitmaps via native/text-bitmap. Words are
+-- extra. Pure ASCII/symbol text uses the hand-drawn fonts below; Arabic/Persian
+-- (or mixed) text is a CoreText Tahoma raster from native/text-bitmap, reduced
+-- to L.textRows.persian rows. Words are
 -- typed in the layout menu, or preset in ~/witching/emoji/words.txt (one per
 -- line, # comments) or the local setting emojiLayout.words.v1, so personal
 -- names stay out of this repository.
 L.wordsFile = os.getenv("HOME") .. "/witching/emoji/words.txt"
--- A 5-row font, mostly 3 wide; M and W are 5 and N and Q 4, since at 3 wide
--- round dots blur M, N and H together. Rows are joined by "/", X is lit.
-L.fontHeight = 5
-L.font = {}
-for c, rows in pairs({
-    A=".X./X.X/XXX/X.X/X.X", B="XX./X.X/XX./X.X/XX.", C=".XX/X../X../X../.XX",
-    D="XX./X.X/X.X/X.X/XX.", E="XXX/X../XX./X../XXX", F="XXX/X../XX./X../X..",
-    G=".XX/X../X.X/X.X/.XX", H="X.X/X.X/XXX/X.X/X.X", I="X/X/X/X/X",
-    J="..X/..X/..X/X.X/.X.", K="X.X/X.X/XX./X.X/X.X", L="X../X../X../X../XXX",
-    M="X...X/XX.XX/X.X.X/X...X/X...X", N="X..X/XX.X/X.XX/X..X/X..X",
-    O=".X./X.X/X.X/X.X/.X.", P="XX./X.X/XX./X../X..", Q=".XX./X..X/X..X/X.X./.X.X",
-    R="XX./X.X/XX./X.X/X.X", S=".XX/X../.X./..X/XX.", T="XXX/.X./.X./.X./.X.",
-    U="X.X/X.X/X.X/X.X/XXX", V="X.X/X.X/X.X/.X./.X.",
-    W="X...X/X...X/X.X.X/XX.XX/X...X", X="X.X/X.X/.X./X.X/X.X",
-    Y="X.X/X.X/.X./.X./.X.", Z="XXX/..X/.X./X../XXX",
-    ["0"]="XXX/X.X/X.X/X.X/XXX", ["1"]=".X./XX./.X./.X./XXX", ["2"]="XXX/..X/XXX/X../XXX",
-    ["3"]="XXX/..X/XXX/..X/XXX", ["4"]="X.X/X.X/XXX/..X/..X", ["5"]="XXX/X../XXX/..X/XXX",
-    ["6"]="XXX/X../XXX/X.X/XXX", ["7"]="XXX/..X/..X/..X/..X", ["8"]="XXX/X.X/XXX/X.X/XXX",
-    ["9"]="XXX/X.X/XXX/..X/XXX", ["♥"]=".X.X./XXXXX/XXXXX/.XXX./..X..",
-    ["!"]="X/X/X/./X", ["?"]="XX./..X/.X./.../.X.",
+-- How many emoji a word takes, as the rows of one line of text: fewer rows
+-- mean fewer and larger emoji and cruder letters. english picks one of the
+-- hand-drawn fonts below (3 to 5 rows). persian is the full line height of the
+-- Tahoma raster, from the madd of آ to the dots of چ (6 to 10 is the useful
+-- range); a word without tall or deep letters takes fewer rows, and text that
+-- mixes scripts follows it too. Change at runtime with, e.g.,
+-- hs -c 'EmojiLayout.textRows.persian = 9'.
+L.textRows = {english=4, persian=7}
+-- Size of a dot, and of a stroke tip too short for a whole cell, relative to a
+-- body emoji. Dots are never dropped: each takes one emoji of its own.
+L.textDotSize = 0.7
+L.textTipSize = 0.7
+-- Hand-drawn fonts by row count, mostly 3 wide; M and W are 5 and N and Q 4 in
+-- the 4- and 5-row fonts, since at 3 wide round dots blur M, N and H together.
+-- The 3-row font is close to a cipher. Rows are joined by "/", X is lit.
+L.fonts = {}
+for rows, glyphs in pairs({
+    [5]={
+        A=".X./X.X/XXX/X.X/X.X", B="XX./X.X/XX./X.X/XX.", C=".XX/X../X../X../.XX",
+        D="XX./X.X/X.X/X.X/XX.", E="XXX/X../XX./X../XXX", F="XXX/X../XX./X../X..",
+        G=".XX/X../X.X/X.X/.XX", H="X.X/X.X/XXX/X.X/X.X", I="X/X/X/X/X",
+        J="..X/..X/..X/X.X/.X.", K="X.X/X.X/XX./X.X/X.X", L="X../X../X../X../XXX",
+        M="X...X/XX.XX/X.X.X/X...X/X...X", N="X..X/XX.X/X.XX/X..X/X..X",
+        O=".X./X.X/X.X/X.X/.X.", P="XX./X.X/XX./X../X..", Q=".XX./X..X/X..X/X.X./.X.X",
+        R="XX./X.X/XX./X.X/X.X", S=".XX/X../.X./..X/XX.", T="XXX/.X./.X./.X./.X.",
+        U="X.X/X.X/X.X/X.X/XXX", V="X.X/X.X/X.X/.X./.X.",
+        W="X...X/X...X/X.X.X/XX.XX/X...X", X="X.X/X.X/.X./X.X/X.X",
+        Y="X.X/X.X/.X./.X./.X.", Z="XXX/..X/.X./X../XXX",
+        ["0"]="XXX/X.X/X.X/X.X/XXX", ["1"]=".X./XX./.X./.X./XXX", ["2"]="XXX/..X/XXX/X../XXX",
+        ["3"]="XXX/..X/XXX/..X/XXX", ["4"]="X.X/X.X/XXX/..X/..X", ["5"]="XXX/X../XXX/..X/XXX",
+        ["6"]="XXX/X../XXX/X.X/XXX", ["7"]="XXX/..X/..X/..X/..X", ["8"]="XXX/X.X/XXX/X.X/XXX",
+        ["9"]="XXX/X.X/XXX/..X/XXX", ["♥"]=".X.X./XXXXX/XXXXX/.XXX./..X..",
+        ["!"]="X/X/X/./X", ["?"]="XX./..X/.X./.../.X.",
+    },
+    [4]={
+        A=".X./X.X/XXX/X.X", B="XX./XX./X.X/XX.", C=".XX/X../X../.XX",
+        D="XX./X.X/X.X/XX.", E="XXX/XX./X../XXX", F="XXX/X../XX./X..",
+        G=".XX/X../X.X/.XX", H="X.X/XXX/X.X/X.X", I="X/X/X/X",
+        J="..X/..X/X.X/.X.", K="X.X/XX./XX./X.X", L="X../X../X../XXX",
+        M="X...X/XX.XX/X.X.X/X...X", N="X..X/XX.X/X.XX/X..X",
+        O=".X./X.X/X.X/.X.", P="XX./X.X/XX./X..", Q=".XX./X..X/X.X./.X.X",
+        R="XX./X.X/XX./X.X", S=".XX/XX./..X/XX.", T="XXX/.X./.X./.X.",
+        U="X.X/X.X/X.X/XXX", V="X.X/X.X/X.X/.X.",
+        W="X...X/X.X.X/XX.XX/X...X", X="X.X/.X./.X./X.X",
+        Y="X.X/X.X/.X./.X.", Z="XXX/.X./X../XXX",
+        ["0"]="XXX/X.X/X.X/XXX", ["1"]=".X./XX./.X./XXX", ["2"]="XX./..X/.X./XXX",
+        ["3"]="XXX/.XX/..X/XXX", ["4"]="X.X/XXX/..X/..X", ["5"]="XXX/XX./..X/XX.",
+        ["6"]="X../XXX/X.X/XXX", ["7"]="XXX/..X/.X./.X.", ["8"]="XXX/XXX/X.X/XXX",
+        ["9"]="XXX/X.X/XXX/..X", ["♥"]="XX.XX/XXXXX/.XXX./..X..",
+        ["!"]="X/X/./X", ["?"]="XX./.XX/.../.X.",
+    },
+    [3]={
+        A=".X./XXX/X.X", B="XX./XXX/XXX", C="XXX/X../XXX",
+        D="XX./X.X/XX.", E="XXX/XX./XXX", F="XXX/XX./X..",
+        G="XX./X.X/XXX", H="X.X/XXX/X.X", I="X/X/X",
+        J="..X/X.X/XXX", K="X.X/XX./X.X", L="X../X../XXX",
+        M="XXX/XXX/X.X", N="XX./X.X/X.X",
+        O="XXX/X.X/XXX", P="XXX/XXX/X..", Q="XXX/XXX/..X",
+        R="XXX/XX./X.X", S=".XX/.X./XX.", T="XXX/.X./.X.",
+        U="X.X/X.X/XXX", V="X.X/X.X/.X.",
+        W="X.X/XXX/XXX", X="X.X/.X./X.X",
+        Y="X.X/.X./.X.", Z="XX./.X./.XX",
+        ["0"]="XXX/X.X/XXX", ["1"]="XX./.X./XXX", ["2"]="XX./.X./.XX",
+        ["3"]="XXX/.XX/XXX", ["4"]="X.X/XXX/..X", ["5"]=".XX/.X./XX.",
+        ["6"]="X../XXX/XXX", ["7"]="XXX/..X/..X", ["8"]="XXX/XXX/XXX",
+        ["9"]="XXX/XXX/..X", ["♥"]="X.X/XXX/.X.",
+        ["!"]="X/./X", ["?"]="XXX/.XX/.X.",
+    },
 }) do
-    local list = {}
-    for row in rows:gmatch("[^/]+") do list[#list+1] = row end
-    L.font[c] = list
+    local font = {}
+    for c, text in pairs(glyphs) do
+        local list = {}
+        for row in text:gmatch("[^/]+") do list[#list+1] = row end
+        font[c] = list
+    end
+    L.fonts[rows] = font
+end
+-- The character set of the hand-drawn fonts; all three cover the same one.
+L.font = L.fonts[5]
+-- The hand-drawn font L.textRows.english selects, and its row count.
+local function latinFont()
+    local rows = math.floor((tonumber(L.textRows.english) or 4) + 0.5)
+    rows = math.max(3, math.min(5, rows))
+    return L.fonts[rows], rows
+end
+-- Rows of a Persian line, kept to what the raster can resolve.
+local function persianRows()
+    return math.max(4, math.min(16, tonumber(L.textRows.persian) or 7))
 end
 L.textMax = 24
 
@@ -724,24 +789,360 @@ function L.loadTextBitmap(force)
     return L.textBitmap
 end
 
-local bitmapLineCache, bitmapLineCount, bitmapCacheMod = {}, 0, nil
+-- *** Reducing a raster to few cells
+-- Turns a large raster (pixels {x, y, letter} on a w by h grid) into cells
+-- {x, y, s, letter} on a grid `cell` pixels coarse, in three parts:
+-- - A dot is a connected piece no larger than dotMax whose letter has a larger
+--   piece too. It is set aside and never thresholded: each dot becomes one
+--   emoji of size L.textDotSize, in its group's own arrangement (a pair, a
+--   triangle), at the clear spot nearest its true position.
+-- - The rest is thinned to a one-pixel skeleton, and a cell is lit by the
+--   skeleton pixels inside it. A stroke is then one cell wide whatever its
+--   thickness or position, and stays connected. Cells the skeleton only clips
+--   are dropped when that breaks nothing.
+-- - A stroke tip too short for a whole cell (a low tooth, the end of a tail)
+--   becomes a smaller emoji of size L.textTipSize against its stroke.
+-- Returns the cells, with a full cell at the left and top edges centred on 0,
+-- and the width and height they cover in cells.
+local kRing = {{0,-1},{1,-1},{1,0},{1,1},{0,1},{-1,1},{-1,0},{-1,-1}}
+
+local function rasterComponents(mask, w, h)
+    local seen, comps = {}, {}
+    for start in pairs(mask) do
+        if not seen[start] then
+            local comp = {minX=math.huge, maxX=-math.huge, minY=math.huge, maxY=-math.huge}
+            local stack = {start}
+            seen[start] = true
+            while #stack > 0 do
+                local k = table.remove(stack)
+                comp[#comp+1] = k
+                local x, y = k % w, k // w
+                comp.minX, comp.maxX = math.min(comp.minX, x), math.max(comp.maxX, x)
+                comp.minY, comp.maxY = math.min(comp.minY, y), math.max(comp.maxY, y)
+                for _, d in ipairs(kRing) do
+                    local nx, ny = x + d[1], y + d[2]
+                    if nx >= 0 and nx < w and ny >= 0 and ny < h then
+                        local nk = ny * w + nx
+                        if mask[nk] and not seen[nk] then seen[nk] = true; stack[#stack+1] = nk end
+                    end
+                end
+            end
+            comps[#comps+1] = comp
+        end
+    end
+    table.sort(comps, function(a, b)
+        if a.minY ~= b.minY then return a.minY < b.minY end
+        return a.minX < b.minX
+    end)
+    return comps
+end
+
+-- Zhang-Suen thinning, in place.
+local function rasterThin(mask, w, h)
+    local function at(x, y) return (x >= 0 and x < w and y >= 0 and y < h and mask[y * w + x]) and 1 or 0 end
+    local changed = true
+    while changed do
+        changed = false
+        for pass = 1, 2 do
+            local del = {}
+            for k in pairs(mask) do
+                local x, y = k % w, k // w
+                local p2, p3, p4, p5 = at(x, y-1), at(x+1, y-1), at(x+1, y), at(x+1, y+1)
+                local p6, p7, p8, p9 = at(x, y+1), at(x-1, y+1), at(x-1, y), at(x-1, y-1)
+                local b = p2 + p3 + p4 + p5 + p6 + p7 + p8 + p9
+                if b >= 2 and b <= 6 then
+                    local seq, a = {p2, p3, p4, p5, p6, p7, p8, p9, p2}, 0
+                    for i = 1, 8 do if seq[i] == 0 and seq[i+1] == 1 then a = a + 1 end end
+                    local ok
+                    if pass == 1 then ok = p2 * p4 * p6 == 0 and p4 * p6 * p8 == 0
+                    else ok = p2 * p4 * p8 == 0 and p2 * p6 * p8 == 0 end
+                    if a == 1 and ok then del[#del+1] = k end
+                end
+            end
+            for _, k in ipairs(del) do mask[k] = nil; changed = true end
+        end
+    end
+end
+
+function L.reduceRaster(pixels, w, h, cell, dotMax)
+    local dotSize = math.max(0.3, math.min(1, tonumber(L.textDotSize) or 0.7))
+    local tipSize = math.max(0.3, math.min(1, tonumber(L.textTipSize) or 0.7))
+    local mask, owner = {}, {}
+    for _, p in ipairs(pixels) do
+        mask[p.y * w + p.x] = true
+        owner[p.y * w + p.x] = p.letter
+    end
+
+    -- Dots apart from the body.
+    local comps, large = rasterComponents(mask, w, h), {}
+    for _, comp in ipairs(comps) do
+        comp.small = comp.maxX - comp.minX < dotMax and comp.maxY - comp.minY < dotMax
+        comp.letter = owner[comp[1]]
+        if not comp.small then
+            for _, k in ipairs(comp) do large[owner[k]] = true end
+        end
+    end
+    local dots, body = {}, {}
+    for _, comp in ipairs(comps) do
+        if comp.small then
+            local sx, sy = 0, 0
+            for _, k in ipairs(comp) do sx, sy = sx + k % w, sy + k // w end
+            -- A small piece that is all of its letter (a digit ۰) is drawn full size.
+            dots[#dots+1] = {px=sx / #comp + 0.5, py=sy / #comp + 0.5, letter=comp.letter,
+                s=large[comp.letter] and dotSize or 1}
+        else
+            for _, k in ipairs(comp) do body[k] = true end
+        end
+    end
+    rasterThin(body, w, h)
+
+    -- The busiest skeleton row is the baseline. A cell edge goes just above
+    -- it, so that teeth standing on the baseline fill the row above.
+    local hist, baseY, baseN = {}, 0, 0
+    for k in pairs(body) do hist[k // w] = (hist[k // w] or 0) + 1 end
+    for y = 0, h - 1 do
+        if (hist[y] or 0) > baseN then baseY, baseN = y, hist[y] end
+    end
+    local oy = (baseY - 1.5) % cell
+
+    local grid = {}
+    local function gk(cx, cy) return cx .. "," .. cy end
+    local function lit(cx, cy) return grid[gk(cx, cy)] ~= nil end
+    for k in pairs(body) do
+        local cx, cy = math.floor((k % w + 0.5) / cell), math.floor((k // w + 0.5 - oy) / cell)
+        local g = grid[gk(cx, cy)]
+        if not g then
+            g = {cx=cx, cy=cy, n=0, letters={}}
+            grid[gk(cx, cy)] = g
+        end
+        g.n = g.n + 1
+        g.letters[owner[k]] = (g.letters[owner[k]] or 0) + 1
+    end
+
+    -- Neighbours of a cell: how many, how many of them edge to edge, whether
+    -- they stay joined to each other without it, and the way to the stroke it
+    -- sticks out of (nil unless every neighbour lies on one side).
+    local function around(cx, cy)
+        local v, count, edges, toward = {}, 0, 0, nil
+        for i, d in ipairs(kRing) do
+            v[i] = lit(cx + d[1], cy + d[2])
+            if v[i] then
+                count = count + 1
+                if d[1] == 0 or d[2] == 0 then edges = edges + 1; toward = d end
+            end
+        end
+        local seen, groups = {}, 0
+        for i = 1, 8 do
+            if v[i] and not seen[i] then
+                groups = groups + 1
+                local stack = {i}
+                seen[i] = true
+                while #stack > 0 do
+                    local a = kRing[table.remove(stack)]
+                    for j = 1, 8 do
+                        local b = kRing[j]
+                        if v[j] and not seen[j] and math.abs(a[1] - b[1]) <= 1 and math.abs(a[2] - b[2]) <= 1 then
+                            seen[j] = true
+                            stack[#stack+1] = j
+                        end
+                    end
+                end
+            end
+        end
+        if edges == 1 then
+            for i, d in ipairs(kRing) do
+                if v[i] and d[1] * toward[1] + d[2] * toward[2] ~= 1 then toward = nil; break end
+            end
+        elseif count == 1 then
+            for i, d in ipairs(kRing) do if v[i] then toward = d end end
+        else
+            toward = nil
+        end
+        return count, edges, groups == 1, toward
+    end
+
+    local order = {}
+    for _, g in pairs(grid) do order[#order+1] = g end
+    table.sort(order, function(a, b)
+        if a.n ~= b.n then return a.n < b.n end
+        if a.cy ~= b.cy then return a.cy < b.cy end
+        return a.cx < b.cx
+    end)
+    for _, g in ipairs(order) do
+        local count, edges, joined, toward = around(g.cx, g.cy)
+        local drop = false
+        if count == 0 then
+            drop = false                                    -- All that is left of a piece.
+        elseif g.n < 0.2 * cell then
+            drop = joined                                   -- Barely clipped.
+        elseif g.n < 0.34 * cell then
+            drop = joined and not toward                    -- Clipped in passing; a tip is kept, small.
+        elseif g.n < 0.6 * cell and joined and count == 2 and edges == 2 then
+            -- A staircase corner: its two neighbours still touch diagonally.
+            drop = lit(g.cx + 1, g.cy) ~= lit(g.cx - 1, g.cy)
+        end
+        if drop then grid[gk(g.cx, g.cy)] = nil end
+    end
+    -- A stroke is one cell wide: a full 2 by 2 block loses a cell that nothing
+    -- hangs on, the one with the fewest neighbours outside the block (a bump
+    -- on a stroke, not a piece of it), then the weakest.
+    local thinned = true
+    while thinned do
+        thinned = false
+        for _, g in ipairs(order) do
+            local x, y = g.cx, g.cy
+            if lit(x, y) and lit(x + 1, y) and lit(x, y + 1) and lit(x + 1, y + 1) then
+                local pick, pickOutside
+                for _, d in ipairs({{0,0},{1,0},{0,1},{1,1}}) do
+                    local c = grid[gk(x + d[1], y + d[2])]
+                    local count, _, joined = around(c.cx, c.cy)
+                    local outside = count - 3
+                    -- A cell a stroke runs straight through stays, or the stroke would show a gap.
+                    local through = (lit(c.cx - 1, c.cy) and lit(c.cx + 1, c.cy))
+                        or (lit(c.cx, c.cy - 1) and lit(c.cx, c.cy + 1))
+                    if joined and not through and (not pick or outside < pickOutside
+                        or (outside == pickOutside and c.n < pick.n)) then
+                        pick, pickOutside = c, outside
+                    end
+                end
+                if pick then
+                    grid[gk(pick.cx, pick.cy)] = nil
+                    thinned = true
+                end
+            end
+        end
+    end
+
+    local out, solid = {}, {}
+    for _, g in pairs(grid) do
+        local letter, most = nil, -1
+        for l, n in pairs(g.letters) do
+            if n > most or (n == most and l < letter) then letter, most = l, n end
+        end
+        local c = {x=g.cx, y=g.cy, s=1, letter=letter}
+        local count, _, joined, toward = around(g.cx, g.cy)
+        if count > 0 and joined and toward and g.n < 0.55 * cell and tipSize < 1 then
+            c.s = tipSize
+            c.x, c.y = c.x + toward[1] * (1 - tipSize) / 2, c.y + toward[2] * (1 - tipSize) / 2
+        end
+        out[#out+1] = c
+        solid[#solid+1] = c
+    end
+
+    -- Dots, by letter and nearness into groups.
+    local groups = {}
+    table.sort(dots, function(a, b)
+        if a.py ~= b.py then return a.py < b.py end
+        return a.px < b.px
+    end)
+    for _, d in ipairs(dots) do
+        local home
+        for _, g in ipairs(groups) do
+            if g.letter == d.letter and g.s == d.s then
+                for _, e in ipairs(g) do
+                    if math.abs(e.px - d.px) <= 2.5 * dotMax and math.abs(e.py - d.py) <= 2.5 * dotMax then home = g end
+                end
+            end
+        end
+        if not home then
+            home = {letter=d.letter, s=d.s}
+            groups[#groups+1] = home
+        end
+        home[#home+1] = d
+    end
+    -- Offsets to try, nearest first.
+    local shifts = {}
+    for dy = -30, 30 do for dx = -30, 30 do shifts[#shifts+1] = {dx / 10, dy / 10} end end
+    table.sort(shifts, function(a, b)
+        local da, db = a[1]^2 + a[2]^2, b[1]^2 + b[2]^2
+        if da ~= db then return da < db end
+        if a[2] ~= b[2] then return a[2] < b[2] end
+        return a[1] < b[1]
+    end)
+    for _, g in ipairs(groups) do
+        local rows, cx, cy = {}, 0, 0
+        for _, d in ipairs(g) do
+            local row = rows[#rows]
+            if not row or d.py - row.py > 0.3 * dotMax then
+                row = {py=d.py}
+                rows[#rows+1] = row
+            end
+            row[#row+1] = d
+            cx, cy = cx + (d.px / cell - 0.5) / #g, cy + ((d.py - oy) / cell - 0.5) / #g
+        end
+        -- The group's arrangement, one dot apart: rows of unequal parity interlock.
+        local shape, yOff, mean = {}, 0, 0
+        for r, row in ipairs(rows) do
+            table.sort(row, function(a, b) return a.px < b.px end)
+            if r > 1 then yOff = yOff + ((#row + #rows[r-1]) % 2 == 1 and 0.87 or 1) * g.s end
+            for j = 1, #row do shape[#shape+1] = {dx=(j - (#row + 1) / 2) * g.s, dy=yOff} end
+        end
+        for _, p in ipairs(shape) do mean = mean + p.dy / #shape end
+        local function clear(ax, ay)
+            for _, p in ipairs(shape) do
+                local x, y = ax + p.dx, ay + p.dy - mean
+                for _, c in ipairs(solid) do
+                    local reach = (c.s + g.s) / 2 + 0.04
+                    if math.abs(c.x - x) < reach and math.abs(c.y - y) < reach then return false end
+                end
+            end
+            return true
+        end
+        local ax, ay = cx, cy
+        for _, shift in ipairs(shifts) do
+            if clear(cx + shift[1], cy + shift[2]) then ax, ay = cx + shift[1], cy + shift[2]; break end
+        end
+        for _, p in ipairs(shape) do
+            local c = {x=ax + p.dx, y=ay + p.dy - mean, s=g.s, letter=g.letter}
+            out[#out+1] = c
+            solid[#solid+1] = c
+        end
+    end
+
+    if #out == 0 then return out, 0, 0 end
+    local minX, minY, maxX, maxY = math.huge, math.huge, -math.huge, -math.huge
+    for _, c in ipairs(out) do
+        minX, maxX = math.min(minX, c.x - c.s / 2), math.max(maxX, c.x + c.s / 2)
+        minY, maxY = math.min(minY, c.y - c.s / 2), math.max(maxY, c.y + c.s / 2)
+    end
+    for _, c in ipairs(out) do c.x, c.y = c.x - minX - 0.5, c.y - minY - 0.5 end
+    table.sort(out, function(a, b)
+        if a.y ~= b.y then return a.y < b.y end
+        return a.x < b.x
+    end)
+    return out, maxX - minX, maxY - minY
+end
+
+-- Tahoma is rasterized large, so that dots and strokes are well apart, then
+-- reduced to L.textRows.persian rows.
+L.textRasterSize = 48
+local bitmapLineCache, bitmapLineCount, bitmapCacheMod, bitmapRefHeight = {}, 0, nil, nil
 local function rasterBitmapLine(tb, text)
     if bitmapCacheMod ~= tb then
-        bitmapLineCache, bitmapLineCount, bitmapCacheMod = {}, 0, tb
+        bitmapLineCache, bitmapLineCount, bitmapCacheMod, bitmapRefHeight = {}, 0, tb, nil
     end
-    local cached = bitmapLineCache[text]
+    local size, rows = L.textRasterSize, persianRows()
+    local id = string.format("%s\0%s\0%s\0%s\0%s", text, size, rows, tostring(L.textDotSize), tostring(L.textTipSize))
+    local cached = bitmapLineCache[id]
     if cached then return cached end
-    local cells, width, height, letters = tb.rasterize(text, "Tahoma", 12)
-    local entry = {text=text, cells=cells, width=width, height=height, letters=letters}
+    if not bitmapRefHeight or bitmapRefHeight.size ~= size then
+        -- A full line: from the madd of آ to the dots of چ.
+        local _, _, height = tb.rasterize("آگچ", "Tahoma", size)
+        bitmapRefHeight = {size=size, height=math.max(1, height or 0, size)}
+    end
+    local pixels, width, height, letters = tb.rasterize(text, "Tahoma", size)
+    local cells, cellsWide, cellsHigh = L.reduceRaster(pixels, width, height,
+        bitmapRefHeight.height / rows, size * 0.17)
+    local entry = {text=text, cells=cells, width=cellsWide, height=cellsHigh, letters=letters}
     if bitmapLineCount >= 256 then
         bitmapLineCache, bitmapLineCount = {}, 0
     end
-    bitmapLineCache[text] = entry
+    bitmapLineCache[id] = entry
     bitmapLineCount = bitmapLineCount + 1
     return entry
 end
 
--- The canonical word for text, or nil when neither the 5-row font nor CoreText can draw it.
+-- The canonical word for text, or nil when neither the hand-drawn fonts nor CoreText can draw it.
 function L.textWord(text)
     text = tostring(text or "")
     if not utf8.len(text) then return nil end
@@ -761,8 +1162,8 @@ end
 
 -- Columns of a line: glyphs one column apart, a space two columns.
 local function textWidth(list)
-    local w = 0
-    for _, c in ipairs(list) do w = w + (c == " " and 2 or #L.font[c][1]) + 1 end
+    local w, font = 0, latinFont()
+    for _, c in ipairs(list) do w = w + (c == " " and 2 or #font[c][1]) + 1 end
     return math.max(0, w - 1)
 end
 
@@ -771,7 +1172,7 @@ end
 -- any. A line is added only for a 25% gain; ties keep fewer lines, then the
 -- narrower split, then the longer first line.
 local function textLines(word)
-    local list, h = chars(word), L.fontHeight
+    local list, h = chars(word), select(2, latinFont())
     local spaces = word:find(" ", 1, true) ~= nil
     local function trim(part)
         while part[1] == " " do table.remove(part, 1) end
@@ -813,16 +1214,16 @@ local function textLines(word)
 end
 
 local function fontCells(word)
-    local h = L.fontHeight
+    local font, h = latinFont()
     local cells, top, letter = {}, 0, 0
     for _, line in ipairs(textLines(word)) do
         local glyphs, x = {}, 0
         for _, c in ipairs(line) do
             if c ~= " " then
                 letter = letter + 1
-                glyphs[#glyphs+1] = {rows=L.font[c], x=x, letter=letter}
+                glyphs[#glyphs+1] = {rows=font[c], x=x, letter=letter}
             end
-            x = x + (c == " " and 2 or #L.font[c][1]) + 1
+            x = x + (c == " " and 2 or #font[c][1]) + 1
         end
         local width = x - 1
         for y = 1, h do
@@ -840,10 +1241,10 @@ local function fontCells(word)
     return cells, letter, math.max(0, top - 1)
 end
 
--- Splits non-ASCII text strictly at spaces into 1..3 lines with a 2px gap,
--- applying the same 25% square-fit gain rule without breaking joined words.
+-- Splits non-ASCII text strictly at spaces into 1..3 lines one blank row
+-- apart, applying the same 25% square-fit gain rule without breaking joined words.
 local function bitmapLines(tb, word)
-    local tokens, gap = {}, 2
+    local tokens, gap = {}, 1
     for tok in word:gmatch("[^ ]+") do tokens[#tokens+1] = tok end
     if #tokens == 0 then return {} end
     local function sliceRaster(a, b)
@@ -885,14 +1286,14 @@ end
 local function bitmapCells(word)
     local tb = L.loadTextBitmap()
     if not tb then return {}, 0, 0 end
-    local cells, top, letter, gap = {}, 0, 0, 2
+    local cells, top, letter, gap = {}, 0, 0, 1
     for _, line in ipairs(bitmapLines(tb, word)) do
         for _, px in ipairs(line.cells) do
             cells[#cells+1] = {
                 i = letter + px.letter,
                 x = px.x - (line.width - 1) / 2,
                 y = top + px.y,
-                s = 1,
+                s = px.s,
             }
         end
         letter = letter + line.letters
@@ -922,15 +1323,18 @@ function L.textCells(word, n)
     return cells
 end
 
+-- Cached per word and row setting, since repeatTo is the cell count.
 local textModes = {}
 local function textMode(key, word)
-    if not textModes[key] then
+    local id = string.format("%s\0%s\0%s\0%s\0%s", key, select(2, latinFont()), persianRows(),
+        tostring(L.textDotSize), tostring(L.textTipSize))
+    if not textModes[id] then
         local cells = L.textCells(word)
-        textModes[key] = {key=key, name="Text " .. word, note="the word in emoji, a letter per emoji",
+        textModes[id] = {key=key, name="Text " .. word, note="the word in emoji, a letter per emoji",
             word=word, repeatTo=#cells, assigns=true,
             build=function(_, _, n) return {L.textCells(word, n)} end}
     end
-    return textModes[key]
+    return textModes[id]
 end
 
 function L.mode(key)

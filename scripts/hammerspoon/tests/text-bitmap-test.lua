@@ -36,9 +36,25 @@ local function runTests()
     end
     assert(topCount > bottomCount, "y = 0 must be top row so glyphs are upright")
 
-    -- Pure ASCII continues to use the 5-row font identically.
+    -- Pure ASCII uses the hand-drawn font L.textRows.english selects.
     assert(L.textWord("hi") == "HI")
-    assert(#L.textCells("HI") == 16, "ASCII 5-row cell count must stay unchanged")
+    assert(L.textRows.english == 4 and L.textRows.persian == 7, "defaults changed; update docs too")
+    assert(#L.textCells("HI") == 13, "HI in the default 4-row font")
+    for rows, count in pairs({[3]=10, [4]=13, [5]=16, [1]=10, [9]=16}) do
+        L.textRows.english = rows
+        assert(#L.textCells("HI") == count, "HI at english = " .. rows)
+        local maxY = 0
+        for _, c in ipairs(L.textCells("HI")) do maxY = math.max(maxY, c.y) end
+        assert(maxY + 1 == math.max(3, math.min(5, rows)), "one line is as many rows as the font")
+    end
+    L.textRows.english = 4
+    for rows, font in pairs(L.fonts) do
+        for c, glyph in pairs(L.fonts[5]) do
+            assert(font[c] and #font[c] == rows, rows .. "-row font lacks or mis-sizes " .. c)
+            for _, row in ipairs(font[c]) do assert(#row == #font[c][1], "ragged glyph " .. c) end
+        end
+        for c in pairs(font) do assert(L.fonts[5][c], "extra glyph " .. c) end
+    end
     assert(L.textWord("love") == "LOVE")
 
     -- Rejections: invalid UTF-8, comments/punctuation, zero-width only, empty, overlong.
@@ -56,12 +72,12 @@ local function runTests()
     assert(L.textWord("کتاب") == "کتاب")
     assert(L.textWord("  کتاب  ") == "کتاب")
     local word4 = L.textCells("کتاب")
-    assert(#word4 >= 25, "کتاب should render with visible bitmap cells")
+    assert(#word4 >= 15 and #word4 < 46, "کتاب at 7 rows takes fewer cells than the 46 of the old 12pt raster")
 
     local seenXY, sumX, countByLetter = {}, {}, {}
     local minX, maxX, minY, maxY = math.huge, -math.huge, math.huge, -math.huge
     for _, cell in ipairs(word4) do
-        assert(cell.s == 1)
+        assert(cell.s > 0 and cell.s <= 1)
         assert(cell.i >= 1 and cell.i <= 4)
         local key = string.format("%.4f,%.4f", cell.x, cell.y)
         assert(not seenXY[key], "Duplicate cell at " .. key)
@@ -73,7 +89,7 @@ local function runTests()
         if cell.y < minY then minY = cell.y end
         if cell.y > maxY then maxY = cell.y end
     end
-    assert(minY == 0 and maxY >= 6)
+    assert(minY == 0 and maxY >= 4 and maxY <= 7, "about L.textRows.persian rows")
     assert(math.abs(minX + maxX) < 1e-6, "Cells should be centered horizontally around x = 0")
 
     -- Logical letter IDs 1..4 must follow RTL positions right-to-left (ک -> ت -> ا -> ب).
@@ -91,7 +107,7 @@ local function runTests()
     for _, c in ipairs(z1) do assert(c.i == 1) end
     local z2 = L.textCells("کتاب", 2)
     for _, c in ipairs(z2) do assert(c.i == 1 or c.i == 2) end
-    local height = maxY + 1
+    local height = math.floor(maxY + 0.5) + 1
     local zStripe = L.textCells("کتاب", height - 1)
     for _, c in ipairs(zStripe) do assert(c.i == math.floor(c.y + 0.5) % (height - 1) + 1) end
     local zPixel = L.textCells("کتاب", height + 5)
@@ -118,24 +134,20 @@ local function runTests()
         assert(#built == 1 and #built[1] == mode.repeatTo)
     end
 
-    -- Multi-word Persian wrapping: must break strictly at spaces with a 2px blank gap.
+    -- Multi-word Persian wrapping: breaks at the space, so two lines are taller than either word.
+    local function extent(cells)
+        local top, bottom = math.huge, -math.huge
+        for _, c in ipairs(cells) do
+            top, bottom = math.min(top, c.y - c.s / 2), math.max(bottom, c.y + c.s / 2)
+        end
+        return bottom - top
+    end
     local phrase = L.textWord("دوستت دارم")
     assert(phrase == "دوستت دارم")
     local wrapped = L.textCells(phrase)
-    local rows = {}
-    local maxRow = 0
-    for _, c in ipairs(wrapped) do
-        local y = math.floor(c.y + 0.5)
-        rows[y] = true
-        if y > maxRow then maxRow = y end
-    end
-    local emptyBands = 0
-    for y = 1, maxRow - 1 do
-        if not rows[y] and not rows[y + 1] then
-            emptyBands = emptyBands + 1
-        end
-    end
-    assert(emptyBands >= 1, "Multi-word phrase should wrap at the space with a 2px gap")
+    local one, two = extent(L.textCells("دوستت")), extent(L.textCells("دارم"))
+    assert(math.abs(extent(wrapped) - (one + two + 1)) < 1e-6,
+        "Multi-word phrase should wrap at the space, one blank row between the lines")
 
     -- Single long Persian word without spaces must stay on one line (never split cursive joining).
     local joined = L.textCells("خوشحال")
@@ -150,6 +162,50 @@ local function runTests()
         if not jRows[y] and not jRows[y + 1] then jEmptyBands = jEmptyBands + 1 end
     end
     assert(jEmptyBands == 0, "Single Persian word without spaces must never wrap across lines")
+
+    -- Fewer rows, fewer emoji; and a dot is never lost, whatever the rows: پیشی has
+    -- 3 + 2 + 3 dots (its final ی has none), each a smaller emoji of its own.
+    local function overlaps(cells)
+        for a = 1, #cells do
+            for b = a + 1, #cells do
+                local reach = (cells[a].s + cells[b].s) / 2 - 1e-6
+                -- As circles: the dots of a triangle interlock like the rows of a beehive.
+                if (cells[a].x - cells[b].x)^2 + (cells[a].y - cells[b].y)^2 < reach^2 then return true end
+            end
+        end
+        return false
+    end
+    -- With tips at full size, only dots are smaller than a body emoji.
+    local tipSize = L.textTipSize
+    L.textTipSize = 1
+    local counts = {}
+    for _, rows in ipairs({5, 6, 7, 8, 9, 10, 12}) do
+        L.textRows.persian = rows
+        local cells = L.textCells("پیشی")
+        local dots, perLetter = 0, {}
+        for _, c in ipairs(cells) do
+            if c.s == L.textDotSize then dots = dots + 1 end
+            perLetter[c.i] = true
+        end
+        assert(dots == 8, string.format("پیشی lost a dot at %d rows: %d left", rows, dots))
+        for i = 1, 4 do assert(perLetter[i], "letter " .. i .. " of پیشی vanished at " .. rows .. " rows") end
+        assert(not overlaps(cells), "overlapping cells at " .. rows .. " rows")
+        assert(L.mode("text:پیشی").repeatTo == #cells, "the layout must follow L.textRows")
+        counts[rows] = #cells
+    end
+    assert(counts[6] < counts[8] and counts[8] < counts[12], "fewer rows must mean fewer emoji")
+    L.textRows.persian = 7
+    for _, word in ipairs({"کتاب", "خوشحال", "گلاب", "چشم", "آب", "ژ", "ث", "۰", "؟!"}) do
+        local cells = L.textCells(word)
+        assert(#cells > 0 and not overlaps(cells), "bad cells for " .. word)
+    end
+    -- Three dots keep their triangle: two rows.
+    local ys = {}
+    for _, c in ipairs(L.textCells("ث")) do if c.s == L.textDotSize then ys[string.format("%.2f", c.y)] = true end end
+    local dotRows = 0
+    for _ in pairs(ys) do dotRows = dotRows + 1 end
+    assert(dotRows == 2, "the three dots of ث should sit in two rows")
+    L.textTipSize = tipSize
 
     -- Preset + remembered Farsi word normalization in L.words() / L.describe().
     settings["emojiLayout.words.v1"] = {"  کتاب ", "می\u{200C}خواهم", "bad#word"}

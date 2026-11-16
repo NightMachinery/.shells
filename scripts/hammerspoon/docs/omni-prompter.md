@@ -203,18 +203,48 @@ make one flower with identical petals rather than alternating ones:
   rather than a ring).
 - **Frame**: the first inside a square border of the rest (17 to 33).
 
-**Text** spells a word with one emoji per pixel: pure ASCII/symbol text (A to Z,
-0 to 9, `♥ ! ?`) uses a 5-row bitmap font (`M` and `W` are 5 wide so they stay
-distinct), while Arabic/Persian text (including ZWNJ, Persian digits and mixed
-symbols such as `کتاب ♥`) uses macOS CoreText via `native/text-bitmap` with
-unantialiased 12pt Tahoma. Type the word in the layout menu and a `Text WORD`
-row appears first. Each letter (in logical reading order for RTL scripts) is one
-emoji, cycling the selection; with more emoji than letters each pixel row is
-one emoji (stripes), and with more emoji than rows each pixel cycles. Long
-text wraps onto up to three lines, whichever gives the largest pixels (ASCII
-can wrap inside a word when there are no spaces, whereas CoreText text wraps
-only at spaces with a 2px line gap so cursive words stay joined). Past about
-nine letters the pixels drop under 30px. The word travels in the layout key
+**Text** spells a word with one emoji per cell of a coarse grid. Type the word
+in the layout menu and a `Text WORD` row appears first. Two variables in
+`core/emoji-layout.lua` set how many emoji a word takes, as the rows of one line
+of text. Fewer rows mean fewer and larger emoji, and cruder letters:
+
+- `EmojiLayout.textRows.english` (default 4, from 3 to 5) picks one of three
+  hand-drawn fonts for pure ASCII/symbol text (A to Z, 0 to 9, `♥ ! ?`). `M`
+  and `W` are 5 wide in the 4- and 5-row fonts so they stay distinct. The 3-row
+  font is close to a cipher: `O` and `0`, or `S` and `5`, are the same shape.
+- `EmojiLayout.textRows.persian` (default 7, useful from 6 to 10) is the full
+  line height for Arabic/Persian text, from the madd of `آ` to the dots of
+  `چ`. A word without tall or deep letters takes fewer rows. Text that mixes
+  scripts (`کتاب ♥`, ZWNJ, Persian digits) follows it too. `کتاب` takes 25
+  emoji at 7 rows; the unreduced 12pt raster used before took 46.
+
+Try a value without editing the file, until the next reload:
+`hs -c 'EmojiLayout.textRows.persian = 9'`.
+
+Persian is drawn by macOS CoreText (`native/text-bitmap`) as a large Tahoma
+raster, which `EmojiLayout.reduceRaster` brings down to the grid:
+
+- **Dots are never dropped.** A dot is a small connected piece of a letter
+  that also has a larger piece. Each dot becomes one emoji of its own, smaller
+  than a body emoji (`EmojiLayout.textDotSize`, 0.7), and a letter's dots keep
+  their arrangement (a pair, a triangle) at the clear spot nearest their true
+  position. Dot count is all that separates `ب` from `پ` or `ت` from `ث`, and
+  plain downscaling loses it: at 7pt the dots of `ی` vanish.
+- **Strokes are one cell wide.** The rest is thinned to a one-pixel skeleton
+  and a cell is lit by the skeleton pixels inside it, so strokes stay
+  connected at any size. The grid is aligned so that teeth standing on the
+  baseline fill the row above it.
+- **Short stroke tips are smaller emoji.** A low tooth or the end of a tail
+  that covers less than about half a cell is drawn at
+  `EmojiLayout.textTipSize` (0.7) against its stroke instead of being dropped
+  or rounded up to a whole cell.
+
+Each letter (in logical reading order for RTL scripts) is one emoji, cycling
+the selection; with more emoji than letters each row is one emoji (stripes),
+and with more emoji than rows each cell cycles. Long text wraps onto up to
+three lines, whichever gives the largest cells (ASCII can wrap inside a word
+when there are no spaces, whereas CoreText text wraps only at spaces, one blank
+row apart, so cursive words stay joined). The word travels in the layout key
 (`text:HI`, `text:کتاب`), so last-used and history keep it. Preset words are
 listed in the menu from the private file `~/witching/emoji/words.txt` (one per
 line, `#` comments) when it exists, and from the Hammerspoon setting
