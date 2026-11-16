@@ -5,24 +5,25 @@
 <meta name="color-scheme" content="light dark">
 <title>Podcast library</title>
 <script src="theme.js?v=6924a29d93bf"></script>
-<link rel="stylesheet" href="style.css?v=7209d122e2bd">
+<link rel="stylesheet" href="style.css?v=2384fa203e5b">
 <body>
 <main>
   <header><div class="header-top"><div class="eyebrow">YOUR LISTENING LIBRARY</div><label class="theme-control" for="theme">Theme <select id="theme"><option value="light">Light</option><option value="dark">Dark</option></select></label></div><h1 id="title">Podcast library</h1><p>Find an older conversation. Keep the ones you want.</p><div class="header-actions"><a id="feed" href="#">Podcast feed ↗</a><button id="refresh">Refresh catalog</button></div></header>
   <section class="controls" aria-label="Browse episodes">
     <label class="search-label" for="search">Search episodes</label><input id="search" type="search" placeholder="Search titles in Persian or English…" autocomplete="off">
     <div class="selectors"><label>Playlist<select id="playlist"><option value="uploads">All episodes</option><option value="downloaded">Downloaded library</option></select></label><label>Order<select id="sort"><option value="new">Newest first</option><option value="old">Oldest first</option><option value="playlist">Playlist order</option><option value="title">Title</option></select></label></div>
-    <div class="filters"><label><input id="hide-downloaded" type="checkbox" checked> Hide downloaded</label><label><input id="hide-archived" type="checkbox" checked> Hide archived</label></div>
+    <div class="filters"><label><input id="hide-downloaded" type="checkbox" checked> <span id="hide-downloaded-label">Hide downloaded</span></label><label><input id="hide-archived" type="checkbox" checked> <span id="hide-archived-label">Hide archived</span></label></div>
   </section>
   <div id="notice" role="status" aria-live="polite"></div>
   <div id="player" hidden><p id="playing-title" dir="auto"></p><audio id="audio-player" controls preload="none"></audio></div>
   <div class="list-header"><h2>Episodes <span id="count"></span></h2><a id="playlist-link" hidden target="_blank" rel="noopener">View on YouTube ↗</a></div>
+  <div id="filter-summary" class="filter-summary" hidden><p id="filter-description" role="status"></p><button id="show-all">Show all episodes</button></div>
   <div class="bulk"><label><input type="checkbox" id="select-page"> Select this page</label><span id="selection"></span><button id="bulk-download" disabled>Download selected</button><button id="bulk-archive" disabled>Archive selected</button><button id="bulk-restore" disabled>Restore selected</button></div>
   <div id="episodes" aria-live="polite"><p class="empty">Loading your library…</p></div>
   <nav id="pagination" aria-label="Episode pages"><button id="previous">← Previous</button><span id="page"></span><button id="next">Next →</button></nav>
   <details class="playlists"><summary><h2>Playlists <span id="playlist-count"></span></h2></summary><p class="playlist-help">Browse the channel’s public playlists, or add one using its YouTube link.</p><form id="add-playlist"><label for="playlist-url">YouTube playlist URL</label><div class="playlist-input"><input id="playlist-url" type="url" placeholder="https://www.youtube.com/playlist?list=…" required><button type="submit">Add playlist</button></div></form><div id="playlists"></div></details>
   <footer>Archive hides an episode from this list. Restore it any time by turning off “Hide archived”. Audio files and your podcast feed are kept.</footer>
 </main>
-<script src="app.js?v=b25feb0af81d"></script>
+<script src="app.js?v=3f9727217e12"></script>
 </body>
 </html>
