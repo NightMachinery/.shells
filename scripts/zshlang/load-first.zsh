@@ -7,6 +7,11 @@
 export NIGHTDIR="${${(%):-%x}:A:h:h}" # echo "_: $_ 0: $0 bs: $BASH_SOURCE"
 export night_prompt_dir="${NIGHTDIR}/PE"
 
+#: How `paseo send' treats an agent mid-turn: `steer' joins the running turn, while `interrupt' aborts
+#: it and makes Claude Code tell the agent its tool call was rejected. Our scripts read their own
+#: `<script>_send_behavior' first, then this; the forked Paseo CLI uses it as its default too.
+export PASEO_SEND_BEHAVIOR="${PASEO_SEND_BEHAVIOR:-steer}"
+
 source "${NIGHTDIR}/zshlang/basic/basic-full.zsh" || return $?
 
 function jinit() {

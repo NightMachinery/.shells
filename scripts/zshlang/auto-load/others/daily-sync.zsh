@@ -14,6 +14,9 @@
 typeset -g daily_sync_config="${daily_sync_config:-${nightNotesPrivate}/configs/daily-sync/config.zsh}"
 typeset -g daily_sync_runs="${daily_sync_runs:-${HOME}/.agents/runs/daily-sync}"
 typeset -g daily_sync_job="${daily_sync_job:-daily-sync-metadata}"
+#: How `paseo send' treats an agent mid-turn: `steer' joins the running turn, `interrupt' aborts it
+#: (and makes Claude Code report a rejected tool call). Falls back to `PASEO_SEND_BEHAVIOR', then `steer'.
+typeset -g daily_sync_send_behavior="${daily_sync_send_behavior:-}"
 
 #: Sent to every machine ahead of the generated commands. Repositories are named
 #: relative to ~; NIGHTDIR is the vcsh repository rooted at ~ itself.
@@ -901,7 +904,7 @@ function h-daily-sync-message {
     local what="$1" body="$2" agent
     agent="$(h-daily-sync-agent)" || return 1
     #: The agent forgets between turns, so the message says it needs nothing from them.
-    ( builtin cd -- "${HOME}" && command paseo send --no-wait "${agent}" "Daily sync update: ${what}.
+    ( builtin cd -- "${HOME}" && command paseo send --no-wait --behavior "${daily_sync_send_behavior:-${PASEO_SEND_BEHAVIOR:-steer}}" "${agent}" "Daily sync update: ${what}.
 This message is complete: it holds the result and the whole list of what is still to do, so you need nothing from earlier turns. The rules are in your first instructions. Run every daily-sync command with elevated access, and carry on with what the NEXT line at the end says.
 
 ${body}" &>/dev/null )

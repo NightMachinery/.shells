@@ -808,7 +808,7 @@ class HandoffTests(unittest.TestCase):
             calls.append(f"model --paseo {self.executable} --home {home} --agent-id {IMPORTED_ID} --model {model}")
         if effort:
             calls.append(f"paseo agent update {IMPORTED_ID} --thinking {effort} --home {home}")
-        calls.append(f"paseo send --no-wait --home {home} --prompt-file {status / 'followup-prompt.txt'} {IMPORTED_ID}")
+        calls.append(f"paseo send --no-wait --behavior steer --home {home} --prompt-file {status / 'followup-prompt.txt'} {IMPORTED_ID}")
         return calls
 
     def followup_record(self):

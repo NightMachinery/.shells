@@ -38,6 +38,11 @@ import time
 import uuid
 
 
+def send_behavior():
+    """How `paseo send` treats an agent mid-turn: steer joins its turn, interrupt aborts it."""
+    return os.environ.get("PASEO_HANDOFF_SEND_BEHAVIOR") or os.environ.get("PASEO_SEND_BEHAVIOR") or "steer"
+
+
 MARKERS = {
     "CLAUDECODE", "CLAUDE_CODE_SESSION_ID", "CODEX_THREAD_ID", "CODEX_SESSION_ID",
     "AI_AGENT", "AGENT_SESSION_REUSE_PANE", "AGENT_SESSION_STATE",
@@ -1193,7 +1198,7 @@ def follow_up(plan, status_dir, agent_id):
         if os.path.lexists(promptfile):
             os.unlink(promptfile)  # Left by an interrupted earlier run.
         write_private_text(promptfile, followup_prompt(plan, agent_id, record))
-        command([plan["paseo"], "send", "--no-wait", "--home", plan["paseo_home"],
+        command([plan["paseo"], "send", "--no-wait", "--behavior", send_behavior(), "--home", plan["paseo_home"],
                  "--prompt-file", str(promptfile), agent_id], timeout=60)
         record["message"] = {"status": "ok", "detail": None, "promptFile": str(promptfile)}
     except Exception as exc:  # Best effort: record the failure and continue.

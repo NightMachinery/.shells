@@ -16,6 +16,9 @@ typeset -g agent_usage_arm_grace_s="${agent_usage_arm_grace_s:-30}"
 #: What the armed job does once the limits reset: =notif= to tell you, or
 #: =continue= to resume the session that was blocked.
 typeset -g agent_usage_arm_action="${agent_usage_arm_action:-notif}"
+#: How `paseo send' treats the resumed agent if it is mid-turn (`steer' or `interrupt'). Falls back to
+#: `PASEO_SEND_BEHAVIOR', then `steer'.
+typeset -g agent_usage_send_behavior="${agent_usage_send_behavior:-}"
 #: How the resume reaches the session, and hence which picker arming opens:
 #: =kitty= types into a kitty window, =tmux= types into a tmux pane, and
 #: =frontmost= types wherever the keyboard focus happens to be, with no picker
@@ -320,7 +323,7 @@ function h-agent-usage-continue-send {
         #: Without `PASEO_AGENT_ID', which a job armed from inside a Paseo
         #: agent would otherwise pass on as the sender.
         ( builtin cd -q ~ && reval-ec command env -u PASEO_AGENT_ID paseo send "${agent_id}" \
-            --prompt "${text}" --no-wait --json --home "${home}" )
+            --prompt "${text}" --no-wait --behavior "${agent_usage_send_behavior:-${PASEO_SEND_BEHAVIOR:-steer}}" --json --home "${home}" )
         return $?
     fi
 

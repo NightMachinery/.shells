@@ -19,7 +19,7 @@ import tempfile
 import time
 import uuid
 
-from paseo_handoff import command, clean_env, HandoffError
+from paseo_handoff import command, clean_env, HandoffError, send_behavior
 
 ROOT = Path(__file__).resolve().parent
 QUOTA_ERROR = re.compile(
@@ -523,7 +523,7 @@ def tick(path, *, inspect_fn=inspect, stored_fn=stored_agent, quota_fn=quota, se
                         # interrupted: no "turn yourself off if finished" clause, which
                         # agents read as "off once this batch is done".
                         send_fn(['paseo', 'send', state['agent_id'], 'Continue.',
-                                 '--home', state['home'], '--no-wait', '--json'])
+                                 '--behavior', send_behavior(), '--home', state['home'], '--no-wait', '--json'])
                     except Exception:
                         # A timeout can mean Paseo accepted the send. Never retry
                         # that failed turn automatically; explicit re-arm clears it.
