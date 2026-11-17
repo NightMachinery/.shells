@@ -57,7 +57,9 @@ only has to follow them from `begin` to `ALL DONE`.
 - `daily-sync conflict <machine> <repo> [abort]`: repeats the conflicted pull on
   that machine and keeps it open, then prints every conflicted hunk as three
   parts (upstream, base, local) with a class and a suggested choice; see
-  Conflicts below. `abort` leaves the repository blocked and notifies.
+  Conflicts below. `abort` leaves the repository blocked and asks the user on
+  agent-desk, one multiple-choice question per hunk (Telegram when agent-desk
+  is missing).
 - `daily-sync resolve <machine> <repo> <file> <hunk>=<choice>...`: resolves the
   hunks of one file by choice, so the agent never edits files on another
   machine. Once no file is conflicted it continues the rebase, and prints the
@@ -137,6 +139,20 @@ line or bare org markup such as `#+begin_verse` proves nothing alone, so a
 copy of it elsewhere does not swallow local's. `both-local-first` puts local's
 additions first. The result is never lossy, but can be untidy: an extra blank
 line, or a stub left by an editor in a file both sides created.
+
+### Asking the user
+
+A blocked repository becomes one agent-desk question, filed under the project
+`daily-sync` and the run `sync-<date>`. Each hunk is a question with the
+options `upstream`, `local`, `both` and `both-local-first` (only the first two
+for a whole-file conflict); the suggested choice is marked recommended, and the
+hunk text is shown in a code block. The answer arrives at the run's agent as
+`Answer to q-... "Sync conflict in ..."`, one line per hunk (`N. <choice>: ...`,
+or `(no answer)`). The agent reopens the conflict with `daily-sync conflict`,
+checks the hunks still match the question, applies the picks with
+`daily-sync resolve`, runs `daily-sync converge`, and replies on the desk. Any
+hunk left unanswered, or answered in the user's own words, keeps the repository
+blocked.
 
 ## State
 

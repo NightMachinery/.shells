@@ -921,7 +921,9 @@ function h-daily-sync-conflict {
         abort)
             out="$(ec "ds-conflict-abort ${(qq)repo}" | h-daily-sync-on "${machine}")"
             ec "LEFT-BLOCKED ${machine} ${repo}" >> "${run}/conflicts.log"
-            h-daily-sync-notify conflict "Notes sync needs you: a merge conflict is blocking at least one repository." ;;
+            #: The desk asks the user hunk by hunk; without it, a notification says to look.
+            h-daily-sync-desk-ask "${machine}" "${repo}" ||
+                h-daily-sync-notify conflict "Notes sync needs you: a merge conflict is blocking at least one repository." ;;
         *)
             ecerr "usage: daily-sync conflict <machine> <repo> [abort]"
             return 64 ;;
@@ -951,6 +953,10 @@ function h-daily-sync-resolve {
 
 function h-daily-sync-conflict-hint {
     local machine="$1" repo="$2" out="$3"
+    if [[ "${out}" == *$'\n### '* || "${out}" == '### '* ]] ; then
+        #: The last listing of the hunks, for the desk question if this conflict is left blocked.
+        print -r -- "${out}" >| "$(h-daily-sync-run-dir)/hunks-${machine}-${repo//\//_}.txt"
+    fi
     ec
     if [[ "${out}" == *(CONFLICT-OPEN|STILL-CONFLICTED|unresolved)* ]] ; then
         ec "NEXT: decide each hunk above by the conflict rules in your instructions. In short:"
@@ -971,6 +977,67 @@ function h-daily-sync-conflict-hint {
     else
         h-daily-sync-next-hint
     fi
+}
+
+function h-daily-sync-desk-ask {
+    : "usage: h-daily-sync-desk-ask <machine> <repo> ; file a blocked conflict on agent-desk, one choice per hunk"
+    #: The user's answer is typed back into this agent, whose instructions say how to apply it.
+    local machine="$1" repo="$2" run hunks choices body
+    run="$(h-daily-sync-run-dir)" @RET
+    hunks="${run}/hunks-${machine}-${repo//\//_}.txt"
+    (( ${+commands[agent-desk]} )) && [[ -r "${hunks}" ]] || return 1
+    choices="${run}/choices-${machine}-${repo//\//_}.json"
+    body="$(command python3 - "${hunks}" "${choices}" "${machine}" "${repo}" <<'DS_PY'
+import json, re, sys
+src, out, machine, repo = sys.argv[1:5]
+text = open(src, encoding='utf-8', errors='replace').read()
+head = re.compile(r'^### (.+?), hunk (\d+) of (\d+), near line (\d+): (\S+) \(suggested: \d+=(\S+)\)$', re.M)
+nomark = re.compile(r'^### (.+?): no conflict markers', re.M)
+qs, index = [], []
+def clip(s, n=3400):
+    return s if len(s) <= n else s[:n] + '\n...'
+opts = lambda: [
+    {"key": "upstream", "label": "Keep the remote's version"},
+    {"key": "local", "label": f"Keep {machine}'s version"},
+    {"key": "both", "label": "Keep both, the remote's first"},
+    {"key": "both-local-first", "label": f"Keep both, {machine}'s first"}]
+heads = list(head.finditer(text))
+for i, m in enumerate(heads):
+    f, k, n, line, cls, sug = m.groups()
+    end = heads[i + 1].start() if i + 1 < len(heads) else len(text)
+    parts = text[m.end():end].split('\nNEXT:')[0].strip('\n')
+    qs.append({"text": f"`{f}`, hunk {k} of {n}, near line {line} ({cls}):\n\n```\n{clip(parts)}\n```",
+               "options": opts(), "recommended": sug if sug in ('upstream', 'local', 'both', 'both-local-first') else ""})
+    index.append(f"{len(qs)}. {f} hunk {k}")
+for m in nomark.finditer(text):
+    f = m.group(1)
+    qs.append({"text": f"`{f}` has no conflict markers (binary, or deleted on one side): keep which side whole?",
+               "options": opts()[:2]})
+    index.append(f"{len(qs)}. {f} (whole file)")
+if not qs:
+    sys.exit(1)
+for q in qs:
+    if not q.get("recommended"):
+        q.pop("recommended", None)
+json.dump({"questions": qs[:30]}, open(out, 'w'))
+print("\n".join(index[:30]))
+if len(qs) > 30:
+    print(f"(and {len(qs) - 30} more hunks, asked once these are resolved)")
+DS_PY
+)" || return 1
+    command agent-desk join "sync-$(command date +%Y-%m-%d)/coord" --project daily-sync &>/dev/null
+    command agent-desk ask --blocked --choices "${choices}" \
+        --title "Sync conflict in ${repo:t} on ${machine}: pick a side per hunk" <<EOF >/dev/null || return 1
+The daily sync could not settle a merge conflict in \`${repo}\` on ${machine}, so the repository is left blocked: nothing there is pulled or pushed until it is resolved.
+
+Each question below is one conflicted hunk, with the three versions: upstream (already on the remote), base (before either side changed it) and local (${machine}'s). The side daily-sync suggests is marked recommended. Leave any hunk unanswered to keep the whole repository blocked.
+
+Your answer goes to the sync agent, which reopens the conflict, applies your choices with \`daily-sync resolve\`, and reports back here.
+
+Questions:
+${body}
+EOF
+    ec "(filed on agent-desk: conflict ${machine} ${repo})"
 }
 
 function h-daily-sync-open-conflicts {
