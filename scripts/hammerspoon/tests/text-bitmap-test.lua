@@ -194,6 +194,19 @@ local function runTests()
         counts[rows] = #cells
     end
     assert(counts[6] < counts[8] and counts[8] < counts[12], "fewer rows must mean fewer emoji")
+    -- A stroke standing right next to another letter keeps its length: the alef
+    -- of برای sits one cell from the ی and was once thinned away as its thickness.
+    for _, rows in ipairs({6, 7, 8, 9, 10}) do
+        L.textRows.persian = rows
+        local top, bottom
+        for _, c in ipairs(L.textCells("برای")) do
+            if c.i == 4 then
+                top, bottom = math.min(top or c.y, c.y), math.max(bottom or c.y, c.y)
+            end
+        end
+        assert(top and bottom - top + 1 >= 0.55 * rows,
+            string.format("the alef of برای is cut short at %d rows", rows))
+    end
     L.textRows.persian = 7
     for _, word in ipairs({"کتاب", "خوشحال", "گلاب", "چشم", "آب", "ژ", "ث", "۰", "؟!"}) do
         local cells = L.textCells(word)

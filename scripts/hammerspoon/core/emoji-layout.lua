@@ -882,8 +882,8 @@ function L.reduceRaster(pixels, w, h, cell, dotMax)
             for _, k in ipairs(comp) do large[owner[k]] = true end
         end
     end
-    local dots, body = {}, {}
-    for _, comp in ipairs(comps) do
+    local dots, body, pieceOf = {}, {}, {}
+    for id, comp in ipairs(comps) do
         if comp.small then
             local sx, sy = 0, 0
             for _, k in ipairs(comp) do sx, sy = sx + k % w, sy + k // w end
@@ -891,7 +891,7 @@ function L.reduceRaster(pixels, w, h, cell, dotMax)
             dots[#dots+1] = {px=sx / #comp + 0.5, py=sy / #comp + 0.5, letter=comp.letter,
                 s=large[comp.letter] and dotSize or 1}
         else
-            for _, k in ipairs(comp) do body[k] = true end
+            for _, k in ipairs(comp) do body[k] = true; pieceOf[k] = id end
         end
     end
     rasterThin(body, w, h)
@@ -912,11 +912,12 @@ function L.reduceRaster(pixels, w, h, cell, dotMax)
         local cx, cy = math.floor((k % w + 0.5) / cell), math.floor((k // w + 0.5 - oy) / cell)
         local g = grid[gk(cx, cy)]
         if not g then
-            g = {cx=cx, cy=cy, n=0, letters={}}
+            g = {cx=cx, cy=cy, n=0, letters={}, pieces={}}
             grid[gk(cx, cy)] = g
         end
         g.n = g.n + 1
         g.letters[owner[k]] = (g.letters[owner[k]] or 0) + 1
+        g.pieces[pieceOf[k]] = true
     end
 
     -- Neighbours of a cell: how many, how many of them edge to edge, whether
@@ -985,13 +986,23 @@ function L.reduceRaster(pixels, w, h, cell, dotMax)
     end
     -- A stroke is one cell wide: a full 2 by 2 block loses a cell that nothing
     -- hangs on, the one with the fewest neighbours outside the block (a bump
-    -- on a stroke, not a piece of it), then the weakest.
+    -- on a stroke, not a piece of it), then the weakest. Only a block that one
+    -- connected piece fills is a thick stroke: two pieces side by side (the
+    -- alef next to the yeh in \216\167\219\140) are separate strokes, and thinning them
+    -- would eat one from its end.
+    local function onePiece(x, y)
+        for id in pairs(grid[gk(x, y)].pieces) do
+            if grid[gk(x + 1, y)].pieces[id] and grid[gk(x, y + 1)].pieces[id]
+                and grid[gk(x + 1, y + 1)].pieces[id] then return true end
+        end
+        return false
+    end
     local thinned = true
     while thinned do
         thinned = false
         for _, g in ipairs(order) do
             local x, y = g.cx, g.cy
-            if lit(x, y) and lit(x + 1, y) and lit(x, y + 1) and lit(x + 1, y + 1) then
+            if lit(x, y) and lit(x + 1, y) and lit(x, y + 1) and lit(x + 1, y + 1) and onePiece(x, y) then
                 local pick, pickOutside
                 for _, d in ipairs({{0,0},{1,0},{0,1},{1,1}}) do
                     local c = grid[gk(x + d[1], y + d[2])]
