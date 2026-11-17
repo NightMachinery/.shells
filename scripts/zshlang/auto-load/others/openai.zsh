@@ -666,7 +666,7 @@ typeset -gA gpt_terra_obj=(
 define-llm-model-v2 gpt_terra_obj
 
 typeset -gA gpt_sol_obj=(
-    model_name 'openai-codex/gpt-6.1-sol'
+    model_name 'openai-codex/gpt-6.2-sol'
     long_name 'gpt_sol'
     short_name 'sol'
     effort 'high'
@@ -677,7 +677,7 @@ typeset -gA gpt_sol_obj=(
 define-llm-model-v2 gpt_sol_obj
 
 typeset -gA gpt_astra_obj=(
-    model_name 'openai-codex/gpt-6-astra'
+    model_name 'openai-codex/gpt-6.2-astra'
     long_name 'gpt_astra'
     short_name 'astra'
     effort_variants 'low'
