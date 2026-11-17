@@ -152,7 +152,8 @@ The **global feed** includes every source whose global-feed exclusion is off; th
 loading a catalog does not download audio. RSS metadata, original-date suffixes,
 and episode identity are retained when combining feeds.
 
-Registry and saved combinations live in `library.sqlite` beside the primary
+Without a configured TOML settings file, registry and saved combinations live
+in `library.sqlite` beside the primary
 `catalog.sqlite`. New catalogs live under `channels/<channel-id>/` in that state
 directory; new audio/RSS lives under `channels/<channel-id>/` beside the primary
 audio directory. Aggregates live under `feeds/` in that audio base. Back up the
@@ -188,24 +189,41 @@ checked sources, even those excluded from the global feed.
 
 ### Persistent settings and browser preferences
 
-Within the configured primary state directory:
+Set `PODCAST_SETTINGS_FILE` to a TOML file outside the served tree. It becomes
+the source of truth for registered sources, automatic-download and global-feed
+flags, archive choices, playlist bookmarks and saved combined-feed memberships.
+The first startup exports existing SQLite choices. Later startups load TOML
+and rebuild the SQLite settings mirror and archived flags, even after cache loss.
+Existing known playlist IDs are preserved on migration; later discoveries are
+cache data, while explicitly added playlist bookmarks are saved to TOML.
 
-- `library.sqlite` stores registered sources, auto-download and global-exclusion
-  settings, automatic-download baselines and saved combined-feed memberships.
-- `catalog.sqlite` stores the primary source’s episodes, archive flags, playlist
-  memberships, successful-fetch timestamps and download jobs.
-- `channels/<source-id>/catalog.sqlite` stores the same per-source data for added
-  YouTube and Telegram channels. Failed refreshes retain successful cached data.
+Set `PODCAST_SETTINGS_SYNC` to a trusted executable command that versions and
+pushes that file. Saves are atomic and serialized. Git runs in a background
+worker; failed syncs retain the local TOML and retry after a minute. The UI shows
+pending/error status. Do not put credentials or sessions in the settings repo.
+For hand edits, stop the app, pull the repo, edit and commit, then restart it.
+The app does not automatically pull or overwrite remote changes after conflicts.
+
+The configured state directory holds rebuildable runtime data:
+
+- `library.sqlite` mirrors durable registrations/settings and contains automatic
+  download checkpoints (`auto_seen`, baseline and last-check information).
+- `catalog.sqlite` holds the primary episode catalog, playlist memberships,
+  fetch timestamps, archive mirror and download jobs.
+- `channels/<source-id>/catalog.sqlite` holds the same cache/job data for each
+  added YouTube or Telegram source. Failed refreshes retain successful caches.
 
 The generated `~/.config/podcast-web/automation.json` lets the legacy CLI yield
-to the library. The SQLite registry is the source of truth for those settings.
-Deployment environment variables define paths, source defaults and PWA scope;
-they live in the deployment configuration, outside the public app source.
+to the app; it can be regenerated. Audio files and RSS feeds remain separately
+stored data. Losing an automatic-download checkpoint establishes a fresh
+baseline instead of downloading the historical catalog again.
 
 Browser local storage holds `podcast-web-preferences` (hide filters, length
 limits, playlist, sort and search), `podcast-web-theme`, and `podcast-web-source`
-(last selected podcast). These are per browser/origin and do not sync across
-devices. The checked-source selection before creating a combined feed is only
-in page memory; creating the feed persists its membership in `library.sqlite`.
-Back up the whole state tree using SQLite’s backup API for live databases, plus
-the audio/feed directories and any separately configured Telegram session.
+(last selected podcast). These preferences are per browser/origin and do not
+sync across devices. Checked sources before creating a combined feed exist only
+in page memory; creating the feed saves its membership in TOML.
+
+Back up/version the TOML plus the audio/feed directories and any separately
+configured Telegram session. SQLite caches can be rebuilt. Without TOML enabled,
+back up the entire state directory using SQLite’s backup API for live databases.

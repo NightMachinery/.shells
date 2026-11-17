@@ -105,6 +105,9 @@ function renderLibrary() {
   const channels=state.data.podcasts;
   if(!channels)return;
   $('podcast-library').hidden=false;
+  const sync=state.data.settings_sync, syncStatus=$('settings-sync-status');
+  syncStatus.hidden=!sync?.configured;
+  syncStatus.textContent=sync?.error || (sync?.sync_enabled?(sync.pending?'Settings saved locally; GitHub sync pending.':'Persistent settings synced to GitHub.'):'Persistent settings saved.');
   const current=state.data.current_podcast;
   if(!state.podcast)state.podcast=current;
   const select=$('podcast');

@@ -22,7 +22,7 @@ def main():
     with tempfile.TemporaryDirectory(prefix='podcast-library-qa-') as temporary:
         base=Path(temporary)
         first=Catalog(base/'state',base/'audio'/'original','https://example.com/yt/original',PRIMARY,'Original podcast')
-        library=Library(first,Catalog,policy_file=base/'policy.json',public_app_path='/podcasts/',pwa_id='/podcasts/hola/')
+        library=Library(first,Catalog,policy_file=base/'policy.json',public_app_path='/podcasts/',pwa_id='/podcasts/hola/',settings_path=base/'library.toml')
         def populate(catalog):
             with catalog.db() as db:
                 db.executemany('INSERT OR IGNORE INTO episodes(id,title,duration) VALUES(?,?,?)',[(OLD,'Downloaded episode',60),(NEW,'An older conversation',120)])
@@ -68,6 +68,7 @@ def main():
                 assert page.url==url
                 assert page.locator('#podcast option').count()==2
                 assert page.locator('#auto-download').is_checked()
+                assert page.locator('#settings-sync-status').is_visible()
                 original_feed=page.locator('#podcast-feed-url').input_value()
                 assert original_feed.endswith('/original/feed.rss')
                 page.get_by_role('button',name='Archive',exact=True).first.click()
@@ -107,6 +108,9 @@ def main():
                 manifest=page.evaluate("fetch('manifest.webmanifest').then(r=>r.json())")
                 assert manifest['id']=='/podcasts/hola/' and manifest['start_url']=='/podcasts/' and manifest['scope']=='/podcasts/'
                 assert not errors,errors
+                settings=library.settings.read()
+                assert len(settings['podcasts'])==3
+                assert NEW in next(p for p in settings['podcasts'] if p['id']==PRIMARY)['archived']
                 print(json.dumps({'podcast_switch_and_reload':'passed','archive_isolation':'passed','global_queue':'passed','combined_feed':'2 sources','global_exclusion':'passed','add_auto_off_and_toggle':'passed','canonical_redirect_and_pwa_identity':'passed','phone_overflow':'none','browser_errors':errors}))
                 browser.close()
         finally:

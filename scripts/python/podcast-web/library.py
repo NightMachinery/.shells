@@ -43,7 +43,8 @@ def channel_url(value):
 
 
 class Library:
-    def __init__(self, primary, catalog_class, *, policy_file=None, public_app_path=None, pwa_id=None):
+    def __init__(self, primary, catalog_class, *, policy_file=None, public_app_path=None, pwa_id=None,
+                 settings_path=None, settings_sync=None):
         self.primary = primary.channel
         self.state = primary.state
         self.audio_root = primary.audio.parent
@@ -54,6 +55,7 @@ class Library:
         self.lock = threading.RLock()
         self.publish_lock = threading.RLock()
         self.policy_file = policy_file
+        self.settings = None
         self.public_app_path, self.pwa_id = public_app_path, pwa_id
         self.refresh_pool = concurrent.futures.ThreadPoolExecutor(max_workers=2)
         # Large playlist histories must not hold up a newly added source's catalog.
@@ -79,8 +81,14 @@ class Library:
                 db.executemany("INSERT OR IGNORE INTO auto_seen VALUES(?,?)", [(self.primary, vid) for vid in known])
                 db.execute("UPDATE podcasts SET auto_ready=? WHERE id=?", (bool(known), self.primary))
             db.execute("UPDATE podcasts SET excluded_global=1 WHERE id=?", (self.primary,))
-        primary.on_download = self.rebuild_feeds
-        primary.on_playlists = self.prefetch_playlists
+        self.configure_catalog(primary)
+        if settings_path:
+            from settings import SettingsFile
+            settings = SettingsFile(settings_path, settings_sync)
+            if not settings.path.exists():
+                settings.write(self.export_settings())
+            self.settings = settings
+            self.apply_settings(settings.read())
         for row in self.podcasts():
             self.catalog(row["id"])
         self.write_policy()
@@ -106,6 +114,72 @@ class Library:
     def write_policy(self):
         write_policy(self.podcasts(), self.policy_file)
 
+    def configure_catalog(self, catalog):
+        catalog.on_download = self.rebuild_feeds
+        catalog.on_playlists = self.prefetch_playlists
+        catalog.on_archive = lambda ids, archived: self.save_archives(catalog.channel, ids, archived)
+        catalog.on_playlist_added = lambda playlist: self.save_playlist(catalog.channel, playlist)
+
+    def export_settings(self):
+        podcasts = []
+        for row in self.podcasts():
+            catalog = self.catalog(row["id"])
+            with catalog.db() as db:
+                archived = [r[0] for r in db.execute("SELECT id FROM episodes WHERE archived=1 ORDER BY id")]
+                playlists = [r[0] for r in db.execute("SELECT id FROM playlists ORDER BY id")]
+            podcasts.append({"id": row["id"], "title": row["title"], "url": row["url"],
+                             "auto_download": bool(row["auto_download"]), "excluded_from_global": bool(row["excluded_global"]),
+                             "archived": archived, "playlists": playlists})
+        with self.db() as db:
+            feeds = [{"title": row["title"], "sources": json.loads(row["members"])} for row in db.execute("SELECT * FROM mixes")]
+        return {"version": 1, "primary": self.primary, "podcasts": podcasts, "feeds": feeds}
+
+    def apply_settings(self, document):
+        from settings import mix_id
+        if document["primary"] != self.primary:
+            raise ValueError("Settings primary source does not match the configured audio library")
+        previous = {r["id"]: r for r in self.podcasts()}
+        identifiers = [p["id"] for p in document["podcasts"]]
+        with self.db() as db:
+            db.execute("DELETE FROM podcasts WHERE id NOT IN (" + ",".join("?" for _ in identifiers) + ")", identifiers)
+            for podcast in document["podcasts"]:
+                db.execute("""INSERT INTO podcasts(id,title,url,auto_download,excluded_global) VALUES(?,?,?,?,?)
+                    ON CONFLICT(id) DO UPDATE SET title=excluded.title,url=excluded.url,
+                    auto_download=excluded.auto_download,excluded_global=excluded.excluded_global""",
+                    (podcast["id"],podcast["title"],podcast["url"],podcast["auto_download"],podcast["excluded_from_global"]))
+            db.execute("DELETE FROM mixes")
+            db.executemany("INSERT INTO mixes VALUES(?,?,?)", [(mix_id(f["sources"]), f["title"], json.dumps(sorted(set(f["sources"])))) for f in document["feeds"]])
+        self.catalogs = {key: value for key,value in self.catalogs.items() if key in identifiers}
+        for podcast in document["podcasts"]:
+            catalog = self.catalog(podcast["id"])
+            catalog.title = podcast["title"]
+            with catalog.db() as db:
+                db.execute("UPDATE episodes SET archived=0")
+                db.executemany("INSERT INTO episodes(id,title,archived) VALUES(?,?,1) ON CONFLICT(id) DO UPDATE SET archived=1", [(vid,vid) for vid in podcast["archived"]])
+                db.executemany("INSERT OR IGNORE INTO playlists VALUES(?,?)", [(pid,pid) for pid in podcast["playlists"]])
+                known = [r[0] for r in db.execute("SELECT video FROM membership WHERE playlist='uploads'")]
+            if podcast["auto_download"] and not previous.get(podcast["id"],{}).get("auto_download"):
+                with self.db() as db:
+                    db.execute("DELETE FROM auto_seen WHERE podcast=?", (podcast["id"],))
+                    db.executemany("INSERT INTO auto_seen VALUES(?,?)", [(podcast["id"],vid) for vid in known])
+                    db.execute("UPDATE podcasts SET auto_ready=? WHERE id=?", (bool(known),podcast["id"]))
+
+    def save_archives(self, identifier, ids, archived):
+        if self.settings:
+            def change(document):
+                podcast = next(p for p in document["podcasts"] if p["id"] == identifier)
+                values = set(podcast["archived"])
+                values.update(ids) if archived else values.difference_update(ids)
+                podcast["archived"] = sorted(values)
+            self.settings.update(change)
+
+    def save_playlist(self, identifier, playlist):
+        if self.settings:
+            def change(document):
+                podcast = next(p for p in document["podcasts"] if p["id"] == identifier)
+                podcast["playlists"] = sorted(set(podcast["playlists"]) | {playlist})
+            self.settings.update(change)
+
     def catalog(self, identifier=None):
         identifier = identifier or self.primary
         with self.lock:
@@ -122,7 +196,7 @@ class Library:
             catalog = cls(self.state / "channels" / identifier,
                 self.audio_root / "channels" / identifier, self.url_root + "/channels/" + identifier,
                 identifier, row["title"], pool=self.pool, on_download=self.rebuild_feeds)
-            catalog.on_playlists = self.prefetch_playlists
+            self.configure_catalog(catalog)
             self.catalogs[identifier] = catalog
             self.ensure_feed(catalog)
             return catalog
@@ -171,6 +245,12 @@ class Library:
         except Exception as exc:
             raise ValueError("Could not read that channel. Check its URL and retry. " + str(exc)[-250:]) from exc
         with self.lock:
+            if self.settings:
+                def change(document):
+                    if not any(p["id"] == identifier for p in document["podcasts"]):
+                        document["podcasts"].append({"id":identifier,"title":title,"url":url,"auto_download":False,
+                                                     "excluded_from_global":bool(excluded),"archived":[],"playlists":[]})
+                self.settings.update(change)
             with self.db() as db:
                 db.execute("INSERT OR IGNORE INTO podcasts(id,title,url,excluded_global) VALUES(?,?,?,?)", (identifier, title, url, bool(excluded)))
             catalog = self.catalog(identifier)
@@ -207,6 +287,10 @@ class Library:
     def maintain_catalogs(self, max_age=21600):
         for row in self.podcasts():
             catalog = self.catalog(row["id"])
+            with catalog.db() as db:
+                uploads = db.execute("SELECT 1 FROM sources WHERE id='uploads'").fetchone()
+            if not uploads and catalog.refreshes.get("uploads", {}).get("status") != "loading":
+                self.schedule_catalog(catalog)
             if catalog.source_type != "youtube":
                 continue
             with catalog.db() as db:
@@ -221,6 +305,8 @@ class Library:
             raise ValueError("auto_download must be true or false")
         catalog = self.catalog(identifier)
         identifier = catalog.channel
+        if self.settings:
+            self.settings.set_source(identifier, "auto_download", enabled)
         with self.lock, self.db() as db:
             old = db.execute("SELECT auto_download FROM podcasts WHERE id=?", (identifier,)).fetchone()
             if enabled and not old[0]:
@@ -238,6 +324,8 @@ class Library:
         catalog = self.catalog(identifier)
         if catalog.channel == self.primary and not excluded:
             raise ValueError("The original podcast is always excluded from the global feed")
+        if self.settings:
+            self.settings.set_source(catalog.channel, "excluded_from_global", excluded)
         with self.db() as db:
             db.execute("UPDATE podcasts SET excluded_global=? WHERE id=?", (excluded, catalog.channel))
         self.rebuild_feeds()
@@ -258,7 +346,8 @@ class Library:
                 "loading": any(r.get("status") == "loading" for r in snap["refreshes"].values())})
             queue.extend(dict(e, podcast_id=row["id"], podcast_title=row["title"]) for e in snap["episodes"] if e.get("job"))
         data.update(podcasts=channels, current_podcast=selected.channel, queue=queue,
-                    global_feed_url=self.url_root + "/feeds/global.rss")
+                    global_feed_url=self.url_root + "/feeds/global.rss",
+                    settings_sync=self.settings.status() if self.settings else {"configured": False})
         return data
 
     def create_mix(self, identifiers):
@@ -271,6 +360,12 @@ class Library:
         if not set(members) <= known:
             raise ValueError("Unknown podcast in feed selection")
         key = hashlib.sha256("\n".join(members).encode()).hexdigest()[:24]
+        if self.settings:
+            from settings import mix_id
+            def change(document):
+                if not any(mix_id(feed["sources"]) == key for feed in document["feeds"]):
+                    document["feeds"].append({"title":"Selected podcasts","sources":members})
+            self.settings.update(change)
         with self.db() as db:
             db.execute("INSERT OR IGNORE INTO mixes VALUES(?,?,?)", (key, "Selected podcasts", json.dumps(members)))
         self.rebuild_feeds()
@@ -363,6 +458,8 @@ class Library:
                 db.execute("UPDATE podcasts SET checked=?,error=? WHERE id=?", (time.time(), str(exc)[-400:], identifier))
 
     def start(self, interval=1800):
+        if self.settings:
+            self.settings.start()
         def run():
             while not self.stop.is_set():
                 self.maintain_catalogs()

@@ -1,4 +1,4 @@
-// Build revision: 75ee024f711b
+// Build revision: 65b30420d3f3
 'use strict';
 self.addEventListener('install', event => event.waitUntil(self.skipWaiting()));
 self.addEventListener('activate', event => event.waitUntil(self.clients.claim()));

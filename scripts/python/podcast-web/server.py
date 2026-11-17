@@ -47,6 +47,8 @@ class Catalog:
         self.pool = pool or concurrent.futures.ThreadPoolExecutor(max_workers=1)
         self.on_download = on_download
         self.on_playlists = None
+        self.on_archive = None
+        self.on_playlist_added = None
         self.lock = threading.RLock()
         self.busy = set()
         self.refreshes = {}
@@ -256,6 +258,8 @@ class Catalog:
     def archive(self, ids, archived):
         if not isinstance(archived, bool) or not isinstance(ids, list) or not 1 <= len(ids) <= 500 or not all(isinstance(i, str) and EPISODE.fullmatch(i) for i in ids):
             raise ValueError("Expected up to 500 episode IDs and a boolean archived value")
+        if self.on_archive:
+            self.on_archive(ids, archived)
         with self.db() as db:
             db.executemany("UPDATE episodes SET archived=? WHERE id=?", [(archived, i) for i in ids])
 
@@ -271,6 +275,8 @@ class Catalog:
             value = parse_qs(parts.query).get("list", [""])[0]
         if not PLAYLIST.fullmatch(value):
             raise ValueError("Expected a YouTube playlist URL or ID")
+        if self.on_playlist_added:
+            self.on_playlist_added(value)
         with self.db() as db:
             db.execute("INSERT OR IGNORE INTO playlists VALUES(?,?)", (value, "Loading playlist…"))
         self.schedule_refresh(value)
@@ -484,7 +490,8 @@ def main():
         parser.error("Expected a YouTube channel ID")
     catalog = Catalog(Path(args.state).expanduser(), Path(args.audio_dir).expanduser(), args.base_url, args.channel, args.title)
     from library import Library
-    library = Library(catalog, Catalog, public_app_path=os.environ.get("PODCAST_APP_PATH"), pwa_id=os.environ.get("PODCAST_PWA_ID"))
+    library = Library(catalog, Catalog, public_app_path=os.environ.get("PODCAST_APP_PATH"), pwa_id=os.environ.get("PODCAST_PWA_ID"),
+                      settings_path=os.environ.get("PODCAST_SETTINGS_FILE"), settings_sync=os.environ.get("PODCAST_SETTINGS_SYNC"))
     server = ThreadingHTTPServer(("127.0.0.1", args.port), Handler)
     server.catalog = catalog
     server.library = library
