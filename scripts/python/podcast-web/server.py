@@ -15,7 +15,7 @@ import threading
 import time
 import unicodedata
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
-from urllib.parse import quote, unquote, urlsplit
+from urllib.parse import quote, unquote, urlsplit, parse_qs
 import xml.etree.ElementTree as ET
 from podcast_dates import append_upload_date
 
@@ -28,12 +28,13 @@ def normalized(title):
 
 
 class Catalog:
-    def __init__(self, state, audio, base_url, channel, title):
+    def __init__(self, state, audio, base_url, channel, title, *, pool=None, on_download=None):
         self.state, self.audio = Path(state), Path(audio)
         self.state.mkdir(parents=True, exist_ok=True)
         self.audio.mkdir(parents=True, exist_ok=True)
         self.base_url, self.channel, self.title = base_url.rstrip("/"), channel, title
-        self.pool = concurrent.futures.ThreadPoolExecutor(max_workers=1)
+        self.pool = pool or concurrent.futures.ThreadPoolExecutor(max_workers=1)
+        self.on_download = on_download
         self.lock = threading.RLock()
         self.busy = set()
         self.refreshes = {}
@@ -289,6 +290,8 @@ class Catalog:
                 f.write(f"youtube {vid}\n")
             self.scan_audio(force=True)
             self.job(vid, "done")
+            if self.on_download:
+                self.on_download()
         except Exception as exc:
             logging.exception("Download failed for %s", vid)
             self.job(vid, "error", str(exc)[-600:])
@@ -350,11 +353,24 @@ class Handler(BaseHTTPRequestHandler):
         self.wfile.write(body)
 
     def do_GET(self):
-        path = urlsplit(self.path).path
+        parsed = urlsplit(self.path)
+        path = parsed.path
         if path == "/health":
             self.reply({"ok": True})
         elif path == "/catalog":
-            self.reply(self.server.catalog.snapshot())
+            try:
+                library = getattr(self.server, "library", None)
+                self.reply(library.snapshot(parse_qs(parsed.query).get("podcast", [None])[0]) if library else self.server.catalog.snapshot())
+            except ValueError as exc:
+                self.reply({"error": str(exc)}, 400)
+        elif path == "/manifest.webmanifest":
+            manifest = json.loads(Path(__file__).with_name("manifest.webmanifest").read_text())
+            library = getattr(self.server, "library", None)
+            if library and library.public_app_path:
+                manifest.update(start_url=library.public_app_path, scope=library.public_app_path)
+            if library and library.pwa_id:
+                manifest["id"] = library.pwa_id
+            self.reply(json.dumps(manifest).encode(), content_type="application/manifest+json")
         else:
             self.reply({"error": "Not found"}, 404)
 
@@ -375,15 +391,26 @@ class Handler(BaseHTTPRequestHandler):
             data = json.loads(self.rfile.read(length))
             if not isinstance(data, dict):
                 raise ValueError("Expected a JSON object")
+            library = getattr(self.server, "library", None)
+            catalog = library.catalog(data.get("podcast")) if library else self.server.catalog
             if self.path == "/archive":
-                self.server.catalog.archive(data.get("ids"), data.get("archived"))
+                catalog.archive(data.get("ids"), data.get("archived"))
             elif self.path == "/download":
-                self.server.catalog.enqueue(data.get("id"))
+                catalog.enqueue(data.get("id"))
             elif self.path == "/refresh":
-                self.server.catalog.schedule_refresh(data.get("source", "uploads"))
+                catalog.schedule_refresh(data.get("source", "uploads"))
             elif self.path == "/playlist":
-                playlist = self.server.catalog.add_playlist(data.get("url"))
+                playlist = catalog.add_playlist(data.get("url"))
                 self.reply({"ok": True, "id": playlist}, 202)
+                return
+            elif self.path == "/podcasts" and library:
+                identifier = library.add(data.get("url"))
+                self.reply({"ok": True, "id": identifier}, 201)
+                return
+            elif self.path == "/auto" and library:
+                library.set_auto(data.get("podcast"), data.get("enabled"))
+            elif self.path == "/feeds" and library:
+                self.reply({"url": library.create_mix(data.get("podcasts"))}, 201)
                 return
             else:
                 self.reply({"error": "Not found"}, 404)
@@ -409,13 +436,17 @@ def main():
     if not re.fullmatch(r"UC[A-Za-z0-9_-]{22}", args.channel):
         parser.error("Expected a YouTube channel ID")
     catalog = Catalog(Path(args.state).expanduser(), Path(args.audio_dir).expanduser(), args.base_url, args.channel, args.title)
+    from library import Library
+    library = Library(catalog, Catalog, public_app_path=os.environ.get("PODCAST_APP_PATH"), pwa_id=os.environ.get("PODCAST_PWA_ID"))
     server = ThreadingHTTPServer(("127.0.0.1", args.port), Handler)
     server.catalog = catalog
+    server.library = library
     for source in ("uploads", "playlists"):
         with catalog.db() as db:
             cached = db.execute("SELECT updated FROM sources WHERE id=?", (source,)).fetchone()
         if not cached or time.time() - cached["updated"] > 21600:
             catalog.schedule_refresh(source)
+    library.start()
     server.serve_forever()
 
 

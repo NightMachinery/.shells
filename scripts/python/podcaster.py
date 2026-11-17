@@ -38,6 +38,7 @@ import re
 import fcntl
 from urllib.parse import urlparse, parse_qs
 from podcast_dates import append_upload_date, parse_upload_date
+from podcast_policy import managed_by_library
 
 from mutagen import File as MutagenFile
 from mutagen.id3 import ID3, APIC
@@ -901,6 +902,9 @@ def main():
     if args.command == "local":
         handle_local_mode(args)
     elif args.command == "yt":
+        if args.non_interactive and managed_by_library(args.channel_input):
+            logging.info("Automatic downloads for this channel are managed by the podcast library; skipping the legacy non-interactive run.")
+            return
         # The web library shares this feed and download archive. Serialize both
         # writers for the whole download/update, not only the final file rename.
         base_dir = os.path.expanduser(args.base_dir)
