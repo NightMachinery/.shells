@@ -573,6 +573,13 @@ L.textTipSize = 0.7
 -- Extra space, in cells, put between two separate strokes that stand side by
 -- side (the alef and the yeh of ای), so that they do not read as one thick stroke.
 L.textStrokeGap = 0.4
+-- The font Persian (and mixed) text is drawn in before it is reduced. Its
+-- proportions carry over: Tahoma's alef barely clears its other letters.
+L.textFont = "Tahoma"
+local function textFont()
+    local font = L.textFont
+    return (type(font) == "string" and font ~= "") and font or "Tahoma"
+end
 -- Hand-drawn fonts by row count, mostly 3 wide; M and W are 5 and N and Q 4 in
 -- the 4- and 5-row fonts, since at 3 wide round dots blur M, N and H together.
 -- The 3-row font is close to a cipher. Rows are joined by "/", X is lit.
@@ -1169,16 +1176,17 @@ local function rasterBitmapLine(tb, text)
     if bitmapCacheMod ~= tb then
         bitmapLineCache, bitmapLineCount, bitmapCacheMod, bitmapRefHeight = {}, 0, tb, nil
     end
-    local size, rows = L.textRasterSize, persianRows()
-    local id = string.format("%s\0%s\0%s\0%s\0%s", text, size, rows, tostring(L.textDotSize), tostring(L.textTipSize)) .. "\0" .. tostring(L.textStrokeGap)
+    local size, rows, font = L.textRasterSize, persianRows(), textFont()
+    local id = table.concat({text, size, rows, tostring(L.textDotSize), tostring(L.textTipSize),
+        tostring(L.textStrokeGap), font}, "\0")
     local cached = bitmapLineCache[id]
     if cached then return cached end
-    if not bitmapRefHeight or bitmapRefHeight.size ~= size then
+    if not bitmapRefHeight or bitmapRefHeight.size ~= size or bitmapRefHeight.font ~= font then
         -- A full line: from the madd of آ to the dots of چ.
-        local _, _, height = tb.rasterize("آگچ", "Tahoma", size)
-        bitmapRefHeight = {size=size, height=math.max(1, height or 0, size)}
+        local _, _, height = tb.rasterize("آگچ", font, size)
+        bitmapRefHeight = {size=size, font=font, height=math.max(1, height or 0, size)}
     end
-    local pixels, width, height, letters = tb.rasterize(text, "Tahoma", size)
+    local pixels, width, height, letters = tb.rasterize(text, font, size)
     local cells, cellsWide, cellsHigh = L.reduceRaster(pixels, width, height,
         bitmapRefHeight.height / rows, size * 0.17)
     local entry = {text=text, cells=cells, width=cellsWide, height=cellsHigh, letters=letters}
@@ -1376,6 +1384,7 @@ local textModes = {}
 local function textMode(key, word)
     local id = string.format("%s\0%s\0%s\0%s\0%s", key, select(2, latinFont()), persianRows(),
         tostring(L.textDotSize), tostring(L.textTipSize)) .. "\0" .. tostring(L.textStrokeGap)
+        .. "\0" .. tostring(L.textFont)
     if not textModes[id] then
         local cells = L.textCells(word)
         textModes[id] = {key=key, name="Text " .. word, note="the word in emoji, a letter per emoji",

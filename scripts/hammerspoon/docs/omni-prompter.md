@@ -243,6 +243,11 @@ raster, which `EmojiLayout.reduceRaster` brings down to the grid:
   Where no stroke crosses the line between their columns, everything to the
   right moves over by `EmojiLayout.textStrokeGap` (0.4 of a cell; 0 turns it
   off).
+- **The font is a setting.** `EmojiLayout.textFont` (default `Tahoma`) names
+  the font the text is drawn in before reduction, and its proportions carry
+  over: Tahoma keeps teeth and dots clearest, but its alef barely clears its
+  other letters. Geeza Pro and Damascus have a taller alef and a `ی` that dips
+  below the baseline, at the cost of coarser teeth at the same row count.
 
 Each letter (in logical reading order for RTL scripts) is one emoji, cycling
 the selection; with more emoji than letters each row is one emoji (stripes),
