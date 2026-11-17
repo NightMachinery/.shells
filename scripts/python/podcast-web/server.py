@@ -19,6 +19,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import quote, unquote, urlsplit, parse_qs
 import xml.etree.ElementTree as ET
 from podcast_dates import append_upload_date, format_upload_date
+from presentation import cover_url, episode_title, image_bytes, set_cover
 
 VIDEO = re.compile(r"^[A-Za-z0-9_-]{11}$")
 EPISODE = re.compile(r"(?:[A-Za-z0-9_-]{11}|tg_[1-9][0-9]{0,18})\Z")
@@ -26,11 +27,25 @@ PLAYLIST = re.compile(r"^[A-Za-z0-9_-]{10,100}$")
 
 
 def normalized(title):
+    title = episode_title(title, "youtube")
     return "".join(c for c in unicodedata.normalize("NFKC", title).replace("ي", "ی").replace("ك", "ک").casefold() if c.isalnum())
 
 
 class Catalog:
     source_type = "youtube"
+
+    @property
+    def artwork_url(self):
+        return cover_url(self.audio, self.base_url)
+
+    def channel_picture(self):
+        from yt_dlp import YoutubeDL
+
+        with YoutubeDL({"extract_flat": "in_playlist", "skip_download": True, "quiet": True,
+                        "playlistend": 1, "socket_timeout": 15, "retries": 1}) as ydl:
+            info = ydl.extract_info(self.channel_url + "/videos", download=False)
+        avatar = next((t["url"] for t in info.get("thumbnails", []) if t.get("id") == "avatar_uncropped"), None)
+        return image_bytes(avatar, host_suffix="googleusercontent.com") if avatar else None
 
     @property
     def channel_url(self):
@@ -243,6 +258,9 @@ class Catalog:
             e["job"] = jobs.get(e["id"])
             e["source_url"] = self.episode_url(e["id"])
             e["source_label"] = "Telegram" if self.source_type == "telegram" else "YouTube"
+            display_title = episode_title(e["title"], self.source_type)
+            if display_title != e["title"]:
+                e["display_title"] = display_title
             e["local"] = bool(e["audio_url"] and hashlib.sha256(e["audio_url"].encode()).hexdigest()[:11] == e["id"])
         remote_urls = {e["audio_url"] for e in episodes if e["audio_url"] and not e["local"]}
         episodes = [e for e in episodes if not e["local"] or e["audio_url"] not in remote_urls]
@@ -252,7 +270,7 @@ class Catalog:
                           "cached": sum(p["id"] in sources for p in playlists),
                           "loading": sum(refreshes.get(p["id"], {}).get("status") == "loading" for p in playlists),
                           "failed": sum(refreshes.get(p["id"], {}).get("status") == "error" for p in playlists)}
-        return {"title": self.title, "source_type": self.source_type, "episodes": episodes, "playlists": playlists, "memberships": memberships,
+        return {"title": self.title, "artwork_url": self.artwork_url, "source_type": self.source_type, "episodes": episodes, "playlists": playlists, "memberships": memberships,
                 "refreshes": refreshes, "sources": sources, "playlist_cache": playlist_cache,
                 "feed_url": self.base_url + "/feed.rss"}
 
@@ -364,7 +382,9 @@ class Catalog:
             if any(Path(unquote(urlsplit(e.get("url", "")).path)).name == path.name for e in channel.findall("item/enclosure")):
                 return
             item = ET.SubElement(channel, "item")
-            ET.SubElement(item, "title").text = info.get("title") or path.stem
+            ET.SubElement(item, "title").text = episode_title(info.get("title") or path.stem, self.source_type)
+            if self.artwork_url:
+                set_cover(channel, self.artwork_url, channel=True)
             ET.SubElement(item, "description").text = append_upload_date(info.get("description"), info.get("upload_date"))
             # Match the CLI's raw (unescaped) URL when generating its GUID, so
             # rebuilding the feed later does not make this item look new again.

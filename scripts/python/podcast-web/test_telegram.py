@@ -1,5 +1,6 @@
 from datetime import datetime, timezone
 from pathlib import Path
+from io import BytesIO
 import tempfile
 from types import SimpleNamespace
 import unittest
@@ -9,6 +10,7 @@ import xml.etree.ElementTree as ET
 from library import Library
 from server import Catalog
 from telegram_source import TelegramCatalog, channel_handle, parse_preview
+from presentation import ITUNES, episode_title
 
 CHANNEL = "tg_sample_audio"
 PRIMARY = "UC" + "a" * 22
@@ -56,7 +58,7 @@ class TelegramTests(unittest.TestCase):
         self.assertEqual(self.catalog.snapshot()['memberships']['uploads'], ['tg_42'])
 
     def test_telegram_download_retains_format_and_updates_feed(self):
-        file = SimpleNamespace(name='Original.mp3', duration=125, ext='.mp3')
+        file = SimpleNamespace(name='Original_episode.MP3\u200f ', duration=125, ext='.mp3')
         message = SimpleNamespace(id=42, file=file, audio=True, voice=False,
                                   document=SimpleNamespace(attributes=[]), message='Original description',
                                   date=datetime(2026, 3, 4, tzinfo=timezone.utc))
@@ -76,9 +78,52 @@ class TelegramTests(unittest.TestCase):
         self.assertTrue(row['audio_url'].endswith('.mp3'))
         self.assertEqual(row['duration'], 125)
         item=ET.parse(self.catalog.audio/'feed.rss').find('./channel/item')
+        self.assertEqual(item.findtext('title'), 'Original episode')
+        self.assertEqual(row['display_title'], 'Original episode')
         self.assertEqual(item.find('enclosure').get('type'), 'audio/mpeg')
         self.assertIn('2026',item.findtext('description'))
         self.assertFalse(list(self.catalog.audio.glob('*.part')))
+
+    def test_existing_feed_titles_and_artwork_preserve_subscriptions(self):
+        from PIL import Image
+        primary = Catalog(self.root/'primary', self.root/'libraries'/'primary', 'https://example.com/yt/primary', PRIMARY, 'Primary')
+        library = Library(primary, Catalog, policy_file=self.root/'policy.json')
+        try:
+            with patch.object(library,'resolve',return_value=(CHANNEL,'Audio','https://t.me/sample_audio')),patch.object(library,'schedule_catalog'):
+                library.add('https://t.me/sample_audio')
+            catalog = library.catalog(CHANNEL)
+            feed = catalog.audio / 'feed.rss'
+            before = ET.parse(feed).getroot()
+            item = ET.SubElement(before.find('channel'), 'item')
+            ET.SubElement(item, 'title').text = 'یک_گفت‌وگو.MP3\u2069 '
+            ET.SubElement(item, 'guid').text = 'keep-this-id'
+            ET.SubElement(item, 'pubDate').text = 'Thu, 05 Mar 2026 12:00:00 GMT'
+            ET.SubElement(item, 'enclosure', url='https://example.com/existing.mp3', length='123', type='audio/mpeg')
+            ET.ElementTree(before).write(feed)
+            picture = BytesIO()
+            Image.new("RGB", (48, 48), "blue").save(picture, "PNG")
+            with patch.object(catalog, 'channel_picture', return_value=picture.getvalue()) as fetch:
+                library.refresh_feed_presentation(catalog)
+                original = feed.read_bytes()
+                library.refresh_feed_presentation(catalog)
+                fetch.assert_called_once()
+            self.assertEqual(feed.read_bytes(), original)
+            result = ET.parse(feed).find('channel')
+            self.assertEqual(result.findtext('item/title'), 'یک گفت‌وگو')
+            for element in ('guid', 'pubDate', 'enclosure'):
+                self.assertEqual(ET.tostring(result.find('item/'+element)), ET.tostring(item.find(element)))
+            self.assertEqual(result.findtext('image/url'), catalog.artwork_url)
+            self.assertEqual(result.find(ITUNES+'image').get('href'), catalog.artwork_url)
+            library.rebuild_feeds()
+            mixed = ET.parse(library.audio_root/'feeds'/'global.rss').find('./channel/item')
+            self.assertEqual(mixed.findtext('title'), 'Audio: یک گفت‌وگو')
+            self.assertEqual(mixed.find(ITUNES+'image').get('href'), catalog.artwork_url)
+            self.assertEqual(episode_title('A_variable in Python', 'youtube'), 'A_variable in Python')
+            self.assertEqual(episode_title('Audio_filename.mp3 ', 'youtube'), 'Audio filename')
+        finally:
+            library.refresh_pool.shutdown(wait=True)
+            library.playlist_pool.shutdown(wait=True)
+            primary.pool.shutdown(wait=True)
 
     def test_registry_exclusion_persists_and_custom_mix_can_include_it(self):
         primary=Catalog(self.root/'primary', self.root/'libraries'/'primary', 'https://example.com/yt/primary', PRIMARY, 'Primary')

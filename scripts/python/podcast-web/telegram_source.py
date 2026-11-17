@@ -13,6 +13,7 @@ import urllib.request
 from urllib.parse import urlsplit
 
 from server import Catalog
+from presentation import image_bytes
 
 HANDLE = re.compile(r"[a-z][a-z0-9_]{4,31}\Z")
 
@@ -97,14 +98,18 @@ def parse_preview(html, handle):
     return title, entries, min(posts) if posts else None
 
 
-def public_page(handle, before=None):
+def public_html(handle, before=None):
     url = "https://t.me/s/" + handle + ("?before=" + str(before) if before else "")
     request = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
     with urllib.request.urlopen(request, timeout=30) as response:
         raw = response.read(8 * 1024 * 1024 + 1)
     if len(raw) > 8 * 1024 * 1024:
         raise ValueError("Telegram preview exceeded its size limit")
-    return parse_preview(raw.decode("utf-8"), handle)
+    return raw.decode("utf-8")
+
+
+def public_page(handle, before=None):
+    return parse_preview(public_html(handle, before), handle)
 
 
 def resolve(value):
@@ -152,6 +157,26 @@ def message_entry(message):
 
 class TelegramCatalog(Catalog):
     source_type = "telegram"
+
+    def channel_picture(self):
+        if not os.environ.get("PODCAST_TELEGRAM_SESSION"):
+            parser = PreviewParser()
+            parser.feed(public_html(self.handle))
+            photo = next(parser.root.find(lambda node: node.has("tgme_page_photo_image")), None)
+            avatar = photo.attrs.get("src") if photo else None
+            return image_bytes(avatar, host_suffix="telesco.pe") if avatar else None
+
+        async def download():
+            client = user_client()
+            try:
+                await client.connect()
+                if not await client.is_user_authorized():
+                    raise ValueError("Telegram artwork requires an authorized session")
+                return await client.download_profile_photo(self.handle, file=bytes)
+            finally:
+                await client.disconnect()
+
+        return asyncio.run(asyncio.wait_for(download(), timeout=30))
 
     @property
     def handle(self):

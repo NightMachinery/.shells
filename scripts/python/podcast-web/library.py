@@ -3,6 +3,7 @@ import concurrent.futures
 from contextlib import contextmanager
 from copy import deepcopy
 import email.utils
+import fcntl
 import hashlib
 import json
 import logging
@@ -15,6 +16,7 @@ from urllib.parse import quote, unquote, urlsplit
 import xml.etree.ElementTree as ET
 
 from podcast_policy import write_policy
+from presentation import episode_title, cover_url, publish_cover, set_cover
 
 CHANNEL_ID = re.compile(r"UC[A-Za-z0-9_-]{22}\Z")
 SOURCE_ID = re.compile(r"(?:UC[A-Za-z0-9_-]{22}|tg_[a-z][a-z0-9_]{4,31})\Z")
@@ -61,6 +63,7 @@ class Library:
         # Large playlist histories must not hold up a newly added source's catalog.
         self.playlist_pool = concurrent.futures.ThreadPoolExecutor(max_workers=2)
         self.stop = threading.Event()
+        self.presentation_wake = threading.Event()
         with self.db() as db:
             db.executescript("""
             CREATE TABLE IF NOT EXISTS podcasts(id TEXT PRIMARY KEY, title TEXT NOT NULL, url TEXT NOT NULL,
@@ -214,6 +217,38 @@ class Library:
             ET.SubElement(channel, key).text = value
         self.write_xml(path, root)
 
+    def refresh_feed_presentation(self, catalog):
+        with catalog.db() as db:
+            checked = db.execute("SELECT updated FROM sources WHERE id='artwork'").fetchone()
+        if not catalog.artwork_url or not checked or time.time() - checked[0] >= 7 * 86400:
+            try:
+                picture = catalog.channel_picture()
+                if picture:
+                    publish_cover(picture, catalog.audio)
+                with catalog.db() as db:
+                    db.execute("INSERT OR REPLACE INTO sources VALUES('artwork',?)", (time.time(),))
+            except Exception:
+                logging.exception("Could not refresh channel artwork for %s", catalog.channel)
+
+        # Share the downloader/CLI lock before rewriting an existing source feed.
+        # The image fetch and decode above need no lock on the audio queue.
+        path = catalog.audio / "feed.rss"
+        with (catalog.audio.parent / ".podcaster.lock").open("a") as lock:
+            fcntl.flock(lock, fcntl.LOCK_EX)
+            self.ensure_feed(catalog)
+            root = ET.parse(path).getroot()
+            channel = root.find("channel")
+            if channel is None:
+                return
+            original = ET.tostring(root)
+            for title in channel.findall("item/title"):
+                if title.text:
+                    title.text = episode_title(title.text, catalog.source_type)
+            if artwork := catalog.artwork_url:
+                set_cover(channel, artwork, channel=True)
+            if ET.tostring(root) != original:
+                self.write_xml(path, root)
+
     @staticmethod
     def write_xml(path, root):
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -262,6 +297,7 @@ class Library:
         if not cached and catalog.refreshes.get("uploads", {}).get("status") != "loading":
             self.schedule_catalog(catalog)
         self.rebuild_feeds()
+        self.presentation_wake.set()
         return identifier
 
     def schedule_catalog(self, catalog):
@@ -341,7 +377,8 @@ class Library:
             snap = data if catalog is selected else catalog.snapshot()
             channels.append({"id": row["id"], "title": row["title"], "url": row["url"],
                 "auto_download": bool(row["auto_download"]), "auto_error": row["error"],
-                "feed_url": snap["feed_url"], "downloaded": sum(bool(e["audio_url"]) for e in snap["episodes"]),
+                "feed_url": snap["feed_url"], "artwork_url": snap["artwork_url"],
+                "downloaded": sum(bool(e["audio_url"]) for e in snap["episodes"]),
                 "episodes": len(snap["memberships"].get("uploads", [])), "excluded_from_global": bool(row["excluded_global"]),
                 "source_type": catalog.source_type, "exclusion_locked": row["id"] == self.primary,
                 "playlist_cache": snap["playlist_cache"],
@@ -381,18 +418,23 @@ class Library:
             with self.db() as db:
                 mixes = [dict(r) for r in db.execute("SELECT * FROM mixes")]
             mixes.append({"id": "global", "title": "All podcasts", "members": json.dumps([r["id"] for r in sources if not r["excluded_global"]])})
+            aggregate_cover = cover_url(self.audio_root / "feeds", self.url_root + "/feeds")
             for mix in mixes:
                 root = ET.Element("rss", version="2.0")
                 channel = ET.SubElement(root, "channel")
                 ET.SubElement(channel, "title").text = mix["title"]
                 ET.SubElement(channel, "link").text = self.url_root
                 ET.SubElement(channel, "description").text = "Downloaded episodes from the selected podcast sources."
+                if aggregate_cover:
+                    set_cover(channel, aggregate_cover, channel=True)
                 members, entries, seen = set(json.loads(mix["members"])), [], set()
                 try:
                     for source in sources:
                         if source["id"] not in members:
                             continue
-                        for item in ET.parse(self.catalog(source["id"]).audio / "feed.rss").findall("./channel/item"):
+                        catalog = self.catalog(source["id"])
+                        artwork = catalog.artwork_url
+                        for item in ET.parse(catalog.audio / "feed.rss").findall("./channel/item"):
                             enclosure = item.find("enclosure")
                             if enclosure is None:
                                 continue
@@ -403,7 +445,9 @@ class Library:
                             item = deepcopy(item)
                             title = item.find("title")
                             if title is not None:
-                                title.text = source["title"] + ": " + (title.text or "")
+                                title.text = source["title"] + ": " + episode_title(title.text or "", catalog.source_type)
+                            if artwork:
+                                set_cover(item, artwork)
                             try:
                                 stamp = email.utils.parsedate_to_datetime(item.findtext("pubDate")).timestamp()
                             except (ValueError, TypeError, AttributeError):
@@ -471,3 +515,23 @@ class Library:
                 self.rebuild_feeds()
                 self.stop.wait(interval)
         threading.Thread(target=run, name="podcast-auto", daemon=True).start()
+
+        def refresh_presentation():
+            icon = Path(__file__).with_name("icon-512.png")
+            if icon.is_file():
+                try:
+                    publish_cover(icon.read_bytes(), self.audio_root / "feeds")
+                except OSError:
+                    logging.exception("Could not publish the library cover")
+            while not self.stop.is_set():
+                self.presentation_wake.clear()
+                for row in self.podcasts():
+                    if self.stop.is_set():
+                        return
+                    try:
+                        self.refresh_feed_presentation(self.catalog(row["id"]))
+                    except (ET.ParseError, OSError):
+                        logging.exception("Could not update the source feed for %s", row["id"])
+                self.rebuild_feeds()
+                self.presentation_wake.wait(interval)
+        threading.Thread(target=refresh_presentation, name="podcast-presentation", daemon=True).start()

@@ -239,8 +239,7 @@ back up the entire state directory using SQLite’s backup API for live database
 The episode toolbar sticks to the top while scrolling, with paging controls at
 both the top and bottom of the list. Feeds and channel management live in the
 collapsible panel beneath the podcast selector. Rows keep titles, original-date
-metadata and actions aligned, including mixed Persian/English text. Telegram
-audio extensions and underscores are cleaned up only in displayed titles.
+metadata and actions aligned, including mixed Persian/English text.
 
 New downloads keep their places in the current list and pagination while their
 Listen/Audio controls update. **Refresh list** reapplies the downloaded filter
@@ -252,3 +251,15 @@ formatter; incomplete/unknown dates are omitted rather than invented.
 Run `python3 python/podcast-web/verify_ui.py --screenshots /tmp/podcast-ui-qa`
 for stable-page checks through manual/automatic completions and light/dark
 desktop, phone and narrow-phone renders.
+
+Episode titles in the app and RSS feeds use the same cleanup rule. Telegram
+attachment names and titles ending in an audio extension lose the extension
+and use spaces in place of underscores. Ordinary YouTube titles retain their
+punctuation. A background pass updates existing RSS titles in place, preserving
+episode IDs, dates and enclosure links.
+
+The app caches the original YouTube or Telegram profile picture alongside each
+source's audio as a square JPEG. The picture appears in the app and in standard
+RSS and iTunes artwork fields. Combined feeds use the library cover, with source
+artwork on individual episodes. Artwork refreshes weekly and keeps the previous
+copy if the source is temporarily unavailable.

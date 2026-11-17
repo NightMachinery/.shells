@@ -12,10 +12,10 @@
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <script src="theme.js?v=6924a29d93bf"></script>
-<link rel="stylesheet" href="style.css?v=2f8af57a4c1b">
+<link rel="stylesheet" href="style.css?v=41936c1f6357">
 <body>
 <main>
-  <header><div class="header-top"><div class="eyebrow">YOUR LISTENING LIBRARY</div><label class="theme-control" for="theme">Theme <select id="theme"><option value="light">Light</option><option value="dark">Dark</option></select></label></div><h1 id="title">Podcast library</h1><p>Find an older conversation. Keep the ones you want.</p><div class="header-actions"><a id="feed" href="#">Podcast feed ↗</a><button id="refresh">Refresh catalog</button><button id="install-app" hidden>Install app</button></div><details id="install-help" hidden><summary>Install on your device</summary><p>Chrome or Edge: open the browser menu and choose Install app or Add to Home screen.</p><p>iPhone or iPad: open in Safari, tap Share, then Add to Home Screen.</p><p>The app opens in its own window. A connection and your usual login are needed to use your library.</p></details></header>
+  <header><div class="header-top"><div class="eyebrow">YOUR LISTENING LIBRARY</div><label class="theme-control" for="theme">Theme <select id="theme"><option value="light">Light</option><option value="dark">Dark</option></select></label></div><div class="podcast-heading"><img id="podcast-cover" src="icon-192.png" width="60" height="60" alt="" referrerpolicy="no-referrer"><h1 id="title">Podcast library</h1></div><div class="header-actions"><a id="feed" href="#">Podcast feed ↗</a><button id="refresh">Refresh catalog</button><button id="install-app" hidden>Install app</button></div><details id="install-help" hidden><summary>Install on your device</summary><p>Chrome or Edge: open the browser menu and choose Install app or Add to Home screen.</p><p>iPhone or iPad: open in Safari, tap Share, then Add to Home Screen.</p><p>The app opens in its own window. A connection and your usual login are needed to use your library.</p></details></header>
   <section id="podcast-library" class="podcast-library" hidden aria-label="Podcast library">
     <div class="source-controls">
       <label class="source-select" for="podcast">Podcast <select id="podcast"></select></label>
@@ -65,7 +65,7 @@
   <details class="playlists"><summary><h2>Playlists <span id="playlist-count"></span></h2></summary><p id="playlist-cache-status" class="playlist-help" role="status"></p><p class="playlist-help">Browse the channel’s public playlists, or add one using its YouTube link.</p><form id="add-playlist"><label for="playlist-url">YouTube playlist URL</label><div class="playlist-input"><input id="playlist-url" type="url" placeholder="https://www.youtube.com/playlist?list=…" required><button type="submit">Add playlist</button></div></form><div id="playlists"></div></details>
   <footer>Archive hides an episode from this list. Restore it any time by turning off “Hide archived”. Audio files and your podcast feed are kept.</footer>
 </main>
-<script src="app.js?v=1816a08f40e2"></script>
+<script src="app.js?v=78a3092b6327"></script>
 <script src="pwa.js?v=1c0c61dcb4b1"></script>
 </body>
 </html>

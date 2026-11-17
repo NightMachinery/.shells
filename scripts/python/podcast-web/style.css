@@ -189,3 +189,9 @@ footer { color: var(--muted); font-size: 11px; line-height: 1.7; padding-top: 12
   .actions .primary { min-width: 74px; }
   .actions button { padding: 5px 7px; }
 }
+
+.podcast-heading { display: flex; align-items: center; gap: 12px; margin: 10px 0 12px; }
+.podcast-heading h1 { margin: 0; min-width: 0; overflow-wrap: anywhere; }
+#podcast-cover,.source-cover { object-fit: cover; flex: none; background: var(--surface); }
+#podcast-cover { border-radius: 12px; }
+.source-cover { width: 26px; height: 26px; border-radius: 5px; }

@@ -11,6 +11,7 @@ import time
 
 from playwright.sync_api import sync_playwright
 from podcast_dates import format_upload_date
+from presentation import episode_title
 
 ROOT=Path(__file__).parent
 
@@ -25,12 +26,12 @@ def main():
     threading.Thread(target=server.serve_forever,daemon=True).start()
     source='tg_sample_audio'
     titles=['چطور با جدایی کنار بیاییم.mp3','شناخت احساسات و رابطه سالم.mp3','گفتگو_در_زمان_اختلاف.mp3','A conversation about family']
-    episodes=[dict(id='tg_'+str(i+1),title=titles[i%4],duration=1500+i*15,
+    episodes=[dict(id='tg_'+str(i+1),title=titles[i%4],display_title=episode_title(titles[i%4], 'telegram'),duration=1500+i*15,
                    published='20240921',published_display=format_upload_date('20240921'),
                    source_label='Telegram',source_url=f'https://t.me/sample_audio/{i+1}',
                    archived=False,is_short=False,local=False,
                    audio_url='https://example.com/old.mp3' if i==0 else None,job=None) for i in range(90)]
-    fixture=dict(title='Listening library',source_type='telegram',current_podcast=source,
+    fixture=dict(title='Listening library',artwork_url='icon-512.png?v=fixture',source_type='telegram',current_podcast=source,
                  podcasts=[dict(id=source,title='Listening library',auto_download=False,excluded_from_global=True,
                                 feed_url='https://example.com/feed.rss',downloaded=1,source_type='telegram')],
                  episodes=episodes,memberships={'uploads':[e['id'] for e in episodes]},
@@ -51,6 +52,7 @@ def main():
                     route.fulfill(status=202,json={'ok':True})
                 page.route('**/api/*',api)
                 page.goto(f'http://127.0.0.1:{server.server_port}/');page.wait_for_selector('.episode')
+                page.wait_for_function("document.getElementById('podcast-cover').naturalWidth === 512")
                 assert page.locator('#count').inner_text()=='(89 of 90)'
                 assert 'September9/2024' in page.locator('.meta time').first.inner_text()
                 assert 'Shahrivar6/31' in page.locator('.meta time').first.inner_text()

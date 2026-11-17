@@ -27,9 +27,7 @@ function save(){try{const p={};preferences.forEach(id=>p[id]=$(id).type==='check
 function selectedCount(){const count=state.selected.size;$('selection').textContent=count?`${count} selected`:'';['bulk-download','bulk-archive','bulk-restore'].forEach(id=>$(id).disabled=!count);$('select-page').checked=state.visible.length>0&&state.visible.every(e=>state.selected.has(e.id));$('select-page').indeterminate=!$('select-page').checked&&state.visible.some(e=>state.selected.has(e.id));}
 function duration(n){if(!n)return '';const m=Math.floor(n/60);return m>=60?`${Math.floor(m/60)}h ${m%60}m`:`${m} min`;}
 function displayTitle(e) {
-  return (e.source_label==='Telegram' || state.data?.source_type==='telegram')
-    ? e.title.replace(/\.(mp3|m4a|m4b|ogg|opus|wav)$/i,'').replace(/_/g,' ').replace(/\s+/g,' ').trim()
-    : e.title;
+  return e.display_title || e.title;
 }
 function render() {
   if(!state.data)return;
@@ -45,7 +43,7 @@ const invalidLength = [minimum, maximum].some(n => n !== null && (!Number.isFini
 $('length-error').textContent = invalidLength ? 'Enter nonnegative lengths, with minimum no greater than maximum.' : '';
 const lengthActive = minimum !== null || maximum !== null;
 const matchesLength = e => !invalidLength && (!lengthActive || (Number.isFinite(e.duration) && e.duration > 0 && (minimum === null || e.duration >= minimum * 60) && (maximum === null || e.duration <= maximum * 60)));
-const matchesSearch = e => !query || normalize(e.title).includes(query) || e.id.includes(query);
+const matchesSearch = e => !query || normalize(displayTitle(e)).includes(query) || normalize(e.title).includes(query) || e.id.includes(query);
 const afterDownloaded = sourceEpisodes.filter(e => !hideDownloaded || !e.audio_url || !state.downloadBaseline.has(e.id));
 const afterArchived = afterDownloaded.filter(e => !hideArchived || !e.archived);
 const afterShorts = afterArchived.filter(e => !$('hide-shorts').checked || !e.is_short);
@@ -65,7 +63,7 @@ $('filter-description').textContent = `Showing ${episodes.length.toLocaleString(
 $('show-all').textContent = `Show all ${sourceEpisodes.length.toLocaleString()}`;
 
   const sort=$('sort').value;
-  if(sort==='title')episodes.sort((a,b)=>a.title.localeCompare(b.title,'fa'));
+  if(sort==='title')episodes.sort((a,b)=>displayTitle(a).localeCompare(displayTitle(b),'fa'));
   else if(sort==='playlist')episodes.sort((a,b)=>(positions.get(a.id)||0)-(positions.get(b.id)||0));
   else {
     const uploads=new Map((d.memberships.uploads||[]).map((id,i)=>[id,i]));
@@ -165,7 +163,7 @@ function renderQueue() {
   const row = (episode, tag, position) => {
     const item = node(tag, undefined, 'queue-item');
     const content = node('div');
-    const title = node('div', (episode.podcast_title ? episode.podcast_title + ': ' : '') + episode.title, 'queue-title'); title.dir = 'auto'; content.append(title);
+    const title = node('div', (episode.podcast_title ? episode.podcast_title + ': ' : '') + displayTitle(episode), 'queue-title'); title.dir = 'auto'; content.append(title);
     const labels = {downloading: 'Downloading…', queued: `Waiting · position ${position}`, done: 'Downloaded', error: 'Failed'};
     content.append(node('span', labels[episode.job.status] || episode.job.status, 'badge'));
     if (episode.job.error) content.append(node('div', episode.job.error, 'job-error'));
@@ -181,6 +179,12 @@ function renderQueue() {
 }
 
 function renderLibrary() {
+  const cover = $('podcast-cover');
+  const artwork = state.data.artwork_url || 'icon-192.png';
+  if (cover.dataset.artwork !== artwork) {
+    cover.dataset.artwork = artwork;
+    cover.src = artwork;
+  }
   const channels=state.data.podcasts;
   if(!channels)return;
   $('podcast-library').hidden=false;
@@ -214,10 +218,22 @@ function renderLibrary() {
     const check=node('input');check.type='checkbox';check.value=source.id;check.checked=state.feedSources.has(source.id);
     check.onchange=()=>{check.checked?state.feedSources.add(source.id):state.feedSources.delete(source.id);$('create-feed').disabled=!state.feedSources.size;};
     const text=node('span',source.title+' · '+source.downloaded+' downloaded'+(source.loading?' · catalog loading…':''));
-    label.append(check,text);sources.append(label);
+    const picture = node('img', undefined, 'source-cover');
+    picture.alt = '';
+    picture.loading = 'lazy';
+    picture.referrerPolicy = 'no-referrer';
+    picture.src = source.artwork_url || 'icon-192.png';
+    picture.onerror = coverFallback;
+    label.append(check,picture,text);sources.append(label);
   }
   $('create-feed').disabled=!state.feedSources.size;
 }
+
+function coverFallback(event) {
+  const picture = event.currentTarget;
+  if (picture.getAttribute('src') !== 'icon-192.png') picture.src = 'icon-192.png';
+}
+$('podcast-cover').onerror = coverFallback;
 async function switchPodcast(identifier) {
   state.podcast=identifier;state.channelToken++;state.page=0;state.selected.clear();state.data=null;state.downloadBaseline=null;state.rebaseDownloads=false;
   $('search').value='';$('playlist').value='uploads';
