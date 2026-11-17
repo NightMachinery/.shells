@@ -149,6 +149,13 @@ class CatalogTests(unittest.TestCase):
         self.assertEqual(append_upload_date("Description", "2024"), "Description")
         self.assertEqual(append_upload_date("Description", "20260230"), "Description")
 
+    def test_catalog_exposes_the_shared_gregorian_jalali_date(self):
+        with self.catalog.db() as db:
+            self.catalog.upsert_episode(db,{'id':ID,'title':'Dated episode','upload_date':'20240921'})
+        row=self.catalog.snapshot()['episodes'][0]
+        self.assertEqual(row['published'],'20240921')
+        self.assertEqual(row['published_display'],'1403/Shahrivar6/31 Saturday 21/September9/2024')
+
     def test_cli_metadata_and_feed_use_original_date_not_fake_date(self):
         import importlib.util
         import sys

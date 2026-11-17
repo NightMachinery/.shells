@@ -233,3 +233,22 @@ in page memory; creating the feed saves its membership in TOML.
 Back up/version the TOML plus the audio/feed directories and any separately
 configured Telegram session. SQLite caches can be rebuilt. Without TOML enabled,
 back up the entire state directory using SQLite’s backup API for live databases.
+
+### Compact browsing and refresh behavior
+
+The episode toolbar sticks to the top while scrolling, with paging controls at
+both the top and bottom of the list. Feeds and channel management live in the
+collapsible panel beneath the podcast selector. Rows keep titles, original-date
+metadata and actions aligned, including mixed Persian/English text. Telegram
+audio extensions and underscores are cleaned up only in displayed titles.
+
+New downloads keep their places in the current list and pagination while their
+Listen/Audio controls update. **Refresh list** reapplies the downloaded filter
+without contacting YouTube. Refresh catalog, reloading the browser or switching
+podcasts starts a new view too. Search, archive, Shorts and length filters still
+apply normally. Dates use the shared month-name Gregorian/Jalali upload-date
+formatter; incomplete/unknown dates are omitted rather than invented.
+
+Run `python3 python/podcast-web/verify_ui.py --screenshots /tmp/podcast-ui-qa`
+for stable-page checks through manual/automatic completions and light/dark
+desktop, phone and narrow-phone renders.

@@ -6,7 +6,7 @@ $('theme').onchange = () => {
   document.documentElement.dataset.theme = theme;
   try { localStorage.setItem('podcast-web-theme', theme); } catch {}
 };
-const state = {data:null, page:0, size:40, selected:new Set(), visible:[], pending:0, loading:false, podcast:null, channelToken:0, feedSources:new Set()};
+const state = {data:null, page:0, size:40, selected:new Set(), visible:[], pending:0, loading:false, podcast:null, channelToken:0, feedSources:new Set(), downloadBaseline:null, rebaseDownloads:false};
 const preferences = ['hide-downloaded','hide-archived','hide-shorts','min-length','max-length','playlist','sort','search'];
 const normalize = s => String(s||'').normalize('NFKC').replace(/ي/g,'ی').replace(/ك/g,'ک').toLocaleLowerCase().replace(/[\u200c\u200d]/g,'');
 const node = (tag, text, cls) => {const e=document.createElement(tag); if(text!==undefined)e.textContent=text;if(cls)e.className=cls;return e;};
@@ -26,7 +26,18 @@ async function action(path,data){if(path==='download')$('download-queue').open=t
 function save(){try{const p={};preferences.forEach(id=>p[id]=$(id).type==='checkbox'?$(id).checked:$(id).value);localStorage.setItem('podcast-web-preferences',JSON.stringify(p));}catch{}}
 function selectedCount(){const count=state.selected.size;$('selection').textContent=count?`${count} selected`:'';['bulk-download','bulk-archive','bulk-restore'].forEach(id=>$(id).disabled=!count);$('select-page').checked=state.visible.length>0&&state.visible.every(e=>state.selected.has(e.id));$('select-page').indeterminate=!$('select-page').checked&&state.visible.some(e=>state.selected.has(e.id));}
 function duration(n){if(!n)return '';const m=Math.floor(n/60);return m>=60?`${Math.floor(m/60)}h ${m%60}m`:`${m} min`;}
-function render(){if(!state.data)return;renderPlaylistCache();const d=state.data,source=$('playlist').value,query=normalize($('search').value).trim();const order=d.memberships[source]||[],positions=new Map(order.map((id,i)=>[id,i]));const sourceEpisodes = d.episodes.filter(e => source === 'downloaded' ? !!e.audio_url : positions.has(e.id));
+function displayTitle(e) {
+  return (e.source_label==='Telegram' || state.data?.source_type==='telegram')
+    ? e.title.replace(/\.(mp3|m4a|m4b|ogg|opus|wav)$/i,'').replace(/_/g,' ').replace(/\s+/g,' ').trim()
+    : e.title;
+}
+function render() {
+  if(!state.data)return;
+  renderPlaylistCache();
+  const d=state.data,source=$('playlist').value,query=normalize($('search').value).trim();
+  if(state.downloadBaseline===null)state.downloadBaseline=new Set(d.episodes.filter(e=>e.audio_url).map(e=>e.id));
+  const order=d.memberships[source]||[],positions=new Map(order.map((id,i)=>[id,i]));
+  const sourceEpisodes=d.episodes.filter(e=>source==='downloaded'?!!e.audio_url:positions.has(e.id));
 const hideDownloaded = $('hide-downloaded').checked, hideArchived = $('hide-archived').checked;
 const minutes = id => $(id).value === '' ? null : Number($(id).value);
 const minimum = minutes('min-length'), maximum = minutes('max-length');
@@ -35,7 +46,7 @@ $('length-error').textContent = invalidLength ? 'Enter nonnegative lengths, with
 const lengthActive = minimum !== null || maximum !== null;
 const matchesLength = e => !invalidLength && (!lengthActive || (Number.isFinite(e.duration) && e.duration > 0 && (minimum === null || e.duration >= minimum * 60) && (maximum === null || e.duration <= maximum * 60)));
 const matchesSearch = e => !query || normalize(e.title).includes(query) || e.id.includes(query);
-const afterDownloaded = sourceEpisodes.filter(e => !hideDownloaded || !e.audio_url);
+const afterDownloaded = sourceEpisodes.filter(e => !hideDownloaded || !e.audio_url || !state.downloadBaseline.has(e.id));
 const afterArchived = afterDownloaded.filter(e => !hideArchived || !e.archived);
 const afterShorts = afterArchived.filter(e => !$('hide-shorts').checked || !e.is_short);
 const afterLength = afterShorts.filter(matchesLength);
@@ -52,14 +63,82 @@ const hiddenReasons = [[hiddenDownloaded, 'downloaded'], [hiddenArchived, 'archi
 $('filter-summary').hidden = !hiddenReasons.length;
 $('filter-description').textContent = `Showing ${episodes.length.toLocaleString()} of ${sourceEpisodes.length.toLocaleString()} episodes. Hidden: ${hiddenReasons.join(', ')}.`;
 $('show-all').textContent = `Show all ${sourceEpisodes.length.toLocaleString()}`;
-const sort=$('sort').value;if(sort==='title')episodes.sort((a,b)=>a.title.localeCompare(b.title,'fa'));else if(sort==='playlist')episodes.sort((a,b)=>(positions.get(a.id)||0)-(positions.get(b.id)||0));else{const uploads=new Map((d.memberships.uploads||[]).map((id,i)=>[id,i]));episodes.sort((a,b)=>{const ai=uploads.get(a.id),bi=uploads.get(b.id);if(ai!==undefined&&bi!==undefined)return sort==='old'?bi-ai:ai-bi;const delta=String(b.published||'').localeCompare(String(a.published||''));return sort==='old'?-delta:delta;});}const pages=Math.max(1,Math.ceil(episodes.length/state.size));state.page=Math.min(state.page,pages-1);state.visible=episodes.slice(state.page*state.size,(state.page+1)*state.size);$('count').textContent=`(${episodes.length.toLocaleString()} of ${sourceEpisodes.length.toLocaleString()})`;$('page').textContent=`Page ${state.page+1} of ${pages}`;$('previous').disabled=state.page===0;$('next').disabled=state.page>=pages-1;const container=$('episodes');container.replaceChildren();if(!episodes.length)container.append(node('p',query?'No matching episodes. Try another search or turn off a hide filter.':source==='downloaded'&&$('hide-downloaded').checked?'Turn off “Hide downloaded” to see your downloaded library.':d.refreshes[source]?.status==='loading'?'Loading this catalog from YouTube. It will appear here automatically…':'No episodes to show. Try turning off the hide filters.','empty'));for(const e of state.visible){const row=node('article',undefined,'episode'),check=node('input');check.type='checkbox';check.checked=state.selected.has(e.id);check.setAttribute('aria-label',`Select ${e.title}`);check.onchange=()=>{check.checked?state.selected.add(e.id):state.selected.delete(e.id);selectedCount();};row.append(check);const body=node('div'),title=node('h3',e.title);title.dir='auto';body.append(title);const meta=node('div',undefined,'meta');if(e.published)meta.append(node('span',`${e.published.slice(0,4)}-${e.published.slice(4,6)}-${e.published.slice(6,8)}`));if(e.duration)meta.append(node('span',duration(e.duration)));if(e.is_short)meta.append(node('span','YouTube Short','badge'));if(e.audio_url)meta.append(node('span','Downloaded','badge'));if(e.archived)meta.append(node('span','Archived','badge archived'));if(e.job&&['queued','downloading'].includes(e.job.status))meta.append(node('span',e.job.status==='queued'?'Queued':'Downloading…','badge'));body.append(meta);if(e.job?.status==='error')body.append(node('div',e.job.error,'job-error'));row.append(body);const controls=node('div',undefined,'actions');if(e.audio_url){controls.append(link('Audio ↗',e.audio_url));controls.append(button('Listen',()=>{const audio=$('audio-player');$('player').hidden=false;$('playing-title').textContent=e.title;if(audio.getAttribute('src')!==e.audio_url)audio.src=e.audio_url;audio.play().catch(()=>{});}));}else{const b=button(e.job?.status==='error'?'Retry download':'Download',()=>action('download',{id:e.id}),'primary');b.disabled=['queued','downloading'].includes(e.job?.status);controls.append(b);}if(!e.local)controls.append(link((e.source_label||'YouTube')+' ↗',e.source_url||`https://www.youtube.com/watch?v=${e.id}`));controls.append(button(e.archived?'Restore':'Archive',()=>action('archive',{ids:[e.id],archived:!e.archived})));row.append(controls);container.append(row);}const plink=$('playlist-link');plink.hidden=['uploads','downloaded'].includes(source);plink.href=`https://www.youtube.com/playlist?list=${encodeURIComponent(source)}`;selectedCount();}
+
+  const sort=$('sort').value;
+  if(sort==='title')episodes.sort((a,b)=>a.title.localeCompare(b.title,'fa'));
+  else if(sort==='playlist')episodes.sort((a,b)=>(positions.get(a.id)||0)-(positions.get(b.id)||0));
+  else {
+    const uploads=new Map((d.memberships.uploads||[]).map((id,i)=>[id,i]));
+    episodes.sort((a,b)=>{
+      const ai=uploads.get(a.id),bi=uploads.get(b.id);
+      if(ai!==undefined&&bi!==undefined)return sort==='old'?bi-ai:ai-bi;
+      const delta=String(b.published||'').localeCompare(String(a.published||''));
+      return sort==='old'?-delta:delta;
+    });
+  }
+  const pages=Math.max(1,Math.ceil(episodes.length/state.size));
+  state.page=Math.min(state.page,pages-1);
+  state.visible=episodes.slice(state.page*state.size,(state.page+1)*state.size);
+  $('count').textContent=`(${episodes.length.toLocaleString()} of ${sourceEpisodes.length.toLocaleString()})`;
+  for(const suffix of ['','-top']){
+    $('page'+suffix).textContent=`Page ${state.page+1} of ${pages}`;
+    $('previous'+suffix).disabled=state.page===0;
+    $('next'+suffix).disabled=state.page>=pages-1;
+  }
+  const retained=episodes.filter(e=>e.audio_url&&!state.downloadBaseline.has(e.id)).length;
+  $('download-retention').textContent=retained?`${retained} completed download${retained===1?'':'s'} kept until refresh.`:'New downloads stay listed until refresh.';
+  const container=$('episodes');container.replaceChildren();
+  if(!episodes.length)container.append(node('p',query?'No matching episodes. Try another search or turn off a hide filter.':source==='downloaded'&&hideDownloaded?'Turn off “Hide downloaded” to see your downloaded library.':d.refreshes[source]?.status==='loading'?'Loading this catalog from the source…':'No episodes to show. Try turning off the hide filters.','empty'));
+  for(const e of state.visible){
+    const row=node('article',undefined,'episode');row.dataset.episode=e.id;
+    const check=node('input');check.type='checkbox';check.checked=state.selected.has(e.id);
+    check.setAttribute('aria-label',`Select ${displayTitle(e)}`);
+    check.onchange=()=>{check.checked?state.selected.add(e.id):state.selected.delete(e.id);selectedCount();};
+    const body=node('div',undefined,'episode-content');body.dir='auto';
+    const title=node('h3',displayTitle(e));title.dir='auto';body.append(title);
+    const meta=node('div',undefined,'meta');meta.dir='ltr';
+    if(e.published_display){
+      const date=node('time',e.published_display),raw=e.published.replace(/-/g,'');
+      date.dateTime=`${raw.slice(0,4)}-${raw.slice(4,6)}-${raw.slice(6,8)}`;
+      date.dir='ltr';date.title='Original upload date';meta.append(date);
+    }
+    if(e.duration)meta.append(node('span',duration(e.duration),'episode-length'));
+    if(e.is_short)meta.append(node('span','YouTube Short','badge'));
+    if(e.archived)meta.append(node('span','Archived','badge archived'));
+    const downloadState=node('span',undefined,'download-state');
+    if(e.audio_url)downloadState.append(node('span','Downloaded','badge'));
+    else if(e.job&&['queued','downloading'].includes(e.job.status))downloadState.append(node('span',e.job.status==='queued'?'Queued':'Downloading…','badge'));
+    meta.append(downloadState);
+    body.append(meta);
+    if(e.job?.status==='error')body.append(node('div',e.job.error,'job-error'));
+    const controls=node('div',undefined,'actions');
+    if(e.audio_url){
+      controls.append(button('Listen',()=>{
+        const audio=$('audio-player');$('player').hidden=false;$('playing-title').textContent=displayTitle(e);
+        if(audio.getAttribute('src')!==e.audio_url)audio.src=e.audio_url;
+        audio.play().catch(()=>{});
+      },'primary'),link('Audio ↗',e.audio_url));
+    }else{
+      const download=button(e.job?.status==='downloading'?'Downloading…':e.job?.status==='queued'?'Queued':e.job?.status==='error'?'Retry':'Download',()=>action('download',{id:e.id}),'primary');
+      download.disabled=['queued','downloading'].includes(e.job?.status);controls.append(download);
+    }
+    if(!e.local)controls.append(link((e.source_label||'YouTube')+' ↗',e.source_url||`https://www.youtube.com/watch?v=${e.id}`));
+    controls.append(button(e.archived?'Restore':'Archive',()=>action('archive',{ids:[e.id],archived:!e.archived})));
+    row.append(check,body,controls);container.append(row);
+  }
+  const plink=$('playlist-link');plink.hidden=['uploads','downloaded'].includes(source);
+  plink.href=`https://www.youtube.com/playlist?list=${encodeURIComponent(source)}`;
+  selectedCount();
+}
 function renderPlaylists(){const select=$('playlist'),previous=select.value;select.replaceChildren();for(const [value,text] of [['uploads','All episodes'],['downloaded','Downloaded library'],...state.data.playlists.map(p=>[p.id,p.title])]){const option=node('option',text);option.value=value;select.append(option);}select.value=[...select.options].some(o=>o.value===previous)?previous:'uploads';$('playlist-count').textContent=`(${state.data.playlists.length})`;const cards=$('playlists');cards.replaceChildren();if(!state.data.playlists.length)cards.append(node('p','No public playlists found. Add a playlist using its YouTube link.','playlist-help'));for(const p of state.data.playlists){const card=node('article',undefined,'playlist-card'),heading=node('h3',p.title);heading.dir='auto';card.dataset.playlist=p.id;card.append(heading,node('p',undefined,'playlist-cache-label playlist-help'),button('Browse episodes',()=>{select.value=p.id;changed({target:select});$('search').scrollIntoView({block:'start',behavior:'smooth'});}),link('YouTube ↗',`https://www.youtube.com/playlist?list=${p.id}`));cards.append(card);}}
-async function load(){if(state.loading)return;state.loading=true;const token=state.channelToken;try{const data=await request('catalog');if(token!==state.channelToken)return;const changedPlaylists=state.data?.current_podcast!==data.current_podcast||JSON.stringify(state.data?.playlists)!==JSON.stringify(data.playlists);state.data=data;renderLibrary();renderQueue();$('title').textContent=data.title;document.title=data.title+' · Podcast library';$('feed').href=data.feed_url;if(changedPlaylists)renderPlaylists();render();const loading=Object.entries(data.refreshes).filter(([,v])=>v.status==='loading');const errors=Object.entries(data.refreshes).filter(([,v])=>v.status==='error');const jobs=data.episodes.filter(e=>['queued','downloading'].includes(e.job?.status));const loaded=(data.memberships.uploads||[]).length,downloaded=data.episodes.filter(e=>e.audio_url).length;notice([`${loaded.toLocaleString()} episodes · ${downloaded.toLocaleString()} downloaded`,loading.length?'Updating catalog from YouTube…':'',jobs.length?`${jobs.length} download${jobs.length===1?'':'s'} in the queue`:'',...errors.map(([s,v])=>`${s==='uploads'?'Episode catalog':s==='playlists'?'Playlists':'Playlist'}: ${v.error}`)].filter(Boolean).join('\n'),!!errors.length);}catch(e){notice(e.message,true);}finally{state.loading=false;}}
+async function load(){if(state.loading)return;state.loading=true;const token=state.channelToken;try{const data=await request('catalog');if(token!==state.channelToken)return;const changedPlaylists=state.data?.current_podcast!==data.current_podcast||JSON.stringify(state.data?.playlists)!==JSON.stringify(data.playlists);if(state.downloadBaseline===null||state.rebaseDownloads){state.downloadBaseline=new Set(data.episodes.filter(e=>e.audio_url).map(e=>e.id));state.rebaseDownloads=false;}state.data=data;renderLibrary();renderQueue();$('title').textContent=data.title;document.title=data.title+' · Podcast library';$('feed').href=data.feed_url;if(changedPlaylists)renderPlaylists();render();const loading=Object.entries(data.refreshes).filter(([,v])=>v.status==='loading');const errors=Object.entries(data.refreshes).filter(([,v])=>v.status==='error');const jobs=data.episodes.filter(e=>['queued','downloading'].includes(e.job?.status));const loaded=(data.memberships.uploads||[]).length,downloaded=data.episodes.filter(e=>e.audio_url).length;notice([`${loaded.toLocaleString()} episodes · ${downloaded.toLocaleString()} downloaded`,loading.length?'Updating catalog from YouTube…':'',jobs.length?`${jobs.length} download${jobs.length===1?'':'s'} in the queue`:'',...errors.map(([s,v])=>`${s==='uploads'?'Episode catalog':s==='playlists'?'Playlists':'Playlist'}: ${v.error}`)].filter(Boolean).join('\n'),!!errors.length);}catch(e){notice(e.message,true);}finally{state.loading=false;}}
 async function ensureSource(){if(!state.data)return;const source=$('playlist').value;if(!['uploads','downloaded'].includes(source)&&!state.data?.sources[source]&&state.data?.refreshes[source]?.status!=='loading')await action('refresh',{source});}
 function changed(event){if(event?.target?.id==='playlist'&&$('playlist').value==='downloaded')$('hide-downloaded').checked=false;state.page=0;save();render();ensureSource();}
 for(const id of preferences)$(id).addEventListener(['search','min-length','max-length'].includes(id)?'input':'change',changed);
-$('refresh').onclick=async()=>{await action('refresh',{source:$('playlist').value==='downloaded'?'uploads':$('playlist').value});if(state.data?.source_type!=='telegram'){await action('refresh',{source:'playlists'});await action('refresh',{source:'shorts'});}};
-$('previous').onclick=()=>{state.page--;render();};$('next').onclick=()=>{state.page++;render();};
+$('refresh-list').onclick=async()=>{state.rebaseDownloads=true;await load();};
+$('refresh').onclick=async()=>{state.rebaseDownloads=true;await action('refresh',{source:$('playlist').value==='downloaded'?'uploads':$('playlist').value});if(state.data?.source_type!=='telegram'){await action('refresh',{source:'playlists'});await action('refresh',{source:'shorts'});}};
+function movePage(delta){state.page+=delta;render();$('episode-list').scrollIntoView({block:'start'});}
+for(const suffix of ['','-top']){$('previous'+suffix).onclick=()=>movePage(-1);$('next'+suffix).onclick=()=>movePage(1);}
 $('select-page').onchange=()=>{for(const e of state.visible)$('select-page').checked?state.selected.add(e.id):state.selected.delete(e.id);render();};
 async function archiveSelection(archived){const podcast=state.podcast,ids=[...state.selected];for(let i=0;i<ids.length;i+=500)await action('archive',{ids:ids.slice(i,i+500),archived,podcast});state.selected.clear();render();}
 $('bulk-archive').onclick=()=>archiveSelection(true);$('bulk-restore').onclick=()=>archiveSelection(false);$('bulk-download').onclick=async()=>{const podcast=state.podcast,ids=[...state.selected];state.selected.clear();for(const id of ids)await action('download',{id,podcast});render();};
@@ -140,7 +219,7 @@ function renderLibrary() {
   $('create-feed').disabled=!state.feedSources.size;
 }
 async function switchPodcast(identifier) {
-  state.podcast=identifier;state.channelToken++;state.page=0;state.selected.clear();state.data=null;
+  state.podcast=identifier;state.channelToken++;state.page=0;state.selected.clear();state.data=null;state.downloadBaseline=null;state.rebaseDownloads=false;
   $('search').value='';$('playlist').value='uploads';
   $('episodes').replaceChildren(node('p','Loading podcast…','empty'));
   try{localStorage.setItem('podcast-web-source',identifier);}catch{}

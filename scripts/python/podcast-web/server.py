@@ -18,7 +18,7 @@ import unicodedata
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import quote, unquote, urlsplit, parse_qs
 import xml.etree.ElementTree as ET
-from podcast_dates import append_upload_date
+from podcast_dates import append_upload_date, format_upload_date
 
 VIDEO = re.compile(r"^[A-Za-z0-9_-]{11}$")
 EPISODE = re.compile(r"(?:[A-Za-z0-9_-]{11}|tg_[1-9][0-9]{0,18})\Z")
@@ -237,6 +237,7 @@ class Catalog:
             jobs = {j["id"]: dict(j) for j in db.execute("SELECT * FROM jobs")}
             sources = {r["id"]: r["updated"] for r in db.execute("SELECT * FROM sources")}
         for e in episodes:
+            e["published_display"] = format_upload_date(e["published"]) if e["published"] else ""
             e["audio_url"] = self.audio_by_id.get(e["id"]) or self.audio_by_title.get(normalized(e["title"]))
             e["archived"] = bool(e["archived"])
             e["job"] = jobs.get(e["id"])

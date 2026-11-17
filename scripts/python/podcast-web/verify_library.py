@@ -85,6 +85,7 @@ def main():
                 page.get_by_role('button',name='Download',exact=True).click()
                 page.wait_for_function("document.getElementById('queue-count').textContent==='(1 active)'")
                 assert 'Second podcast' in page.locator('#queue-active').inner_text()
+                page.locator('#feed-settings').evaluate('(e)=>e.open=true')
                 page.locator('#manage-podcasts').evaluate('(e)=>e.open=true')
                 page.locator(f'#feed-sources input[value="{PRIMARY}"]').check()
                 page.locator(f'#feed-sources input[value="{SECOND}"]').check()
