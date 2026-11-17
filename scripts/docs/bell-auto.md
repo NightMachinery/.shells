@@ -286,7 +286,7 @@ the Telethon backend, which talks MTProto directly rather than through the Bot A
 server, and whether the server enforces the same limit there is untested: the
 channel had no message old enough to try. So when the delete fails,
 `h-bell-tlg-batch-retire` edits the message down to a short "answered" tombstone
-instead, and the records outlive the 48 hours (`bell_auto_tlg_retract_t`) so that a
+instead (through `tsend-retract`, which agent-desk's Telegram notifications share), and the records outlive the 48 hours (`bell_auto_tlg_retract_t`) so that a
 late answer can still settle its batch.
 
 `bellaok` leaves sent batches alone. It silences the machine and drops what has not

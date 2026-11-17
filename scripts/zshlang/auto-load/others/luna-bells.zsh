@@ -761,16 +761,10 @@ function h-bell-tlg-batch-retire {
     (( claimed == 1 )) || return 0
     silent redism del "${key}:lines" || true
 
-    reval-timeout 60 tsend delete -- "$dest" "${ids[@]}" && return 0
-
     #: Bots cannot delete a message older than 48 hours, even as admins, but can
-    #: edit their own at any age. So mark it settled rather than leave it looking
-    #: pending. See ./docs/bell-auto.md.
-    ecgray "$0: could not delete batch ${batch}; marking it answered instead."
-    local id
-    for id in "${ids[@]}" ; do
-        reval-timeout 60 tsend edit -- "$dest" "$id" "✓ answered" || return 1
-    done
+    #: edit their own at any age. So [agfi:tsend-retract] marks it settled rather
+    #: than leave it looking pending. See ./docs/bell-auto.md.
+    tsend-retract "$dest" "✓ answered" "${ids[@]}"
 }
 
 function h-bell-tlg-retract {

@@ -15,6 +15,43 @@ function tsend-retry {
     retry tsend "$@"
 }
 ###
+#: A tracked send and its retraction, for a message that should disappear once
+#: its fact stops holding: an agent-desk notification once the item is read,
+#: a bell once the session is answered ([agfi:h-bell-tlg-batch-retire]).
+function tsend-tracked {
+    : "usage: tsend-tracked <dest> <parse-mode> <text>; sends one message and prints its handle for [agfi:tsend-retract-handle]: the dest, a tab, and the message ids"
+    local dest="${1}" mode="${2}" text="${3}"
+    tlg-dest-assert "$dest" @RET
+    test -n "$text" || return 1
+
+    local out
+    out="$(reval-timeout 60 tsend --print-ids --parse-mode="$mode" -- "$dest" "$text")" || return 1
+    #: Unquoted, so that no output is no ids rather than one empty one.
+    local -a ids=( ${(M)${(f)out}:#[[:digit:]]##} )
+    (( ${#ids} )) || return 1
+    ec "${dest}"$'\t'"${(j: :)ids}"
+}
+
+function tsend-retract {
+    : "usage: tsend-retract <dest> <tombstone> <id>...; deletes the messages, or edits each down to <tombstone> where Telegram refuses (a bot cannot delete after 48 hours, but can always edit its own)"
+    local dest="${1}" tombstone="${2}"
+    local -a ids=( "${@[3,-1]}" )
+    test -n "$dest" && (( ${#ids} )) || return 1
+
+    reval-timeout 60 tsend delete -- "$dest" "${ids[@]}" && return 0
+    local id
+    for id in "${ids[@]}" ; do
+        reval-timeout 60 tsend edit -- "$dest" "$id" "$tombstone" || return 1
+    done
+}
+
+function tsend-retract-handle {
+    : "usage: tsend-retract-handle <handle> <tombstone>; retracts what [agfi:tsend-tracked] sent"
+    local handle="${1}" tombstone="${2}"
+    [[ "$handle" == ?*$'\t'?* ]] || return 1
+    tsend-retract "${handle%%$'\t'*}" "$tombstone" ${(s: :)${handle#*$'\t'}}
+}
+###
 function tsend-live {
     : "usage: [tsend_live_alert_p=y] tsend-live NAME DEST MARKDOWN
 Keeps one live rich message per NAME in DEST, for a status that changes: edits it in place, which does not notify. With tsend_live_alert_p=y, or when the edit fails, sends a fresh message, which notifies, and removes the old one."
