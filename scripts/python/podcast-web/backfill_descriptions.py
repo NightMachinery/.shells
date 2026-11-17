@@ -26,7 +26,15 @@ def backfill(audio_dir, apply=False):
             if enclosure is None:
                 counts["no_audio"] += 1
                 continue
-            path = audio_dir / Path(unquote(urlsplit(enclosure.get("url", "")).path)).name
+            url = enclosure.get("url", "")
+            path = audio_dir / Path(unquote(urlsplit(url).path)).name
+            if not path.is_file():
+                # Older feeds wrote literal '#' and '?' in filenames without
+                # URL-encoding them. Try their original filename for metadata
+                # lookup, while preserving the existing enclosure and GUID.
+                legacy_path = audio_dir / Path(unquote(url.rsplit("/", 1)[-1])).name
+                if legacy_path.is_file():
+                    path = legacy_path
             try:
                 media = File(path, easy=True)
                 date = parse_upload_date(media.get("date", [None])[0]) if media else None

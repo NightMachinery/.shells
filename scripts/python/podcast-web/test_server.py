@@ -160,6 +160,19 @@ class CatalogTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             self.catalog.add_playlist("https://attacker.example/playlist?list=PLabcdefghijk")
 
+    def test_backfill_reads_legacy_unescaped_filename(self):
+        import backfill_descriptions
+        audio = self.catalog.audio / "shorts #5870.m4a"
+        audio.write_bytes(b"fixture")
+        feed = self.catalog.audio / "feed.rss"
+        feed.write_text('<rss><channel><item><description>Original</description><guid>stable</guid><enclosure url="https://example.com/shorts #5870.m4a"/></item></channel></rss>')
+        with patch.object(backfill_descriptions, "File", return_value={"date": ["20260304"]}) as read:
+            self.assertEqual(backfill_descriptions.backfill(self.catalog.audio, apply=True)["updated"], 1)
+            self.assertEqual(read.call_args.args[0], audio)
+        item = ET.parse(feed).find("./channel/item")
+        self.assertEqual(item.find("enclosure").get("url"), "https://example.com/shorts #5870.m4a")
+        self.assertEqual(item.findtext("guid"), "stable")
+
     def test_queue_deduplicates_and_respects_cli_lock(self):
         self.seed()
         started, release = threading.Event(), threading.Event()
