@@ -1899,9 +1899,11 @@ function L.previewPane(chooser, resolve)
                     canvas:level(hs.canvas.windowLevels.screenSaver)
                     canvas:behavior({"canJoinAllSpaces", "stationary"})
                 end
+                -- Dark in the system's dark mode, near white otherwise.
+                local dark = hs.host and hs.host.interfaceStyle and hs.host.interfaceStyle() == "Dark"
                 canvas:replaceElements(
-                    {type="rectangle", fillColor={white=1, alpha=0.97},
-                     strokeColor={white=0, alpha=0.25}, strokeWidth=1, action="strokeAndFill",
+                    {type="rectangle", fillColor={white=dark and 0.13 or 0.97, alpha=0.97},
+                     strokeColor={white=dark and 1 or 0, alpha=0.25}, strokeWidth=1, action="strokeAndFill",
                      roundedRectRadii={xRadius=20, yRadius=20}},
                     {type="image", image=image, imageScaling="scaleProportionally",
                      frame={x=14, y=14, w=size - 28, h=size - 28}})
