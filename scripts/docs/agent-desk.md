@@ -22,27 +22,67 @@ The config is generated rather than tracked because it names this machine's
 zsh by absolute path: a notification click runs under launchd, where `zsh`
 would be Apple's `/bin/zsh`, which lacks the PCRE module our startup needs.
 
+`agent-desk-config-install` also writes `base_url` (the dashboard's address,
+so notifications link to the item), `away_command`, `remote_label` and
+`ssh_hosts`. Their values are private, so they come from options or
+variables rather than this repository: `--base-url` or `agent_desk_base_url`
+(else the desk app's address from html-reports' `apps.py`, where that is
+installed), `--remote-label` or `agent_desk_remote_label` (default
+Telegram), and `--ssh-host HOST=TARGET` or the associative array
+`agent_desk_ssh_hosts`. Rerun it with `--force` after changing them.
+
 ## What each command does
 
-- [agfi:agent-desk-notify] (`notify_command`): one Agent Desk notification
-  per question, `tell --notify` and done report. Its group is the event id, so
-  one question never replaces another. The title is the item's title; the
-  body is its path and level, plus `@host` for an item merged from another
-  machine. A blocked question ignores Do Not Disturb; the rest respect it.
-  Clicking runs `agent-desk open <id>`.
-- A blocked question asked on this machine while the user is away (screen
-  locked, or idle for `agent_desk_tlg_idle_min_s`, 600 s by default) also goes
-  to Telegram through [agfi:tnotif], title only. The idle check is
-  [agfi:h-agent-usage-idle-s].
-- [agfi:agent-desk-dismiss] (`dismiss_command`): when a question is answered
-  or an item is marked read, removes its notification with
-  [agfi:notif-os-remove].
+The core decides which channels an event goes to (the user's `notify.desktop`
+and `notify.remote` settings) and calls `notify_command` once per channel,
+with `channel` in the payload. Whatever the command prints is the handle the
+core keeps, and hands back to `dismiss_command` when the item is read or
+answered.
+
+- [agfi:agent-desk-notify] (`notify_command`):
+  - `desktop`: one Agent Desk notification per item. Its group is the event
+    id, so one question never replaces another, and the group is the handle.
+    The title is the item's title; the body is its path and level, plus
+    `@host` for an item merged from another machine. A blocked question
+    ignores Do Not Disturb; the rest respect it. Clicking runs
+    `agent-desk open <id>`.
+  - `remote`: one rich Telegram message through [agfi:tsend-tracked]: the
+    item's title, its path, what it is, the agent's title, a link to its
+    page on the dashboard, and the body folded under "Details" (cut at
+    `agent_desk_tlg_body_max` characters, 3000 by default). It goes to the
+    `notify.remote.dest` setting, else to `tlg_notifs`. The handle is the
+    destination and the message id.
+- [agfi:agent-desk-dismiss] (`dismiss_command`): a desktop card is removed
+  with [agfi:notif-os-remove] (by its handle, or by the event id for a card
+  raised before handles existed). A Telegram message is deleted with
+  [agfi:tsend-retract-handle]; past the 48 hours in which a bot may delete,
+  it is edited down to one line such as "✓ answered: Which split?".
+- [agfi:agent-desk-away-p] (`away_command`): exits 0 when the user is away:
+  the screen is locked, or the keyboard and mouse have been idle for
+  `agent_desk_tlg_idle_min_s` (600 s by default). The core asks it for
+  `notify.remote = away`.
 - [agfi:agent-desk-open] (`open_command`): opens a done report's report file
-  with [agfi:h-agent-done-open-report], as Agent Done's card does; anything
-  else opens a new kitty window running `agent-desk inbox <path>`, scoped to
-  the item's node.
+  with [agfi:h-agent-done-open-report], as Agent Done's card does; else the
+  item's page on the dashboard; else a new kitty window running
+  `agent-desk inbox <path>`, scoped to the item's node.
 - `agent-done` lists open blocked questions in its report and files the
   session's end on the desk; see "agent-desk" in [agent-done.md](agent-done.md).
+
+[agfi:tsend-tracked] and [agfi:tsend-retract] are the same pair the bell hooks
+use to take back a Telegram message once its session is answered (see
+[bell-auto.md](bell-auto.md)).
+
+## The turn-end bell
+
+[agfi:h-bell-agent-hook] does not ring at the end of a turn (Claude Code's
+Stop, Codex's turn-complete) for a session that `agent-desk whoami` places on
+a desk node, as long as the desk has a `notify_command`: such a session's
+questions and done report already notify, so the bell was a duplicate. Hook
+events that carry a message, such as a permission request, still ring, and
+so does every session not on a node. `agent_desk_bell_on_node=y` brings the
+old behaviour back. The check is [agfi:h-agent-desk-on-node-p], which names
+the session to `whoami` explicitly, since the hook runs in BrishGarden
+without the agent's environment.
 
 The core runs `notify_command` and `dismiss_command` detached, so a slow
 notifier never holds up an agent; their output goes to
