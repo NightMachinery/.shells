@@ -94,6 +94,14 @@ summary h2 { display: inline; }
 .queue-item { border-top: 1px solid var(--line); padding: 9px 0; overflow-wrap: anywhere; }
 .queue-title { font-size: 13px; line-height: 1.6; margin-bottom: 4px; }
 .queue-actions { display: flex; gap: 10px; align-items: center; margin-top: 6px; font-size: 12px; }
+#download-log { width: min(640px, calc(100% - 24px)); max-height: 90dvh; padding: 16px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); color: var(--text); }
+#download-log::backdrop { background: rgb(0 0 0 / 48%); }
+#download-log-episode { margin: 6px 0; overflow-wrap: anywhere; }
+#download-log-output { max-height: 52dvh; overflow: auto; margin: 12px 0; padding: 10px; border: 1px solid var(--line); border-radius: 6px; white-space: pre-wrap; overflow-wrap: anywhere; font-size: 12px; }
+.log-actions, .cookie-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.log-actions { justify-content: flex-end; }
+#youtube-cookies-form { display: grid; gap: 6px; justify-items: start; }
+#youtube-cookie-file { min-width: 0; max-width: 100%; }
 #queue-history { padding-top: 8px; }
 #queue-history .queue-title { color: var(--text); }
 .controls { padding: 14px 0 8px; }

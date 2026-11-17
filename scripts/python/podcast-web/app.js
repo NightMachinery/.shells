@@ -121,6 +121,7 @@ $('show-all').textContent = `Show all ${sourceEpisodes.length.toLocaleString()}`
       download.disabled=['queued','downloading'].includes(e.job?.status);controls.append(download);
     }
     if(!e.local)controls.append(link((e.source_label||'YouTube')+' ↗',e.source_url||`https://www.youtube.com/watch?v=${e.id}`));
+    if(e.job?.status==='error')controls.append(button('View log',()=>showDownloadLog(e)));
     controls.append(button(e.archived?'Restore':'Archive',()=>action('archive',{ids:[e.id],archived:!e.archived})));
     row.append(check,body,controls);container.append(row);
   }
@@ -142,17 +143,43 @@ async function archiveSelection(archived){const podcast=state.podcast,ids=[...st
 $('bulk-archive').onclick=()=>archiveSelection(true);$('bulk-restore').onclick=()=>archiveSelection(false);$('bulk-download').onclick=async()=>{const podcast=state.podcast,ids=[...state.selected];state.selected.clear();for(const id of ids)await action('download',{id,podcast});render();};
 try{state.podcast=localStorage.getItem('podcast-web-source')||null;const p=JSON.parse(localStorage.getItem('podcast-web-preferences')||'{}');for(const id of preferences){if(p[id]!==undefined){if($(id).type==='checkbox')$(id).checked=p[id];else if(id!=='playlist')$(id).value=p[id];}}state.savedPlaylist=p.playlist;}catch{}
 (async()=>{await load();if(state.savedPlaylist&&[...$('playlist').options].some(o=>o.value===state.savedPlaylist)){$('playlist').value=state.savedPlaylist;render();await ensureSource();}})();
-setInterval(()=>{if(!document.hidden&&!state.pending){const active=state.data&&(Object.values(state.data.refreshes).some(v=>v.status==='loading')||state.data.episodes.some(e=>['queued','downloading'].includes(e.job?.status)));if(active||Date.now()-(state.lastSlowLoad||0)>60000){state.lastSlowLoad=Date.now();load();}}},4000);
+setInterval(()=>{if(!document.hidden&&!state.pending){const active=state.data&&(Object.values(state.data.refreshes).some(v=>v.status==='loading')||(state.data.queue||state.data.episodes).some(e=>['queued','downloading'].includes(e.job?.status)));if(active||Date.now()-(state.lastSlowLoad||0)>60000){state.lastSlowLoad=Date.now();load();}}},4000);
 document.addEventListener('visibilitychange',()=>{if(!document.hidden)load();});
 
 $('add-playlist').onsubmit=async event=>{event.preventDefault();const b=event.currentTarget.querySelector('button');b.disabled=true;try{const result=await request('playlist',{url:$('playlist-url').value});await load();$('playlist').value=result.id;changed({target:$('playlist')});$('playlist-url').value='';}catch(e){notice(e.message,true);}finally{b.disabled=false;}};
 
 $('show-all').onclick = () => { $('hide-downloaded').checked = false; $('hide-archived').checked = false; $('hide-shorts').checked = false; $('min-length').value = ''; $('max-length').value = ''; $('search').value = ''; changed(); };
 
+let selectedLog;
+function showDownloadLog(episode) {
+  selectedLog = new URLSearchParams({id:episode.id, podcast:episode.podcast_id || state.podcast || ''});
+  $('download-log-episode').textContent = displayTitle(episode);
+  $('download-log').showModal();
+  refreshDownloadLog();
+}
+
+async function refreshDownloadLog() {
+  const log = selectedLog, output = $('download-log-output'), refresh = $('refresh-download-log');
+  output.textContent = 'Loading download log…';
+  refresh.disabled = true;
+  try {
+    const result = await request('download-log?' + log);
+    if (log !== selectedLog) return;
+    const lines = result.entries.map(entry => `${new Date(entry.at * 1000).toLocaleString()}  ${entry.level.toUpperCase()}  ${entry.message}`);
+    output.textContent = lines.length ? lines.join('\n') : 'No log entries were recorded for this job.';
+    output.scrollTop = output.scrollHeight;
+  } catch (error) {
+    if (log === selectedLog) output.textContent = error.message;
+  } finally {
+    if (log === selectedLog) refresh.disabled = false;
+  }
+}
+$('refresh-download-log').onclick = refreshDownloadLog;
+
 function renderQueue() {
   const jobs = (state.data.queue || state.data.episodes).filter(e => e.job);
   const active = jobs.filter(e => ['queued', 'downloading'].includes(e.job.status)).sort((a,b) => (a.job.status === 'downloading' ? 0 : 1) - (b.job.status === 'downloading' ? 0 : 1) || a.job.updated - b.job.updated);
-  const recent = jobs.filter(e => !['queued', 'downloading'].includes(e.job.status)).sort((a,b) => b.job.updated - a.job.updated);
+  const recent = jobs.filter(e => !['queued', 'downloading'].includes(e.job.status)).sort((a,b) => Number(b.job.status === 'error') - Number(a.job.status === 'error') || b.job.updated - a.job.updated);
   const running = active.filter(e => e.job.status === 'downloading').length;
   const failed = recent.filter(e => e.job.status === 'error').length;
   $('queue-count').textContent = `(${active.length} active)`;
@@ -168,6 +195,7 @@ function renderQueue() {
     content.append(node('span', labels[episode.job.status] || episode.job.status, 'badge'));
     if (episode.job.error) content.append(node('div', episode.job.error, 'job-error'));
     const controls = node('div', undefined, 'queue-actions');
+    controls.append(button('View log', () => showDownloadLog(episode)));
     if (episode.audio_url) controls.append(link('Audio ↗', episode.audio_url));
     if (episode.job.status === 'error') controls.append(button('Retry download', () => action('download', {id:episode.id,podcast:episode.podcast_id || state.podcast})));
     item.append(content, controls); return item;
@@ -188,6 +216,7 @@ function renderLibrary() {
   const channels=state.data.podcasts;
   if(!channels)return;
   $('podcast-library').hidden=false;
+  renderCookieStatus();
   const sync=state.data.settings_sync, syncStatus=$('settings-sync-status');
   syncStatus.hidden=!sync?.configured;
   syncStatus.textContent=sync?.error || (sync?.sync_enabled?(sync.pending?'Settings saved locally; GitHub sync pending.':'Persistent settings synced to GitHub.'):'Persistent settings saved.');
@@ -228,6 +257,36 @@ function renderLibrary() {
   }
   $('create-feed').disabled=!state.feedSources.size;
 }
+
+let savingCookies = false;
+function renderCookieStatus(message) {
+  const configured = state.data?.youtube_cookies?.configured;
+  $('remove-youtube-cookies').disabled = savingCookies || !configured;
+  if (!savingCookies || message) $('youtube-cookies-status').textContent = message || (configured ? 'YouTube cookies are saved on the server.' : 'No YouTube cookies imported.');
+}
+
+async function updateYouTubeCookies(remove) {
+  const form = $('youtube-cookies-form'), file = $('youtube-cookie-file').files[0], submit = form.querySelector('[type=submit]');
+  if (savingCookies || (!remove && !file)) return;
+  savingCookies = true;
+  renderCookieStatus(remove ? 'Removing cookies…' : 'Importing cookies…');
+  submit.disabled = true;
+  let message;
+  try {
+    if (file && !remove && file.size > 64 * 1024) throw Error('Choose a cookie export of at most 64 KB.');
+    const result = await request('youtube-cookies', remove ? {remove:true} : {text:await file.text()});
+    form.reset();
+    if (state.data) state.data.youtube_cookies = result;
+    message = result.configured ? 'YouTube cookies saved. Retry the failed download.' : 'YouTube cookies removed.';
+  } catch (error) {
+    message = error.message;
+  } finally {
+    savingCookies = submit.disabled = false;
+    renderCookieStatus(message);
+  }
+}
+$('youtube-cookies-form').onsubmit = event => {event.preventDefault(); updateYouTubeCookies(false);};
+$('remove-youtube-cookies').onclick = () => updateYouTubeCookies(true);
 
 function coverFallback(event) {
   const picture = event.currentTarget;

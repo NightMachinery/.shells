@@ -85,6 +85,29 @@ def main():
                 page.get_by_role('button',name='Download',exact=True).click()
                 page.wait_for_function("document.getElementById('queue-count').textContent==='(1 active)'")
                 assert 'Second podcast' in page.locator('#queue-active').inner_text()
+                # Old failed jobs can still show their last error from before logging.
+                with library.catalog(SECOND).db() as db:
+                    db.execute("UPDATE jobs SET status='error',error=? WHERE id=?",
+                               ('HTTP Error 403 for https://example.invalid/signed?secret=fixture', NEW))
+                page.reload();page.wait_for_selector('.episode')
+                page.locator('#download-queue > summary').click()
+                page.locator('#queue-history > summary').click()
+                page.locator('#queue-recent').get_by_role('button',name='View log').click()
+                page.wait_for_function("document.getElementById('download-log-output').textContent.includes('HTTP Error 403 for [URL]')")
+                assert 'secret' not in page.locator('#download-log').inner_text()
+                assert page.evaluate("document.getElementById('download-log').getBoundingClientRect().width <= innerWidth")
+                page.get_by_role('button',name='Close',exact=True).click()
+                page.locator('#youtube-sign-in > summary').click()
+                page.locator('#youtube-cookie-file').set_input_files({
+                    'name':'cookies.txt','mimeType':'text/plain',
+                    'buffer':b'# Netscape HTTP Cookie File\n.youtube.com\tTRUE\t/\tTRUE\t0\tTEST\tfixture\n',
+                })
+                page.get_by_role('button',name='Import cookies').click()
+                page.wait_for_function("document.getElementById('youtube-cookies-status').textContent.includes('cookies saved')")
+                assert library.youtube_cookies.status()['configured']
+                page.get_by_role('button',name='Remove cookies').click()
+                page.wait_for_function("document.getElementById('youtube-cookies-status').textContent.includes('cookies removed')")
+                assert not library.youtube_cookies.status()['configured']
                 page.locator('#feed-settings').evaluate('(e)=>e.open=true')
                 page.locator('#manage-podcasts').evaluate('(e)=>e.open=true')
                 page.locator(f'#feed-sources input[value="{PRIMARY}"]').check()
@@ -112,7 +135,7 @@ def main():
                 settings=library.settings.read()
                 assert len(settings['podcasts'])==3
                 assert NEW in next(p for p in settings['podcasts'] if p['id']==PRIMARY)['archived']
-                print(json.dumps({'podcast_switch_and_reload':'passed','archive_isolation':'passed','global_queue':'passed','combined_feed':'2 sources','global_exclusion':'passed','add_auto_off_and_toggle':'passed','canonical_redirect_and_pwa_identity':'passed','phone_overflow':'none','browser_errors':errors}))
+                print(json.dumps({'podcast_switch_and_reload':'passed','archive_isolation':'passed','global_queue':'passed','download_log_and_cookie_import':'passed','combined_feed':'2 sources','global_exclusion':'passed','add_auto_off_and_toggle':'passed','canonical_redirect_and_pwa_identity':'passed','phone_overflow':'none','browser_errors':errors}))
                 browser.close()
         finally:
             server.shutdown();server.server_close();library.refresh_pool.shutdown(wait=True);library.playlist_pool.shutdown(wait=True);first.pool.shutdown(wait=True)

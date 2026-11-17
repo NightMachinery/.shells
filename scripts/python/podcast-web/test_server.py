@@ -9,6 +9,7 @@ import time
 import unittest
 from unittest.mock import patch
 import xml.etree.ElementTree as ET
+from download_support import YouTubeCookies
 from podcast_dates import append_upload_date, format_upload_date
 
 spec = importlib.util.spec_from_file_location("podcast_web", Path(__file__).with_name("server.py"))
@@ -265,6 +266,70 @@ class CatalogTests(unittest.TestCase):
         self.assertEqual(row["job"]["status"], "done")
         self.assertIn(f"youtube {ID}", (self.catalog.audio.parent / ".downloaded.txt").read_text())
         self.assertEqual(len(ET.parse(self.catalog.audio / "feed.rss").findall("./channel/item")), 1)
+
+    def test_youtube_sign_in_retry_keeps_cookies_and_signed_urls_out_of_log(self):
+        self.seed()
+        cookies = self.catalog.youtube_cookies = YouTubeCookies(self.catalog.state)
+        cookies.import_file("# Netscape HTTP Cookie File\n.youtube.com\tTRUE\t/\tTRUE\t0\tTEST\tfixture\n")
+        original = cookies.path.read_bytes()
+        audio = self.catalog.audio / f"An older episode [{ID}].m4a"
+        attempts = []
+
+        class YDL:
+            def __init__(self, options): self.options = options
+            def __enter__(self): return self
+            def __exit__(self, *args): pass
+            def extract_info(self, url, download):
+                stream = self.options.get("cookiefile")
+                attempts.append(bool(stream))
+                logger = self.options["logger"]
+                if not stream:
+                    raise ValueError("Sign in to confirm you’re not a bot")
+                assert "fixture" in stream.read()
+                stream.write("modified by downloader")
+                logger.warning("Media https://example.invalid/path?signature=private-signature\nCookie: TEST=fixture")
+                audio.write_bytes(b"fixture")
+                return {"id": ID, "title": "An older episode"}
+            def prepare_filename(self, info): return str(audio)
+
+        with patch("yt_dlp.YoutubeDL", YDL):
+            self.catalog.download(ID)
+        self.assertEqual(attempts, [False, True])
+        self.assertEqual(cookies.path.read_bytes(), original)
+        log = self.catalog.download_log(ID)
+        self.assertEqual(log["status"], "done")
+        messages = "\n".join(entry["message"] for entry in log["entries"])
+        self.assertIn("Retrying with imported YouTube cookies", messages)
+        self.assertIn("Media [URL] [redacted header]", messages)
+        self.assertNotIn("private-signature", messages)
+        self.assertNotIn("fixture", messages)
+
+    def test_media_403_does_not_send_cookies(self):
+        self.seed()
+        cookies = self.catalog.youtube_cookies = YouTubeCookies(self.catalog.state)
+        with patch.object(cookies, "stream") as stream, patch("yt_dlp.YoutubeDL") as ydl:
+            ydl.return_value.__enter__.return_value.extract_info.side_effect = ValueError("HTTP Error 403: Forbidden")
+            with self.assertLogs(level="ERROR"):
+                self.catalog.download(ID)
+            stream.assert_not_called()
+            self.assertEqual(ydl.call_count, 1)
+        self.assertEqual(self.catalog.download_log(ID)["entries"][-1]["message"], "HTTP Error 403: Forbidden")
+
+    def test_cookie_import_filters_other_domains_and_preserves_valid_export(self):
+        cookies = YouTubeCookies(self.catalog.state)
+        cookies.import_file("# Netscape HTTP Cookie File\n"
+                            ".example.net\tTRUE\t/\tTRUE\t0\tFOREIGN\toutside\n"
+                            "#HttpOnly_.youtube.com\tTRUE\t/\tTRUE\t0\tTEST\tyoutube\n")
+        content = cookies.path.read_text()
+        self.assertIn("#HttpOnly_.youtube.com", content)
+        self.assertNotIn("outside", content)
+        self.assertEqual(cookies.path.stat().st_mode & 0o777, 0o600)
+        with self.assertRaisesRegex(ValueError, "invalid YouTube row"):
+            cookies.import_file("# Netscape HTTP Cookie File\n.youtube.com\tTRUE\t/\tTRUE\tsecret\tNAME\tvalue\n")
+        self.assertEqual(cookies.path.read_text(), content)
+        cookies.remove()
+        self.assertFalse(cookies.status()["configured"])
+        self.assertIsNone(cookies.stream())
 
     def test_http_rejects_cross_origin_and_invalid_payloads(self):
         self.seed()

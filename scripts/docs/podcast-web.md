@@ -9,7 +9,21 @@ your choice and applies it before rendering the page.
 
 Open **Download queue** near the top to see the current download, waiting episodes
 in order, and recent completed/failed jobs. The queue includes episodes hidden
-by list filters. Failed jobs have a retry button; finished jobs link to their audio.
+by list filters. Select **View log** to see timestamped downloader messages.
+Failed jobs have a retry button and appear first in download history. Finished
+jobs link to their audio. Logs retain up to 100 entries per job and 5,000 per
+catalog. Jobs that predate logging can still show their last error.
+
+If YouTube asks for sign-in, open **YouTube cookies** and import a YouTube-only
+Netscape `cookies.txt` export, then retry the download. See
+[yt-dlp's export instructions](https://github.com/yt-dlp/yt-dlp/wiki/Extractors#exporting-youtube-cookies).
+The app first tries public downloads without cookies and retries once with them
+on a sign-in error. Imports keep only `youtube.com` cookies and save them under
+`secrets/` in the server's runtime state with owner-only file permissions.
+**Remove cookies** deletes the saved copy. The app keeps cookies out of feed
+files, download logs and the versioned settings. This setting applies to the
+app's download worker. Enable Deno or Node and install the matching `yt-dlp-ejs`
+package for [YouTube JavaScript support](https://github.com/yt-dlp/yt-dlp/wiki/EJS).
 
 Use **Install app** in the header to add the library to your home screen or desktop.
 It opens in a standalone window with a headphone icon. When the browser cannot

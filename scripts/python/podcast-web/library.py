@@ -15,6 +15,7 @@ import time
 from urllib.parse import quote, unquote, urlsplit
 import xml.etree.ElementTree as ET
 
+from download_support import YouTubeCookies
 from podcast_policy import write_policy
 from presentation import (
     cover_url, enclosure_name, episode_title, mark_feed_updated,
@@ -52,6 +53,7 @@ class Library:
                  settings_path=None, settings_sync=None):
         self.primary = primary.channel
         self.state = primary.state
+        self.youtube_cookies = YouTubeCookies(self.state)
         self.audio_root = primary.audio.parent
         self.url_root = primary.base_url.rsplit("/", 1)[0]
         self.catalog_class = catalog_class
@@ -123,6 +125,7 @@ class Library:
         write_policy(self.podcasts(), self.policy_file)
 
     def configure_catalog(self, catalog):
+        catalog.youtube_cookies = self.youtube_cookies
         catalog.on_download = self.rebuild_feeds
         catalog.on_playlists = self.prefetch_playlists
         catalog.on_archive = lambda ids, archived: self.save_archives(catalog.channel, ids, archived)
@@ -403,6 +406,7 @@ class Library:
             queue.extend(dict(e, podcast_id=row["id"], podcast_title=row["title"]) for e in snap["episodes"] if e.get("job"))
         data.update(podcasts=channels, current_podcast=selected.channel, queue=queue,
                     global_feed_url=self.url_root + "/feeds/global.rss",
+                    youtube_cookies=self.youtube_cookies.status(),
                     settings_sync=self.settings.status() if self.settings else {"configured": False})
         return data
 

@@ -19,6 +19,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import quote, unquote, urlsplit, parse_qs
 import xml.etree.ElementTree as ET
 from podcast_dates import append_upload_date, format_upload_date
+from download_support import DownloadLogger, safe_log, youtube_needs_login
 from presentation import cover_url, episode_title, image_bytes, mark_feed_updated, set_cover, set_duration
 
 VIDEO = re.compile(r"^[A-Za-z0-9_-]{11}$")
@@ -68,6 +69,7 @@ class Catalog:
         self.on_playlists = None
         self.on_archive = None
         self.on_playlist_added = None
+        self.youtube_cookies = None
         self.lock = threading.RLock()
         self.busy = set()
         self.refreshes = {}
@@ -82,6 +84,10 @@ class Catalog:
             CREATE TABLE IF NOT EXISTS membership(playlist TEXT, video TEXT, position INTEGER, PRIMARY KEY(playlist,video));
             CREATE TABLE IF NOT EXISTS sources(id TEXT PRIMARY KEY, updated REAL);
             CREATE TABLE IF NOT EXISTS jobs(id TEXT PRIMARY KEY, status TEXT, error TEXT, updated REAL);
+            CREATE TABLE IF NOT EXISTS download_logs(
+              seq INTEGER PRIMARY KEY, id TEXT NOT NULL, at REAL NOT NULL, level TEXT NOT NULL, message TEXT NOT NULL
+            );
+            CREATE INDEX IF NOT EXISTS download_logs_episode ON download_logs(id,seq);
             UPDATE jobs SET status='error', error='Interrupted by restart; retry the download.' WHERE status IN ('queued','downloading');
             """)
             if "is_short" not in {row[1] for row in db.execute("PRAGMA table_info(episodes)")}:
@@ -254,6 +260,9 @@ class Catalog:
                 memberships.setdefault(m["playlist"], []).append(m["video"])
             playlists = [dict(p) for p in db.execute("SELECT * FROM playlists ORDER BY title")]
             jobs = {j["id"]: dict(j) for j in db.execute("SELECT * FROM jobs")}
+            for job in jobs.values():
+                if job["error"]:
+                    job["error"] = safe_log(job["error"])
             sources = {r["id"]: r["updated"] for r in db.execute("SELECT * FROM sources")}
         for e in episodes:
             e["published_display"] = format_upload_date(e["published"]) if e["published"] else ""
@@ -323,8 +332,38 @@ class Catalog:
             self.pool.submit(self.download, vid)
 
     def job(self, vid, status, error=None):
+        error = safe_log(error) if error else None
         with self.db() as db:
             db.execute("INSERT INTO jobs VALUES(?,?,?,?) ON CONFLICT(id) DO UPDATE SET status=excluded.status,error=excluded.error,updated=excluded.updated", (vid, status, error, time.time()))
+        self.record_download(vid, "error" if status == "error" else "info", error or {
+            "queued": "Added to the download queue.",
+            "downloading": "Download started.",
+            "done": "Audio is available in the feed.",
+        }.get(status, "Download failed."))
+
+    def record_download(self, vid, level, message):
+        with self.db() as db:
+            db.execute("INSERT INTO download_logs(id,at,level,message) VALUES(?,?,?,?)",
+                       (vid, time.time(), level, safe_log(message)))
+            db.execute("""DELETE FROM download_logs WHERE id=? AND seq < (
+                SELECT seq FROM download_logs WHERE id=? ORDER BY seq DESC LIMIT 1 OFFSET 99
+            )""", (vid, vid))
+            db.execute("DELETE FROM download_logs WHERE seq <= (SELECT max(seq)-5000 FROM download_logs)")
+
+    def download_log(self, vid):
+        if not isinstance(vid, str) or not EPISODE.fullmatch(vid):
+            raise ValueError("Invalid episode ID")
+        with self.db() as db:
+            job = db.execute("SELECT * FROM jobs WHERE id=?", (vid,)).fetchone()
+            if job is None:
+                raise ValueError("No download job for this episode")
+            entries = [dict(row) for row in db.execute(
+                "SELECT at,level,message FROM download_logs WHERE id=? ORDER BY seq", (vid,))]
+        # Jobs created before logging was deployed retain their last error.
+        error = safe_log(job["error"]) if job["error"] else None
+        if error and (not entries or entries[-1]["message"] != error):
+            entries.append({"at": job["updated"], "level": "error", "message": error})
+        return {"status": job["status"], "entries": entries}
 
     def download(self, vid):
         try:
@@ -351,10 +390,26 @@ class Catalog:
             self.job(vid, "downloading")
             options = {"format": "bestaudio[ext=m4a]/bestaudio/best", "outtmpl": str(self.audio / "%(title)s [%(id)s].%(ext)s"),
                        "noplaylist": True, "quiet": True, "socket_timeout": 30, "retries": 3, "overwrites": False,
+                       "js_runtimes": {"deno": {}, "node": {}},
+                       "logger": DownloadLogger(lambda level, message: self.record_download(vid, level, message)),
                        "postprocessors": [{"key": "FFmpegExtractAudio", "preferredcodec": "m4a"}, {"key": "FFmpegMetadata"}]}
-            with YoutubeDL(options) as ydl:
-                info = ydl.extract_info(f"https://www.youtube.com/watch?v={vid}", download=True)
-                path = Path(ydl.prepare_filename(info)).with_suffix(".m4a")
+            def fetch(opts):
+                with YoutubeDL(opts) as ydl:
+                    info = ydl.extract_info(self.episode_url(vid), download=True)
+                    return info, Path(ydl.prepare_filename(info)).with_suffix(".m4a")
+
+            try:
+                info, path = fetch(options)
+            except Exception as exc:
+                if not youtube_needs_login(exc):
+                    raise
+                cookies = self.youtube_cookies.stream() if self.youtube_cookies else None
+                if cookies is None:
+                    self.record_download(vid, "info", "YouTube requested sign-in. Optional cookies can be imported in this app.")
+                    raise
+                self.record_download(vid, "info", "YouTube requested sign-in. Retrying with imported YouTube cookies.")
+                with cookies:
+                    info, path = fetch(dict(options, cookiefile=cookies))
             if not path.is_file() or not path.stat().st_size:
                 raise ValueError("Download did not produce an audio file")
             self.add_to_feed(info, path)
@@ -367,8 +422,8 @@ class Catalog:
             if self.on_download:
                 self.on_download()
         except Exception as exc:
-            logging.exception("Download failed for %s", vid)
-            self.job(vid, "error", str(exc)[-600:])
+            logging.error("Download failed for %s: %s", vid, safe_log(exc))
+            self.job(vid, "error", str(exc))
 
     def add_to_feed(self, info, path):
         feed = self.audio / "feed.rss"
@@ -439,6 +494,14 @@ class Handler(BaseHTTPRequestHandler):
                 self.reply(library.snapshot(parse_qs(parsed.query).get("podcast", [None])[0]) if library else self.server.catalog.snapshot())
             except ValueError as exc:
                 self.reply({"error": str(exc)}, 400)
+        elif path == "/download-log":
+            query = parse_qs(parsed.query)
+            library = getattr(self.server, "library", None)
+            try:
+                catalog = library.catalog(query.get("podcast", [None])[0]) if library else self.server.catalog
+                self.reply(catalog.download_log(query.get("id", [None])[0]))
+            except ValueError as exc:
+                self.reply({"error": str(exc)}, 400)
         elif path == "/manifest.webmanifest":
             manifest = json.loads(Path(__file__).with_name("manifest.webmanifest").read_text())
             library = getattr(self.server, "library", None)
@@ -462,12 +525,24 @@ class Handler(BaseHTTPRequestHandler):
             return
         try:
             length = int(self.headers.get("Content-Length", "0"))
-            if not 0 < length <= 32768:
+            limit = 262144 if self.path == "/youtube-cookies" else 32768
+            if not 0 < length <= limit:
                 raise ValueError("Invalid request size")
-            data = json.loads(self.rfile.read(length))
+            try:
+                data = json.loads(self.rfile.read(length))
+            except (UnicodeError, json.JSONDecodeError):
+                raise ValueError("Invalid JSON request") from None
             if not isinstance(data, dict):
                 raise ValueError("Expected a JSON object")
             library = getattr(self.server, "library", None)
+            if self.path == "/youtube-cookies" and library:
+                cookies = library.youtube_cookies
+                if data.get("remove") is True:
+                    cookies.remove()
+                else:
+                    cookies.import_file(data.get("text"))
+                self.reply(cookies.status())
+                return
             catalog = library.catalog(data.get("podcast")) if library else self.server.catalog
             if self.path == "/archive":
                 catalog.archive(data.get("ids"), data.get("archived"))
