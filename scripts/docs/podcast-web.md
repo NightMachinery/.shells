@@ -1,7 +1,7 @@
 # Podcast library
 
-`python/podcast-web` adds a browser for a YouTube podcast channel's full upload
-history and playlists. It queues older episodes for download, links existing
+`python/podcast-web` manages a library of YouTube podcast channels, full upload
+histories and playlists. It queues older episodes for download, links existing
 audio files, and saves reversible archive choices on the server. Hiding a
 downloaded or archived episode affects the list only, not the audio or RSS feed.
 The header has Light and Dark themes. Light is the default; the browser remembers
@@ -124,3 +124,37 @@ The checks include credentialed manifest requests, native prompt handling,
 worker scope, no private offline copies, cross-origin login redirects, and
 preservation of another app's cache. `--screenshots DIRECTORY` saves phone views.
 Manifest setup follows the [web.dev manifest guide](https://web.dev/articles/add-manifest).
+
+
+Choose a **Podcast** to browse its episodes and playlists. Add a YouTube channel
+URL, handle or ID under **Add podcasts and combine feeds**. Each channel has its
+own catalog, archives, audio directory and RSS URL; the existing primary channel
+keeps its original files and feed URL. The queue spans the whole library and
+labels each job with its podcast.
+
+New channels have automatic downloads **off**. Enabling them records a baseline
+of known uploads and then checks for new uploads every 30 minutes. Older episodes
+remain manual. The original channel retains its enabled setting. The optional
+runtime policy `~/.config/podcast-web/automation.json` makes the legacy CLI's
+non-interactive channel runs yield to the app, so an old cron job cannot bypass
+the toggle. Interactive CLI downloads are unaffected.
+
+Check multiple podcast sources to create a stable combined RSS URL. It includes
+downloaded audio from exactly those sources and updates when new audio arrives.
+The **global feed** automatically includes every channel except the original
+primary channel, including channels added later. Feeds may initially be empty:
+loading a catalog does not download audio. RSS metadata, original-date suffixes,
+and episode identity are retained when combining feeds.
+
+Registry and saved combinations live in `library.sqlite` beside the primary
+`catalog.sqlite`. New catalogs live under `channels/<channel-id>/` in that state
+directory; new audio/RSS lives under `channels/<channel-id>/` beside the primary
+audio directory. Aggregates live under `feeds/` in that audio base. Back up the
+whole state directory to preserve settings, archives and combined selections.
+
+A deployment can move the app without moving audio or changing subscriptions.
+`PODCAST_APP_PATH` sets the canonical manifest start URL/scope, and `PODCAST_PWA_ID`
+can retain the old resolved identity. Serve the API's `/manifest.webmanifest`
+response at the manifest's public URL in that case, and keep old entry URLs as
+redirects. Watch `library.py` and the dereferenced `podcast_policy.py` helper when
+deploying the server.
