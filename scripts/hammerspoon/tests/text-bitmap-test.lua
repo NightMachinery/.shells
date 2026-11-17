@@ -199,13 +199,23 @@ local function runTests()
     for _, rows in ipairs({6, 7, 8, 9, 10}) do
         L.textRows.persian = rows
         local top, bottom
-        for _, c in ipairs(L.textCells("برای")) do
+        local cells = L.textCells("برای")
+        for _, c in ipairs(cells) do
             if c.i == 4 then
                 top, bottom = math.min(top or c.y, c.y), math.max(bottom or c.y, c.y)
             end
         end
         assert(top and bottom - top + 1 >= 0.55 * rows,
             string.format("the alef of برای is cut short at %d rows", rows))
+        -- ... and stands clear of the ی beside it, by L.textStrokeGap.
+        for _, a in ipairs(cells) do
+            for _, y in ipairs(cells) do
+                if a.i == 4 and y.i == 5 and a.s == 1 and y.s == 1 and a.y == y.y then
+                    assert(math.abs(a.x - y.x) >= 1 + L.textStrokeGap - 1e-6,
+                        string.format("the alef of برای touches the ی at %d rows", rows))
+                end
+            end
+        end
     end
     L.textRows.persian = 7
     for _, word in ipairs({"کتاب", "خوشحال", "گلاب", "چشم", "آب", "ژ", "ث", "۰", "؟!"}) do

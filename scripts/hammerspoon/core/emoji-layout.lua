@@ -570,6 +570,9 @@ L.textRows = {english=4, persian=7}
 -- body emoji. Dots are never dropped: each takes one emoji of its own.
 L.textDotSize = 0.7
 L.textTipSize = 0.7
+-- Extra space, in cells, put between two separate strokes that stand side by
+-- side (the alef and the yeh of ای), so that they do not read as one thick stroke.
+L.textStrokeGap = 0.4
 -- Hand-drawn fonts by row count, mostly 3 wide; M and W are 5 and N and Q 4 in
 -- the 4- and 5-row fonts, since at 3 wide round dots blur M, N and H together.
 -- The 3-row font is close to a cipher. Rows are joined by "/", X is lit.
@@ -917,7 +920,7 @@ function L.reduceRaster(pixels, w, h, cell, dotMax)
         end
         g.n = g.n + 1
         g.letters[owner[k]] = (g.letters[owner[k]] or 0) + 1
-        g.pieces[pieceOf[k]] = true
+        g.pieces[pieceOf[k]] = (g.pieces[pieceOf[k]] or 0) + 1
     end
 
     -- Neighbours of a cell: how many, how many of them edge to edge, whether
@@ -1024,13 +1027,46 @@ function L.reduceRaster(pixels, w, h, cell, dotMax)
         end
     end
 
+    -- Two pieces standing side by side, a cell apart, would read as one thick
+    -- stroke. Where no piece crosses the line between their columns, the text
+    -- is cut there and everything to the right moves over by L.textStrokeGap.
+    local strokeGap = math.max(0, math.min(1, tonumber(L.textStrokeGap) or 0.4))
+    -- A cell belongs to the piece with most of its pixels: the hook of a
+    -- neighbouring letter may reach a little into it.
+    local function piece(g)
+        if not g.piece then
+            local most = -1
+            for id, n in pairs(g.pieces) do
+                if n > most or (n == most and id < g.piece) then g.piece, most = id, n end
+            end
+        end
+        return g.piece
+    end
+    local function shared(a, b) return piece(a) == piece(b) end
+    local touching, crossed, cuts = {}, {}, {}
+    for _, g in pairs(grid) do
+        for dy = -1, 1 do
+            local r = grid[gk(g.cx + 1, g.cy + dy)]
+            if r and shared(g, r) then crossed[g.cx] = true
+            elseif r and dy == 0 then touching[g.cx] = true end
+        end
+    end
+    for b in pairs(touching) do
+        if not crossed[b] and strokeGap > 0 then cuts[#cuts+1] = b + 0.5 end
+    end
+    local function cutShift(x)
+        local n = 0
+        for _, b in ipairs(cuts) do if b < x then n = n + 1 end end
+        return n * strokeGap
+    end
+
     local out, solid = {}, {}
     for _, g in pairs(grid) do
         local letter, most = nil, -1
         for l, n in pairs(g.letters) do
             if n > most or (n == most and l < letter) then letter, most = l, n end
         end
-        local c = {x=g.cx, y=g.cy, s=1, letter=letter}
+        local c = {x=g.cx + cutShift(g.cx), y=g.cy, s=1, letter=letter}
         local count, _, joined, toward = around(g.cx, g.cy)
         if count > 0 and joined and toward and g.n < 0.55 * cell and tipSize < 1 then
             c.s = tipSize
@@ -1099,6 +1135,7 @@ function L.reduceRaster(pixels, w, h, cell, dotMax)
             end
             return true
         end
+        cx = cx + cutShift(cx)
         local ax, ay = cx, cy
         for _, shift in ipairs(shifts) do
             if clear(cx + shift[1], cy + shift[2]) then ax, ay = cx + shift[1], cy + shift[2]; break end
@@ -1133,7 +1170,7 @@ local function rasterBitmapLine(tb, text)
         bitmapLineCache, bitmapLineCount, bitmapCacheMod, bitmapRefHeight = {}, 0, tb, nil
     end
     local size, rows = L.textRasterSize, persianRows()
-    local id = string.format("%s\0%s\0%s\0%s\0%s", text, size, rows, tostring(L.textDotSize), tostring(L.textTipSize))
+    local id = string.format("%s\0%s\0%s\0%s\0%s", text, size, rows, tostring(L.textDotSize), tostring(L.textTipSize)) .. "\0" .. tostring(L.textStrokeGap)
     local cached = bitmapLineCache[id]
     if cached then return cached end
     if not bitmapRefHeight or bitmapRefHeight.size ~= size then
@@ -1338,7 +1375,7 @@ end
 local textModes = {}
 local function textMode(key, word)
     local id = string.format("%s\0%s\0%s\0%s\0%s", key, select(2, latinFont()), persianRows(),
-        tostring(L.textDotSize), tostring(L.textTipSize))
+        tostring(L.textDotSize), tostring(L.textTipSize)) .. "\0" .. tostring(L.textStrokeGap)
     if not textModes[id] then
         local cells = L.textCells(word)
         textModes[id] = {key=key, name="Text " .. word, note="the word in emoji, a letter per emoji",

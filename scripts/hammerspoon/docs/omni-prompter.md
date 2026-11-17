@@ -238,6 +238,11 @@ raster, which `EmojiLayout.reduceRaster` brings down to the grid:
   that covers less than about half a cell is drawn at
   `EmojiLayout.textTipSize` (0.7) against its stroke instead of being dropped
   or rounded up to a whole cell.
+- **Side-by-side strokes get a gap.** Two separate strokes one cell apart,
+  such as the alef and the `ی` in `برای`, would read as one thick stroke.
+  Where no stroke crosses the line between their columns, everything to the
+  right moves over by `EmojiLayout.textStrokeGap` (0.4 of a cell; 0 turns it
+  off).
 
 Each letter (in logical reading order for RTL scripts) is one emoji, cycling
 the selection; with more emoji than letters each row is one emoji (stripes),
