@@ -98,11 +98,15 @@ class TelegramTests(unittest.TestCase):
             ET.SubElement(item, 'title').text = 'یک_گفت‌وگو.MP3\u2069 '
             ET.SubElement(item, 'guid').text = 'keep-this-id'
             ET.SubElement(item, 'pubDate').text = 'Thu, 05 Mar 2026 12:00:00 GMT'
-            ET.SubElement(item, 'enclosure', url='https://example.com/existing.mp3', length='123', type='audio/mpeg')
+            ET.SubElement(item, 'enclosure', url='https://example.com/existing#clip.mp3', length='123', type='audio/mpeg')
+            ET.SubElement(item, ITUNES+'duration').text = '0:01:30.500'
             ET.ElementTree(before).write(feed)
             picture = BytesIO()
             Image.new("RGB", (48, 48), "blue").save(picture, "PNG")
-            with patch.object(catalog, 'channel_picture', return_value=picture.getvalue()) as fetch:
+            # The real file's metadata wins even when the enclosure still
+            # contains an old unescaped "#" in its filename.
+            catalog.file_cache = {'existing#clip.mp3': ((123, 0), {'duration': 94})}
+            with patch.object(catalog, 'channel_picture', return_value=picture.getvalue()) as fetch, patch.object(catalog, 'scan_audio'):
                 library.refresh_feed_presentation(catalog)
                 original = feed.read_bytes()
                 library.refresh_feed_presentation(catalog)
@@ -112,12 +116,19 @@ class TelegramTests(unittest.TestCase):
             self.assertEqual(result.findtext('item/title'), 'یک گفت‌وگو')
             for element in ('guid', 'pubDate', 'enclosure'):
                 self.assertEqual(ET.tostring(result.find('item/'+element)), ET.tostring(item.find(element)))
-            self.assertEqual(result.findtext('image/url'), catalog.artwork_url)
+            self.assertEqual(result.findtext('image/url'), catalog.rss_artwork_url)
+            self.assertEqual(result.findtext('image/width'), '144')
+            self.assertNotIn('?', catalog.artwork_url)
+            self.assertLess(list(result).index(result.find(ITUNES+'image')), list(result).index(result.find('item')))
             self.assertEqual(result.find(ITUNES+'image').get('href'), catalog.artwork_url)
+            self.assertEqual(result.find('item/'+ITUNES+'image').get('href'), catalog.artwork_url)
+            self.assertEqual(result.findtext('item/'+ITUNES+'duration'), '94')
+            self.assertEqual(result.findtext('item/pubDate'), 'Thu, 05 Mar 2026 12:00:00 GMT')
             library.rebuild_feeds()
             mixed = ET.parse(library.audio_root/'feeds'/'global.rss').find('./channel/item')
             self.assertEqual(mixed.findtext('title'), 'Audio: یک گفت‌وگو')
             self.assertEqual(mixed.find(ITUNES+'image').get('href'), catalog.artwork_url)
+            self.assertEqual(mixed.findtext(ITUNES+'duration'), '94')
             self.assertEqual(episode_title('A_variable in Python', 'youtube'), 'A_variable in Python')
             self.assertEqual(episode_title('Audio_filename.mp3 ', 'youtube'), 'Audio filename')
         finally:

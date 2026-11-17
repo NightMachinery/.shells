@@ -259,7 +259,14 @@ punctuation. A background pass updates existing RSS titles in place, preserving
 episode IDs, dates and enclosure links.
 
 The app caches the original YouTube or Telegram profile picture alongside each
-source's audio as a square JPEG. The picture appears in the app and in standard
-RSS and iTunes artwork fields. Combined feeds use the library cover, with source
-artwork on individual episodes. Artwork refreshes weekly and keeps the previous
-copy if the source is temporarily unavailable.
+source's audio as a square JPEG. Show artwork is published before the episode
+list. The iTunes field and web app use the 1400-pixel cover, while the standard
+RSS image uses a 144-pixel JPEG. Both URLs carry a version in the filename.
+Individual episodes use their source cover when no artwork was supplied for that
+episode. Combined feeds have a separate library cover. Artwork refreshes weekly
+and keeps the previous copy if the source is temporarily unavailable.
+
+Each hosted episode publishes its duration as whole seconds in
+`itunes:duration`. Maintenance checks the length against the local audio
+metadata, with the existing feed duration as a fallback when the file cannot be
+read. Combined feeds carry those episode durations through.

@@ -16,7 +16,10 @@ from urllib.parse import quote, unquote, urlsplit
 import xml.etree.ElementTree as ET
 
 from podcast_policy import write_policy
-from presentation import episode_title, cover_url, publish_cover, set_cover
+from presentation import (
+    cover_url, enclosure_name, episode_title, mark_feed_updated,
+    prepare_cover_files, publish_cover, set_cover, set_duration,
+)
 
 CHANNEL_ID = re.compile(r"UC[A-Za-z0-9_-]{22}\Z")
 SOURCE_ID = re.compile(r"(?:UC[A-Za-z0-9_-]{22}|tg_[a-z][a-z0-9_]{4,31})\Z")
@@ -218,6 +221,7 @@ class Library:
         self.write_xml(path, root)
 
     def refresh_feed_presentation(self, catalog):
+        prepare_cover_files(catalog.audio)
         with catalog.db() as db:
             checked = db.execute("SELECT updated FROM sources WHERE id='artwork'").fetchone()
         if not catalog.artwork_url or not checked or time.time() - checked[0] >= 7 * 86400:
@@ -232,6 +236,7 @@ class Library:
 
         # Share the downloader/CLI lock before rewriting an existing source feed.
         # The image fetch and decode above need no lock on the audio queue.
+        catalog.scan_audio()
         path = catalog.audio / "feed.rss"
         with (catalog.audio.parent / ".podcaster.lock").open("a") as lock:
             fcntl.flock(lock, fcntl.LOCK_EX)
@@ -241,12 +246,24 @@ class Library:
             if channel is None:
                 return
             original = ET.tostring(root)
-            for title in channel.findall("item/title"):
-                if title.text:
+            artwork = catalog.artwork_url
+            for item in channel.findall("item"):
+                title = item.find("title")
+                if title is not None and title.text:
                     title.text = episode_title(title.text, catalog.source_type)
-            if artwork := catalog.artwork_url:
-                set_cover(channel, artwork, channel=True)
+                if artwork:
+                    set_cover(item, artwork)
+                enclosure = item.find("enclosure")
+                duration = None
+                if enclosure is not None:
+                    name = enclosure_name(enclosure.get("url", ""), catalog.file_cache)
+                    cached = catalog.file_cache.get(name)
+                    duration = cached[1].get("duration") if cached else None
+                set_duration(item, duration)
+            if artwork:
+                set_cover(channel, artwork, rss_url=catalog.rss_artwork_url)
             if ET.tostring(root) != original:
+                mark_feed_updated(channel)
                 self.write_xml(path, root)
 
     @staticmethod
@@ -419,6 +436,7 @@ class Library:
                 mixes = [dict(r) for r in db.execute("SELECT * FROM mixes")]
             mixes.append({"id": "global", "title": "All podcasts", "members": json.dumps([r["id"] for r in sources if not r["excluded_global"]])})
             aggregate_cover = cover_url(self.audio_root / "feeds", self.url_root + "/feeds")
+            aggregate_rss_cover = cover_url(self.audio_root / "feeds", self.url_root + "/feeds", rss=True)
             for mix in mixes:
                 root = ET.Element("rss", version="2.0")
                 channel = ET.SubElement(root, "channel")
@@ -426,7 +444,7 @@ class Library:
                 ET.SubElement(channel, "link").text = self.url_root
                 ET.SubElement(channel, "description").text = "Downloaded episodes from the selected podcast sources."
                 if aggregate_cover:
-                    set_cover(channel, aggregate_cover, channel=True)
+                    set_cover(channel, aggregate_cover, rss_url=aggregate_rss_cover)
                 members, entries, seen = set(json.loads(mix["members"])), [], set()
                 try:
                     for source in sources:

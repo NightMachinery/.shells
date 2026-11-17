@@ -19,7 +19,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import quote, unquote, urlsplit, parse_qs
 import xml.etree.ElementTree as ET
 from podcast_dates import append_upload_date, format_upload_date
-from presentation import cover_url, episode_title, image_bytes, set_cover
+from presentation import cover_url, episode_title, image_bytes, mark_feed_updated, set_cover, set_duration
 
 VIDEO = re.compile(r"^[A-Za-z0-9_-]{11}$")
 EPISODE = re.compile(r"(?:[A-Za-z0-9_-]{11}|tg_[1-9][0-9]{0,18})\Z")
@@ -37,6 +37,10 @@ class Catalog:
     @property
     def artwork_url(self):
         return cover_url(self.audio, self.base_url)
+
+    @property
+    def rss_artwork_url(self):
+        return cover_url(self.audio, self.base_url, rss=True)
 
     def channel_picture(self):
         from yt_dlp import YoutubeDL
@@ -383,17 +387,17 @@ class Catalog:
                 return
             item = ET.SubElement(channel, "item")
             ET.SubElement(item, "title").text = episode_title(info.get("title") or path.stem, self.source_type)
-            if self.artwork_url:
-                set_cover(channel, self.artwork_url, channel=True)
+            if artwork := self.artwork_url:
+                set_cover(channel, artwork, rss_url=self.rss_artwork_url)
+                set_cover(item, artwork)
             ET.SubElement(item, "description").text = append_upload_date(info.get("description"), info.get("upload_date"))
             # Match the CLI's raw (unescaped) URL when generating its GUID, so
             # rebuilding the feed later does not make this item look new again.
             ET.SubElement(item, "guid", isPermaLink="false").text = hashlib.md5(f"{unquote(self.base_url)}/{path.name}|{path.stat().st_mtime}".encode()).hexdigest()
             ET.SubElement(item, "enclosure", url=url, length=str(path.stat().st_size), type=mimetypes.guess_type(path.name)[0] or "audio/mpeg")
             ET.SubElement(item, "pubDate").text = email.utils.formatdate(path.stat().st_mtime, usegmt=True)
-            if info.get("duration"):
-                seconds = int(info["duration"])
-                ET.SubElement(item, "{http://www.itunes.com/dtds/podcast-1.0.dtd}duration").text = f"{seconds//3600}:{seconds//60%60:02}:{seconds%60:02}"
+            set_duration(item, info.get("duration"))
+            mark_feed_updated(channel)
             temp = feed.with_name(".feed.web.tmp")
             temp.write_bytes(ET.tostring(tree, encoding="utf-8", xml_declaration=True))
             if (feed.read_bytes() if feed.exists() else None) == original:

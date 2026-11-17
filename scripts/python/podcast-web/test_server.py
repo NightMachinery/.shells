@@ -138,6 +138,7 @@ class CatalogTests(unittest.TestCase):
         self.assertEqual(tree.findtext("./channel/title"), "Keep me")
         self.assertEqual(tree.findtext("./channel/item/guid"), "stable-guid")
         self.assertEqual(len(tree.findall("./channel/item")), 2)
+        self.assertEqual(tree.findall("./channel/item")[1].findtext("{http://www.itunes.com/dtds/podcast-1.0.dtd}duration"), "123")
         self.assertTrue(tree.findall("./channel/item")[1].findtext("description").endswith("1404/Esfand12/13 Wednesday 4/March3/2026"))
 
     def test_original_date_format_and_no_invented_dates(self):
