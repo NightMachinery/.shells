@@ -482,7 +482,7 @@ function emojiChooser()
             if choice.layout and not pendingImages then
                 -- A click on a layout row: the chooser is already gone, so
                 -- export and paste once ready.
-                local emojis, seed = menu.items, EmojiLayout.jumbleSeed
+                local emojis, seed = menu.items, choice.seed or EmojiLayout.jumbleSeed
                 emojiChooserWebp(emojis, function(err, datas)
                     if err then alert_gateway("Emoji WebP: " .. tostring(err), {color="warn"}); return end
                     recent.record(emojis)
@@ -651,7 +651,7 @@ function emojiChooser()
             if menu.active then menu.pick("png") else pasteImage("PNG") end
         end),
         layouts = hs.hotkey.bind('ctrl', 'return', function()
-            if menu.active then menu.close() else menu.open(currentEmojis()) end
+            if menu.active then menu.advance() else menu.open(currentEmojis()) end
         end),
         tab = hs.hotkey.bind('', 'tab', function()
             if menu.active then menu.reroll() else cycleSort() end

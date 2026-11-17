@@ -208,6 +208,33 @@ local function runTests()
         end
     end
     L.textFont = "Tahoma"
+    -- A key names its font, except Tahoma (the font of every older key), so
+    -- history redraws a set as it was made whatever font is chosen now.
+    assert(L.textKey("کتاب", "Tahoma") == "text:کتاب")
+    assert(L.textKey("کتاب", "Geeza Pro") == "text[Geeza Pro]:کتاب")
+    assert(L.textKey("HI", "Geeza Pro") == "text:HI", "the hand-drawn Latin fonts have no font choice")
+    local geeza, tahoma = L.mode("text[Geeza Pro]:کتاب"), L.mode("text:کتاب")
+    assert(geeza.font == "Geeza Pro" and geeza.key == "text[Geeza Pro]:کتاب" and tahoma.font == "Tahoma")
+    L.textFont = "Geeza Pro"
+    assert(L.mode("text:کتاب").font == "Tahoma", "a key without a font stays Tahoma")
+    assert(L.textKey("کتاب") == "text[Geeza Pro]:کتاب", "a new key takes the chosen font")
+    L.textFont = "Tahoma"
+    local function shape(mode)
+        local parts = {}
+        for _, c in ipairs(mode.build(nil, nil, 4)[1]) do parts[#parts+1] = string.format("%.2f,%.2f", c.x, c.y) end
+        return table.concat(parts, " ")
+    end
+    assert(shape(geeza) ~= shape(tahoma), "the two fonts must draw different shapes")
+    assert(L.usesTextFont("text:کتاب") and not L.usesTextFont("text:HI") and not L.usesTextFont("jumble"))
+    -- Tab steps through the fonts in order and wraps; Ctrl+Enter lists them all.
+    assert(#L.variants("text:کتاب") == #L.textFonts and L.variants("text:HI") == nil)
+    local key = "text:کتاب"
+    for _ = 1, #L.textFonts do key = L.nextVariant(key) end
+    assert(key == "text:کتاب", "the fonts wrap around")
+    assert((L.nextVariant("text:کتاب")) == "text[" .. L.textFonts[2] .. "]:کتاب")
+    local jumbleKey, jumbleSeed = L.nextVariant("jumble", 3)
+    assert(jumbleKey == "jumble" and jumbleSeed == 4)
+    assert(#L.variants("jumble", 8) == 8 and L.variants("auto") == nil)
     -- A stroke standing right next to another letter keeps its length: the alef
     -- of برای sits one cell from the ی and was once thinned away as its thickness.
     for _, rows in ipairs({6, 7, 8, 9, 10}) do

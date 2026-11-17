@@ -482,7 +482,7 @@ function telegramEmojiChooser()
         if choice.layout and not images then
             -- A click on a layout row: the chooser is already gone, so export
             -- and paste once ready.
-            local picked,seed=menu.items,EmojiLayout.jumbleSeed
+            local picked,seed=menu.items,choice.seed or EmojiLayout.jumbleSeed
             local ok,err=pcall(T.export,picked,"webp",choice.layout,function(failure,datas)
                 if failure then alert_gateway(tostring(failure),{color="warn"});return end
                 recordPicks(picked)
@@ -607,7 +607,7 @@ function telegramEmojiChooser()
             if menu.active then menu.pick("png") else exportImage("png") end
         end),
         layouts=hs.hotkey.bind("ctrl","return",function()
-            if menu.active then menu.close() else menu.open(currentEntries()) end
+            if menu.active then menu.advance() else menu.open(currentEntries()) end
         end),
         tab=hs.hotkey.bind("","tab",function()if menu.active then menu.reroll() else switchSource() end end),
         save=hs.hotkey.bind("cmd","s",function()
@@ -710,7 +710,7 @@ function emojiStickerHistoryChooser()
         -- A click: the chooser is already gone, so export and paste once ready.
         local entries=choice.entries or menu.items
         local layout=choice.layout or choice.set.layout
-        local seed=choice.layout and EmojiLayout.jumbleSeed or choice.set.seed
+        local seed=choice.layout and (choice.seed or EmojiLayout.jumbleSeed) or choice.set.seed
         local ok,err=pcall(T.export,entries,"webp",layout,function(failure,datas)
             if failure then alert_gateway(tostring(failure),{color="warn"});return end
             paste(datas,{entries=entries,layout=layout,seed=seed})
@@ -720,7 +720,7 @@ function emojiStickerHistoryChooser()
     local function refresh()
         local rows=T.historyRows()
         chooser:placeholderText("Recent sticker sets · "..#rows.." · Enter: WebP · Cmd+Shift+Enter: PNG · "..
-            "Ctrl+Enter: other layouts · Cmd+Backspace: forget")
+            "Tab: next font or seed · Ctrl+Enter: other layouts · Cmd+Backspace: forget")
         ChooserSearch.setChoices(chooser,rows)
     end
     -- Export first, then select, so the paste lands where Hyper+Ctrl+A started.
@@ -745,21 +745,35 @@ function emojiStickerHistoryChooser()
         if row and row.set then exportSet(row.entries,row.set.layout,row.set.seed,format) end
     end
     menu=EmojiLayout.menu{
-        chooser=chooser,ownEnter=true,
+        chooser=chooser,ownEnter=true,ownPane=true,
         images=T.images,
         export=function(layout,format,entries)exportSet(entries,layout,EmojiLayout.jumbleSeed,format)end,
         back=refresh,
     }
+    -- The large preview covers the history rows as well as the menu's.
+    local pane=EmojiLayout.previewPane(chooser,function(row)
+        if menu.active then return menu.preview(row) end
+        if not row.set then return nil end
+        return row.set.layout,#row.entries,row.set.seed,function()return T.images(row.entries)end
+    end)
+    -- Tab on a history row: the same set in its next font or seed.
+    local function vary()
+        local row=chooser:selectedRowContents()
+        if not (row and row.history and EmojiLayout.revise(row.history)) then return end
+        local selected=chooser:selectedRow()
+        refresh()
+        chooser:selectedRow(selected)
+    end
     local hotkeys={
         enter=hs.hotkey.bind("","return",function()exportRow("webp")end),
         webp=hs.hotkey.bind("cmd","return",function()exportRow("webp")end),
         png=hs.hotkey.bind({"cmd","shift"},"return",function()exportRow("png")end),
         layouts=hs.hotkey.bind("ctrl","return",function()
-            if menu.active then menu.close();return end
+            if menu.active then menu.advance();return end
             local row=chooser:selectedRowContents()
             if row and row.entries then menu.open(row.entries) end
         end),
-        tab=hs.hotkey.bind("","tab",function()if menu.active then menu.reroll() end end),
+        tab=hs.hotkey.bind("","tab",function()if menu.active then menu.reroll() else vary() end end),
         forget=hs.hotkey.bind("cmd","delete",function()
             local row=chooser:selectedRowContents()
             if menu.active or not (row and row.history) then return end
@@ -772,6 +786,7 @@ function emojiStickerHistoryChooser()
     local function cleanup()
         closed=true;generation=generation+1
         menu.cleanup()
+        pane.stop()
         if cancelExport then cancelExport();cancelExport=nil end
         for _,hotkey in pairs(hotkeys) do hotkey:delete() end
         inputLangPop()
@@ -782,6 +797,7 @@ function emojiStickerHistoryChooser()
     inputLangPush()
     langSetEn()
     chooser:show()
+    pane.start()
 end
 hyper_bind_v2{mods={"ctrl"},key="a",pressedfn=emojiStickerHistoryChooser}
 if telegramEmojiPrewarmDelay then T.prewarm() end

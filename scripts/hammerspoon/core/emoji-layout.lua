@@ -571,17 +571,19 @@ L.textRows = {english=4, persian=7}
 L.textDotSize = 0.7
 L.textTipSize = 0.7
 -- Clear space, in cells, kept between a dot group and the strokes around it.
-L.textDotGap = 0.15
+L.textDotGap = 0.3
 -- Extra space, in cells, put between two separate strokes that stand side by
 -- side (the alef and the yeh of ای), so that they do not read as one thick stroke.
 L.textStrokeGap = 0.4
 -- The font Persian (and mixed) text is drawn in before it is reduced. Its
 -- proportions carry over: Tahoma's alef barely clears its other letters.
 -- Tab on a Persian text row of the layout menu moves to the next installed
--- font of L.textFonts; the choice is remembered across reloads. Tahoma keeps
--- teeth and dots clearest, Vazirmatn and Geeza Pro have a tall alef and a yeh
--- that dips below the line, IranNastaliq is the calligraphic hand.
-L.textFonts = {"Tahoma", "Vazirmatn", "Geeza Pro", "IranNastaliq"}
+-- font of L.textFonts; the choice is remembered across reloads, and a layout
+-- key names its font (text[Vazirmatn]:word; none means Tahoma). Tahoma keeps
+-- teeth clearest; the others have a taller alef and a yeh that dips below the
+-- line. IranNastaliq is left out as unreadable at these sizes: adding it
+-- here brings it back, its tuning below is kept.
+L.textFonts = {"Tahoma", "Vazirmatn", "Parastoo", "Geeza Pro"}
 -- What a font needs beyond the defaults. rows: a line that runs downhill
 -- needs more rows for the same detail, so L.textRows.persian is multiplied.
 -- size: the raster size is multiplied, for a font that is small for its point
@@ -589,7 +591,10 @@ L.textFonts = {"Tahoma", "Vazirmatn", "Geeza Pro", "IranNastaliq"}
 -- a dot group as one fused piece. ligatures: the font joins letters into
 -- shared glyphs, so a dot cannot be traced to its letter and dots are counted
 -- by shape alone.
-L.textFontTuning = {IranNastaliq={rows=1.8, size=2.6, dot=0.155, ligatures=true}, ["Geeza Pro"]={dot=0.125}}
+L.textFontTuning = {
+    IranNastaliq={rows=1.8, size=2.6, dot=0.155, ligatures=true},
+    ["Geeza Pro"]={dot=0.125}, ["B Nazanin"]={dot=0.105}, Damascus={dot=0.11}, Lalezar={dot=0.15},
+}
 -- Dots by letter. \219\140 is left out: it has two inside a word and none at its end.
 local kLetterDots = {}
 for count, letters in ipairs({"\216\168\216\172\216\174\216\176\216\178\216\182\216\184\216\186\217\129\217\134", "\216\170\217\130\216\169\217\138", "\217\190\216\171\218\134\218\152\216\180"}) do
@@ -604,23 +609,42 @@ local function fontInstalled(name)
     return ok and found and true or false
 end
 -- A font that is not installed (another Mac) falls back to Tahoma.
+local fontOverride
 local function textFont()
-    local font = L.textFont
+    local font = fontOverride
+    if not font then
+        -- The remembered choice counts only while its font is still offered.
+        for _, name in ipairs(L.textFonts) do if name == L.textFont then font = name end end
+    end
     if type(font) == "string" and font ~= "" and (font == "Tahoma" or fontInstalled(font)) then return font end
     return "Tahoma"
 end
-function L.cycleTextFont()
-    local fonts, at = {}, 0
+local function withFont(font, fn, ...)
+    local before = fontOverride
+    fontOverride = font or before
+    local result = table.pack(pcall(fn, ...))
+    fontOverride = before
+    if not result[1] then error(result[2], 0) end
+    return table.unpack(result, 2, result.n)
+end
+function L.installedTextFonts()
+    local fonts = {}
     for _, name in ipairs(L.textFonts) do
-        if name == "Tahoma" or fontInstalled(name) then
-            fonts[#fonts+1] = name
-            if name == textFont() then at = #fonts end
-        end
+        if name == "Tahoma" or fontInstalled(name) then fonts[#fonts+1] = name end
     end
-    L.textFont = fonts[at % #fonts + 1] or "Tahoma"
+    return fonts
+end
+local function fontAfter(font)
+    local fonts, at = L.installedTextFonts(), 0
+    for k, name in ipairs(fonts) do if name == font then at = k end end
+    return fonts[at % #fonts + 1] or "Tahoma"
+end
+function L.setTextFont(font)
+    L.textFont = font
     if hs.settings then hs.settings.set(kTextFontKey, L.textFont) end
     return L.textFont
 end
+function L.cycleTextFont() return L.setTextFont(fontAfter(textFont())) end
 -- Hand-drawn fonts by row count, mostly 3 wide; M and W are 5 and N and Q 4 in
 -- the 4- and 5-row fonts, since at 3 wide round dots blur M, N and H together.
 -- The 3-row font is close to a cipher. Rows are joined by "/", X is lit.
@@ -925,7 +949,7 @@ end
 function L.reduceRaster(pixels, w, h, cell, dotMax, dotUnit, expect, byArea)
     local dotSize = math.max(0.3, math.min(1, tonumber(L.textDotSize) or 0.7))
     local tipSize = math.max(0.3, math.min(1, tonumber(L.textTipSize) or 0.7))
-    local dotGap = math.max(0, math.min(1, tonumber(L.textDotGap) or 0.15))
+    local dotGap = math.max(0, math.min(1, tonumber(L.textDotGap) or 0.3))
     local mask, owner = {}, {}
     for _, p in ipairs(pixels) do
         mask[p.y * w + p.x] = true
@@ -1171,8 +1195,30 @@ function L.reduceRaster(pixels, w, h, cell, dotMax, dotUnit, expect, byArea)
             elseif r and dy == 0 then touching[g.cx] = true end
         end
     end
+    local cutAt = {}
     for b in pairs(touching) do
-        if not crossed[b] and strokeGap > 0 then cuts[#cuts+1] = b + 0.5 end
+        if not crossed[b] and strokeGap > 0 then cuts[#cuts+1] = b + 0.5; cutAt[b] = true end
+    end
+    -- Where no cut can part them (one piece above another, as the bar of a gaf
+    -- over its arm), the smaller piece moves away whole, by the same gap.
+    local pieceSize, push = {}, {}
+    for _, g in pairs(grid) do pieceSize[piece(g)] = (pieceSize[piece(g)] or 0) + 1 end
+    for _, g in pairs(grid) do
+        for _, d in ipairs({{1, 0}, {0, 1}}) do
+            local r = grid[gk(g.cx + d[1], g.cy + d[2])]
+            if r and piece(r) ~= piece(g) and not (d[1] == 1 and cutAt[g.cx]) and strokeGap > 0 then
+                local small, way = piece(g), -1
+                if pieceSize[piece(r)] < pieceSize[small] then small, way = piece(r), 1 end
+                push[small] = push[small] or {0, 0}
+                push[small][1], push[small][2] = push[small][1] + d[1] * way, push[small][2] + d[2] * way
+            end
+        end
+    end
+    local function pushed(g)
+        local p = push[piece(g)]
+        if not p then return 0, 0 end
+        if math.abs(p[2]) >= math.abs(p[1]) then return 0, (p[2] < 0 and -1 or 1) * strokeGap end
+        return (p[1] < 0 and -1 or 1) * strokeGap, 0
     end
     local function cutShift(x)
         local n = 0
@@ -1186,7 +1232,8 @@ function L.reduceRaster(pixels, w, h, cell, dotMax, dotUnit, expect, byArea)
         for l, n in pairs(g.letters) do
             if n > most or (n == most and l < letter) then letter, most = l, n end
         end
-        local c = {x=g.cx + cutShift(g.cx), y=g.cy, s=1, letter=letter}
+        local pushX, pushY = pushed(g)
+        local c = {x=g.cx + cutShift(g.cx) + pushX, y=g.cy + pushY, s=1, letter=letter}
         local count, _, joined, toward = around(g.cx, g.cy)
         if count > 0 and joined and toward and g.n < 0.55 * cell and tipSize < 1 then
             c.s = tipSize
@@ -1487,12 +1534,12 @@ end
 -- One cell per lit pixel, lines centred. Each letter is one emoji, cycling
 -- through the selection. With more emoji than letters, each pixel row is one
 -- emoji (stripes), and with more than rows, each pixel.
-function L.textCells(word, n)
+function L.textCells(word, n, font)
     local cells, letter, totalHeight
     if isFontWord(word) then
         cells, letter, totalHeight = fontCells(word)
     else
-        cells, letter, totalHeight = bitmapCells(word)
+        cells, letter, totalHeight = withFont(font, bitmapCells, word)
     end
     n = n or letter
     if n > 0 then
@@ -1507,36 +1554,74 @@ end
 
 -- Cached per word and row setting, since repeatTo is the cell count.
 local textModes = {}
-local function textMode(key, word)
-    local id = string.format("%s\0%s\0%s\0%s\0%s", key, select(2, latinFont()), persianRows(),
-        tostring(L.textDotSize), tostring(L.textTipSize)) .. "\0" .. tostring(L.textStrokeGap) .. "\0" .. tostring(L.textDotGap)
-        .. "\0" .. textFont()
+local function textMode(key, word, font)
+    font = font and withFont(font, textFont)
+    local id = table.concat({key, select(2, latinFont()), persianRows(), tostring(L.textDotSize),
+        tostring(L.textTipSize), tostring(L.textStrokeGap), tostring(L.textDotGap), font or ""}, "\0")
     if not textModes[id] then
-        local cells = L.textCells(word)
+        local cells = L.textCells(word, nil, font)
         local name = "Text " .. word
-        if not isFontWord(word) then name = name .. " · " .. textFont() end
+        if font then name = name .. " · " .. font end
         textModes[id] = {key=key, name=name, note="the word in emoji, a letter per emoji",
-            word=word, repeatTo=#cells, assigns=true,
-            build=function(_, _, n) return {L.textCells(word, n)} end}
+            word=word, font=font, repeatTo=#cells, assigns=true,
+            build=function(_, _, n) return {L.textCells(word, n, font)} end}
     end
     return textModes[id]
 end
 
--- Whether a layout is drawn in L.textFont (Persian or mixed text).
+-- A text layout's key. Persian (or mixed) text names its font, text[Font]:word;
+-- Tahoma, the font of every key written before fonts could be chosen, is left out.
+function L.textKey(word, font)
+    if isFontWord(word) then return "text:" .. word end
+    font = font or textFont()
+    return font == "Tahoma" and ("text:" .. word) or ("text[" .. font .. "]:" .. word)
+end
+local function parseTextKey(key)
+    if type(key) ~= "string" then return nil end
+    local font, raw = key:match("^text%[([^%]]+)%]:(.+)$")
+    if not raw then font, raw = nil, key:match("^text:(.+)$") end
+    local word = raw and L.textWord(raw)
+    if not word then return nil end
+    if isFontWord(word) then return word, nil end
+    return word, font or "Tahoma"
+end
+
+-- Whether a layout is drawn in a font of L.textFonts (Persian or mixed text).
 function L.usesTextFont(key)
-    local word = type(key) == "string" and L.textWord(key:match("^text:(.+)$"))
-    return word and not isFontWord(word) or false
+    local word, font = parseTextKey(key)
+    return word and font and true or false
 end
 
 function L.mode(key)
     for _, mode in ipairs(L.modes) do if mode.key == key then return mode end end
-    local word = type(key) == "string" and L.textWord(key:match("^text:(.+)$"))
-    if word then return textMode("text:" .. word, word) end
+    local word, font = parseTextKey(key)
+    if word then return textMode(L.textKey(word, font), word, font) end
     error("Unknown emoji layout: " .. tostring(key))
+end
+
+-- What Tab steps through for a layout: the installed fonts for Persian text,
+-- the next seeds for a seeded layout. Nil when there is nothing to choose.
+function L.variants(key, count)
+    local word, font = parseTextKey(key)
+    local list = {}
+    if word and font then
+        for _, name in ipairs(L.installedTextFonts()) do list[#list+1] = {key=L.textKey(word, name), font=name} end
+    elseif L.seeded(key) then
+        for seed = L.jumbleSeed, L.jumbleSeed + (count or 8) - 1 do list[#list+1] = {key=key, seed=seed} end
+    end
+    return #list > 1 and list or nil
+end
+-- The next of them after the given one: a key and a seed.
+function L.nextVariant(key, seed)
+    local word, font = parseTextKey(key)
+    if word and font then return L.textKey(word, fontAfter(font)), seed end
+    if L.seeded(key) then return key, (seed or L.jumbleSeed) + 1 end
+    return key, seed
 end
 
 -- Whether a layout's cells depend on the seed, which Tab re-rolls.
 function L.seeded(key)
+    if parseTextKey(key) then return false end
     local ok, mode = pcall(L.mode, key)
     return ok and mode.seeded or false
 end
@@ -1654,11 +1739,11 @@ function L.thumbnail(images, key, built, size)
 end
 
 -- Chooser rows for the Ctrl+Enter menu, last used first.
-function L.row(images, n, mode)
-    local built, slots = L.build(mode.key, n, L.jumbleSeed)
-    local name = mode.seeded and (mode.name .. " #" .. L.jumbleSeed) or mode.name
+function L.row(images, n, mode, seed)
+    local built, slots = L.build(mode.key, n, seed or L.jumbleSeed)
+    local name = mode.seeded and (mode.name .. " #" .. (seed or L.jumbleSeed)) or mode.name
     local row = {text=name, subText=L.describe(mode.key, n, built, slots), layout=mode.key,
-                 searchText=mode.name .. " " .. mode.note}
+                 seed=mode.seeded and seed or nil, searchText=mode.name .. " " .. mode.note}
     local ok, image = pcall(L.thumbnail, images, mode.key, built)
     if ok then row.image = image end
     return row
@@ -1668,7 +1753,7 @@ end
 function L.textRow(images, n, query)
     local word = L.textWord(query)
     if not word then return nil end
-    local row = L.row(images, n, L.mode("text:" .. word))
+    local row = L.row(images, n, L.mode(L.textKey(word)))
     row.searchText = query
     return row
 end
@@ -1676,11 +1761,13 @@ end
 function L.choices(images, n)
     local rows, last = {}, hs.settings.get(kLastKey)
     local modes = L.available(n)
-    for _, word in ipairs(L.words()) do modes[#modes+1] = L.mode("text:" .. word) end
+    for _, word in ipairs(L.words()) do modes[#modes+1] = L.mode(L.textKey(word)) end
     local lastKey = last
-    if type(last) == "string" and last:match("^text:") then
+    if type(last) == "string" and last:match("^text[:%[]") then
         local ok, lastMode = pcall(L.mode, last)
         if ok then
+            -- The remembered word, in the font chosen now.
+            lastMode = L.mode(L.textKey(lastMode.word))
             lastKey = lastMode.key
             local seen = false
             for _, mode in ipairs(modes) do if mode.key == lastKey then seen = true; break end end
@@ -1784,15 +1871,92 @@ function L.pasteRest(datas)
     if #datas > 1 then L.sequenceTimer = hs.timer.doAfter(L.sequenceDelay, step) end
 end
 
+-- A large picture of the highlighted row, at the right of the screen: a row's
+-- own image is too small to judge a shape by. resolve(row) gives the layout
+-- key, the emoji count, the seed and a function returning the images, or nil
+-- for a row that has no layout.
+L.previewSize = L.previewSize or 440
+function L.previewPane(chooser, resolve)
+    local pane, canvas, timer, shown = {}, nil, nil, nil
+    local function draw()
+        local row = chooser:selectedRowContents()
+        local key, n, seed, images
+        if row and next(row) then key, n, seed, images = resolve(row) end
+        local id = key and table.concat({key, tostring(n), tostring(seed), tostring(row.text), tostring(row.history)}, "\0")
+        if id == shown then return end
+        shown = id
+        local image
+        if id then
+            local frame = hs.screen.mainScreen():frame()
+            local size = math.floor(math.min(L.previewSize, frame.w * 0.27))
+            local ok, result = pcall(function()
+                return L.thumbnail(images(), key, (L.build(key, n, seed)), size - 28)
+            end)
+            if ok and result then
+                image = result
+                if not canvas then
+                    canvas = hs.canvas.new({x=frame.x + frame.w - size - 20, y=frame.y + frame.h * 0.14, w=size, h=size})
+                    canvas:level(hs.canvas.windowLevels.screenSaver)
+                    canvas:behavior({"canJoinAllSpaces", "stationary"})
+                end
+                canvas:replaceElements(
+                    {type="rectangle", fillColor={white=1, alpha=0.97},
+                     strokeColor={white=0, alpha=0.25}, strokeWidth=1, action="strokeAndFill",
+                     roundedRectRadii={xRadius=20, yRadius=20}},
+                    {type="image", image=image, imageScaling="scaleProportionally",
+                     frame={x=14, y=14, w=size - 28, h=size - 28}})
+                canvas:show()
+            end
+        end
+        if not image and canvas then canvas:hide() end
+    end
+    function pane.start()
+        if timer or not (hs.timer and hs.screen and hs.canvas and hs.canvas.windowLevels) then return end
+        shown = nil
+        timer = hs.timer.doEvery(0.12, function() pcall(draw) end)
+        pcall(draw)
+    end
+    function pane.stop()
+        if timer then timer:stop(); timer = nil end
+        if canvas then canvas:delete(); canvas = nil end
+        shown = nil
+    end
+    return pane
+end
+
 -- The Ctrl+Enter menu inside an open chooser. o.images(items) gives preview
 -- images, o.export(key, format, items) exports, o.back() restores the list.
--- o.ownEnter means the caller already binds Enter and calls m.pick itself.
+-- o.ownEnter means the caller already binds Enter and calls m.pick itself;
+-- o.ownPane that it shows its own L.previewPane.
+-- Ctrl+Enter goes one level deeper each time (m.advance): the layouts, then,
+-- on a row that has them, every choice Tab would step through (the fonts of
+-- a Persian word, the next Jumble seeds), then back to the caller's list.
 function L.menu(o)
     local m = {active=false}
     local enter
+    local pane = not o.ownPane and L.previewPane(o.chooser, function(row) return m.preview(row) end)
+    function m.preview(row)
+        if not (m.active and row.layout) then return nil end
+        return row.layout, #m.items, row.seed or L.jumbleSeed, function() return o.images(m.items) end
+    end
     local function show(keepRow)
         local row = keepRow and o.chooser:selectedRow() or 1
         local images = o.images(m.items)
+        if m.variantsOf then
+            local choices = {}
+            for _, variant in ipairs(L.variants(m.variantsOf, 8) or {}) do
+                local choice = L.row(images, #m.items, L.mode(variant.key), variant.seed)
+                if not keepRow and variant.key == m.variantsOf and not variant.seed then row = #choices + 1 end
+                choices[#choices+1] = choice
+            end
+            ChooserSearch.setDynamic(o.chooser, nil)
+            ChooserSearch.setChoices(o.chooser, choices)
+            o.chooser:selectedRow(row)
+            o.chooser:placeholderText((L.seeded(m.variantsOf) and "Seeds" or "Fonts") .. " for " ..
+                L.mode(m.variantsOf).name .. " · Enter: WebP · Cmd+Shift+Enter: PNG" ..
+                (L.seeded(m.variantsOf) and " · Tab: more" or "") .. " · Ctrl+Enter: back")
+            return
+        end
         local choices = L.choices(images, #m.items)
         local byLayout = {}
         for _, choice in ipairs(choices) do
@@ -1804,20 +1968,21 @@ function L.menu(o)
         ChooserSearch.setDynamic(o.chooser, function(query)
             local word = L.textWord(query)
             if not word then return nil end
-            local textRow = byLayout["text:" .. word] or L.textRow(images, #m.items, query)
+            local textRow = byLayout[L.textKey(word)] or L.textRow(images, #m.items, query)
             return textRow and {textRow} or nil
         end, "layout")
         ChooserSearch.setChoices(o.chooser, choices)
         o.chooser:selectedRow(row)
         o.chooser:placeholderText("Layout for " .. #m.items .. " emoji · type a word to spell it · " ..
-            "Enter: WebP · Cmd+Shift+Enter: PNG · Tab: re-roll, or next font on Persian text · Ctrl+Enter: back")
+            "Enter: WebP · Cmd+Shift+Enter: PNG · Tab: next seed or font · Ctrl+Enter: all of them, or back")
     end
     function m.open(items)
         if #items == 0 then return end
         if not m.active then m.query = o.chooser:query() end
-        m.items, m.active = items, true
+        m.items, m.active, m.variantsOf = items, true, nil
         o.chooser:query("")
         show(false)
+        if pane then pane.start() end
         if not o.ownEnter then
             enter = enter or hs.hotkey.bind("", "return", function() m.pick("webp") end)
         end
@@ -1833,8 +1998,23 @@ function L.menu(o)
         o.chooser:query(m.query or "")
         o.back()
     end
+    function m.advance()
+        if not m.active then return end
+        local row = not m.variantsOf and o.chooser:selectedRowContents()
+        if row and row.layout and L.variants(row.layout) then
+            m.variantsOf = row.layout
+            o.chooser:query("")
+            show(false)
+            return
+        end
+        m.close()
+    end
     -- Tab: the next font on a Persian text row, a new Jumble anywhere else.
     function m.reroll()
+        if m.variantsOf then
+            if L.seeded(m.variantsOf) then L.jumbleSeed = L.jumbleSeed + 8; show(false) end
+            return
+        end
         local row = o.chooser:selectedRowContents()
         if row and L.usesTextFont(row.layout) then L.cycleTextFont() else L.jumbleSeed = L.jumbleSeed + 1 end
         show(true)
@@ -1842,12 +2022,15 @@ function L.menu(o)
     function m.pick(format)
         local row = o.chooser:selectedRowContents()
         if not (row and row.layout) then return end
+        if row.seed then L.jumbleSeed = row.seed end
+        if L.usesTextFont(row.layout) then L.setTextFont(L.mode(row.layout).font) end
         L.remember(row.layout)
         o.export(row.layout, format, m.items)
     end
     function m.cleanup()
         if m.active then ChooserSearch.setDynamic(o.chooser, nil) end
-        m.active = false
+        m.active, m.variantsOf = false, nil
+        if pane then pane.stop() end
         if enter then enter:delete(); enter = nil end
     end
     return m
@@ -1892,6 +2075,18 @@ function L.record(entries, layout, seed)
         if historyKey(entry.items, entry.layout, entry.seed) ~= key then history[#history+1] = entry end
     end
     hs.settings.set(kHistoryKey, history)
+end
+
+-- Tab on a history row: the same set in its next font or seed, in place.
+function L.revise(index)
+    local history = L.history()
+    local entry = history[index]
+    if not entry then return false end
+    local layout, seed = L.nextVariant(entry.layout, entry.seed)
+    if layout == entry.layout and seed == entry.seed then return false end
+    entry.layout, entry.seed = layout, seed
+    hs.settings.set(kHistoryKey, history)
+    return true
 end
 
 function L.forget(index)

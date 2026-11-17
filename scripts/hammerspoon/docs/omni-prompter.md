@@ -152,9 +152,15 @@ Ctrl+Enter replaces the emoji list with layout rows. Each row has a 64px
 preview of the actual selection and the approximate size, such as
 `≈512×476, 245px cells`, flagged `small in Telegram` when the short side drops
 below 128px. Enter pastes the highlighted layout as WebP, Cmd+Shift+Enter as
-PNG, Tab re-rolls Jumble, Ctrl+Enter returns to the emoji list (restoring the
-query), and Shift+Backspace still removes the last pick and refreshes the
-previews. The last layout used is listed first. Every shape is offered for any
+PNG, and Shift+Backspace still removes the last pick and refreshes the
+previews. Tab steps the highlighted row to its next choice: a new seed for
+Jumble, the next font for Persian text. Ctrl+Enter goes one level deeper: on a
+row that has such choices it lists them all (the installed fonts, or the next
+eight seeds, where Tab shows eight more), and from there, or from any other
+row, it returns to the emoji list (restoring the query). While these lists are
+open, a large picture of the highlighted row is shown at the right of the
+screen (`EmojiLayout.previewSize`, 440px), since a row's own image is too
+small to judge a shape by. The last layout used is listed first. Every shape is offered for any
 selection: a short one repeats to a minimum that suits the shape (shown as
 `repeated to N` in the row), and a shape of fixed size (a board, a flake, a
 tree, a pixel heart) cycles the selection over its extra cells. Shapes stop
@@ -245,17 +251,24 @@ raster, which `EmojiLayout.reduceRaster` brings down to the grid:
   off).
 - **Dot counts come from the alphabet.** `پ` has three dots whatever the font
   draws: where a font fuses a pair or a triangle into one piece (Geeza Pro),
-  the piece is split into the dots its letter must have. Dots keep
-  `EmojiLayout.textDotGap` (0.15 of a cell) clear of the strokes around them.
-- **Tab changes the font.** On a Persian text row of the layout menu, Tab
-  moves to the next installed font of `EmojiLayout.textFonts`, and the row
-  names the font; the choice is remembered. Tahoma (the default) keeps teeth
-  clearest but its alef barely clears its other letters. Vazirmatn
-  (`brew install --cask font-vazirmatn`) and Geeza Pro have a tall alef and a
-  `ی` that dips below the line. IranNastaliq is the calligraphic hand: drawn
-  with 1.8 times the rows, hard to read, and its squeezed dot groups are
-  counted by area, so a dot can go missing. A font that is not installed is
-  skipped. Per-font adjustments live in `EmojiLayout.textFontTuning`.
+  the piece is split into the dots its letter must have.
+- **Dots stay clear of strokes.** A dot group keeps `EmojiLayout.textDotGap`
+  (0.3 of a cell) of space to every stroke around it.
+- **Stacked strokes get the same gap.** A small piece sitting on another, as
+  the bar of a `گ` on its arm, moves away whole by `textStrokeGap`.
+- **Tab changes the font.** On a Persian text row, Tab moves to the next
+  installed font of `EmojiLayout.textFonts`: Tahoma (the default, clearest
+  teeth, short alef), Vazirmatn and Parastoo (tall alef, a `ی` that dips below
+  the line; `brew install --cask font-vazirmatn font-parastoo`), Geeza Pro. A
+  font that is not installed is skipped, and the choice is remembered.
+- **The key names the font.** A Persian text layout's key is
+  `text[Vazirmatn]:word`; plain `text:word` means Tahoma. So last-used and
+  history redraw a set in the font it was made with.
+- **Left out:** IranNastaliq (unreadable at these sizes, and its squeezed dot
+  groups lose dots), Lalezar, B Nazanin and Damascus (broken strokes or wrong
+  dot counts), Estedad (like Vazirmatn but more fragmented). Their tuning in
+  `EmojiLayout.textFontTuning` is kept: adding a name to `textFonts` brings
+  the font back.
 
 Each letter (in logical reading order for RTL scripts) is one emoji, cycling
 the selection; with more emoji than letters each row is one emoji (stripes),
@@ -283,7 +296,10 @@ name, the count and the age.
   Cmd+Shift+Enter as PNG. Re-pasting moves it to the top.
 - Ctrl+Enter lists the other layouts for that set, exactly as in the pickers;
   Enter there pastes in the chosen layout and records it as a new set.
-  Ctrl+Enter again returns to the history.
+  Ctrl+Enter again lists the fonts or seeds of the highlighted row, as in
+  the pickers, and then returns to the history.
+- Tab redraws the highlighted set in its next font (Persian text) or seed
+  (Jumble), in place. The large picture at the right follows the highlight.
 - Cmd+Backspace forgets the highlighted set.
 
 Sets may mix Unicode and premium emoji. They are stored in the Hammerspoon
