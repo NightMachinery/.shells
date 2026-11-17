@@ -401,6 +401,13 @@ with, and Paseo's `codex app-server` processes outlive edits to `config.toml`. O
 for exactly that reason. Any failure (no `paseo-ls`, no session id, unreadable
 records) falls through to the normal bell.
 
+### Sessions on an agent-desk node
+
+A turn's end does not ring for a session that has joined an agent-desk node while
+the desk notifies: its questions and done report raise their own notifications.
+Prompts with a message (a permission request) still ring. `agent_desk_bell_on_node=y`
+restores the bell. See "The turn-end bell" in [agent-desk.md](agent-desk.md).
+
 ### Making them persist until dismissed
 
 Whether a notification fades on its own is decided by its *style*, not by the

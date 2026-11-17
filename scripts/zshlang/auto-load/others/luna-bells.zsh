@@ -1923,6 +1923,16 @@ runs goes to [agfi:bell-paseo] instead."
         return $?
     fi
 
+    #: A turn's end (no message: Claude Code's Stop, Codex's turn-complete) is
+    #: not rung for a session on an agent-desk node while the desk notifies:
+    #: what it needs from the user arrives as its questions and done report.
+    #: Prompts that carry a message, such as a permission request, still ring.
+    #: agent_desk_bell_on_node=y rings as before. See ./docs/agent-desk.md.
+    if test -z "$msg" && test -n "$id" && ! bool "${agent_desk_bell_on_node:-n}" &&
+            (( ${+functions[h-agent-desk-on-node-p]} )) && h-agent-desk-on-node-p "$app" "$id" ; then
+        return 0
+    fi
+
     #: Before the name lookup, so a silenced subagent costs one tmux call.
     local tlg="${bell_auto_tlg:-auto}"
     if [[ "$(h-bell-agent-role "$pane" "$node_p" "$id")" == sub ]] ; then
