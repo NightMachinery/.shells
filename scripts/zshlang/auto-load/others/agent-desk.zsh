@@ -61,8 +61,49 @@ agent_desk_ssh_hosts."
             lines+=( "$(h-agent-desk-toml-str "$h") = $(h-agent-desk-toml-str "${hosts[$h]}")" )
         done
     fi
+    lines+=( '' '[tasks]'
+        "launch_command = $(h-agent-desk-toml-str "$z agent-desk-task-launch")"
+        "quota_command = $(h-agent-desk-toml-str "$z agent-desk-quota-json")"
+    )
     print -rl -- "${lines[@]}" > "${file}" @RET
     ec "${file}"
+}
+
+function agent-desk-task-launch {
+    : "launch_command: starts a Paseo agent on the deferred task on stdin and prints its id. The task's profile is provider[/model][@thinking], default \$agent_desk_task_profile or codex/gpt-6.1-terra@high; Codex runs in auto-review mode."
+    local json prompt cwd title profile provider thinking id
+    json="$(command cat)" @RET
+    prompt="$(print -r -- "${json}" | command jq -r '.prompt')" @RET
+    cwd="$(print -r -- "${json}" | command jq -r '.cwd // empty')"
+    title="$(print -r -- "${json}" | command jq -r '"\(.display_id) \(.title)"')"
+    id="$(print -r -- "${json}" | command jq -r '.id')"
+    profile="$(print -r -- "${json}" | command jq -r '.profile // empty')"
+    test -n "${profile}" || profile="${agent_desk_task_profile:-codex/gpt-6.1-terra@high}"
+    provider="${profile%%@*}"
+    thinking=''
+    [[ "${profile}" == *@* ]] && thinking="${profile#*@}"
+    test -d "${cwd}" || cwd="${HOME}"
+    local -a args=( run --no-wait -q --provider "${provider}" --cwd "${cwd}" --title "${title[1,80]}" --label "agent-desk.task=${id}" )
+    test -n "${thinking}" && args+=( --thinking "${thinking}" )
+    [[ "${provider}" == codex* ]] && args+=( --mode auto-review )
+    #: The user launches it, so it is no agent's child.
+    command env -u PASEO_AGENT_ID "${agent_desk_paseo:-paseo}" "${args[@]}" "${prompt}"
+}
+
+function agent-desk-quota-json {
+    : "quota_command: prints every account's usage as {\"gauges\": {name: {pct, reset}}}, through the quota-management skill's readers"
+    local dir="${HOME}/.claude/skills/quota-management/scripts"
+    test -r "${dir}/quota_readers.py" || { ecerr "$0: no quota readers at ${dir}" ; return 1 }
+    QUOTA_READERS_DIR="${dir}" command python3 -c '
+import json, os, sys
+sys.path.insert(0, os.environ["QUOTA_READERS_DIR"])
+import quota_readers as q
+_, readers = q.choose_readers()
+gauges = {}
+for source, reader in readers.items():
+    gauges.update(q.measure(source, reader)[0])
+print(json.dumps({"gauges": gauges}))
+'
 }
 
 function h-agent-desk-toml-str {

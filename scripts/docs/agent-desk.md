@@ -65,6 +65,21 @@ answered.
   with [agfi:h-agent-done-open-report], as Agent Done's card does; else the
   item's page on the dashboard; else a new kitty window running
   `agent-desk inbox <path>`, scoped to the item's node.
+- [agfi:agent-desk-task-launch] (`[tasks] launch_command`): starts a Paseo
+  agent on a deferred task with `paseo run --no-wait`, outside any agent
+  (`PASEO_AGENT_ID` removed), in the task's directory, titled with its id and
+  title and labelled `agent-desk.task=<id>`. The task's profile is
+  `provider[/model][@thinking]`; without one, `agent_desk_task_profile`, else
+  `codex/gpt-6.1-terra@high`. Codex runs in `auto-review` mode. Set
+  `agent_desk_paseo` to another binary to test it without launching.
+- [agfi:agent-desk-quota-json] (`[tasks] quota_command`): every account's
+  usage through the quota-management skill's readers, for
+  `agent-desk task nudge`. That command needs a scheduler; the crontab line
+  is `20 */3 * * * "$HOME/go/bin/agent-desk" task nudge >/dev/null 2>&1`.
+- The prompt hook: `UserPromptSubmit` in Claude Code's `settings.json` and
+  Codex's `hooks.json` runs `agent-desk hook prompt`, which keeps the user's
+  messages to a session on the desk word for word (`agent-desk
+  instructions`). Codex asks to trust the new handler at its next launch.
 - `agent-done` lists open blocked questions in its report and files the
   session's end on the desk; see "agent-desk" in [agent-done.md](agent-done.md).
 
