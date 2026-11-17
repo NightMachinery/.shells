@@ -167,10 +167,10 @@ class Library:
 
     def schedule_catalog(self, catalog):
         with catalog.lock:
-            for source in ("uploads", "playlists"):
+            for source in ("uploads", "playlists", "shorts"):
                 catalog.refreshes[source] = {"status": "loading", "error": None}
         def fetch():
-            for source in ("uploads", "playlists"):
+            for source in ("uploads", "playlists", "shorts"):
                 catalog.refresh(source)
         self.refresh_pool.submit(fetch)
 
@@ -283,8 +283,7 @@ class Library:
                 with catalog.db() as episodes:
                     existing = [r[0] for r in episodes.execute("SELECT video FROM membership WHERE playlist='uploads' ORDER BY position")]
                     for e in entries:
-                        episodes.execute("INSERT INTO episodes(id,title,duration,published) VALUES(?,?,?,?) ON CONFLICT(id) DO UPDATE SET title=excluded.title,duration=coalesce(excluded.duration,episodes.duration),published=coalesce(excluded.published,episodes.published)",
-                            (e["id"], e.get("title") or e["id"], e.get("duration"), e.get("upload_date")))
+                        catalog.upsert_episode(episodes, e)
                     ids = [e["id"] for e in entries]
                     order = ids + [vid for vid in existing if vid not in set(ids)]
                     episodes.execute("DELETE FROM membership WHERE playlist='uploads'")
@@ -309,6 +308,13 @@ class Library:
         def run():
             while not self.stop.is_set():
                 for row in self.podcasts():
+                    catalog = self.catalog(row["id"])
+                    with catalog.db() as db:
+                        cached = db.execute("SELECT updated FROM sources WHERE id='shorts'").fetchone()
+                    with catalog.lock:
+                        if (not cached or time.time() - cached[0] > 21600) and catalog.refreshes.get("shorts", {}).get("status") != "loading":
+                            catalog.refreshes["shorts"] = {"status": "loading", "error": None}
+                            self.refresh_pool.submit(catalog.refresh, "shorts")
                     if row["auto_download"]:
                         self.poll_auto(row["id"])
                 self.rebuild_feeds()

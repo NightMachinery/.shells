@@ -56,7 +56,7 @@ Filters persist per browser, while archives persist across devices. A downloaded
 library view also lists files whose videos are no longer in the channel catalog.
 Each list shows its visible and total episode counts. Filter checkboxes include
 downloaded/archived counts for the selected playlist, and a summary explains hidden
-episodes. “Show all” clears the search and both hide filters for the current view.
+episodes. YouTube Shorts are hidden by default using Shorts URLs and a cached channel Shorts tab, never duration guesses. Minimum and maximum lengths use minutes (inclusive, decimals allowed); unknown lengths are excluded while a limit is set. These filters are saved in the browser. “Show all” clears search, length limits and all hide filters. The Shorts index refreshes on startup when missing, every six hours, or with Refresh catalog.
 
 Downloads run one at a time, preserve the existing M4A format, include a video ID
 in the filename, update the existing feed atomically, and append to the CLI's

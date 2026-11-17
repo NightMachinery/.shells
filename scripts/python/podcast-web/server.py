@@ -51,6 +51,8 @@ class Catalog:
             CREATE TABLE IF NOT EXISTS jobs(id TEXT PRIMARY KEY, status TEXT, error TEXT, updated REAL);
             UPDATE jobs SET status='error', error='Interrupted by restart; retry the download.' WHERE status IN ('queued','downloading');
             """)
+            if "is_short" not in {row[1] for row in db.execute("PRAGMA table_info(episodes)")}:
+                db.execute("ALTER TABLE episodes ADD COLUMN is_short INTEGER NOT NULL DEFAULT 0")
 
     def db(self):
         db = sqlite3.connect(self.state / "catalog.sqlite", timeout=30)
@@ -66,7 +68,7 @@ class Catalog:
     def schedule_refresh(self, source="uploads"):
         if not isinstance(source, str):
             raise ValueError("Expected a source name")
-        if source not in ("uploads", "playlists"):
+        if source not in ("uploads", "playlists", "shorts"):
             with self.db() as db:
                 if not db.execute("SELECT 1 FROM playlists WHERE id=?", (source,)).fetchone():
                     raise ValueError("Unknown playlist")
@@ -92,6 +94,13 @@ class Catalog:
                             continue
                         raise
                 info = {"entries": entries}
+            elif source == "shorts":
+                try:
+                    info = self.extract(f"https://www.youtube.com/channel/{self.channel}/shorts")
+                except Exception as exc:
+                    if "does not have a" not in str(exc) or " tab" not in str(exc):
+                        raise
+                    info = {"entries": []}
             else:
                 url = f"https://www.youtube.com/playlist?list={'UU' + self.channel[2:] if source == 'uploads' else source}"
                 info = self.extract(url)
@@ -116,8 +125,7 @@ class Catalog:
                         published = e.get("upload_date")
                         if not published and e.get("timestamp"):
                             published = time.strftime("%Y%m%d", time.gmtime(e["timestamp"]))
-                        db.execute("INSERT INTO episodes(id,title,duration,published) VALUES(?,?,?,?) ON CONFLICT(id) DO UPDATE SET title=excluded.title,duration=coalesce(excluded.duration,episodes.duration),published=coalesce(excluded.published,episodes.published)",
-                                   (vid, e.get("title") or vid, e.get("duration"), published))
+                        self.upsert_episode(db, dict(e, upload_date=published), source == "shorts")
                         db.execute("INSERT OR IGNORE INTO membership VALUES(?,?,?)", (source, vid, pos))
                 db.execute("INSERT INTO sources VALUES(?,?) ON CONFLICT(id) DO UPDATE SET updated=excluded.updated", (source, time.time()))
             with self.lock:
@@ -126,6 +134,17 @@ class Catalog:
             logging.exception("Catalog refresh failed")
             with self.lock:
                 self.refreshes[source] = {"status": "error", "error": str(exc)[-600:]}
+
+    @staticmethod
+    def upsert_episode(db, entry, is_short=False):
+        is_short = is_short or entry.get("is_short") is True or any(
+            "/shorts/" in (entry.get(key) or "") for key in ("url", "webpage_url"))
+        db.execute("""INSERT INTO episodes(id,title,duration,published,is_short) VALUES(?,?,?,?,?)
+            ON CONFLICT(id) DO UPDATE SET title=excluded.title,
+            duration=coalesce(excluded.duration,episodes.duration),
+            published=coalesce(excluded.published,episodes.published),
+            is_short=max(episodes.is_short,excluded.is_short)""",
+            (entry["id"], entry.get("title") or entry["id"], entry.get("duration"), entry.get("upload_date"), bool(is_short)))
 
     def scan_audio(self, force=False):
         with self.lock:

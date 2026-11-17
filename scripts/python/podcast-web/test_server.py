@@ -1,6 +1,7 @@
 import http.client
 import importlib.util
 import json
+import sqlite3
 from pathlib import Path
 import tempfile
 import threading
@@ -81,6 +82,46 @@ class CatalogTests(unittest.TestCase):
             self.catalog.refresh("uploads")
         self.assertEqual(len(self.catalog.snapshot()["memberships"]["uploads"]), 123)
         self.assertEqual(self.catalog.refreshes["uploads"]["status"], "error")
+
+    def test_shorts_index_preserves_lengths_and_does_not_guess_from_duration(self):
+        regular, short = "regular0001", "short000001"
+        self.catalog.extract = lambda url: {"entries": [
+            {"id": regular, "title": "A short regular video", "duration": 45},
+            {"id": short, "title": "A Short", "duration": 90}]}
+        self.catalog.refresh("uploads")
+        self.catalog.extract = lambda url: {"entries": [{"id": short, "title": "A Short"}]}
+        self.catalog.refresh("shorts")
+        # Uploads and playlist responses often use watch URLs even for Shorts.
+        self.catalog.extract = lambda url: {"entries": [{"id": short, "title": "A Short", "url": "https://www.youtube.com/watch?v=" + short}]}
+        self.catalog.refresh("uploads")
+        rows = {e["id"]: e for e in self.catalog.snapshot()["episodes"]}
+        self.assertFalse(rows[regular]["is_short"])
+        self.assertTrue(rows[short]["is_short"])
+        self.assertEqual(rows[short]["duration"], 90)
+
+    def test_shorts_url_and_missing_tab(self):
+        self.catalog.extract = lambda url: {"entries": [{"id": ID, "title": "Short", "url": "https://www.youtube.com/shorts/" + ID}]}
+        self.catalog.refresh("uploads")
+        self.assertTrue(self.catalog.snapshot()["episodes"][0]["is_short"])
+        self.catalog.extract = lambda url: (_ for _ in ()).throw(ValueError("This channel does not have a shorts tab"))
+        self.catalog.refresh("shorts")
+        self.assertEqual(self.catalog.refreshes["shorts"]["status"], "ready")
+        self.assertTrue(self.catalog.snapshot()["episodes"][0]["is_short"])
+
+    def test_existing_catalog_gains_shorts_column_without_losing_archives(self):
+        state = self.root / "legacy"
+        state.mkdir()
+        with sqlite3.connect(state / "catalog.sqlite") as db:
+            db.execute("CREATE TABLE episodes(id TEXT PRIMARY KEY,title TEXT NOT NULL,duration REAL,published TEXT,archived INTEGER DEFAULT 0)")
+            db.execute("INSERT INTO episodes VALUES(?,?,?,NULL,1)", (ID, "Keep this", 180))
+        migrated = web.Catalog(state, self.root / "legacy-audio", "https://example.com/legacy", CHANNEL, "Legacy")
+        try:
+            row = migrated.snapshot()["episodes"][0]
+            self.assertTrue(row["archived"])
+            self.assertEqual(row["duration"], 180)
+            self.assertFalse(row["is_short"])
+        finally:
+            migrated.pool.shutdown()
 
     def test_feed_update_preserves_old_guids_and_is_idempotent(self):
         feed = self.catalog.audio / "feed.rss"
