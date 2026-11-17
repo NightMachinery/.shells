@@ -87,8 +87,10 @@ class Library:
             settings = SettingsFile(settings_path, settings_sync)
             if not settings.path.exists():
                 settings.write(self.export_settings())
+            document = settings.read()
+            settings.write(document)
             self.settings = settings
-            self.apply_settings(settings.read())
+            self.apply_settings(document)
         for row in self.podcasts():
             self.catalog(row["id"])
         self.write_policy()

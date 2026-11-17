@@ -26,6 +26,10 @@ class SettingsTests(unittest.TestCase):
         self.library.refresh_pool.shutdown(wait=True);self.library.playlist_pool.shutdown(wait=True);self.catalog.pool.shutdown(wait=True)
         self.tmp.cleanup()
 
+    def settings_files(self):
+        root=self.library.settings.path.parent
+        return {str(p.relative_to(root)):p.read_bytes() for p in root.rglob('*.toml')}
+
     def test_runtime_choices_persist_but_catalogs_and_jobs_do_not(self):
         with self.catalog.db() as db:self.catalog.upsert_episode(db,{'id':ID,'title':'Episode'})
         self.catalog.archive([ID],True)
@@ -39,10 +43,10 @@ class SettingsTests(unittest.TestCase):
         self.assertEqual(rows[PRIMARY]['playlists'],['PLmanualplaylist'])
         self.assertFalse(rows[PRIMARY]['auto_download']);self.assertTrue(rows[SECOND]['excluded_from_global'])
         self.assertEqual(len(doc['feeds']),1)
-        before=self.library.settings.path.read_bytes()
+        before=self.settings_files()
         self.catalog.extract=lambda url:{'entries':[{'id':ID,'title':'Refreshed','duration':45}]}
         self.catalog.refresh('uploads');self.catalog.job(ID,'done')
-        self.assertEqual(self.library.settings.path.read_bytes(),before)
+        self.assertEqual(self.settings_files(),before)
         self.assertEqual(tomllib.loads(dumps(doc)),doc)
 
     def test_toml_rebuilds_settings_and_archives_after_sqlite_loss(self):
@@ -104,6 +108,39 @@ class SettingsTests(unittest.TestCase):
         def changed_during_push(*args,**kwargs):store.set_source(PRIMARY,'auto_download',False)
         with patch('settings.subprocess.run',side_effect=changed_during_push):store.sync_once()
         self.assertTrue(store.pending.is_set(),'Edits during a push need another sync pass')
+
+    def test_modular_settings_change_only_the_selected_podcast(self):
+        with patch.object(self.library,'resolve',return_value=(SECOND,'Second','https://www.youtube.com/@second')),patch.object(self.library,'schedule_catalog'):
+            self.library.add('@second')
+        before=self.settings_files()
+        self.library.set_auto(SECOND,True)
+        after=self.settings_files()
+        self.assertEqual([p for p in before if before[p]!=after[p]],['podcasts/'+SECOND+'.toml'])
+        root=tomllib.loads(after['library.toml'].decode())
+        self.assertEqual(root['version'],2)
+        self.assertNotIn('podcasts',root)
+        self.assertEqual(len(list((self.library.settings.path.parent/'podcasts').glob('*.toml'))),2)
+
+    def test_legacy_migration_is_recoverable_if_interrupted(self):
+        document=self.library.settings.read()
+        path=self.root/'legacy-config'/'library.toml';path.parent.mkdir()
+        path.write_text(dumps(document))
+        store=SettingsFile(path);atomic=store.atomic_write
+        def interrupted(target,content):
+            if target==store.path:raise OSError('Interrupted before the final migration step')
+            return atomic(target,content)
+        with patch.object(store,'atomic_write',side_effect=interrupted),self.assertRaises(OSError):store.write(document)
+        self.assertEqual(tomllib.loads(path.read_text())['version'],1)
+        self.assertEqual(store.read(),document)
+        store.write(document)
+        self.assertEqual(tomllib.loads(path.read_text())['version'],2)
+        self.assertEqual(store.read(),document)
+
+    def test_modular_filename_must_match_id(self):
+        path=self.library.settings.path.parent/'podcasts'/(PRIMARY+'.toml')
+        content=path.read_text();path.write_text(content.replace(PRIMARY,SECOND))
+        with self.assertRaises(ValueError):self.library.settings.read()
+        self.assertEqual(path.read_text(),content.replace(PRIMARY,SECOND))
 
 
 if __name__=='__main__':unittest.main()

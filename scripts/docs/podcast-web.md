@@ -189,16 +189,22 @@ checked sources, even those excluded from the global feed.
 
 ### Persistent settings and browser preferences
 
-Set `PODCAST_SETTINGS_FILE` to a TOML file outside the served tree. It becomes
-the source of truth for registered sources, automatic-download and global-feed
-flags, archive choices, playlist bookmarks and saved combined-feed memberships.
-The first startup exports existing SQLite choices. Later startups load TOML
-and rebuild the SQLite settings mirror and archived flags, even after cache loss.
+Set `PODCAST_SETTINGS_FILE` to `library.toml` in a dedicated directory outside
+the served tree. Global settings and the primary source ID live in that file;
+each `podcasts/<source-id>.toml` holds one source’s registration, automation and
+global-feed flags, archives and playlist bookmarks. Saved combinations live in
+`feeds.toml`. Editing one podcast changes only its own file.
+
+The first startup exports existing SQLite choices. An older combined TOML file
+is migrated automatically, replacing its root manifest only after all modular
+files have been written. Readers, writers and Git snapshots share a file lock.
+Later startups rebuild the SQLite settings mirror and archived flags from the
+modular bundle, even after cache loss.
 Existing known playlist IDs are preserved on migration; later discoveries are
 cache data, while explicitly added playlist bookmarks are saved to TOML.
 
 Set `PODCAST_SETTINGS_SYNC` to a trusted executable command that versions and
-pushes that file. Saves are atomic and serialized. Git runs in a background
+pushes the complete managed TOML bundle in one commit. Saves are atomic and serialized. Git runs in a background
 worker; failed syncs retain the local TOML and retry after a minute. The UI shows
 pending/error status. Do not put credentials or sessions in the settings repo.
 For hand edits, stop the app, pull the repo, edit and commit, then restart it.

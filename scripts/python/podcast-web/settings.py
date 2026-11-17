@@ -1,5 +1,6 @@
 """Durable, human-readable library settings; fetched metadata stays in SQLite."""
 from copy import deepcopy
+from contextlib import contextmanager
 import fcntl
 import hashlib
 import json
@@ -65,6 +66,19 @@ def validate(document):
     return document
 
 
+def podcast_lines(podcast):
+    quote = lambda value: json.dumps(value, ensure_ascii=False)
+    lines = [field + " = " + quote(podcast[field])
+             for field in ("id", "title", "url", "auto_download", "excluded_from_global")]
+    for field in ("archived", "playlists"):
+        values = sorted(set(podcast[field]))
+        lines.append(field + " = [" + ("" if values else "]"))
+        if values:
+            lines.extend("  " + quote(value) + "," for value in values)
+            lines.append("]")
+    return lines
+
+
 def dumps(document):
     document = validate(deepcopy(document))
     quote = lambda value: json.dumps(value, ensure_ascii=False)
@@ -72,18 +86,24 @@ def dumps(document):
              "# Catalogs, fetch times, jobs and credentials are stored separately.",
              "version = 1", "primary = " + quote(document["primary"])]
     for podcast in sorted(document["podcasts"], key=lambda p: p["id"]):
-        lines.extend(["", "[[podcasts]]"])
-        for field in ("id", "title", "url", "auto_download", "excluded_from_global"):
-            lines.append(field + " = " + quote(podcast[field]))
-        for field in ("archived", "playlists"):
-            values = sorted(set(podcast[field]))
-            lines.append(field + " = [" + ("" if values else "]"))
-            if values:
-                lines.extend("  " + quote(value) + "," for value in values)
-                lines.append("]")
+        lines.extend(["", "[[podcasts]]", *podcast_lines(podcast)])
     for feed in sorted(document["feeds"], key=lambda f: mix_id(f["sources"])):
         lines.extend(["", "[[feeds]]", "title = " + quote(feed["title"]),
                       "sources = [" + ", ".join(quote(s) for s in sorted(set(feed["sources"]))) + "]"])
+    return "\n".join(lines) + "\n"
+
+
+def podcast_toml(podcast):
+    return "# Persistent settings for this podcast.\n" + "\n".join(podcast_lines(podcast)) + "\n"
+
+
+def feeds_toml(feeds):
+    if not feeds:
+        return "# Saved combined feeds.\nfeeds = []\n"
+    lines = ["# Saved combined feeds."]
+    for feed in sorted(feeds, key=lambda f: mix_id(f["sources"])):
+        lines.extend(["", "[[feeds]]", "title = " + json.dumps(feed["title"], ensure_ascii=False),
+                      "sources = " + json.dumps(sorted(set(feed["sources"])), ensure_ascii=False)])
     return "\n".join(lines) + "\n"
 
 
@@ -98,34 +118,82 @@ class SettingsFile:
         self.error = None
         self.last_synced = None
 
-    def read(self):
-        with self.path.open("rb") as stream:
-            return validate(tomllib.load(stream))
+    @contextmanager
+    def locked(self, exclusive=True):
+        with self.lock, self.path.with_suffix(self.path.suffix + ".lock").open("a") as lock:
+            fcntl.flock(lock, fcntl.LOCK_EX if exclusive else fcntl.LOCK_SH)
+            yield
 
-    def write(self, document):
-        content = dumps(document)
-        if self.path.exists() and self.path.read_text() == content:
-            return
+    def _read(self):
+        with self.path.open("rb") as stream:
+            document = tomllib.load(stream)
+        if document.get("version") == 1:
+            return validate(document)
+        if document.get("version") != 2:
+            raise ValueError("Unsupported settings version")
+        podcasts = []
+        for path in sorted((self.path.parent / "podcasts").glob("*.toml")):
+            with path.open("rb") as stream:
+                podcast = tomllib.load(stream)
+            if podcast.get("id") != path.stem or not SOURCE.fullmatch(path.stem):
+                raise ValueError("Podcast settings filename must match its source ID")
+            podcasts.append(podcast)
+        with (self.path.parent / "feeds.toml").open("rb") as stream:
+            feeds = tomllib.load(stream).get("feeds", [])
+        return validate({"version": 1, "primary": document.get("primary"), "podcasts": podcasts, "feeds": feeds})
+
+    def read(self):
+        with self.locked(exclusive=False):
+            return self._read()
+
+    @staticmethod
+    def atomic_write(path, content):
+        path.parent.mkdir(parents=True, exist_ok=True)
+        if path.exists() and path.read_text() == content:
+            return False
         temporary = None
         try:
-            with tempfile.NamedTemporaryFile(mode="w", encoding="utf-8", dir=self.path.parent,
-                                             prefix="." + self.path.name, suffix=".tmp", delete=False) as stream:
+            with tempfile.NamedTemporaryFile(mode="w", encoding="utf-8", dir=path.parent,
+                                             prefix="." + path.name, suffix=".tmp", delete=False) as stream:
                 temporary = Path(stream.name)
                 stream.write(content)
                 stream.flush()
                 os.fsync(stream.fileno())
-            temporary.replace(self.path)
+            temporary.replace(path)
         finally:
             if temporary and temporary.exists():
                 temporary.unlink()
-        self.pending.set()
+        return True
+
+    def _write(self, document):
+        document = validate(deepcopy(document))
+        directory = self.path.parent / "podcasts"
+        changed = False
+        known = {p["id"] for p in document["podcasts"]}
+        for podcast in document["podcasts"]:
+            changed |= self.atomic_write(directory / (podcast["id"] + ".toml"), podcast_toml(podcast))
+        changed |= self.atomic_write(self.path.parent / "feeds.toml", feeds_toml(document["feeds"]))
+        for path in directory.glob("*.toml"):
+            if SOURCE.fullmatch(path.stem) and path.stem not in known:
+                path.unlink()
+                changed = True
+        # During migration, the legacy file remains authoritative until every
+        # modular file is safely in place. This final replacement commits it.
+        root = ("# Global podcast library settings. Per-source settings are in podcasts/.\n"
+                "version = 2\nprimary = " + json.dumps(document["primary"]) + "\n")
+        changed |= self.atomic_write(self.path, root)
+        if changed:
+            self.pending.set()
+
+    def write(self, document):
+        with self.locked():
+            self._write(document)
 
     def update(self, change):
-        with self.lock, self.path.with_suffix(self.path.suffix + ".lock").open("a") as lock:
-            fcntl.flock(lock, fcntl.LOCK_EX)
-            document = self.read()
+        with self.locked():
+            document = self._read()
             change(document)
-            self.write(document)
+            self._write(document)
 
     def set_source(self, identifier, field, value):
         def change(document):
