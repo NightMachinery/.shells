@@ -65,8 +65,30 @@ agent_desk_ssh_hosts."
         "launch_command = $(h-agent-desk-toml-str "$z agent-desk-task-launch")"
         "quota_command = $(h-agent-desk-toml-str "$z agent-desk-quota-json")"
     )
+    if (( ${+commands[hs]} )) ; then
+        lines+=( '' '[screen]'
+            "banner_on = $(h-agent-desk-toml-str "$z 'agent-desk-screen-banner on'")"
+            "banner_off = $(h-agent-desk-toml-str "$z 'agent-desk-screen-banner off'")"
+        )
+    fi
     print -rl -- "${lines[@]}" > "${file}" @RET
     ec "${file}"
+}
+
+function agent-desk-screen-banner {
+    : "banner_on/banner_off of agent-desk's screen lock: the Hammerspoon agent banner. on reads AGENT_DESK_REASON and AGENT_DESK_SECONDS."
+    local reason secs
+    case "$1" in
+        (on)
+            reason="${AGENT_DESK_REASON:-An agent is driving the screen}"
+            reason="${reason//\]==\]/] ==]}"
+            secs="${AGENT_DESK_SECONDS:-1800}"
+            [[ "${secs}" == <-> ]] || secs=1800
+            command hs -q -c "agentBannerOn([==[${reason}]==], ${secs})" </dev/null
+            ;;
+        (off) command hs -q -c 'agentBannerOff()' </dev/null ;;
+        (*) ecerr "usage: agent-desk-screen-banner on|off" ; return 2 ;;
+    esac
 }
 
 function agent-desk-task-launch {

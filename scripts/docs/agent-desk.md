@@ -76,6 +76,10 @@ answered.
   usage through the quota-management skill's readers, for
   `agent-desk task nudge`. That command needs a scheduler; the crontab line
   is `20 */3 * * * "$HOME/go/bin/agent-desk" task nudge >/dev/null 2>&1`.
+- [agfi:agent-desk-screen-banner] (`[screen] banner_on`, `banner_off`): the
+  Hammerspoon agent banner (`agentBannerOn` with the agent's reason and how
+  long it holds the screen, and `agentBannerOff`) for agent-desk's screen lock,
+  `agent-desk screen take`. The installer writes it only where `hs` exists.
 - The prompt hook: `UserPromptSubmit` in Claude Code's `settings.json` and
   Codex's `hooks.json` runs `agent-desk hook prompt`, which keeps the user's
   messages to a session on the desk word for word (`agent-desk
