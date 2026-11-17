@@ -46,6 +46,7 @@ class Catalog:
         self.base_url, self.channel, self.title = base_url.rstrip("/"), channel, title
         self.pool = pool or concurrent.futures.ThreadPoolExecutor(max_workers=1)
         self.on_download = on_download
+        self.on_playlists = None
         self.lock = threading.RLock()
         self.busy = set()
         self.refreshes = {}
@@ -76,7 +77,7 @@ class Catalog:
                         "ignoreerrors": False, "socket_timeout": 30, "retries": 2}) as ydl:
             return ydl.extract_info(url, download=False)
 
-    def schedule_refresh(self, source="uploads"):
+    def schedule_refresh(self, source="uploads", *, executor=None):
         if not isinstance(source, str):
             raise ValueError("Expected a source name")
         if source not in ("uploads", "playlists", "shorts"):
@@ -88,7 +89,10 @@ class Catalog:
                 return
             self.refreshes[source] = {"status": "loading", "error": None}
             # Catalog fetches do not wait behind audio downloads.
-            threading.Thread(target=self.refresh, args=(source,), daemon=True).start()
+            if executor is None:
+                threading.Thread(target=self.refresh, args=(source,), daemon=True).start()
+            else:
+                executor.submit(self.refresh, source)
 
     def refresh(self, source):
         try:
@@ -141,6 +145,8 @@ class Catalog:
                 db.execute("INSERT INTO sources VALUES(?,?) ON CONFLICT(id) DO UPDATE SET updated=excluded.updated", (source, time.time()))
             with self.lock:
                 self.refreshes[source] = {"status": "ready", "error": None}
+            if source == "playlists" and self.on_playlists:
+                self.on_playlists(self)
         except Exception as exc:
             logging.exception("Catalog refresh failed")
             with self.lock:
@@ -239,8 +245,13 @@ class Catalog:
         episodes = [e for e in episodes if not e["local"] or e["audio_url"] not in remote_urls]
         with self.lock:
             refreshes = dict(self.refreshes)
+        playlist_cache = {"total": len(playlists),
+                          "cached": sum(p["id"] in sources for p in playlists),
+                          "loading": sum(refreshes.get(p["id"], {}).get("status") == "loading" for p in playlists),
+                          "failed": sum(refreshes.get(p["id"], {}).get("status") == "error" for p in playlists)}
         return {"title": self.title, "source_type": self.source_type, "episodes": episodes, "playlists": playlists, "memberships": memberships,
-                "refreshes": refreshes, "sources": sources, "feed_url": self.base_url + "/feed.rss"}
+                "refreshes": refreshes, "sources": sources, "playlist_cache": playlist_cache,
+                "feed_url": self.base_url + "/feed.rss"}
 
     def archive(self, ids, archived):
         if not isinstance(archived, bool) or not isinstance(ids, list) or not 1 <= len(ids) <= 500 or not all(isinstance(i, str) and EPISODE.fullmatch(i) for i in ids):

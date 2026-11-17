@@ -56,6 +56,8 @@ class Library:
         self.policy_file = policy_file
         self.public_app_path, self.pwa_id = public_app_path, pwa_id
         self.refresh_pool = concurrent.futures.ThreadPoolExecutor(max_workers=2)
+        # Large playlist histories must not hold up a newly added source's catalog.
+        self.playlist_pool = concurrent.futures.ThreadPoolExecutor(max_workers=2)
         self.stop = threading.Event()
         with self.db() as db:
             db.executescript("""
@@ -78,6 +80,7 @@ class Library:
                 db.execute("UPDATE podcasts SET auto_ready=? WHERE id=?", (bool(known), self.primary))
             db.execute("UPDATE podcasts SET excluded_global=1 WHERE id=?", (self.primary,))
         primary.on_download = self.rebuild_feeds
+        primary.on_playlists = self.prefetch_playlists
         for row in self.podcasts():
             self.catalog(row["id"])
         self.write_policy()
@@ -119,6 +122,7 @@ class Library:
             catalog = cls(self.state / "channels" / identifier,
                 self.audio_root / "channels" / identifier, self.url_root + "/channels/" + identifier,
                 identifier, row["title"], pool=self.pool, on_download=self.rebuild_feeds)
+            catalog.on_playlists = self.prefetch_playlists
             self.catalogs[identifier] = catalog
             self.ensure_feed(catalog)
             return catalog
@@ -188,6 +192,30 @@ class Library:
                 catalog.refresh(source)
         self.refresh_pool.submit(fetch)
 
+    def prefetch_playlists(self, catalog, max_age=21600):
+        if catalog.source_type != "youtube":
+            return
+        with catalog.db() as db:
+            playlists = list(db.execute("""SELECT p.id,s.updated FROM playlists p
+                LEFT JOIN sources s ON s.id=p.id ORDER BY p.id"""))
+        for playlist in playlists:
+            if self.stop.is_set():
+                return
+            if playlist["updated"] is None or time.time() - playlist["updated"] > max_age:
+                catalog.schedule_refresh(playlist["id"], executor=self.playlist_pool)
+
+    def maintain_catalogs(self, max_age=21600):
+        for row in self.podcasts():
+            catalog = self.catalog(row["id"])
+            if catalog.source_type != "youtube":
+                continue
+            with catalog.db() as db:
+                cached = {r["id"]: r["updated"] for r in db.execute("SELECT id,updated FROM sources WHERE id IN ('playlists','shorts')")}
+            for source in ("playlists", "shorts"):
+                if time.time() - cached.get(source, 0) > max_age:
+                    catalog.schedule_refresh(source, executor=self.refresh_pool)
+            self.prefetch_playlists(catalog, max_age)
+
     def set_auto(self, identifier, enabled):
         if not isinstance(enabled, bool):
             raise ValueError("auto_download must be true or false")
@@ -226,6 +254,7 @@ class Library:
                 "feed_url": snap["feed_url"], "downloaded": sum(bool(e["audio_url"]) for e in snap["episodes"]),
                 "episodes": len(snap["memberships"].get("uploads", [])), "excluded_from_global": bool(row["excluded_global"]),
                 "source_type": catalog.source_type, "exclusion_locked": row["id"] == self.primary,
+                "playlist_cache": snap["playlist_cache"],
                 "loading": any(r.get("status") == "loading" for r in snap["refreshes"].values())})
             queue.extend(dict(e, podcast_id=row["id"], podcast_title=row["title"]) for e in snap["episodes"] if e.get("job"))
         data.update(podcasts=channels, current_podcast=selected.channel, queue=queue,
@@ -336,14 +365,8 @@ class Library:
     def start(self, interval=1800):
         def run():
             while not self.stop.is_set():
+                self.maintain_catalogs()
                 for row in self.podcasts():
-                    catalog = self.catalog(row["id"])
-                    with catalog.db() as db:
-                        cached = db.execute("SELECT updated FROM sources WHERE id='shorts'").fetchone()
-                    with catalog.lock:
-                        if catalog.source_type == "youtube" and (not cached or time.time() - cached[0] > 21600) and catalog.refreshes.get("shorts", {}).get("status") != "loading":
-                            catalog.refreshes["shorts"] = {"status": "loading", "error": None}
-                            self.refresh_pool.submit(catalog.refresh, "shorts")
                     if row["auto_download"]:
                         self.poll_auto(row["id"])
                 self.rebuild_feeds()

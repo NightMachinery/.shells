@@ -47,11 +47,18 @@ The SQLite database stores catalog metadata, playlist membership, archives,
 and download status outside the served tree. Back it up to preserve archives.
 
 The initial catalog fetch reads the full uploads playlist, without the CLI's
-recent-episode limit. Playlist contents load when first opened. Refresh fetches
-the selected playlist and the channel's Podcasts and Playlists tabs. Podcast
-collections are included even when there is no Playlists tab. You can also add
-a playlist using its YouTube URL. Cached catalogs
-remain available when YouTube fails. Search supports Persian and English titles.
+recent-episode limit. Every registered YouTube channel’s public playlists are
+discovered and their complete contents cached in the background, including
+newly added channels. Two playlist workers keep requests bounded while source
+catalogs and audio downloads use separate workers.
+
+Missing or six-hour-old playlist catalogs and contents refresh automatically;
+restart resumes unfinished caching. Refresh fetches the selected playlist and
+the channel’s Podcasts and Playlists tabs, then caches new collections. Podcast
+collections are included even when there is no Playlists tab. Playlists can also
+be added by YouTube URL. Each playlist shows its cached episode count, and the
+playlist section reports cache progress and failures. Successful caches remain
+available when YouTube fails. Search supports Persian and English titles.
 Filters persist per browser, while archives persist across devices. A downloaded
 library view also lists files whose videos are no longer in the channel catalog.
 Each list shows its visible and total episode counts. Filter checkboxes include
@@ -141,8 +148,7 @@ the toggle. Interactive CLI downloads are unaffected.
 
 Check multiple podcast sources to create a stable combined RSS URL. It includes
 downloaded audio from exactly those sources and updates when new audio arrives.
-The **global feed** automatically includes every channel except the original
-primary channel, including channels added later. Feeds may initially be empty:
+The **global feed** includes every source whose global-feed exclusion is off; the original primary channel is always excluded. Feeds may initially be empty:
 loading a catalog does not download audio. RSS metadata, original-date suffixes,
 and episode identity are retained when combining feeds.
 
@@ -179,3 +185,27 @@ New sources start with automatic downloads off. The **Exclude from global feed**
 checkbox controls global membership independently of archives and automation.
 The original podcast remains excluded. Explicit combined feeds can include any
 checked sources, even those excluded from the global feed.
+
+### Persistent settings and browser preferences
+
+Within the configured primary state directory:
+
+- `library.sqlite` stores registered sources, auto-download and global-exclusion
+  settings, automatic-download baselines and saved combined-feed memberships.
+- `catalog.sqlite` stores the primary source’s episodes, archive flags, playlist
+  memberships, successful-fetch timestamps and download jobs.
+- `channels/<source-id>/catalog.sqlite` stores the same per-source data for added
+  YouTube and Telegram channels. Failed refreshes retain successful cached data.
+
+The generated `~/.config/podcast-web/automation.json` lets the legacy CLI yield
+to the library. The SQLite registry is the source of truth for those settings.
+Deployment environment variables define paths, source defaults and PWA scope;
+they live in the deployment configuration, outside the public app source.
+
+Browser local storage holds `podcast-web-preferences` (hide filters, length
+limits, playlist, sort and search), `podcast-web-theme`, and `podcast-web-source`
+(last selected podcast). These are per browser/origin and do not sync across
+devices. The checked-source selection before creating a combined feed is only
+in page memory; creating the feed persists its membership in `library.sqlite`.
+Back up the whole state tree using SQLite’s backup API for live databases, plus
+the audio/feed directories and any separately configured Telegram session.

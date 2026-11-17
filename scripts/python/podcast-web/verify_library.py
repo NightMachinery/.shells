@@ -110,7 +110,7 @@ def main():
                 print(json.dumps({'podcast_switch_and_reload':'passed','archive_isolation':'passed','global_queue':'passed','combined_feed':'2 sources','global_exclusion':'passed','add_auto_off_and_toggle':'passed','canonical_redirect_and_pwa_identity':'passed','phone_overflow':'none','browser_errors':errors}))
                 browser.close()
         finally:
-            server.shutdown();server.server_close();library.refresh_pool.shutdown(wait=True);first.pool.shutdown(wait=True)
+            server.shutdown();server.server_close();library.refresh_pool.shutdown(wait=True);library.playlist_pool.shutdown(wait=True);first.pool.shutdown(wait=True)
 
 
 if __name__=='__main__':

@@ -102,7 +102,7 @@ class TelegramTests(unittest.TestCase):
             with library.db() as db:self.assertEqual(db.execute('SELECT excluded_global FROM podcasts WHERE id=?',(CHANNEL,)).fetchone()[0],1)
             with self.assertRaises(ValueError):library.set_excluded(PRIMARY,False)
         finally:
-            library.refresh_pool.shutdown(wait=True);primary.pool.shutdown(wait=True)
+            library.refresh_pool.shutdown(wait=True);library.playlist_pool.shutdown(wait=True);primary.pool.shutdown(wait=True)
 
 
 if __name__=='__main__':unittest.main()

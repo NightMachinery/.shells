@@ -2,6 +2,8 @@ import importlib.util
 import json
 from pathlib import Path
 import tempfile
+import threading
+import time
 import unittest
 from unittest.mock import patch
 import xml.etree.ElementTree as ET
@@ -27,6 +29,7 @@ class LibraryTests(unittest.TestCase):
     def tearDown(self):
         self.library.stop.set()
         self.library.refresh_pool.shutdown(wait=True)
+        self.library.playlist_pool.shutdown(wait=True)
         self.primary.pool.shutdown(wait=True)
         self.tmp.cleanup()
 
@@ -38,6 +41,75 @@ class LibraryTests(unittest.TestCase):
         with catalog.db() as db:
             db.execute("INSERT OR IGNORE INTO episodes(id,title) VALUES(?,?)", (vid,title))
             db.execute("INSERT OR IGNORE INTO membership VALUES('uploads',?,0)", (vid,))
+
+    def wait_for_refreshes(self, catalog):
+        deadline = time.monotonic() + 5
+        while any(r["status"] == "loading" for r in catalog.refreshes.values()):
+            self.assertLess(time.monotonic(), deadline, catalog.refreshes)
+            time.sleep(0.01)
+
+    def test_new_source_prefetches_discovered_playlist_contents_without_audio(self):
+        self.add();catalog=self.library.catalog(SECOND)
+        def extract(url):
+            if url.endswith(('/podcasts','/playlists')):
+                return {'entries':[{'id':'PLfirstplaylist','title':'First'},{'id':'PLemptyplaylist','title':'Empty'}]}
+            if 'list=PLfirstplaylist' in url:
+                return {'entries':[{'id':OLD,'title':'Older episode'}]}
+            if 'list=UU' in url:
+                return {'entries':[{'id':NEW,'title':'Upload'}]}
+            return {'entries':[]}
+        with patch.object(catalog,'extract',side_effect=extract),patch.object(catalog,'enqueue') as download:
+            self.library.schedule_catalog(catalog)
+            self.wait_for_refreshes(catalog)
+            snap=catalog.snapshot()
+            self.assertEqual(snap['playlist_cache'],{'total':2,'cached':2,'loading':0,'failed':0})
+            self.assertEqual(snap['memberships']['PLfirstplaylist'],[OLD])
+            self.assertIn('PLemptyplaylist',snap['sources'],'Successful empty playlists are cached too')
+            download.assert_not_called()
+
+    def test_startup_prefetches_all_sources_independently_of_auto_download(self):
+        self.add();other=self.library.catalog(SECOND)
+        for catalog in (self.primary,other):
+            with catalog.db() as db:
+                db.execute("INSERT INTO playlists VALUES('PLpendinglist','Pending')")
+                db.executemany('INSERT INTO sources VALUES(?,?)',[(source,time.time()) for source in ('playlists','shorts')])
+        with patch.object(self.primary,'extract',return_value={'entries':[{'id':OLD,'title':'Primary'}]}),patch.object(other,'extract',return_value={'entries':[{'id':NEW,'title':'Second'}]}):
+            self.library.maintain_catalogs()
+            self.wait_for_refreshes(self.primary);self.wait_for_refreshes(other)
+        self.assertEqual(self.primary.snapshot()['memberships']['PLpendinglist'],[OLD])
+        self.assertEqual(other.snapshot()['memberships']['PLpendinglist'],[NEW])
+        self.assertFalse(next(r for r in self.library.podcasts() if r['id']==SECOND)['auto_download'])
+
+    def test_prefetch_is_bounded_deduplicated_and_keeps_failed_cache(self):
+        catalog=self.primary
+        with catalog.db() as db:
+            db.executemany('INSERT INTO playlists VALUES(?,?)',[(f'PLplaylist{i:03d}',str(i)) for i in range(5)])
+            db.execute("INSERT INTO membership VALUES('PLplaylist004',?,0)",(OLD,))
+            db.execute("INSERT INTO sources VALUES('PLplaylist004',0)")
+        release=threading.Event();lock=threading.Lock();active=0;peak=0;calls=[]
+        def extract(url):
+            nonlocal active,peak
+            with lock:
+                calls.append(url);active+=1;peak=max(peak,active)
+            try:
+                self.assertTrue(release.wait(5))
+                if url.endswith('PLplaylist004'):raise ValueError('Temporarily unavailable')
+                return {'entries':[]}
+            finally:
+                with lock:active-=1
+        with patch.object(catalog,'extract',side_effect=extract),self.assertLogs(level='ERROR'):
+            self.library.prefetch_playlists(catalog)
+            self.library.prefetch_playlists(catalog)
+            release.set();self.wait_for_refreshes(catalog)
+        self.assertEqual(len(calls),5)
+        self.assertLessEqual(peak,2)
+        snap=catalog.snapshot()
+        self.assertEqual(snap['playlist_cache'],{'total':5,'cached':5,'loading':0,'failed':1})
+        self.assertEqual(snap['memberships']['PLplaylist004'],[OLD])
+        self.assertEqual(snap['sources']['PLplaylist004'],0)
+        with patch.object(catalog,'schedule_refresh') as schedule:
+            self.library.prefetch_playlists(catalog)
+            self.assertEqual(schedule.call_count,1,'Only the failed stale cache should be retried')
 
     def feed_episode(self, catalog, vid=OLD):
         path=catalog.audio/(vid+".m4a")
@@ -130,7 +202,7 @@ class LibraryTests(unittest.TestCase):
                 library.poll_auto(PRIMARY)
                 enqueue.assert_called_once_with(NEW)
         finally:
-            library.refresh_pool.shutdown(wait=True);primary.pool.shutdown(wait=True)
+            library.refresh_pool.shutdown(wait=True);library.playlist_pool.shutdown(wait=True);primary.pool.shutdown(wait=True)
 
     def test_legacy_cron_yields_to_library_for_on_and_off_channels(self):
         self.add()
@@ -163,7 +235,9 @@ class LibraryTests(unittest.TestCase):
         try:
             self.assertFalse(next(r for r in restored.podcasts() if r["id"]==PRIMARY)["auto_download"])
             self.assertEqual(restored.create_mix([SECOND,PRIMARY]),url)
-        finally:restored.refresh_pool.shutdown(wait=True)
+        finally:
+            restored.refresh_pool.shutdown(wait=True)
+            restored.playlist_pool.shutdown(wait=True)
 
     def test_mix_validation_and_channel_url_validation(self):
         for value in ([],[THIRD],["../../secret"],"all"):
