@@ -52,6 +52,15 @@
             "timeout": 10
           }
         ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "if [ -x \"$HOME/go/bin/agent-desk\" ]; then \"$HOME/go/bin/agent-desk\" hook prompt --agent codex >/dev/null 2>&1; fi",
+            "timeout": 10
+          }
+        ]
       }
     ],
     "PreToolUse": [
