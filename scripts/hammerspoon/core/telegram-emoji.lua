@@ -566,6 +566,14 @@ function telegramEmojiChooser()
             if #selected>0 then menu.refresh({table.unpack(selected)}) end
         end
     end
+    -- Shift+Tab: the picks in a random order.
+    local function shuffle()
+        if #selected>1 then
+            generation=generation+1
+            EmojiLayout.shuffle(selected);updateAlert()
+            menu.refresh({table.unpack(selected)})
+        end
+    end
     -- The picks, or else the highlighted emoji.
     local function currentEntries()
         if #selected>0 then return {table.unpack(selected)} end
@@ -615,7 +623,7 @@ function telegramEmojiChooser()
             if ok then refresh() else alert_gateway(tostring(err),{color="warn"}) end
         end),
         add=hs.hotkey.bind("shift","return",addCurrent),
-        shiftTab=hs.hotkey.bind("shift","tab",removeLast),
+        shiftTab=hs.hotkey.bind("shift","tab",shuffle),
         backslash=hs.hotkey.bind("","\\",removeLast),
         shiftUp=hs.hotkey.bind("shift","up",function()toggleMove(-1)end,nil,function()toggleMove(-1)end),
         shiftDown=hs.hotkey.bind("shift","down",function()toggleMove(1)end,nil,function()toggleMove(1)end),
@@ -673,16 +681,22 @@ local function ago(time,now)
     return seconds//86400 .."d ago"
 end
 
-function T.historyRows(now)
+-- changes, by history index, holds what Tab and Shift+Tab did to a row while
+-- the list is open: {layout=, seed=, entries=}. Nothing is saved until the
+-- set is sent, which records it as a new set.
+function T.historyRows(now,changes)
     local rows={}
-    for index,set in ipairs(EmojiLayout.history()) do
-        local entries=T.historyEntries(set.items)
+    for index,saved in ipairs(EmojiLayout.history()) do
+        local change=changes and changes[index] or {}
+        local set={items=saved.items,time=saved.time,layout=change.layout or saved.layout,seed=saved.seed}
+        if change.layout then set.seed=change.seed end
+        local entries=change.entries or T.historyEntries(saved.items)
         local text,names={}, {}
         for i,entry in ipairs(entries) do text[i]=entry.emoji;names[i]=entry.name or "" end
         local mode=EmojiLayout.mode(set.layout)
         local built,slots=EmojiLayout.build(set.layout,#entries,set.seed)
         local row={text=table.concat(text),entries=entries,set=set,history=index,
-            subText=mode.name..(set.seed and (" #"..set.seed) or "").." · "..#entries.." emoji · "..ago(set.time,now)..
+            subText=mode.name..(set.seed and (" #"..set.seed) or "").." · "..#entries.." emoji · "..(next(change) and "changed, not saved" or ago(set.time,now))..
                 (slots>#entries and (" · repeated to "..slots) or ""),
             searchText=mode.name.." "..table.concat(names," ")}
         local ok,image=pcall(EmojiLayout.thumbnail,T.images(entries),set.layout,built)
@@ -717,10 +731,11 @@ function emojiStickerHistoryChooser()
         end,seed)
         if not ok then alert_gateway(tostring(err),{color="warn"}) end
     end)
+    local changes={}
     local function refresh()
-        local rows=T.historyRows()
+        local rows=T.historyRows(nil,changes)
         chooser:placeholderText("Recent sticker sets · "..#rows.." · Enter: WebP · Cmd+Shift+Enter: PNG · "..
-            "Tab: next font or seed · Ctrl+Enter: other layouts · Cmd+Backspace: forget")
+            "Tab: next font or seed · Shift+Tab: shuffle · Ctrl+Enter: other layouts · Cmd+Backspace: forget")
         ChooserSearch.setChoices(chooser,rows)
     end
     -- Export first, then select, so the paste lands where Hyper+Ctrl+A started.
@@ -756,13 +771,32 @@ function emojiStickerHistoryChooser()
         if not row.set then return nil end
         return row.set.layout,#row.entries,row.set.seed,function()return T.images(row.entries)end
     end)
-    -- Tab on a history row: the same set in its next font or seed.
-    local function vary()
-        local row=chooser:selectedRowContents()
-        if not (row and row.history and EmojiLayout.revise(row.history)) then return end
+    local function change(row,fields)
+        local entry=changes[row.history] or {}
+        for key,value in pairs(fields) do entry[key]=value end
+        changes[row.history]=entry
         local selected=chooser:selectedRow()
         refresh()
         chooser:selectedRow(selected)
+    end
+    -- Tab on a history row: the same set in its next font or seed, until the
+    -- list closes; sending it records a new set.
+    local function vary()
+        local row=chooser:selectedRowContents()
+        if not (row and row.history) then return end
+        local layout,seed=EmojiLayout.nextVariant(row.set.layout,row.set.seed)
+        if layout~=row.set.layout or seed~=row.set.seed then change(row,{layout=layout,seed=seed}) end
+    end
+    -- Shift+Tab: its emoji in a random order, likewise.
+    local function shuffle()
+        if menu.active then
+            if #menu.items>1 then menu.refresh(EmojiLayout.shuffle({table.unpack(menu.items)})) end
+            return
+        end
+        local row=chooser:selectedRowContents()
+        if row and row.history and #row.entries>1 then
+            change(row,{entries=EmojiLayout.shuffle({table.unpack(row.entries)})})
+        end
     end
     local hotkeys={
         enter=hs.hotkey.bind("","return",function()exportRow("webp")end),
@@ -774,10 +808,12 @@ function emojiStickerHistoryChooser()
             if row and row.entries then menu.open(row.entries) end
         end),
         tab=hs.hotkey.bind("","tab",function()if menu.active then menu.reroll() else vary() end end),
+        shiftTab=hs.hotkey.bind("shift","tab",shuffle),
         forget=hs.hotkey.bind("cmd","delete",function()
             local row=chooser:selectedRowContents()
             if menu.active or not (row and row.history) then return end
             EmojiLayout.forget(row.history)
+            changes={}
             local selected=chooser:selectedRow()
             refresh()
             chooser:selectedRow(math.max(1,selected))

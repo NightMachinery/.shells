@@ -235,6 +235,9 @@ local function runTests()
     local jumbleKey, jumbleSeed = L.nextVariant("jumble", 3)
     assert(jumbleKey == "jumble" and jumbleSeed == 4)
     assert(#L.variants("jumble", 8) == 8 and L.variants("auto") == nil)
+    local shuffled = L.shuffle({1, 2, 3, 4, 5, 6})
+    table.sort(shuffled)
+    assert(table.concat(shuffled) == "123456", "a shuffle keeps every item")
     -- A stroke standing right next to another letter keeps its length: the alef
     -- of برای sits one cell from the ی and was once thinned away as its thickness.
     for _, rows in ipairs({6, 7, 8, 9, 10}) do

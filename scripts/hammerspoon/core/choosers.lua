@@ -570,6 +570,15 @@ function emojiChooser()
         end
     end
 
+    -- Shift+Tab: the picks in a random order.
+    local function shuffle()
+        if #selectedEmojis > 1 then
+            EmojiLayout.shuffle(selectedEmojis)
+            updateAlert()
+            menu.refresh({table.unpack(selectedEmojis)})
+        end
+    end
+
     -- The picks, or else the highlighted emoji.
     local function currentEmojis()
         if #selectedEmojis > 0 then return {table.unpack(selectedEmojis)} end
@@ -657,7 +666,7 @@ function emojiChooser()
             if menu.active then menu.reroll() else cycleSort() end
         end),
         backslash = hs.hotkey.bind('', '\\', removeLast),
-        shiftTab = hs.hotkey.bind('shift', 'tab', removeLast),
+        shiftTab = hs.hotkey.bind('shift', 'tab', shuffle),
         shiftUp = hs.hotkey.bind('shift', 'up', function() toggleMove(-1) end, nil, function() toggleMove(-1) end),
         shiftDown = hs.hotkey.bind('shift', 'down', function() toggleMove(1) end, nil, function() toggleMove(1) end),
     }

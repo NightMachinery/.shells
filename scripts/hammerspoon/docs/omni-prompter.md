@@ -60,8 +60,8 @@ Unicode name, including older joined sequences such as 🙂‍↔️.
 
 - Tab alternates recent usage and newest Unicode introduction first.
 - Shift+Enter adds the highlighted emoji. Shift+Backspace removes one selection
-  per key-down, including repeated presses with Shift held. Shift+Tab and
-  backslash also remove the last selection.
+  per key-down, including repeated presses with Shift held; backslash also
+  removes the last selection. Shift+Tab puts the selection in a random order.
 - Shift+Down and Shift+Up toggle the highlighted emoji (add it, or remove it
   if already picked) and then move one row, so holding Shift and arrowing
   picks a run of rows. Each press toggles the row it leaves.
@@ -299,7 +299,10 @@ name, the count and the age.
   Ctrl+Enter again lists the fonts or seeds of the highlighted row, as in
   the pickers, and then returns to the history.
 - Tab redraws the highlighted set in its next font (Persian text) or seed
-  (Jumble), in place. The large picture at the right follows the highlight.
+  (Jumble), and Shift+Tab puts its emoji in a random order. Neither is
+  saved: the row reads "changed, not saved" and the history is as it was the
+  next time it opens. Sending a changed set records it as a new set.
+  The large picture at the right follows the highlight.
 - Cmd+Backspace forgets the highlighted set.
 
 Sets may mix Unicode and premium emoji. They are stored in the Hammerspoon
@@ -377,7 +380,8 @@ picker does not inspect account/session stores or messages. Saved entries remain
 usable while Purple or its export feature is off.
 
 Shift+Enter adds the highlighted emoji to a selection shown as a tally, and
-Shift+Backspace, Shift+Tab or backslash removes the last one, as in Hyper+A.
+Shift+Backspace or backslash removes the last one and Shift+Tab shuffles them,
+as in Hyper+A.
 Shift+Down and Shift+Up toggle and move, as in Hyper+A. The tally banner shows each
 pick's real artwork (the premium preview, or the Noto image for a Unicode
 pick), not the premium emoji's Unicode stand-in; Hyper+A's tally shows its

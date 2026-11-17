@@ -2079,16 +2079,13 @@ function L.record(entries, layout, seed)
     hs.settings.set(kHistoryKey, history)
 end
 
--- Tab on a history row: the same set in its next font or seed, in place.
-function L.revise(index)
-    local history = L.history()
-    local entry = history[index]
-    if not entry then return false end
-    local layout, seed = L.nextVariant(entry.layout, entry.seed)
-    if layout == entry.layout and seed == entry.seed then return false end
-    entry.layout, entry.seed = layout, seed
-    hs.settings.set(kHistoryKey, history)
-    return true
+-- Shift+Tab in the emoji lists: the same emoji in a random order.
+function L.shuffle(list)
+    for k = #list, 2, -1 do
+        local other = math.random(k)
+        list[k], list[other] = list[other], list[k]
+    end
+    return list
 end
 
 function L.forget(index)
