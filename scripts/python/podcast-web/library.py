@@ -17,6 +17,7 @@ import xml.etree.ElementTree as ET
 from podcast_policy import write_policy
 
 CHANNEL_ID = re.compile(r"UC[A-Za-z0-9_-]{22}\Z")
+SOURCE_ID = re.compile(r"(?:UC[A-Za-z0-9_-]{22}|tg_[a-z][a-z0-9_]{4,31})\Z")
 
 
 def channel_url(value):
@@ -64,6 +65,8 @@ class Library:
             CREATE TABLE IF NOT EXISTS auto_seen(podcast TEXT, video TEXT, PRIMARY KEY(podcast,video));
             CREATE TABLE IF NOT EXISTS mixes(id TEXT PRIMARY KEY, title TEXT NOT NULL, members TEXT NOT NULL);
             """)
+            if "excluded_global" not in {r[1] for r in db.execute("PRAGMA table_info(podcasts)")}:
+                db.execute("ALTER TABLE podcasts ADD COLUMN excluded_global INTEGER NOT NULL DEFAULT 0")
             created = db.execute("INSERT OR IGNORE INTO podcasts(id,title,url,auto_download) VALUES(?,?,?,1)",
                        (self.primary, primary.title, "https://www.youtube.com/channel/" + self.primary)).rowcount
             if created:
@@ -73,6 +76,7 @@ class Library:
                     known = [r[0] for r in existing.execute("SELECT video FROM membership WHERE playlist='uploads'")]
                 db.executemany("INSERT OR IGNORE INTO auto_seen VALUES(?,?)", [(self.primary, vid) for vid in known])
                 db.execute("UPDATE podcasts SET auto_ready=? WHERE id=?", (bool(known), self.primary))
+            db.execute("UPDATE podcasts SET excluded_global=1 WHERE id=?", (self.primary,))
         primary.on_download = self.rebuild_feeds
         for row in self.podcasts():
             self.catalog(row["id"])
@@ -108,7 +112,11 @@ class Library:
                 row = db.execute("SELECT * FROM podcasts WHERE id=?", (identifier,)).fetchone()
             if row is None:
                 raise ValueError("Unknown podcast")
-            catalog = self.catalog_class(self.state / "channels" / identifier,
+            cls = self.catalog_class
+            if identifier.startswith("tg_"):
+                from telegram_source import TelegramCatalog
+                cls = TelegramCatalog
+            catalog = cls(self.state / "channels" / identifier,
                 self.audio_root / "channels" / identifier, self.url_root + "/channels/" + identifier,
                 identifier, row["title"], pool=self.pool, on_download=self.rebuild_feeds)
             self.catalogs[identifier] = catalog
@@ -122,7 +130,7 @@ class Library:
         root = ET.Element("rss", version="2.0")
         channel = ET.SubElement(root, "channel")
         for key, value in (("title", catalog.title), ("description", "Downloaded episodes from " + catalog.title),
-                           ("link", "https://www.youtube.com/channel/" + catalog.channel)):
+                           ("link", catalog.channel_url)):
             ET.SubElement(channel, key).text = value
         self.write_xml(path, root)
 
@@ -138,6 +146,9 @@ class Library:
 
     @staticmethod
     def resolve(value):
+        if isinstance(value, str) and re.match(r"(?:https://)?(?:t\.me|telegram\.me)/", value.strip()):
+            from telegram_source import resolve
+            return resolve(value)
         from yt_dlp import YoutubeDL
         url = channel_url(value)
         with YoutubeDL({"extract_flat": "in_playlist", "playlistend": 1, "skip_download": True,
@@ -148,14 +159,16 @@ class Library:
             raise ValueError("YouTube did not return a channel ID")
         return identifier, info.get("channel") or info.get("uploader") or info.get("title") or identifier, url
 
-    def add(self, value):
+    def add(self, value, *, excluded=None):
+        if excluded is not None and not isinstance(excluded, bool):
+            raise ValueError("Global feed exclusion must be true or false")
         try:
             identifier, title, url = self.resolve(value)
         except Exception as exc:
-            raise ValueError("Could not read that YouTube channel. Check its URL and retry. " + str(exc)[-250:]) from exc
+            raise ValueError("Could not read that channel. Check its URL and retry. " + str(exc)[-250:]) from exc
         with self.lock:
             with self.db() as db:
-                db.execute("INSERT OR IGNORE INTO podcasts(id,title,url) VALUES(?,?,?)", (identifier, title, url))
+                db.execute("INSERT OR IGNORE INTO podcasts(id,title,url,excluded_global) VALUES(?,?,?,?)", (identifier, title, url, bool(excluded)))
             catalog = self.catalog(identifier)
             self.write_policy()
         with catalog.db() as db:
@@ -166,11 +179,12 @@ class Library:
         return identifier
 
     def schedule_catalog(self, catalog):
+        sources = ("uploads",) if catalog.source_type == "telegram" else ("uploads", "playlists", "shorts")
         with catalog.lock:
-            for source in ("uploads", "playlists", "shorts"):
+            for source in sources:
                 catalog.refreshes[source] = {"status": "loading", "error": None}
         def fetch():
-            for source in ("uploads", "playlists", "shorts"):
+            for source in sources:
                 catalog.refresh(source)
         self.refresh_pool.submit(fetch)
 
@@ -190,6 +204,16 @@ class Library:
             db.execute("UPDATE podcasts SET auto_download=?,error=NULL WHERE id=?", (enabled, identifier))
         self.write_policy()
 
+    def set_excluded(self, identifier, excluded):
+        if not isinstance(excluded, bool):
+            raise ValueError("Global feed exclusion must be true or false")
+        catalog = self.catalog(identifier)
+        if catalog.channel == self.primary and not excluded:
+            raise ValueError("The original podcast is always excluded from the global feed")
+        with self.db() as db:
+            db.execute("UPDATE podcasts SET excluded_global=? WHERE id=?", (excluded, catalog.channel))
+        self.rebuild_feeds()
+
     def snapshot(self, identifier=None):
         selected = self.catalog(identifier)
         data = selected.snapshot()
@@ -200,7 +224,8 @@ class Library:
             channels.append({"id": row["id"], "title": row["title"], "url": row["url"],
                 "auto_download": bool(row["auto_download"]), "auto_error": row["error"],
                 "feed_url": snap["feed_url"], "downloaded": sum(bool(e["audio_url"]) for e in snap["episodes"]),
-                "episodes": len(snap["memberships"].get("uploads", [])), "excluded_from_global": row["id"] == self.primary,
+                "episodes": len(snap["memberships"].get("uploads", [])), "excluded_from_global": bool(row["excluded_global"]),
+                "source_type": catalog.source_type, "exclusion_locked": row["id"] == self.primary,
                 "loading": any(r.get("status") == "loading" for r in snap["refreshes"].values())})
             queue.extend(dict(e, podcast_id=row["id"], podcast_title=row["title"]) for e in snap["episodes"] if e.get("job"))
         data.update(podcasts=channels, current_podcast=selected.channel, queue=queue,
@@ -210,7 +235,7 @@ class Library:
     def create_mix(self, identifiers):
         if not isinstance(identifiers, list) or not identifiers or len(identifiers) > 100:
             raise ValueError("Check at least one podcast")
-        if not all(isinstance(i, str) and CHANNEL_ID.fullmatch(i) for i in identifiers):
+        if not all(isinstance(i, str) and SOURCE_ID.fullmatch(i) for i in identifiers):
             raise ValueError("Invalid podcast ID")
         members = sorted(set(identifiers))
         known = {row["id"] for row in self.podcasts()}
@@ -229,7 +254,7 @@ class Library:
                 self.ensure_feed(self.catalog(source["id"]))
             with self.db() as db:
                 mixes = [dict(r) for r in db.execute("SELECT * FROM mixes")]
-            mixes.append({"id": "global", "title": "All podcasts", "members": json.dumps([r["id"] for r in sources if r["id"] != self.primary])})
+            mixes.append({"id": "global", "title": "All podcasts", "members": json.dumps([r["id"] for r in sources if not r["excluded_global"]])})
             for mix in mixes:
                 root = ET.Element("rss", version="2.0")
                 channel = ET.SubElement(root, "channel")
@@ -272,10 +297,14 @@ class Library:
             return
         catalog = self.catalog(identifier)
         try:
-            with YoutubeDL({"extract_flat": "in_playlist", "playlistend": 50, "skip_download": True,
+            if catalog.source_type == "telegram":
+                info = {"entries": catalog.recent_entries()}
+            else:
+                with YoutubeDL({"extract_flat": "in_playlist", "playlistend": 50, "skip_download": True,
                             "quiet": True, "socket_timeout": 30, "retries": 1}) as ydl:
-                info = ydl.extract_info("https://www.youtube.com/playlist?list=UU" + identifier[2:], download=False)
-            entries = [e for e in info.get("entries", []) if e and re.fullmatch(r"[A-Za-z0-9_-]{11}", e.get("id", ""))]
+                    info = ydl.extract_info("https://www.youtube.com/playlist?list=UU" + identifier[2:], download=False)
+            from server import EPISODE
+            entries = [e for e in info.get("entries", []) if e and EPISODE.fullmatch(e.get("id", ""))]
             with self.lock, self.db() as db:
                 current = db.execute("SELECT auto_download,auto_ready FROM podcasts WHERE id=?", (identifier,)).fetchone()
                 if not current["auto_download"]:
@@ -312,7 +341,7 @@ class Library:
                     with catalog.db() as db:
                         cached = db.execute("SELECT updated FROM sources WHERE id='shorts'").fetchone()
                     with catalog.lock:
-                        if (not cached or time.time() - cached[0] > 21600) and catalog.refreshes.get("shorts", {}).get("status") != "loading":
+                        if catalog.source_type == "youtube" and (not cached or time.time() - cached[0] > 21600) and catalog.refreshes.get("shorts", {}).get("status") != "loading":
                             catalog.refreshes["shorts"] = {"status": "loading", "error": None}
                             self.refresh_pool.submit(catalog.refresh, "shorts")
                     if row["auto_download"]:

@@ -158,3 +158,24 @@ can retain the old resolved identity. Serve the API's `/manifest.webmanifest`
 response at the manifest's public URL in that case, and keep old entry URLs as
 redirects. Watch `library.py` and the dereferenced `podcast_policy.py` helper when
 deploying the server.
+
+### Telegram audio channels
+
+The Add podcast field also accepts public `https://t.me/channel` URLs. Telegram
+audio and voice posts have stable message IDs, archives, original upload dates,
+manual downloads and individual/combined RSS feeds. Audio keeps its original
+format; text, images and non-audio attachments are omitted. Public previews can
+load a catalog, but downloading audio and reading complete metadata require a
+Telegram **user** session. Bot tokens cannot read channel history.
+
+Set `PODCAST_TELEGRAM_SESSION` to an already-authorized Telethon SQLite session
+file on the server. The adapter reads its authorization into memory, without
+modifying that file or logging in, joining channels or sending messages. API
+credentials come from `TELEGRAM_API_ID` / `TELEGRAM_API_HASH`, or the first two
+lines of the existing private `~/.telegram-config`. Keep sessions and credentials
+outside repositories and the served tree. The Python environment needs Telethon.
+
+New sources start with automatic downloads off. The **Exclude from global feed**
+checkbox controls global membership independently of archives and automation.
+The original podcast remains excluded. Explicit combined feeds can include any
+checked sources, even those excluded from the global feed.

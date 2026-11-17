@@ -7,6 +7,7 @@ import email.utils
 import hashlib
 import json
 import logging
+import mimetypes
 import os
 from pathlib import Path
 import re
@@ -20,6 +21,7 @@ import xml.etree.ElementTree as ET
 from podcast_dates import append_upload_date
 
 VIDEO = re.compile(r"^[A-Za-z0-9_-]{11}$")
+EPISODE = re.compile(r"(?:[A-Za-z0-9_-]{11}|tg_[1-9][0-9]{0,18})\Z")
 PLAYLIST = re.compile(r"^[A-Za-z0-9_-]{10,100}$")
 
 
@@ -28,6 +30,15 @@ def normalized(title):
 
 
 class Catalog:
+    source_type = "youtube"
+
+    @property
+    def channel_url(self):
+        return "https://www.youtube.com/channel/" + self.channel
+
+    def episode_url(self, identifier):
+        return "https://www.youtube.com/watch?v=" + identifier
+
     def __init__(self, state, audio, base_url, channel, title, *, pool=None, on_download=None):
         self.state, self.audio = Path(state), Path(audio)
         self.state.mkdir(parents=True, exist_ok=True)
@@ -155,7 +166,9 @@ class Catalog:
                 if p.suffix.lower() not in (".m4a", ".mp3", ".m4b", ".ogg", ".opus", ".wav") or not p.is_file() or not p.stat().st_size:
                     continue
                 url = self.base_url + "/" + quote(p.name, safe="")
-                match = re.search(r"\[([A-Za-z0-9_-]{11})\]$", p.stem)
+                match = re.search(r"\[([A-Za-z0-9_-]+)\]$", p.stem)
+                if match and not EPISODE.fullmatch(match[1]):
+                    match = None
                 if match:
                     by_id[match[1]] = url
                 by_title[normalized(p.stem)] = url
@@ -219,17 +232,19 @@ class Catalog:
             e["audio_url"] = self.audio_by_id.get(e["id"]) or self.audio_by_title.get(normalized(e["title"]))
             e["archived"] = bool(e["archived"])
             e["job"] = jobs.get(e["id"])
+            e["source_url"] = self.episode_url(e["id"])
+            e["source_label"] = "Telegram" if self.source_type == "telegram" else "YouTube"
             e["local"] = bool(e["audio_url"] and hashlib.sha256(e["audio_url"].encode()).hexdigest()[:11] == e["id"])
         remote_urls = {e["audio_url"] for e in episodes if e["audio_url"] and not e["local"]}
         episodes = [e for e in episodes if not e["local"] or e["audio_url"] not in remote_urls]
         with self.lock:
             refreshes = dict(self.refreshes)
-        return {"title": self.title, "episodes": episodes, "playlists": playlists, "memberships": memberships,
+        return {"title": self.title, "source_type": self.source_type, "episodes": episodes, "playlists": playlists, "memberships": memberships,
                 "refreshes": refreshes, "sources": sources, "feed_url": self.base_url + "/feed.rss"}
 
     def archive(self, ids, archived):
-        if not isinstance(archived, bool) or not isinstance(ids, list) or not 1 <= len(ids) <= 500 or not all(isinstance(i, str) and VIDEO.fullmatch(i) for i in ids):
-            raise ValueError("Expected up to 500 video IDs and a boolean archived value")
+        if not isinstance(archived, bool) or not isinstance(ids, list) or not 1 <= len(ids) <= 500 or not all(isinstance(i, str) and EPISODE.fullmatch(i) for i in ids):
+            raise ValueError("Expected up to 500 episode IDs and a boolean archived value")
         with self.db() as db:
             db.executemany("UPDATE episodes SET archived=? WHERE id=?", [(archived, i) for i in ids])
 
@@ -251,8 +266,8 @@ class Catalog:
         return value
 
     def enqueue(self, vid):
-        if not isinstance(vid, str) or not VIDEO.fullmatch(vid):
-            raise ValueError("Invalid video ID")
+        if not isinstance(vid, str) or not EPISODE.fullmatch(vid):
+            raise ValueError("Invalid episode ID")
         with self.db() as db:
             e = db.execute("SELECT * FROM episodes WHERE id=?", (vid,)).fetchone()
         if not e:
@@ -336,7 +351,7 @@ class Catalog:
             # Match the CLI's raw (unescaped) URL when generating its GUID, so
             # rebuilding the feed later does not make this item look new again.
             ET.SubElement(item, "guid", isPermaLink="false").text = hashlib.md5(f"{unquote(self.base_url)}/{path.name}|{path.stat().st_mtime}".encode()).hexdigest()
-            ET.SubElement(item, "enclosure", url=url, length=str(path.stat().st_size), type="audio/mp4")
+            ET.SubElement(item, "enclosure", url=url, length=str(path.stat().st_size), type=mimetypes.guess_type(path.name)[0] or "audio/mpeg")
             ET.SubElement(item, "pubDate").text = email.utils.formatdate(path.stat().st_mtime, usegmt=True)
             if info.get("duration"):
                 seconds = int(info["duration"])
@@ -423,11 +438,13 @@ class Handler(BaseHTTPRequestHandler):
                 self.reply({"ok": True, "id": playlist}, 202)
                 return
             elif self.path == "/podcasts" and library:
-                identifier = library.add(data.get("url"))
+                identifier = library.add(data.get("url"), excluded=data.get("excluded_from_global"))
                 self.reply({"ok": True, "id": identifier}, 201)
                 return
             elif self.path == "/auto" and library:
                 library.set_auto(data.get("podcast"), data.get("enabled"))
+            elif self.path == "/global-exclusion" and library:
+                library.set_excluded(data.get("podcast"), data.get("excluded"))
             elif self.path == "/feeds" and library:
                 self.reply({"url": library.create_mix(data.get("podcasts"))}, 201)
                 return

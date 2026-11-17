@@ -114,6 +114,7 @@ class CatalogTests(unittest.TestCase):
         with sqlite3.connect(state / "catalog.sqlite") as db:
             db.execute("CREATE TABLE episodes(id TEXT PRIMARY KEY,title TEXT NOT NULL,duration REAL,published TEXT,archived INTEGER DEFAULT 0)")
             db.execute("INSERT INTO episodes VALUES(?,?,?,NULL,1)", (ID, "Keep this", 180))
+        db.close()
         migrated = web.Catalog(state, self.root / "legacy-audio", "https://example.com/legacy", CHANNEL, "Legacy")
         try:
             row = migrated.snapshot()["episodes"][0]

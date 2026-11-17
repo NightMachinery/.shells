@@ -74,6 +74,11 @@ def main():
                 page.wait_for_function("document.getElementById('count').textContent==='(0 of 2)'")
                 page.locator('#podcast').select_option(SECOND);page.wait_for_selector('.episode')
                 assert not page.locator('#auto-download').is_checked()
+                page.locator('#exclude-global').check()
+                page.wait_for_function("document.getElementById('library-status').textContent.includes('Excluded')")
+                assert next(r for r in library.podcasts() if r['id']==SECOND)['excluded_global']
+                page.locator('#exclude-global').uncheck()
+                page.wait_for_function("document.getElementById('library-status').textContent.includes('Included')")
                 assert page.locator('#title').inner_text()=='Second podcast'
                 assert page.locator('#count').inner_text()=='(1 of 2)'
                 page.get_by_role('button',name='Download',exact=True).click()
