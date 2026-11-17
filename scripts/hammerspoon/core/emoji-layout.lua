@@ -634,6 +634,37 @@ function L.installedTextFonts()
     end
     return fonts
 end
+-- Fonts that draw worse (broken strokes, a dot lost here and there): Tab
+-- skips them, the Ctrl+Enter list of fonts shows them after the others.
+L.textFontsMore = {"Estedad", "Damascus", "B Nazanin", "Lalezar", "IranNastaliq"}
+local function allTextFonts()
+    local fonts = L.installedTextFonts()
+    for _, name in ipairs(L.textFontsMore) do
+        if fontInstalled(name) then fonts[#fonts+1] = name end
+    end
+    return fonts
+end
+-- Which emoji a cell of a text layout takes: one per letter, one per row of
+-- cells, or all of them shuffled evenly over the cells. The backtick key
+-- steps through them; the choice is remembered and a key names it.
+L.textColorings = {"letter", "row", "shuffled"}
+local kColoringNames = {letter="per letter", row="per row", shuffled="shuffled"}
+local kTextColoringKey = "emojiLayout.textColoring"
+L.textColoring = (hs.settings and hs.settings.get(kTextColoringKey)) or "letter"
+local function textColoring(value)
+    return kColoringNames[value] and value or "letter"
+end
+local function coloringAfter(value)
+    for k, name in ipairs(L.textColorings) do
+        if name == textColoring(value) then return L.textColorings[k % #L.textColorings + 1] end
+    end
+    return "letter"
+end
+function L.cycleTextColoring()
+    L.textColoring = coloringAfter(L.textColoring)
+    if hs.settings then hs.settings.set(kTextColoringKey, L.textColoring) end
+    return L.textColoring
+end
 local function fontAfter(font)
     local fonts, at = L.installedTextFonts(), 0
     for k, name in ipairs(fonts) do if name == font then at = k end end
@@ -1273,7 +1304,7 @@ function L.reduceRaster(pixels, w, h, cell, dotMax, dotUnit, expect, byArea)
         if a[2] ~= b[2] then return a[2] < b[2] end
         return a[1] < b[1]
     end)
-    for _, g in ipairs(groups) do
+    for groupIndex, g in ipairs(groups) do
         local rows, cx, cy = {}, 0, 0
         for _, d in ipairs(g) do
             local row = rows[#rows]
@@ -1308,7 +1339,7 @@ function L.reduceRaster(pixels, w, h, cell, dotMax, dotUnit, expect, byArea)
             if clear(cx + shift[1], cy + shift[2]) then ax, ay = cx + shift[1], cy + shift[2]; break end
         end
         for _, p in ipairs(shape) do
-            local c = {x=ax + p.dx, y=ay + p.dy - mean, s=g.s, letter=g.letter}
+            local c = {x=ax + p.dx, y=ay + p.dy - mean, s=g.s, letter=g.letter, group=groupIndex}
             out[#out+1] = c
             solid[#solid+1] = c
         end
@@ -1516,9 +1547,10 @@ local function bitmapCells(word)
     local tb = L.loadTextBitmap()
     if not tb then return {}, 0, 0 end
     local cells, top, letter, gap = {}, 0, 0, 1
-    for _, line in ipairs(bitmapLines(tb, word)) do
+    for lineIndex, line in ipairs(bitmapLines(tb, word)) do
         for _, px in ipairs(line.cells) do
             cells[#cells+1] = {
+                g = px.group and (lineIndex * 1000 + px.group),
                 i = letter + px.letter,
                 x = px.x - (line.width - 1) / 2,
                 y = top + px.y,
@@ -1534,7 +1566,7 @@ end
 -- One cell per lit pixel, lines centred. Each letter is one emoji, cycling
 -- through the selection. With more emoji than letters, each pixel row is one
 -- emoji (stripes), and with more than rows, each pixel.
-function L.textCells(word, n, font)
+function L.textCells(word, n, font, coloring, seed)
     local cells, letter, totalHeight
     if isFontWord(word) then
         cells, letter, totalHeight = fontCells(word)
@@ -1542,19 +1574,37 @@ function L.textCells(word, n, font)
         cells, letter, totalHeight = withFont(font, bitmapCells, word)
     end
     n = n or letter
-    if n > 0 then
-        for k, cell in ipairs(cells) do
-            if n <= letter then cell.i = (cell.i - 1) % n + 1
-            elseif n <= totalHeight then cell.i = math.floor(cell.y + 0.5) % n + 1
-            else cell.i = (k - 1) % n + 1 end
+    coloring = textColoring(coloring)
+    if n <= 0 then return cells end
+    if coloring == "row" then
+        -- A dot group is one emoji, that of the row its middle falls in.
+        local sum, count = {}, {}
+        for _, cell in ipairs(cells) do
+            if cell.g then sum[cell.g], count[cell.g] = (sum[cell.g] or 0) + cell.y, (count[cell.g] or 0) + 1 end
         end
+        for _, cell in ipairs(cells) do
+            local y = cell.g and sum[cell.g] / count[cell.g] or cell.y
+            cell.i = math.floor(y + 0.5) % n + 1
+        end
+    elseif coloring == "shuffled" then
+        -- Every emoji equally often, in an order the seed fixes.
+        local order, state = {}, ((seed or 1) * 7919 + 12345) % 2147483648
+        for k = 1, #cells do order[k] = (k - 1) % n + 1 end
+        for k = #order, 2, -1 do
+            state = (state * 1103515245 + 12345) % 2147483648
+            local other = math.floor(state / 65536) % k + 1
+            order[k], order[other] = order[other], order[k]
+        end
+        for k, cell in ipairs(cells) do cell.i = order[k] end
+    else
+        for _, cell in ipairs(cells) do cell.i = (cell.i - 1) % n + 1 end
     end
     return cells
 end
 
 -- Cached per word and row setting, since repeatTo is the cell count.
 local textModes = {}
-local function textMode(key, word, font)
+local function textMode(key, word, font, coloring)
     font = font and withFont(font, textFont)
     local id = table.concat({key, select(2, latinFont()), persianRows(), tostring(L.textDotSize),
         tostring(L.textTipSize), tostring(L.textStrokeGap), tostring(L.textDotGap), font or ""}, "\0")
@@ -1562,28 +1612,41 @@ local function textMode(key, word, font)
         local cells = L.textCells(word, nil, font)
         local name = "Text " .. word
         if font then name = name .. " · " .. font end
-        textModes[id] = {key=key, name=name, note="the word in emoji, a letter per emoji",
-            word=word, font=font, repeatTo=#cells, assigns=true,
-            build=function(_, _, n) return {L.textCells(word, n, font)} end}
+        if coloring ~= "letter" then name = name .. " · " .. kColoringNames[coloring] end
+        textModes[id] = {key=key, name=name, note="the word in emoji, emoji " .. kColoringNames[coloring],
+            word=word, font=font, coloring=coloring, repeatTo=#cells, assigns=true,
+            seeded=coloring == "shuffled" or nil,
+            build=function(_, seed, n) return {L.textCells(word, n, font, coloring, seed)} end}
     end
     return textModes[id]
 end
 
--- A text layout's key. Persian (or mixed) text names its font, text[Font]:word;
--- Tahoma, the font of every key written before fonts could be chosen, is left out.
-function L.textKey(word, font)
-    if isFontWord(word) then return "text:" .. word end
-    font = font or textFont()
-    return font == "Tahoma" and ("text:" .. word) or ("text[" .. font .. "]:" .. word)
+-- A text layout's key: text[options]:word. The options are the font of Persian
+-- (or mixed) text and the colouring, and the defaults are left out: Tahoma,
+-- the font of every key written before fonts could be chosen, and per letter.
+function L.textKey(word, font, coloring)
+    local options = {}
+    if not isFontWord(word) then
+        font = font or textFont()
+        if font ~= "Tahoma" then options[#options+1] = font end
+    end
+    coloring = textColoring(coloring or L.textColoring)
+    if coloring ~= "letter" then options[#options+1] = coloring end
+    if #options == 0 then return "text:" .. word end
+    return "text[" .. table.concat(options, ",") .. "]:" .. word
 end
 local function parseTextKey(key)
     if type(key) ~= "string" then return nil end
-    local font, raw = key:match("^text%[([^%]]+)%]:(.+)$")
-    if not raw then font, raw = nil, key:match("^text:(.+)$") end
+    local options, raw = key:match("^text%[([^%]]+)%]:(.+)$")
+    if not raw then options, raw = "", key:match("^text:(.+)$") end
     local word = raw and L.textWord(raw)
     if not word then return nil end
-    if isFontWord(word) then return word, nil end
-    return word, font or "Tahoma"
+    local font, coloring = nil, "letter"
+    for option in options:gmatch("[^,]+") do
+        if kColoringNames[option] then coloring = option else font = option end
+    end
+    if isFontWord(word) then return word, nil, coloring end
+    return word, font or "Tahoma", coloring
 end
 
 -- Whether a layout is drawn in a font of L.textFonts (Persian or mixed text).
@@ -1591,21 +1654,28 @@ function L.usesTextFont(key)
     local word, font = parseTextKey(key)
     return word and font and true or false
 end
+function L.isText(key) return parseTextKey(key) ~= nil end
+-- The same text in the next colouring.
+function L.nextColoring(key)
+    local word, font, coloring = parseTextKey(key)
+    if not word then return key end
+    return L.textKey(word, font, coloringAfter(coloring))
+end
 
 function L.mode(key)
     for _, mode in ipairs(L.modes) do if mode.key == key then return mode end end
-    local word, font = parseTextKey(key)
-    if word then return textMode(L.textKey(word, font), word, font) end
+    local word, font, coloring = parseTextKey(key)
+    if word then return textMode(L.textKey(word, font, coloring), word, font, coloring) end
     error("Unknown emoji layout: " .. tostring(key))
 end
 
 -- What Tab steps through for a layout: the installed fonts for Persian text,
 -- the next seeds for a seeded layout. Nil when there is nothing to choose.
 function L.variants(key, count)
-    local word, font = parseTextKey(key)
+    local word, font, coloring = parseTextKey(key)
     local list = {}
     if word and font then
-        for _, name in ipairs(L.installedTextFonts()) do list[#list+1] = {key=L.textKey(word, name), font=name} end
+        for _, name in ipairs(allTextFonts()) do list[#list+1] = {key=L.textKey(word, name, coloring), font=name} end
     elseif L.seeded(key) then
         for seed = L.jumbleSeed, L.jumbleSeed + (count or 8) - 1 do list[#list+1] = {key=key, seed=seed} end
     end
@@ -1613,15 +1683,16 @@ function L.variants(key, count)
 end
 -- The next of them after the given one: a key and a seed.
 function L.nextVariant(key, seed)
-    local word, font = parseTextKey(key)
-    if word and font then return L.textKey(word, fontAfter(font)), seed end
+    local word, font, coloring = parseTextKey(key)
+    if word and font then return L.textKey(word, fontAfter(font), coloring), seed end
     if L.seeded(key) then return key, (seed or L.jumbleSeed) + 1 end
     return key, seed
 end
 
 -- Whether a layout's cells depend on the seed, which Tab re-rolls.
 function L.seeded(key)
-    if parseTextKey(key) then return false end
+    local word, _, coloring = parseTextKey(key)
+    if word then return coloring == "shuffled" end
     local ok, mode = pcall(L.mode, key)
     return ok and mode.seeded or false
 end
@@ -1880,9 +1951,10 @@ function L.previewPane(chooser, resolve)
     local pane, canvas, timer, shown = {}, nil, nil, nil
     local function draw()
         local row = chooser:selectedRowContents()
-        local key, n, seed, images
-        if row and next(row) then key, n, seed, images = resolve(row) end
-        local id = key and table.concat({key, tostring(n), tostring(seed), tostring(row.text), tostring(row.history)}, "\0")
+        local key, n, seed, images, token
+        if row and next(row) then key, n, seed, images, token = resolve(row) end
+        local id = key and table.concat({key, tostring(n), tostring(seed), tostring(row.text),
+            tostring(row.history), tostring(token)}, "\0")
         if id == shown then return end
         shown = id
         local image
@@ -1939,9 +2011,10 @@ function L.menu(o)
     local pane = not o.ownPane and L.previewPane(o.chooser, function(row) return m.preview(row) end)
     function m.preview(row)
         if not (m.active and row.layout) then return nil end
-        return row.layout, #m.items, row.seed or L.jumbleSeed, function() return o.images(m.items) end
+        return row.layout, #m.items, row.seed or L.jumbleSeed, function() return o.images(m.items) end, m.shown
     end
     local function show(keepRow)
+        m.shown = (m.shown or 0) + 1     -- The same row may now show other emoji.
         local row = keepRow and o.chooser:selectedRow() or 1
         local images = o.images(m.items)
         if m.variantsOf then
@@ -1976,7 +2049,7 @@ function L.menu(o)
         ChooserSearch.setChoices(o.chooser, choices)
         o.chooser:selectedRow(row)
         o.chooser:placeholderText("Layout for " .. #m.items .. " emoji · type a word to spell it · " ..
-            "Enter: WebP · Cmd+Shift+Enter: PNG · Tab: next seed or font · Ctrl+Enter: all of them, or back")
+            "Enter: WebP · Cmd+Shift+Enter: PNG · Tab: next seed or font · `: text colouring · Ctrl+Enter: all of them, or back")
     end
     function m.open(items)
         if #items == 0 then return end
@@ -2019,6 +2092,18 @@ function L.menu(o)
         end
         local row = o.chooser:selectedRowContents()
         if row and L.usesTextFont(row.layout) then L.cycleTextFont() else L.jumbleSeed = L.jumbleSeed + 1 end
+        show(true)
+    end
+    -- Backtick: the next colouring of a text row.
+    function m.recolor()
+        if not m.active then return end
+        local row = o.chooser:selectedRowContents()
+        if not (row and L.isText(row.layout)) then return end
+        L.cycleTextColoring()
+        if m.variantsOf then
+            local word, font = parseTextKey(m.variantsOf)
+            m.variantsOf = L.textKey(word, font)
+        end
         show(true)
     end
     function m.pick(format)

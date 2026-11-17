@@ -136,7 +136,7 @@ assert(L.mode('text:hi').key=='text:HI' and not pcall(L.mode,'text:#'))
 local hi=L.build('text:hi',2)[1]
 assert(#hi==13,'In the default 4-row font H is 9 pixels and I 4')
 for k,c in ipairs(hi) do assert(c.i==(c.x<1 and 1 or 2),'H is the first emoji, I the second') end
-local striped=L.build('text:z',3)[1]
+local striped=L.build('text[row]:z',3)[1]
 for _,c in ipairs(striped) do assert(c.i==c.y%3+1,'Rows stripe through a longer selection') end
 local two=L.build('text:radio',1)[1]
 local width=0;for _,c in ipairs(two) do width=math.max(width,2*math.abs(c.x)+1) end

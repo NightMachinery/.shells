@@ -624,6 +624,7 @@ function telegramEmojiChooser()
         end),
         add=hs.hotkey.bind("shift","return",addCurrent),
         shiftTab=hs.hotkey.bind("shift","tab",shuffle),
+        recolor=hs.hotkey.bind("","`",function()menu.recolor()end),
         backslash=hs.hotkey.bind("","\\",removeLast),
         shiftUp=hs.hotkey.bind("shift","up",function()toggleMove(-1)end,nil,function()toggleMove(-1)end),
         shiftDown=hs.hotkey.bind("shift","down",function()toggleMove(1)end,nil,function()toggleMove(1)end),
@@ -735,7 +736,7 @@ function emojiStickerHistoryChooser()
     local function refresh()
         local rows=T.historyRows(nil,changes)
         chooser:placeholderText("Recent sticker sets · "..#rows.." · Enter: WebP · Cmd+Shift+Enter: PNG · "..
-            "Tab: next font or seed · Shift+Tab: shuffle · Ctrl+Enter: other layouts · Cmd+Backspace: forget")
+            "Tab: next font or seed · `: text colouring · Shift+Tab: shuffle · Ctrl+Enter: other layouts · Cmd+Backspace: forget")
         ChooserSearch.setChoices(chooser,rows)
     end
     -- Export first, then select, so the paste lands where Hyper+Ctrl+A started.
@@ -809,6 +810,13 @@ function emojiStickerHistoryChooser()
         end),
         tab=hs.hotkey.bind("","tab",function()if menu.active then menu.reroll() else vary() end end),
         shiftTab=hs.hotkey.bind("shift","tab",shuffle),
+        recolor=hs.hotkey.bind("","`",function()
+            if menu.active then menu.recolor();return end
+            local row=chooser:selectedRowContents()
+            if not (row and row.history) then return end
+            local layout=EmojiLayout.nextColoring(row.set.layout)
+            if layout~=row.set.layout then change(row,{layout=layout,seed=row.set.seed}) end
+        end),
         forget=hs.hotkey.bind("cmd","delete",function()
             local row=chooser:selectedRowContents()
             if menu.active or not (row and row.history) then return end

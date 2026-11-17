@@ -667,6 +667,7 @@ function emojiChooser()
         end),
         backslash = hs.hotkey.bind('', '\\', removeLast),
         shiftTab = hs.hotkey.bind('shift', 'tab', shuffle),
+        recolor = hs.hotkey.bind('', '`', function() menu.recolor() end),
         shiftUp = hs.hotkey.bind('shift', 'up', function() toggleMove(-1) end, nil, function() toggleMove(-1) end),
         shiftDown = hs.hotkey.bind('shift', 'down', function() toggleMove(1) end, nil, function() toggleMove(1) end),
     }

@@ -264,15 +264,27 @@ raster, which `EmojiLayout.reduceRaster` brings down to the grid:
 - **The key names the font.** A Persian text layout's key is
   `text[Vazirmatn]:word`; plain `text:word` means Tahoma. So last-used and
   history redraw a set in the font it was made with.
-- **Left out:** IranNastaliq (unreadable at these sizes, and its squeezed dot
-  groups lose dots), Lalezar, B Nazanin and Damascus (broken strokes or wrong
-  dot counts), Estedad (like Vazirmatn but more fragmented). Their tuning in
-  `EmojiLayout.textFontTuning` is kept: adding a name to `textFonts` brings
-  the font back.
+- **Weaker fonts are in the list only.** Estedad (like Vazirmatn but more
+  fragmented), Damascus, B Nazanin and Lalezar (broken strokes or a wrong dot
+  count here and there) and IranNastaliq (hard to read at these sizes, and
+  its squeezed dot groups lose dots) are in `EmojiLayout.textFontsMore`: Tab
+  skips them, the Ctrl+Enter list of fonts shows them after the others when
+  they are installed.
 
-Each letter (in logical reading order for RTL scripts) is one emoji, cycling
-the selection; with more emoji than letters each row is one emoji (stripes),
-and with more emoji than rows each cell cycles. Long text wraps onto up to
+Which emoji a cell takes is the colouring, and the backtick key steps through
+the three on a text row (in the layout list, the fonts list and the history):
+
+- **per letter** (the default): each letter, in logical reading order for RTL
+  scripts, is one emoji, cycling the selection. Its dots take the same emoji.
+- **per row:** each row of cells is one emoji, as stripes. A dot group is one
+  emoji, that of the row its middle falls in.
+- **shuffled:** every emoji equally often, in a random order. The order is
+  fixed by the seed, which history keeps; Tab re-rolls it for Latin text.
+
+The choice is remembered, and the key names it along with the font:
+`text[Vazirmatn,row]:word`. A key without a colouring is per letter.
+
+Long text wraps onto up to
 three lines, whichever gives the largest cells (ASCII can wrap inside a word
 when there are no spaces, whereas CoreText text wraps only at spaces, one blank
 row apart, so cursive words stay joined). The word travels in the layout key

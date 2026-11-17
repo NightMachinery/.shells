@@ -102,16 +102,37 @@ local function runTests()
         string.format("Expected RTL x order 1..4, got %.2f, %.2f, %.2f, %.2f",
             meanX[1], meanX[2], meanX[3], meanX[4]))
 
-    -- Emoji color cycling modes: <= letters, letter..height (stripes), > height (per-pixel).
+    -- Colourings: per letter (the default), per row of cells, shuffled.
     local z1 = L.textCells("کتاب", 1)
     for _, c in ipairs(z1) do assert(c.i == 1) end
-    local z2 = L.textCells("کتاب", 2)
-    for _, c in ipairs(z2) do assert(c.i == 1 or c.i == 2) end
-    local height = math.floor(maxY + 0.5) + 1
-    local zStripe = L.textCells("کتاب", height - 1)
-    for _, c in ipairs(zStripe) do assert(c.i == math.floor(c.y + 0.5) % (height - 1) + 1) end
-    local zPixel = L.textCells("کتاب", height + 5)
-    for k, c in ipairs(zPixel) do assert(c.i == (k - 1) % (height + 5) + 1) end
+    local z9, used = L.textCells("کتاب", 9), {}
+    for _, c in ipairs(z9) do used[c.i] = true end
+    for i = 1, 9 do assert((used[i] or false) == (i <= 4), "per letter uses one emoji a letter, whatever the count") end
+    local zRow, groupEmoji = L.textCells("کتاب", 3, nil, "row"), {}
+    for _, c in ipairs(zRow) do
+        if c.g then
+            assert(groupEmoji[c.g] == nil or groupEmoji[c.g] == c.i, "a dot group is one emoji")
+            groupEmoji[c.g] = c.i
+        else
+            assert(c.i == math.floor(c.y + 0.5) % 3 + 1)
+        end
+    end
+    local function emojiOf(cells)
+        local parts, counts = {}, {}
+        for k, c in ipairs(cells) do parts[k] = c.i; counts[c.i] = (counts[c.i] or 0) + 1 end
+        return table.concat(parts, ","), counts
+    end
+    local shuffledA, counts = emojiOf(L.textCells("کتاب", 5, nil, "shuffled", 3))
+    for i = 1, 5 do assert(counts[i] >= #zRow // 5 and counts[i] <= #zRow // 5 + 1, "shuffled uses every emoji equally") end
+    assert(shuffledA == emojiOf(L.textCells("کتاب", 5, nil, "shuffled", 3)), "the seed fixes the order")
+    assert(shuffledA ~= emojiOf(L.textCells("کتاب", 5, nil, "shuffled", 4)))
+    L.textColoring = "letter"
+    assert(L.textKey("کتاب", "Vazirmatn", "row") == "text[Vazirmatn,row]:کتاب")
+    assert(L.textKey("HI", nil, "shuffled") == "text[shuffled]:HI" and L.textKey("HI") == "text:HI")
+    assert(L.mode("text[row]:کتاب").coloring == "row" and L.mode("text[row]:کتاب").font == "Tahoma")
+    assert(L.mode("text:کتاب").coloring == "letter", "a key without a colouring is per letter")
+    assert(L.nextColoring("text:HI") == "text[row]:HI" and L.nextColoring("text[shuffled]:HI") == "text:HI")
+    assert(L.seeded("text[shuffled]:HI") and not L.seeded("text[row]:HI"))
 
     -- Other Persian words, ligatures, ZWNJ, Persian digits, mixed ASCII/heart.
     for _, sample in ipairs({
@@ -227,7 +248,7 @@ local function runTests()
     assert(shape(geeza) ~= shape(tahoma), "the two fonts must draw different shapes")
     assert(L.usesTextFont("text:کتاب") and not L.usesTextFont("text:HI") and not L.usesTextFont("jumble"))
     -- Tab steps through the fonts in order and wraps; Ctrl+Enter lists them all.
-    assert(#L.variants("text:کتاب") == #L.textFonts and L.variants("text:HI") == nil)
+    assert(#L.variants("text:کتاب") == #L.textFonts + #L.textFontsMore and L.variants("text:HI") == nil)
     local key = "text:کتاب"
     for _ = 1, #L.textFonts do key = L.nextVariant(key) end
     assert(key == "text:کتاب", "the fonts wrap around")
