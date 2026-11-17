@@ -70,6 +70,23 @@ assert(installed[1].id=='55' and installed[2].id=='44','Packs the account has no
 env.io.open=function()end
 local none,missing=T.entries()
 assert(#none==0 and missing.state=='missing')
+local oldOs,oldSettings,oldAttributes=env.os,env.hs.settings,env.hs.fs.attributes
+local available={}
+env.os={getenv=function(k)return k=='HOME' and '/inert/home' or nil end}
+env.hs.settings={get=function()end}
+env.hs.fs.attributes=function(path)return available[path] and 'file' or nil end
+local stable='/inert/home/Library/Application Support/Purple/emoji-export/catalog.json'
+local legacy='/inert/home/Library/Caches/Purple/emoji-export/catalog.json'
+assert(T.catalogPath()==stable,'New exports live outside cache directories')
+available[legacy]=true
+assert(T.catalogPath()==legacy,'Installed older clients remain discoverable')
+available[stable]=true
+assert(T.catalogPath()==stable,'New catalog wins when both paths exist')
+env.hs.settings.get=function()return '/inert/explicit/catalog.json' end
+assert(T.catalogPath()=='/inert/explicit/catalog.json','Explicit settings never silently fall back')
+env.os.getenv=function(k)return k=='NIGHT_TELEGRAM_EMOJI_CATALOG' and '/inert/env/catalog.json' or nil end
+assert(T.catalogPath()=='/inert/env/catalog.json','Environment override still wins')
+env.os,env.hs.settings,env.hs.fs.attributes=oldOs,oldSettings,oldAttributes
 -- Several emoji in one rich paste, decoded as tdesktop's DeserializeTags reads it.
 local first=T.catalogEntry({id='111',alt='😍'},'/inert')
 local second=T.catalogEntry({id='222',alt='🙂‍↔️'},'/inert')

@@ -242,10 +242,18 @@ end
 -- The second result describes the catalog for the placeholder: state is
 -- "ok", "missing" or "invalid", and modified is its mtime when present.
 -- Unchanged inputs return the same table, which callers may use as a cache key.
+function T.catalogPath()
+    local override=os.getenv("NIGHT_TELEGRAM_EMOJI_CATALOG") or hs.settings.get("telegramEmoji.catalogPath")
+    if override then return override end
+    local home=os.getenv("HOME")
+    local path=home.."/Library/Application Support/Purple/emoji-export/catalog.json"
+    local legacy=home.."/Library/Caches/Purple/emoji-export/catalog.json"
+    if hs.fs.attributes(path,"mode")~="file" and hs.fs.attributes(legacy,"mode")=="file" then return legacy end
+    return path
+end
+
 function T.entries()
-    local path=os.getenv("NIGHT_TELEGRAM_EMOJI_CATALOG") or
-        hs.settings.get("telegramEmoji.catalogPath") or
-        (os.getenv("HOME").."/Library/Caches/Purple/emoji-export/catalog.json")
+    local path=T.catalogPath()
     local status={state="missing",modified=hs.fs.attributes(path,"modification")}
     local content=readFile(path)
     if not (catalogCache and catalogCache.path==path and catalogCache.content==content) then
