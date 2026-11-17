@@ -243,11 +243,19 @@ raster, which `EmojiLayout.reduceRaster` brings down to the grid:
   Where no stroke crosses the line between their columns, everything to the
   right moves over by `EmojiLayout.textStrokeGap` (0.4 of a cell; 0 turns it
   off).
-- **The font is a setting.** `EmojiLayout.textFont` (default `Tahoma`) names
-  the font the text is drawn in before reduction, and its proportions carry
-  over: Tahoma keeps teeth and dots clearest, but its alef barely clears its
-  other letters. Geeza Pro and Damascus have a taller alef and a `ی` that dips
-  below the baseline, at the cost of coarser teeth at the same row count.
+- **Dot counts come from the alphabet.** `پ` has three dots whatever the font
+  draws: where a font fuses a pair or a triangle into one piece (Geeza Pro),
+  the piece is split into the dots its letter must have. Dots keep
+  `EmojiLayout.textDotGap` (0.15 of a cell) clear of the strokes around them.
+- **Tab changes the font.** On a Persian text row of the layout menu, Tab
+  moves to the next installed font of `EmojiLayout.textFonts`, and the row
+  names the font; the choice is remembered. Tahoma (the default) keeps teeth
+  clearest but its alef barely clears its other letters. Vazirmatn
+  (`brew install --cask font-vazirmatn`) and Geeza Pro have a tall alef and a
+  `ی` that dips below the line. IranNastaliq is the calligraphic hand: drawn
+  with 1.8 times the rows, hard to read, and its squeezed dot groups are
+  counted by area, so a dot can go missing. A font that is not installed is
+  skipped. Per-font adjustments live in `EmojiLayout.textFontTuning`.
 
 Each letter (in logical reading order for RTL scripts) is one emoji, cycling
 the selection; with more emoji than letters each row is one emoji (stripes),

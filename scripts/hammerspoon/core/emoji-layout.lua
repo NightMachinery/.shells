@@ -570,15 +570,56 @@ L.textRows = {english=4, persian=7}
 -- body emoji. Dots are never dropped: each takes one emoji of its own.
 L.textDotSize = 0.7
 L.textTipSize = 0.7
+-- Clear space, in cells, kept between a dot group and the strokes around it.
+L.textDotGap = 0.15
 -- Extra space, in cells, put between two separate strokes that stand side by
 -- side (the alef and the yeh of ای), so that they do not read as one thick stroke.
 L.textStrokeGap = 0.4
 -- The font Persian (and mixed) text is drawn in before it is reduced. Its
 -- proportions carry over: Tahoma's alef barely clears its other letters.
-L.textFont = "Tahoma"
+-- Tab on a Persian text row of the layout menu moves to the next installed
+-- font of L.textFonts; the choice is remembered across reloads. Tahoma keeps
+-- teeth and dots clearest, Vazirmatn and Geeza Pro have a tall alef and a yeh
+-- that dips below the line, IranNastaliq is the calligraphic hand.
+L.textFonts = {"Tahoma", "Vazirmatn", "Geeza Pro", "IranNastaliq"}
+-- What a font needs beyond the defaults. rows: a line that runs downhill
+-- needs more rows for the same detail, so L.textRows.persian is multiplied.
+-- size: the raster size is multiplied, for a font that is small for its point
+-- size. dot: the width of one dot over the raster size, for a font that draws
+-- a dot group as one fused piece. ligatures: the font joins letters into
+-- shared glyphs, so a dot cannot be traced to its letter and dots are counted
+-- by shape alone.
+L.textFontTuning = {IranNastaliq={rows=1.8, size=2.6, dot=0.155, ligatures=true}, ["Geeza Pro"]={dot=0.125}}
+-- Dots by letter. \219\140 is left out: it has two inside a word and none at its end.
+local kLetterDots = {}
+for count, letters in ipairs({"\216\168\216\172\216\174\216\176\216\178\216\182\216\184\216\186\217\129\217\134", "\216\170\217\130\216\169\217\138", "\217\190\216\171\218\134\218\152\216\180"}) do
+    for _, code in utf8.codes(letters) do kLetterDots[code] = count end
+end
+local kTextFontKey = "emojiLayout.textFont"
+L.textFont = (hs.settings and hs.settings.get(kTextFontKey)) or "Tahoma"
+local function fontInstalled(name)
+    local valid = hs.styledtext and hs.styledtext.validFont
+    if not valid then return true end
+    local ok, found = pcall(valid, name)
+    return ok and found and true or false
+end
+-- A font that is not installed (another Mac) falls back to Tahoma.
 local function textFont()
     local font = L.textFont
-    return (type(font) == "string" and font ~= "") and font or "Tahoma"
+    if type(font) == "string" and font ~= "" and (font == "Tahoma" or fontInstalled(font)) then return font end
+    return "Tahoma"
+end
+function L.cycleTextFont()
+    local fonts, at = {}, 0
+    for _, name in ipairs(L.textFonts) do
+        if name == "Tahoma" or fontInstalled(name) then
+            fonts[#fonts+1] = name
+            if name == textFont() then at = #fonts end
+        end
+    end
+    L.textFont = fonts[at % #fonts + 1] or "Tahoma"
+    if hs.settings then hs.settings.set(kTextFontKey, L.textFont) end
+    return L.textFont
 end
 -- Hand-drawn fonts by row count, mostly 3 wide; M and W are 5 and N and Q 4 in
 -- the 4- and 5-row fonts, since at 3 wide round dots blur M, N and H together.
@@ -874,9 +915,17 @@ local function rasterThin(mask, w, h)
     end
 end
 
-function L.reduceRaster(pixels, w, h, cell, dotMax)
+-- dotUnit, for a font that draws a dot group as one fused piece (Nastaliq),
+-- is the width of one dot: a compact piece up to about two dots across that
+-- belongs to a letter with a body is split into its dots. expect, letter to
+-- dot count, is what the alphabet says (three for \217\190): the dot pieces of such a
+-- letter share that many dots by area, however the font draws them.
+-- byArea, for a font that squeezes several letters' dots into one blob,
+-- counts the dots of a piece by its area and takes pieces up to four across.
+function L.reduceRaster(pixels, w, h, cell, dotMax, dotUnit, expect, byArea)
     local dotSize = math.max(0.3, math.min(1, tonumber(L.textDotSize) or 0.7))
     local tipSize = math.max(0.3, math.min(1, tonumber(L.textTipSize) or 0.7))
+    local dotGap = math.max(0, math.min(1, tonumber(L.textDotGap) or 0.15))
     local mask, owner = {}, {}
     for _, p in ipairs(pixels) do
         mask[p.y * w + p.x] = true
@@ -885,16 +934,80 @@ function L.reduceRaster(pixels, w, h, cell, dotMax)
 
     -- Dots apart from the body.
     local comps, large = rasterComponents(mask, w, h), {}
+    -- A speck of a pixel or two is the rasterizer's, not the letter's.
+    for k = #comps, 1, -1 do
+        if #comps[k] < 0.02 * dotMax * dotMax and #comps > 1 then
+            for _, q in ipairs(comps[k]) do mask[q] = nil end
+            table.remove(comps, k)
+        end
+    end
     for _, comp in ipairs(comps) do
-        comp.small = comp.maxX - comp.minX < dotMax and comp.maxY - comp.minY < dotMax
+        local cw, ch = comp.maxX - comp.minX + 1, comp.maxY - comp.minY + 1
+        comp.small = cw - 1 < dotMax and ch - 1 < dotMax
         comp.letter = owner[comp[1]]
-        if not comp.small then
+        local reach = (byArea and 4 or 2.3) * (dotUnit or 0)
+        comp.fused = not comp.small and dotUnit and cw <= reach and ch <= reach
+            and #comp >= 0.4 * cw * ch and math.max(1, math.floor(byArea
+                and #comp / (0.72 * dotUnit * dotUnit) + 0.5 or math.max(cw, ch) / dotUnit + 0.5))
+        if not comp.small and not comp.fused then
             for _, k in ipairs(comp) do large[owner[k]] = true end
+        end
+    end
+    local byLetter = {}
+    for _, comp in ipairs(comps) do
+        if comp.fused and not large[comp.letter] then comp.fused = nil end
+        if comp.small then comp.fused = 1 end
+        if comp.fused and large[comp.letter] then
+            byLetter[comp.letter] = byLetter[comp.letter] or {area=0}
+            local pieces = byLetter[comp.letter]
+            pieces[#pieces+1] = comp
+            pieces.area = pieces.area + #comp
+        end
+    end
+    for letter, pieces in pairs(byLetter) do
+        local want = expect and expect[letter]
+        if want and #pieces <= want then
+            -- Largest remainders, at least a dot a piece.
+            local left = want
+            for _, comp in ipairs(pieces) do
+                comp.share = want * #comp / pieces.area
+                comp.fused = math.max(1, math.floor(comp.share))
+                left = left - comp.fused
+            end
+            table.sort(pieces, function(a, b)
+                local ra, rb = a.share - a.fused, b.share - b.fused
+                if ra ~= rb then return ra > rb end
+                return a[1] < b[1]
+            end)
+            for _, comp in ipairs(pieces) do
+                if left <= 0 then break end
+                comp.fused, left = comp.fused + 1, left - 1
+            end
         end
     end
     local dots, body, pieceOf = {}, {}, {}
     for id, comp in ipairs(comps) do
-        if comp.small then
+        if comp.fused and comp.fused > 1 then
+            -- Bands across the longer side, a dot at the middle of each.
+            local wide = comp.maxX - comp.minX >= comp.maxY - comp.minY
+            local lo = wide and comp.minX or comp.minY
+            local span = (wide and comp.maxX or comp.maxY) - lo + 1
+            local sums = {}
+            for _, k in ipairs(comp) do
+                local at = wide and k % w or k // w
+                local band = math.min(comp.fused, math.floor((at - lo) * comp.fused / span) + 1)
+                local sum = sums[band] or {x=0, y=0, n=0}
+                sums[band] = sum
+                sum.x, sum.y, sum.n = sum.x + k % w, sum.y + k // w, sum.n + 1
+            end
+            for band = 1, comp.fused do
+                local sum = sums[band]
+                if sum then
+                    dots[#dots+1] = {px=sum.x / sum.n + 0.5, py=sum.y / sum.n + 0.5,
+                        letter=comp.letter, s=dotSize}
+                end
+            end
+        elseif comp.fused or comp.small then
             local sx, sy = 0, 0
             for _, k in ipairs(comp) do sx, sy = sx + k % w, sy + k // w end
             -- A small piece that is all of its letter (a digit ۰) is drawn full size.
@@ -1136,7 +1249,7 @@ function L.reduceRaster(pixels, w, h, cell, dotMax)
             for _, p in ipairs(shape) do
                 local x, y = ax + p.dx, ay + p.dy - mean
                 for _, c in ipairs(solid) do
-                    local reach = (c.s + g.s) / 2 + 0.04
+                    local reach = (c.s + g.s) / 2 + dotGap
                     if math.abs(c.x - x) < reach and math.abs(c.y - y) < reach then return false end
                 end
             end
@@ -1176,9 +1289,12 @@ local function rasterBitmapLine(tb, text)
     if bitmapCacheMod ~= tb then
         bitmapLineCache, bitmapLineCount, bitmapCacheMod, bitmapRefHeight = {}, 0, tb, nil
     end
-    local size, rows, font = L.textRasterSize, persianRows(), textFont()
+    local font = textFont()
+    local tuning = L.textFontTuning[font] or {}
+    local size = L.textRasterSize * (tonumber(tuning.size) or 1)
+    local rows = persianRows() * (tonumber(tuning.rows) or 1)
     local id = table.concat({text, size, rows, tostring(L.textDotSize), tostring(L.textTipSize),
-        tostring(L.textStrokeGap), font}, "\0")
+        tostring(L.textStrokeGap) .. "\0" .. tostring(L.textDotGap), font}, "\0")
     local cached = bitmapLineCache[id]
     if cached then return cached end
     if not bitmapRefHeight or bitmapRefHeight.size ~= size or bitmapRefHeight.font ~= font then
@@ -1187,8 +1303,18 @@ local function rasterBitmapLine(tb, text)
         bitmapRefHeight = {size=size, font=font, height=math.max(1, height or 0, size)}
     end
     local pixels, width, height, letters = tb.rasterize(text, font, size)
+    -- The rasterizer numbers the visible letters in reading order; when that
+    -- matches the text's own letters, each one's dot count is known.
+    local expect, codes = {}, {}
+    for _, code in utf8.codes(text) do
+        if code > 0x20 and code ~= 0x200C and code ~= 0x200D and code ~= 0x640
+            and not (code >= 0x64B and code <= 0x65F) then codes[#codes+1] = code end
+    end
+    if #codes == letters and not tuning.ligatures then
+        for k, code in ipairs(codes) do expect[k] = kLetterDots[code] end
+    end
     local cells, cellsWide, cellsHigh = L.reduceRaster(pixels, width, height,
-        bitmapRefHeight.height / rows, size * 0.17)
+        bitmapRefHeight.height / rows, size * (tuning.dot and 0.2 or 0.17), tuning.dot and size * tuning.dot, expect, tuning.ligatures)
     local entry = {text=text, cells=cells, width=cellsWide, height=cellsHigh, letters=letters}
     if bitmapLineCount >= 256 then
         bitmapLineCache, bitmapLineCount = {}, 0
@@ -1383,15 +1509,23 @@ end
 local textModes = {}
 local function textMode(key, word)
     local id = string.format("%s\0%s\0%s\0%s\0%s", key, select(2, latinFont()), persianRows(),
-        tostring(L.textDotSize), tostring(L.textTipSize)) .. "\0" .. tostring(L.textStrokeGap)
-        .. "\0" .. tostring(L.textFont)
+        tostring(L.textDotSize), tostring(L.textTipSize)) .. "\0" .. tostring(L.textStrokeGap) .. "\0" .. tostring(L.textDotGap)
+        .. "\0" .. textFont()
     if not textModes[id] then
         local cells = L.textCells(word)
-        textModes[id] = {key=key, name="Text " .. word, note="the word in emoji, a letter per emoji",
+        local name = "Text " .. word
+        if not isFontWord(word) then name = name .. " · " .. textFont() end
+        textModes[id] = {key=key, name=name, note="the word in emoji, a letter per emoji",
             word=word, repeatTo=#cells, assigns=true,
             build=function(_, _, n) return {L.textCells(word, n)} end}
     end
     return textModes[id]
+end
+
+-- Whether a layout is drawn in L.textFont (Persian or mixed text).
+function L.usesTextFont(key)
+    local word = type(key) == "string" and L.textWord(key:match("^text:(.+)$"))
+    return word and not isFontWord(word) or false
 end
 
 function L.mode(key)
@@ -1676,7 +1810,7 @@ function L.menu(o)
         ChooserSearch.setChoices(o.chooser, choices)
         o.chooser:selectedRow(row)
         o.chooser:placeholderText("Layout for " .. #m.items .. " emoji · type a word to spell it · " ..
-            "Enter: WebP · Cmd+Shift+Enter: PNG · Tab: re-roll · Ctrl+Enter: back")
+            "Enter: WebP · Cmd+Shift+Enter: PNG · Tab: re-roll, or next font on Persian text · Ctrl+Enter: back")
     end
     function m.open(items)
         if #items == 0 then return end
@@ -1699,8 +1833,10 @@ function L.menu(o)
         o.chooser:query(m.query or "")
         o.back()
     end
+    -- Tab: the next font on a Persian text row, a new Jumble anywhere else.
     function m.reroll()
-        L.jumbleSeed = L.jumbleSeed + 1
+        local row = o.chooser:selectedRowContents()
+        if row and L.usesTextFont(row.layout) then L.cycleTextFont() else L.jumbleSeed = L.jumbleSeed + 1 end
         show(true)
     end
     function m.pick(format)

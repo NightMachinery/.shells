@@ -23,7 +23,7 @@ static int rasterize(lua_State *L) {
     double size = luaL_optnumber(L, 3, 12.0);
     if (!isfinite(size)) size = 12.0;
     if (size < 6.0) size = 6.0;
-    if (size > 64.0) size = 64.0;
+    if (size > 256.0) size = 256.0;
     if (len == 0) return push_empty_bitmap(L);
 
     @autoreleasepool {

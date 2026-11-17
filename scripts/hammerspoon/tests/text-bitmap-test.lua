@@ -194,6 +194,20 @@ local function runTests()
         counts[rows] = #cells
     end
     assert(counts[6] < counts[8] and counts[8] < counts[12], "fewer rows must mean fewer emoji")
+    -- Dot counts come from the alphabet, so a font that draws a pair or a
+    -- triangle as one fused piece (Geeza Pro) still shows every dot.
+    L.textRows.persian = 7
+    for _, font in ipairs({"Tahoma", "Geeza Pro"}) do
+        L.textFont = font
+        for word, want in pairs({["پیشی"]=8, ["قشنگ"]=6, ["ثبت"]=6, ["تپش"]=8}) do
+            local dots = 0
+            for _, c in ipairs(L.textCells(word)) do
+                if c.s == L.textDotSize then dots = dots + 1 end
+            end
+            assert(dots == want, string.format("%s in %s shows %d dots, not %d", word, font, dots, want))
+        end
+    end
+    L.textFont = "Tahoma"
     -- A stroke standing right next to another letter keeps its length: the alef
     -- of برای sits one cell from the ی and was once thinned away as its thickness.
     for _, rows in ipairs({6, 7, 8, 9, 10}) do
