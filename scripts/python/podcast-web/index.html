@@ -3,12 +3,19 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="color-scheme" content="light dark">
+<meta name="theme-color" content="#f7f8f3">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Podcasts">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
 <title>Podcast library</title>
+<link rel="manifest" href="manifest.webmanifest" crossorigin="use-credentials">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
 <script src="theme.js?v=6924a29d93bf"></script>
-<link rel="stylesheet" href="style.css?v=8d42f2b2f93f">
+<link rel="stylesheet" href="style.css?v=bd5c2de0e1b5">
 <body>
 <main>
-  <header><div class="header-top"><div class="eyebrow">YOUR LISTENING LIBRARY</div><label class="theme-control" for="theme">Theme <select id="theme"><option value="light">Light</option><option value="dark">Dark</option></select></label></div><h1 id="title">Podcast library</h1><p>Find an older conversation. Keep the ones you want.</p><div class="header-actions"><a id="feed" href="#">Podcast feed ↗</a><button id="refresh">Refresh catalog</button></div></header>
+  <header><div class="header-top"><div class="eyebrow">YOUR LISTENING LIBRARY</div><label class="theme-control" for="theme">Theme <select id="theme"><option value="light">Light</option><option value="dark">Dark</option></select></label></div><h1 id="title">Podcast library</h1><p>Find an older conversation. Keep the ones you want.</p><div class="header-actions"><a id="feed" href="#">Podcast feed ↗</a><button id="refresh">Refresh catalog</button><button id="install-app" hidden>Install app</button></div><details id="install-help" hidden><summary>Install on your device</summary><p>Chrome or Edge: open the browser menu and choose Install app or Add to Home screen.</p><p>iPhone or iPad: open in Safari, tap Share, then Add to Home Screen.</p><p>The app opens in its own window. A connection and your usual login are needed to use your library.</p></details></header>
   <details id="download-queue" class="download-queue"><summary><h2>Download queue <span id="queue-count"></span></h2></summary><p id="queue-status" role="status"></p><ol id="queue-active"></ol><details id="queue-history"><summary>Recent downloads <span id="queue-history-count"></span></summary><div id="queue-recent"></div></details></details>
   <section class="controls" aria-label="Browse episodes">
     <label class="search-label" for="search">Search episodes</label><input id="search" type="search" placeholder="Search titles in Persian or English…" autocomplete="off">
@@ -26,5 +33,6 @@
   <footer>Archive hides an episode from this list. Restore it any time by turning off “Hide archived”. Audio files and your podcast feed are kept.</footer>
 </main>
 <script src="app.js?v=6da12ce4dd56"></script>
+<script src="pwa.js?v=1c0c61dcb4b1"></script>
 </body>
 </html>

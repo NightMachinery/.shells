@@ -1,0 +1,6 @@
+# Original icons are rendered deterministically by build.py.
+/icon.svg
+/icon-192.png
+/icon-512.png
+/icon-maskable-512.png
+/apple-touch-icon.png

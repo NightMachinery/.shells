@@ -11,8 +11,19 @@ Open **Download queue** near the top to see the current download, waiting episod
 in order, and recent completed/failed jobs. The queue includes episodes hidden
 by list filters. Failed jobs have a retry button; finished jobs link to their audio.
 
+Use **Install app** in the header to add the library to your home screen or desktop.
+It opens in a standalone window with a headphone icon. When the browser cannot
+show an installation prompt, the button shows its menu instructions instead.
+The manifest is loaded with credentials so a private deployment can stay behind
+its normal login. Its identity and scope resolve to the page's own directory.
+
+The app remains online: the service worker provides a generic reconnect page,
+and does not cache the private page, episode data, login responses, audio, or
+mutations. It does not touch other apps' caches. Normal online navigation always
+fetches the current page, whose changing assets have content-hashed URLs.
+
 Run it in the Python environment that already runs `podcaster.py` (`yt-dlp`,
-`jdatetime` and FFmpeg are required):
+`jdatetime`, Pillow and FFmpeg are required):
 
 ```sh
 python python/podcast-web/build.py
@@ -23,7 +34,8 @@ python python/podcast-web/server.py --channel CHANNEL_ID \
 ```
 
 The server binds `127.0.0.1:8812`; `PORT` overrides it. Serve `index.html`,
-`app.js`, `theme.js`, and `style.css` behind an authenticated reverse proxy, and strip
+`app.js`, `theme.js`, `pwa.js`, `style.css`, the manifest, icons, and `sw.js`
+behind an authenticated reverse proxy, and strip
 the page's `/api` prefix when proxying to this server. JSON mutations require
 same-origin browser requests with `X-Podcast-Action: 1`. Authentication belongs
 to the private page's proxy, as with other private HTML reports.
@@ -92,3 +104,23 @@ python python/podcast-web/backfill_descriptions.py --audio-dir "$AUDIO_DIR" --ap
 
 The first command previews counts. The second takes the downloader's shared lock,
 keeps a `feed.before-upload-dates.rss` backup, and updates the feed atomically.
+
+The PWA manifest and service worker keep stable URLs. `build.py` regenerates the
+original headphone artwork at 192, 512, and 180 pixels (Pillow is already a CLI
+dependency), hashes the install script, and changes the worker revision when the
+app changes. Rendered icon files are gitignored. Running the build twice on
+identical inputs changes no files.
+The manifest omits `id` so its identity comes from the resolved `start_url`,
+keeping separate pages on the same origin distinct.
+
+With Playwright and its Chromium browser installed, verify installability and
+login/offline behavior using synthetic data in a temporary browser profile:
+
+```sh
+python python/podcast-web/verify_pwa.py
+```
+
+The checks include credentialed manifest requests, native prompt handling,
+worker scope, no private offline copies, cross-origin login redirects, and
+preservation of another app's cache. `--screenshots DIRECTORY` saves phone views.
+Manifest setup follows the [web.dev manifest guide](https://web.dev/articles/add-manifest).
