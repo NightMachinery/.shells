@@ -171,7 +171,11 @@ months. With no tty to ask, it says so and continues.
 =agents-md-doctor= exists because the failure mode is silence. It lists every
 source, whether it exists and how long it is, then reports =STALE= if the
 written file has drifted, =MISSING= if it was never written, and =OVERSIZED=
-past 200 lines, which is where Claude Code's docs say adherence starts to drop.
+past 200 lines, which is where Claude Code's docs say adherence starts to drop,
+or past =agents_md_max_bytes= (30,000 by default). Codex counts the global file
+against its =project_doc_max_bytes= (32 KiB by default) and gives project
+=AGENTS.md= files only what is left, so a global file over that budget silently
+drops every project's instructions.
 For a rules target it lists each file with its size, flags =OVER CAP= past
 agy's 24,000 bytes and =EXTRA= for a leftover file, and estimates the share of
 agy's rules budget. Under =retired:= it names any old output still on disk.

@@ -464,7 +464,8 @@ function agents-md-doctor {
         elif [[ "$(command cat -- "${target}")" != "${assembled}" ]] ; then
             ecerr "  STALE: differs from its sources, run agents-md-sync"
         else
-            ec "  = ${#${(@f)assembled}}L, in sync"
+            h-agents-md-bytes "${assembled}"
+            ec "  = ${#${(@f)assembled}}L, ${REPLY}B, in sync"
             h-agents-md-doctor-lines "${assembled}"
         fi
     done
@@ -475,12 +476,22 @@ function agents-md-doctor {
 }
 
 function h-agents-md-doctor-lines {
-    : "usage: h-agents-md-doctor-lines <assembled>; warns when it is too long"
+    : "usage: h-agents-md-doctor-lines <assembled>; warns when it has too many lines or bytes"
     local lines="${#${(@f)1}}"
     #: Claude Code's docs ask for under 200 lines; adherence drops on longer
     #: files, and every agent pays the context either way.
     if (( lines > 200 )) ; then
         ecerr "  OVERSIZED: ${lines} lines, trim the sources"
+    fi
+
+    #: Codex counts the global file against `project_doc_max_bytes` (32 KiB by
+    #: default) and gives project AGENTS.md files only what is left; at 37 KB
+    #: they were silently truncated to nothing. Warn well before the default,
+    #: so growth shows up here rather than as lost project instructions.
+    local max="${agents_md_max_bytes:-30000}"
+    h-agents-md-bytes "${1}"
+    if (( REPLY > max )) ; then
+        ecerr "  OVERSIZED: ${REPLY} bytes (warning at ${max}), trim the sources"
     fi
 }
 
