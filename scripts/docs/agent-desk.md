@@ -67,13 +67,23 @@ answered.
   `agent-desk inbox <path>`, scoped to the item's node. On macOS the
   dashboard page reuses a tab that is already on the dashboard
   ([agfi:h-agent-desk-open-tab]): it switches that tab to the item and
-  brings it to the front, without reloading the page. This works in the
-  Chromium-family browsers listed in `agent_desk_open_tab_browsers` (Brave,
-  Chrome, Edge, Vivaldi); the browser is `agent_desk_open_browser` (a bundle
-  id), else the default one. The first click asks for the Automation
-  permission ("Agent Desk wants to control ..."); without it, or with no such
-  tab, it opens a new tab as before. Set `agent_desk_open_reuse_tab=n` to
-  always open a new tab.
+  brings it to the front, without reloading the page. Set
+  `agent_desk_open_reuse_tab=n` to always open a new tab.
+- [agfi:agent-desk-tabs-install] builds that tab switcher,
+  `~/Applications/Agent Desk Tabs.app`, from `macos/desk-tabs/main.swift`.
+  It is a separate app so that only it holds the Automation permission to
+  control the browser, and it can only use it one way: its AppleScript is
+  fixed, it reads the dashboard's address from agent-desk's config (never
+  from the caller), refuses any URL outside it, and only moves a dashboard
+  tab to another dashboard page, else opens the URL normally. It works in
+  the default browser when that is Chromium-family (Brave, Chrome, Edge,
+  Vivaldi). The first click after each build asks to let "Agent Desk Tabs"
+  control the browser: the app keeps the default ad-hoc signature, so a
+  rebuilt or replaced binary never inherits the grant. `agent-desk-tabs
+  --dry-run URL` (inside the app) says what it would do without touching
+  the browser; its messages are in the unified log (`/usr/bin/log show
+  --predicate 'process == "agent-desk-tabs"'`). Without the app, a click
+  opens a new tab.
 - [agfi:agent-desk-task-launch] (`[tasks] launch_command`): starts a Paseo
   agent on a deferred task with `paseo run --no-wait`, outside any agent
   (`PASEO_AGENT_ID` removed), in the task's directory, titled with its id and

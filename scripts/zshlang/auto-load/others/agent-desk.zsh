@@ -299,71 +299,58 @@ function agent-desk-dismiss {
     notif_app=desk notif-os-remove "${f[handle]:-agent-desk-${f[id]}}"
 }
 
-#: Chromium-family browsers, whose AppleScript lists each tab's URL.
-typeset -ga agent_desk_open_tab_browsers=(
-    com.brave.Browser com.google.Chrome com.google.Chrome.beta com.google.Chrome.canary
-    org.chromium.Chromium com.microsoft.edgemac com.vivaldi.Vivaldi
-)
+typeset -g agent_desk_tabs_app="${agent_desk_tabs_app:-${HOME}/Applications/Agent Desk Tabs.app}"
 
-function h-agent-desk-default-browser {
-    : "Prints the bundle id of this Mac's default browser (the https handler), or nothing"
-    command python3 -I -c '
-import os, plistlib
-p = os.path.expanduser("~/Library/Preferences/com.apple.LaunchServices/com.apple.launchservices.secure.plist")
-for h in plistlib.load(open(p, "rb")).get("LSHandlers", []):
-    if h.get("LSHandlerURLScheme") == "https":
-        print(h.get("LSHandlerRoleAll", ""))
-        break
-' 2>/dev/null
+function agent-desk-tabs-install {
+    : "usage: agent-desk-tabs-install
+Builds macos/desk-tabs/main.swift into ~/Applications/Agent Desk Tabs.app
+(agent_desk_tabs_app), the helper behind [agfi:h-agent-desk-open-tab]. It is
+ad-hoc signed with the default designated requirement, so each build (or a
+replaced binary) asks for the Automation permission again on its first click,
+rather than inheriting the grant."
+    local src="${NIGHTDIR:-${HOME}/scripts}/macos/desk-tabs/main.swift"
+    local app="${agent_desk_tabs_app}" tmp
+    [[ -e "${src}" ]] || { ecerr "$0: missing ${src}" ; return 1 }
+    tmp="$(command mktemp -d)" || return $?
+    {
+        h-agent-desk-tabs-build "${src}" "${tmp}/a.app" || return $?
+        command rm -rf -- "${app}" || return $?
+        command mkdir -p "${app:h}" || return $?
+        command mv -- "${tmp}/a.app" "${app}" || return $?
+        ec "Installed ${app}; the first notification click asks to let it control the browser."
+    } always {
+        command rm -rf -- "${tmp}"
+    }
+}
+
+function h-agent-desk-tabs-build {
+    : "usage: h-agent-desk-tabs-build SRC APP: compiles and signs the bundle APP"
+    local src="$1" app="$2" plist="$2/Contents/Info.plist" kv
+    command mkdir -p "${app}/Contents/MacOS" || return $?
+    command xcrun swiftc -O -framework AppKit -o "${app}/Contents/MacOS/agent-desk-tabs" "${src}" || return $?
+    command plutil -create xml1 "${plist}" || return $?
+    for kv in CFBundleIdentifier=com.user.night-agent-desk.tabs 'CFBundleName=Agent Desk Tabs' \
+        CFBundleExecutable=agent-desk-tabs CFBundlePackageType=APPL CFBundleVersion=1 \
+        CFBundleShortVersionString=1.0 LSMinimumSystemVersion=11.0 \
+        'NSAppleEventsUsageDescription=Switches your open agent-desk tab to the item you clicked, instead of opening a new tab.' ; do
+        command plutil -insert "${kv%%=*}" -string "${kv#*=}" "${plist}" || return $?
+    done
+    command plutil -insert LSUIElement -bool true "${plist}" || return $?
+    command codesign --force --sign - "${app}" || return $?
 }
 
 function h-agent-desk-open-tab {
     : "usage: h-agent-desk-open-tab URL
-Points a browser tab already on the dashboard (same address before the #) at
-URL, switches to it and brings its window and the browser to the front. Only
-the part after # changes, so the page does not reload. The browser is
-agent_desk_open_browser (a bundle id), else the default one; it must be in
-agent_desk_open_tab_browsers. Returns 1 when that browser is not running, has
-no such tab, is not in the list, or macOS refuses to let the caller control
-it (the Automation permission), so the caller opens URL as usual."
-    local url="${1-}" base="${1%%\#*}" want id="" b res
-    want="${agent_desk_open_browser:-$(h-agent-desk-default-browser)}"
-    [[ -n "${base}" && -n "${want}" ]] || return 1
-    for b in "${agent_desk_open_tab_browsers[@]}" ; do
-        [[ "${b:l}" == "${want:l}" ]] && { id="${b}" ; break }
-    done
-    [[ -n "${id}" ]] || return 1
-    #: The id comes from the list above, so it is safe to write into the
-    #: script; AppleScript needs the application at compile time to know its
-    #: terms (tabs, URL).
-    res="$(command osascript - "${base}" "${url}" 2>&1 <<EOF
-on run argv
-	set base to item 1 of argv
-	set target to item 2 of argv
-	if not (application id "${id}" is running) then return "none"
-	tell application id "${id}"
-		repeat with w in windows
-			set i to 0
-			repeat with t in tabs of w
-				set i to i + 1
-				if (URL of t) starts with base then
-					set URL of t to target
-					set active tab index of w to i
-					set index of w to 1
-					activate
-					return "reused"
-				end if
-			end repeat
-		end repeat
-	end tell
-	return "none"
-end run
-EOF
-)"
-    [[ "${res}" == reused ]] && return 0
-    #: On stderr, which agent-desk logs for each click (hooks.log).
-    [[ "${res}" == none ]] || ecerr "$0: ${id}: ${res}"
-    return 1
+Hands URL to the Agent Desk Tabs helper ([agfi:agent-desk-tabs-install]),
+which switches a browser tab already on the dashboard to it, or opens it
+normally. Only that helper holds the permission to control the browser, and
+it only moves a dashboard tab to another dashboard page. Returns 1 when the
+helper is not installed, so the caller opens URL itself."
+    local url="${1-}"
+    [[ -n "${url}" && -x "${agent_desk_tabs_app}/Contents/MacOS/agent-desk-tabs" ]] || return 1
+    #: Through LaunchServices, so the helper (not this shell's app) is the
+    #: one macOS asks about; -n so its arguments reach a fresh instance.
+    command open -n -g -a "${agent_desk_tabs_app}" --args "${url}"
 }
 
 function agent-desk-open {

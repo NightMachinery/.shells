@@ -140,9 +140,9 @@ printf "%s\n" "$*" > "$FAKE_OPENED"' > "${fixture}/bin/open"
         command chmod +x "${fixture}/bin/open" "${fixture}/bin/xdg-open"
         rehash
         local -x FAKE_OPENED="${fixture}/opened-url"
-        # Never talk to a real browser: tab reuse is off, and a browser
-        # outside the list is refused before any AppleScript runs.
-        agent_desk_open_browser=com.example.none h-agent-desk-open-tab 'https://desk.example.net/#/' && exit 1
+        # Never talk to a real browser: tab reuse is off, and without the
+        # helper app it declines, so the caller opens the URL itself.
+        agent_desk_tabs_app="${fixture}/no-such.app" h-agent-desk-open-tab 'https://desk.example.net/#/' && exit 1
         local agent_desk_open_reuse_tab=n
         payload tell notify true | agent-desk-open || exit 1
         check open-url "$(<"${FAKE_OPENED}")" 'https://desk.example.net/#/p/example-proj/rerun-nov/coord?item=q-7f3a'
