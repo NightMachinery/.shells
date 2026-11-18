@@ -131,6 +131,19 @@ function notif-os {
             #: NSUserDefaults parses option values as plists. A leading backslash
             #: forces literal text and terminal-notifier strips that backslash.
             reval-timeout 12 "$notifier" -title "\\${title}" -message "\\${msg}" "$opts[@]"
+            local ret=$?
+            #: The bypass is upstream's legacy NSUserNotification path. Since
+            #: about 2026-11-11 it delivers nothing on this macOS: the app waits
+            #: for a delivery that never comes and exits 4 (its own timeout).
+            #: Then post through the normal path, which Focus may hold in
+            #: Notification Center, rather than lose the notification.
+            if (( ret == 4 )) && bool "$ignore_dnd" ; then
+                ecgray "$0: the Do Not Disturb bypass timed out; posting normally"
+                opts=( "${(@)opts:#-ignoreDnD}" )
+                reval-timeout 12 "$notifier" -title "\\${title}" -message "\\${msg}" "$opts[@]"
+                ret=$?
+            fi
+            return $ret
         else
             ectrace "notification app is unavailable"
             return 1
