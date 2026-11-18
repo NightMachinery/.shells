@@ -242,7 +242,7 @@ function h-codex-status-agent-quotas-p {
     local codex_home="${CODEX_HOME:-}"
     ensure-array codex_status_args
 
-    [[ "${1}" == status ]] && shift
+    [[ "${1:-}" == status ]] && shift
     test -z "${profile}" || return 1
     test -z "${limits}" || return 1
     (( ${#codex_status_args} == 0 )) || return 1
@@ -268,7 +268,7 @@ Every Codex auth snapshot's identity and rate limits; see docs/codex_status.md."
         local aq_strip_ansi_p="${codex_status_strip_ansi_p:-n}"
         local aq_full_pct="${codex_status_full_pct:-}"
 
-        [[ "${1}" == status ]] && shift
+        [[ "${1:-}" == status ]] && shift
         local aq_args=()
         bool "${aq_strip_ansi_p}" && aq_args+=(--color never)
         test -n "${aq_full_pct}" && aq_args+=(--full-pct "${aq_full_pct}")
