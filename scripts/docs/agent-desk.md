@@ -64,7 +64,16 @@ answered.
 - [agfi:agent-desk-open] (`open_command`): opens a done report's report file
   with [agfi:h-agent-done-open-report], as Agent Done's card does; else the
   item's page on the dashboard; else a new kitty window running
-  `agent-desk inbox <path>`, scoped to the item's node.
+  `agent-desk inbox <path>`, scoped to the item's node. On macOS the
+  dashboard page reuses a tab that is already on the dashboard
+  ([agfi:h-agent-desk-open-tab]): it switches that tab to the item and
+  brings it to the front, without reloading the page. This works in the
+  Chromium-family browsers listed in `agent_desk_open_tab_browsers` (Brave,
+  Chrome, Edge, Vivaldi); the browser is `agent_desk_open_browser` (a bundle
+  id), else the default one. The first click asks for the Automation
+  permission ("Agent Desk wants to control ..."); without it, or with no such
+  tab, it opens a new tab as before. Set `agent_desk_open_reuse_tab=n` to
+  always open a new tab.
 - [agfi:agent-desk-task-launch] (`[tasks] launch_command`): starts a Paseo
   agent on a deferred task with `paseo run --no-wait`, outside any agent
   (`PASEO_AGENT_ID` removed), in the task's directory, titled with its id and

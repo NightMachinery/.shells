@@ -4,6 +4,9 @@
 #: under sh with the event as JSON on stdin. See docs/agent-desk.md.
 ##
 typeset -g agent_desk_tlg_idle_min_s="${agent_desk_tlg_idle_min_s:-600}"
+#: A notification click reuses a browser tab already on the dashboard (see
+#: [agfi:h-agent-desk-open-tab]); n opens a new tab each time.
+typeset -g agent_desk_open_reuse_tab="${agent_desk_open_reuse_tab:-y}"
 
 function agent-desk-config-install {
     : "usage: agent-desk-config-install [--force] [--base-url URL] [--remote-label NAME] [--ssh-host HOST=TARGET]...
@@ -296,6 +299,70 @@ function agent-desk-dismiss {
     notif_app=desk notif-os-remove "${f[handle]:-agent-desk-${f[id]}}"
 }
 
+#: Chromium-family browsers, whose AppleScript lists each tab's URL.
+typeset -ga agent_desk_open_tab_browsers=(
+    com.brave.Browser com.google.Chrome com.google.Chrome.beta com.google.Chrome.canary
+    org.chromium.Chromium com.microsoft.edgemac com.vivaldi.Vivaldi
+)
+
+function h-agent-desk-default-browser {
+    : "Prints the bundle id of this Mac's default browser (the https handler), or nothing"
+    command python3 -I -c '
+import os, plistlib
+p = os.path.expanduser("~/Library/Preferences/com.apple.LaunchServices/com.apple.launchservices.secure.plist")
+for h in plistlib.load(open(p, "rb")).get("LSHandlers", []):
+    if h.get("LSHandlerURLScheme") == "https":
+        print(h.get("LSHandlerRoleAll", ""))
+        break
+' 2>/dev/null
+}
+
+function h-agent-desk-open-tab {
+    : "usage: h-agent-desk-open-tab URL
+Points a browser tab already on the dashboard (same address before the #) at
+URL, switches to it and brings its window and the browser to the front. Only
+the part after # changes, so the page does not reload. The browser is
+agent_desk_open_browser (a bundle id), else the default one; it must be in
+agent_desk_open_tab_browsers. Returns 1 when that browser is not running, has
+no such tab, is not in the list, or macOS refuses to let the caller control
+it (the Automation permission), so the caller opens URL as usual."
+    local url="${1-}" base="${1%%\#*}" want id="" b res
+    want="${agent_desk_open_browser:-$(h-agent-desk-default-browser)}"
+    [[ -n "${base}" && -n "${want}" ]] || return 1
+    for b in "${agent_desk_open_tab_browsers[@]}" ; do
+        [[ "${b:l}" == "${want:l}" ]] && { id="${b}" ; break }
+    done
+    [[ -n "${id}" ]] || return 1
+    #: The id comes from the list above, so it is safe to write into the
+    #: script; AppleScript needs the application at compile time to know its
+    #: terms (tabs, URL).
+    res="$(command osascript - "${base}" "${url}" 2>/dev/null <<EOF
+on run argv
+	set base to item 1 of argv
+	set target to item 2 of argv
+	if not (application id "${id}" is running) then return "none"
+	tell application id "${id}"
+		repeat with w in windows
+			set i to 0
+			repeat with t in tabs of w
+				set i to i + 1
+				if (URL of t) starts with base then
+					set URL of t to target
+					set active tab index of w to i
+					set index of w to 1
+					activate
+					return "reused"
+				end if
+			end repeat
+		end repeat
+	end tell
+	return "none"
+end run
+EOF
+)" || return 1
+    [[ "${res}" == reused ]]
+}
+
 function agent-desk-open {
     : "open_command: opens a done report, else the item's page on the dashboard, else the inbox scoped to the item's node in a new kitty window"
     ##
@@ -308,6 +375,9 @@ function agent-desk-open {
     fi
     if test -n "${f[url]}" ; then
         if isDarwin ; then
+            if bool "${agent_desk_open_reuse_tab}" && h-agent-desk-open-tab "${f[url]}" ; then
+                return 0
+            fi
             command open "${f[url]}"
         else
             command xdg-open "${f[url]}"
