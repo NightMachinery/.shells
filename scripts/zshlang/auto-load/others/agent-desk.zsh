@@ -336,7 +336,7 @@ it (the Automation permission), so the caller opens URL as usual."
     #: The id comes from the list above, so it is safe to write into the
     #: script; AppleScript needs the application at compile time to know its
     #: terms (tabs, URL).
-    res="$(command osascript - "${base}" "${url}" 2>/dev/null <<EOF
+    res="$(command osascript - "${base}" "${url}" 2>&1 <<EOF
 on run argv
 	set base to item 1 of argv
 	set target to item 2 of argv
@@ -359,8 +359,11 @@ on run argv
 	return "none"
 end run
 EOF
-)" || return 1
-    [[ "${res}" == reused ]]
+)"
+    [[ "${res}" == reused ]] && return 0
+    #: On stderr, which agent-desk logs for each click (hooks.log).
+    [[ "${res}" == none ]] || ecerr "$0: ${id}: ${res}"
+    return 1
 }
 
 function agent-desk-open {
