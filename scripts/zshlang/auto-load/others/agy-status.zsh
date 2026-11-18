@@ -1084,8 +1084,54 @@ function h-agy-status-account-json {
          buckets: ($buckets | map(. + {used_percent: (100 - .remaining_percent)}))}'
 }
 
+function h-agy-status-agent-quotas-p {
+    #: Whether this =agy-status= call can be answered by the agent-quotas
+    #: daemon. Not for what only this file does: the flat bucket array
+    #: (=agy_status_json_p=y= without =--json=), the credit balance, the
+    #: cache-only switch, =--help=, or an unknown flag.
+    #: Usage: h-agy-status-agent-quotas-p [user-arg...]
+    ##
+    local flat_p="${agy_status_json_p:-n}"
+    local credits_p="${agy_status_credits_p:-n}"
+    local cache_only_p="${agy_status_cache_only_p:-n}"
+
+    if bool "${flat_p}" && (( ! ${@[(Ie)--json]} )) ; then
+        return 1
+    fi
+    bool "${credits_p}" && return 1
+    bool "${cache_only_p}" && return 1
+
+    h-agent-quotas-args-ok '--json --account=' "$@" &&
+        h-agent-quotas-p
+}
+
+function h-agy-status-agent-quotas {
+    #: =agent-quotas agy-status= with this file's knobs. The daemon serves its
+    #: statusline cache; =deus= (=deusvult=) and =agy_status_method=slow= make
+    #: it run the slow path, as they do here.
+    #: Usage: h-agy-status-agent-quotas [--json] [--account N]
+    ##
+    local method="${agy_status_method:-statusline}"
+    local columns="${agy_status_columns:-${COLUMNS:-80}}"
+    local color="${agy_status_color:-auto}"
+    local absolute="${agy_status_absolute_p:-auto}"
+
+    [[ "${columns}" == <1-> ]] || columns=80
+    local args=(--columns "${columns}" --color "${color}" --absolute "${absolute}")
+    [[ "${method}" == slow ]] && args+=(--refresh)
+
+    command agent-quotas agy-status "${args[@]}" "$@"
+}
+
 function agy-status {
     : "all configured accounts; --json for account objects, --account N to select one"
+    #: Asks the agent-quotas daemon when it answers
+    #: ([agfi:h-agy-status-agent-quotas-p]); everything below is the fallback.
+    if h-agy-status-agent-quotas-p "$@" ; then
+        h-agy-status-agent-quotas "$@"
+        return $?
+    fi
+
     ensure-cmd jq @RET
     local json_p=n account='' arg
     while (( $# )) ; do

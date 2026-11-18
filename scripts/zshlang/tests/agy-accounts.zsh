@@ -48,7 +48,10 @@ PY
 command chmod +x "${test_tmp}/bin/agy"
 typeset -gx PATH="${test_tmp}/bin:${PATH}"
 source "${test_root}/zshlang/auto-load/others/antigravity.zsh"
+source "${test_root}/zshlang/auto-load/others/agent-quotas.zsh"
 source "${test_root}/zshlang/auto-load/others/agy-status.zsh"
+#: The zsh engine is what this file tests; the agent-quotas route has its own block.
+typeset -g agent_quotas_p=n
 function h-agent-launch { shift; command "$@" }
 
 function fail { print -ru2 -- "$*"; exit 1 }
@@ -95,6 +98,23 @@ agy_status_columns=80 agy-status > "${test_tmp}/human.txt" 2> "${test_tmp}/human
 [[ ! -s "${test_tmp}/human.err" ]] || fail 'human diagnostics escaped account blocks'
 command rg --quiet 'resets in|reset .* ago' "${test_tmp}/human.txt" || fail 'relative resets missing'
 print -r -- "${json}" | command jq --exit-status 'all(.[]; has("_display_cache_file") | not)' >/dev/null
+
+# With the agent-quotas daemon answering, the account report comes from it;
+# the flat bucket array and cache-only mode stay with the zsh engine.
+command cat > "${test_tmp}/bin/agent-quotas" <<'SH'
+#!/bin/sh
+[ "$1" = health ] && exit 0
+printf 'AQ %s\n' "$*"
+SH
+command chmod +x "${test_tmp}/bin/agent-quotas"
+#: The directory was hashed before the stub existed.
+rehash
+agent_quotas_p=auto
+[[ "$(agy_status_columns=90 agy-status --account cave --json)" == 'AQ agy-status --columns 90 --color auto --absolute auto --account cave --json' ]] || fail 'agent-quotas route'
+[[ "$(agy_status_method=slow agy_status_columns=90 agy-status)" == 'AQ agy-status --columns 90 --color auto --absolute auto --refresh' ]] || fail 'slow method lost on the agent-quotas route'
+AGY_ACCOUNT_ID=acc1 agy_status_json_p=y agy-status | command jq --exit-status '.[0].source == "cache"' >/dev/null || fail 'flat array left the zsh engine'
+[[ "$(agy-status --bogus 2>&1)" != AQ* ]] || fail 'unknown flag reached agent-quotas'
+agent_quotas_p=n
 
 # Best account considers the minimum known window; only Gemini prefers acc2.
 agy-best --model 'Gemini fixture' models

@@ -108,7 +108,16 @@ account for an explicit ID. `--continue` stays account/workspace-specific.
 
 ## Status and choosing an account
 
-`agy-status` (`agys`) reports every configured account in a separate block. The
+`agy-status` (`agys`) reports every configured account in a separate block.
+When the [agent-quotas](https://github.com/NightMachinery/agent-quotas) daemon
+answers, `agy-status` and `agy-status --json` come from it
+(`agent-quotas agy-status`, the same report and JSON, read from the statusline
+cache; `deus` or `agy_status_method=slow` make it run the slow path) and the
+zsh engine below is the fallback. The flat bucket array
+(`agy_status_json_p=y` without `--json`), the credit balance and
+`agy_status_cache_only_p=y` always use the zsh engine; `agent_quotas_p=n`
+forces it for any call. The daemon lists the accounts in its own config, which
+`agent-quotas config init` copied from `AGY_ACCOUNTS`. The
 header carries its name, sign-in state, known plan tier, cache age or live
 provenance, and email (dim in a terminal). `auth stored` means file credentials
 exist but this cached reading has not verified them. Each aligned row shows a
