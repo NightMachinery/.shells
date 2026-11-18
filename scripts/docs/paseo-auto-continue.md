@@ -111,6 +111,18 @@ send operation. Turn it off before intentionally abandoning a blocked task.
 
 ## Worker and state
 
+Where the [agent-quotas](https://github.com/NightMachinery/agent-quotas) daemon
+answers, `paseo-auto-continue-on|off|status|stopped` and the pickers' listing
+call `agent-quotas continue ...` (`list` becomes `continue list --paseo`) with
+the same arguments, and the daemon's Paseo engine does the checking: no tmux
+worker is started, and `status` reports `watcher: agent-quotas daemon`. It
+reads and writes these same registration files under the same lock, so claims
+carry over in both directions. A call that does not name a Paseo agent by its
+full UUID (argument or `PASEO_AGENT_ID`), `agent_quotas_p=n`, or a host without
+the daemon uses the script and its worker as described below. Workers started
+before the switch keep running until they are stopped; both take the lock and
+record the claim before sending, so a failed turn is still resumed at most once.
+
 Each registration has a detached tmux worker named
 `paseo-auto-continue-<hash>`, which outlives the originating shell. State lives
 under `${XDG_STATE_HOME:-~/.local/state}/agent-sessions/auto-continue-paseo/`
@@ -143,6 +155,7 @@ account, and it cannot recover an error that Paseo fails to persist as a
 quota-failed turn. Credentials are read at check time from the bound profile;
 turn the watcher off before signing that profile into a different account.
 
-Code: `python/paseo_auto_continue.py`,
-`zshlang/auto-load/others/paseo-auto-continue.zsh`, and the shared dispatch in
-`zshlang/auto-load/others/agent-auto-continue.zsh`.
+Code: `python/paseo_auto_continue.py` (the fallback),
+`zshlang/auto-load/others/paseo-auto-continue.zsh`, the shared dispatch in
+`zshlang/auto-load/others/agent-auto-continue.zsh`, and agent-quotas's Paseo
+engine (a port of the script).

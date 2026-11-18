@@ -1,8 +1,9 @@
 # `/auto-continue`: a session arms itself to resume after its usage limit resets
 
 Inside Paseo, the same skill targets the exact Paseo agent and sends through
-Paseo instead of a terminal. Its local watcher uses the existing quota readers
-and only resumes that agent's own quota-failed turn. See
+Paseo instead of a terminal. Its watcher (the agent-quotas daemon's Paseo engine
+where that daemon runs, else a local worker using the existing quota readers)
+only resumes that agent's own quota-failed turn. See
 [Auto-continue for Paseo](paseo-auto-continue.md) for usage and differences
 (including direct delivery without the keyboard idle gate).
 
@@ -85,8 +86,9 @@ and the exit status says whether any failed.
 
 `agent-auto-continue-off-fz` lists what is registered, native and Paseo alike,
 and turns auto-continue off for each pick. The Paseo registrations come from
-`paseo_auto_continue.py list`, so the shell never parses the watcher's state
-files. If a registered Paseo agent's native session also has a native
+`agent-quotas continue list --paseo` where the agent-quotas daemon answers, else
+`paseo_auto_continue.py list` (the same rows), so the shell never parses the
+watcher's state files. If a registered Paseo agent's native session also has a native
 registration, only the Paseo row is offered, and turning it off removes both.
 A native registration with no Paseo row standing for it is offered normally,
 since that is the only way to remove it.
