@@ -19,7 +19,10 @@ function h-color-mode-p { [[ "${1}" == always ]] }
 function date-unix-to-3339 { command gdate --date="@${1}" --iso-8601=seconds }
 function silent { "$@" >/dev/null 2>&1 }
 typeset -gx NIGHTDIR="${test_root}"
+source "${test_root}/zshlang/auto-load/others/agent-quotas.zsh"
 source "${test_root}/zshlang/auto-load/others/agent-status.zsh"
+#: The fan-out below is the fallback; the agent-quotas route is tested last.
+typeset -g agent_quotas_p=n
 function fail { print -ru2 -- "$*"; exit 1 }
 function bella_zsh_disable1 { return 0 }
 function ensure-array { return 0 }
@@ -75,4 +78,24 @@ agent-status --json agy claude 2> "${test_tmp}/errors" | command jq --exit-statu
     and .providers[0].accounts[0].windows[0].used_percent == 25
     and .providers[1].accounts[1].error == "Login required"' >/dev/null || fail 'agent-status --json'
 [[ ! -s "${test_tmp}/errors" ]] || fail 'diagnostics escaped the JSON'
-print -r -- 'ok: provider JSON fanout, stable order, partial failures, cache context, local compact rendering and --json'
+
+#: With the agent-quotas daemon answering, one call replaces the fan-out, and
+#: colour and width are still decided here (its stdout may be the pager's).
+command mkdir -p "${test_tmp}/bin"
+command cat > "${test_tmp}/bin/agent-quotas" <<'SH'
+#!/bin/sh
+[ "$1" = health ] && exit 0
+printf 'AQ %s\n' "$*"
+SH
+command chmod +x "${test_tmp}/bin/agent-quotas"
+typeset -gx PATH="${test_tmp}/bin:${PATH}"
+rehash
+agent_quotas_p=auto
+function parallelm { fail 'fanned out although agent-quotas answers' }
+[[ "$(agent-status --json agy claude)" == 'AQ agent-status --json agy claude' ]] || fail 'agent-quotas JSON route'
+function pager-if-overflow-streaming { command cat }
+[[ "$(agent_status_columns=90 agent-status codex)" == 'AQ agent-status --columns 90 --color never --absolute auto codex' ]] || fail 'agent-quotas report route'
+#: An agent it does not know keeps the old fan-out.
+function parallelm { print -r -- '{"agent":"unknown","exit":2,"report":null,"cache_files":{}}' }
+agent-status --json unknown | command jq --exit-status '.providers[0].agent == "unknown"' >/dev/null || fail 'unknown agent left the fallback'
+print -r -- 'ok: provider JSON fanout, stable order, partial failures, cache context, local compact rendering, --json and the agent-quotas route'

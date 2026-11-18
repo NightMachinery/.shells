@@ -19,8 +19,15 @@
 #: garden must be restarted (=brishz-restart=) after any edit to the functions
 #: below, or it will keep running the versions it loaded at start-up.
 #:
+#: When the agent-quotas daemon answers ([agfi:h-agent-quotas-p]), all of the
+#: above is skipped: =agent-quotas agent-status= renders the same report and
+#: JSON from its cache in one call. The fan-out is the fallback.
+#:
 #: See =docs/agent-usage-armed.md=.
 ##
+#: The agents =agent-quotas agent-status= knows. A call naming any other goes
+#: the old way, which reports it as an error section.
+typeset -ga agent_status_known_agents=( claude codex agy )
 #: Colour of the combined report: =auto= means "colour iff our own stdout is a
 #: terminal". An enum rather than a switch, because "decide for me" is a third
 #: state that a boolean cannot carry, and it is the default.
@@ -117,6 +124,20 @@ function agent-status {
     fi
     if (( ${#agents} == 0 )) ; then
         agents=( claude codex )
+    fi
+    #: The agent-quotas daemon already holds every account's reading, so with
+    #: it up there is nothing to fan out: one call renders the same document
+    #: or report. Colour and width are decided here as below, since its stdout
+    #: may be the pager's pipe.
+    if (( ${#agents:|agent_status_known_agents} == 0 )) && h-agent-quotas-p ; then
+        if [[ "${format}" == json ]] ; then
+            command agent-quotas agent-status --json "${agents[@]}"
+            return $?
+        fi
+        command agent-quotas agent-status --columns "${columns}" --color "${color}" \
+            --absolute "${agent_status_absolute_p:-auto}" "${agents[@]}" |
+            pager-if-overflow-streaming
+        return $?
     fi
     local render="${NIGHTDIR:-${HOME}/scripts}/python/agent_status_render.py"
     if [[ "${format}" == json ]] ; then

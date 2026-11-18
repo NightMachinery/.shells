@@ -29,6 +29,13 @@ deadline over:
 That list is where the per-agent deadline sources are enumerated; the linked
 docs say how each one is read and reduced to a single time.
 
+Where the [agent-quotas](https://github.com/NightMachinery/agent-quotas) daemon
+answers, `claude-code-usage`, `codex-status`, `agy-status` and `agent-status`
+read its cache instead of calling the providers themselves (same reports and
+JSON), so every reader above gets its deadline from one poller per account. The
+armed jobs and watchers described here are unchanged; the old readers remain the
+fallback on a host without the daemon.
+
 The names follow one rule: `auto-continue` is anything that waits and resumes
 later (every entry point above), `continue` resumes now. The `continue` ones
 are `agent-continue-kitty-fz`, `agent-continue-tmux-fz` and
@@ -350,6 +357,13 @@ agent-status claude codex agy      # the same, for one call
 ```
 
 The array, or the arguments, also set section order.
+
+When the agent-quotas daemon answers, `agent-status` is a single call to
+`agent-quotas agent-status`, which renders the same report and JSON from its
+cache: no fan-out, no garden. Colour and width are still decided by the zsh
+function, and the report still goes through `pager-if-overflow-streaming`. A
+provider name it does not know, `agent_quotas_p=n`, or a host without the daemon
+takes the fan-out described below.
 
 `agent-status --json [AGENT...]` prints the same accounts as one JSON document
 instead, for programs: `{generated_at, providers: [{agent, title, error,
