@@ -327,9 +327,12 @@ with the ivy workspace and terminal Emacs among the tabs, and exports the
 terminal background hints. Without it, Kitty starts a plain shell. Session
 changes require a full Kitty restart, which can terminate direct child jobs;
 coordinate that restart rather than closing a user's terminal to test it.
-The first ivy tab creates its workspace when absent, even when background
-services already have a tmux server. Existing ivy workspaces keep the normal
-reuse path.
+The first tab runs plain [agfi:ivy]. When no `ivy` tmux session exists, it runs
+the full startup (the launcher, then the workspace), even if background jobs
+already started a tmux server. When the session exists, it offers to reattach
+instead. Do not point the tab at [agfi:ivy-self]: that builds only the
+workspace and skips the launcher, which is how every boot from 2026-10-26 to
+2026-11-18 came up without BrishGarden, Caddy, the lock watcher and the rest.
 
 A tmux server keeps the macOS privacy grants of whatever started it, and every
 later session shares them. Started by Kitty's ivy tab, it inherits Kitty's Full

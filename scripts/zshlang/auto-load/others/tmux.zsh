@@ -205,15 +205,23 @@ function ivy {
     ## ivy acts as the terminal emulator's startup hook, as well
     # phoenix-reload
     ##
-    if ! whitespace-is "$(pgrep tmux)" ; then
+    if tmux-server-live-p ; then
         #: The one moment you are sure to be at kitty, able to restart a server
         #: that a mosh or ssh session started; see [agfi:tmux-server-doctor].
         tmux-server-kitty-p
         if (( $? == 1 )) ; then
             tmux-server-doctor || true
         fi
+    fi
 
-        if ! ask "$0: tmux seems to be running already; Proceed?" N ; then
+    #: The ivy session, not a running tmux server, is what says startup has
+    #: already run. Background jobs (agents, `tmux-job-start', a mosh shell)
+    #: can start a server before kitty runs us at boot. When a running server
+    #: was the test, boot met a "Proceed?" prompt whose default skipped
+    #: the launcher, and the workaround for that prompt then skipped it on
+    #: every boot. See =docs/macos-workstation.md=.
+    if command tmux has-session -t '=ivy' 2>/dev/null ; then
+        if ! ask "$0: the ivy session exists, so startup has already run; run it again?" N ; then
             ivy-tmux-title-set
             tmux attach -t ivy
             return 0
