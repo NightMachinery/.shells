@@ -510,8 +510,9 @@ function ds-conflict-print {
 }
 
 function ds-conflict-show {
-    #: ds-conflict-show <repo> <machine>: repeat the conflicted pull, keep it open, print the hunks.
-    local repo="$1" label="$2"
+    #: ds-conflict-show <repo> <machine> [fresh]: repeat the conflicted pull, keep it open, print
+    #: the hunks. With `fresh', a rebase or merge already in progress is someone else's: say so.
+    local repo="$1" label="$2" fresh="${3:-}"
     if ! ds-exists "${repo}" ; then
         print -r -- "MISSING ${repo}"
         return 0
@@ -519,6 +520,10 @@ function ds-conflict-show {
     local -a G how nosign
     ds-repo "${repo}"
     local out='' try
+    if [[ "${fresh}" == fresh ]] && ds-inprog "${repo}" ; then
+        print -r -- "ALREADY-OPEN ${repo}: a rebase or merge is already in progress"
+        return 0
+    fi
     if ! ds-inprog "${repo}" ; then
         how=(--rebase)
         if [[ -n "$(command "${G[@]}" status --porcelain -uno 2>/dev/null)" ]] ; then
@@ -911,13 +916,21 @@ ${body}" &>/dev/null )
 }
 
 function h-daily-sync-conflict {
-    : "usage: daily-sync conflict <machine> <repo> [abort]"
+    : "usage: daily-sync conflict <machine> <repo> [abort]
+For apply-answer: [reopen] refuses a conflict that is already open, [abort-quiet] files nothing."
     local machine="$1" repo="$2" action="${3:-show}" run out
     assert-args machine repo @RET
     run="$(h-daily-sync-run-dir)" @RET
     case "${action}" in
         show)
             out="$(ec "ds-conflict-show ${(qq)repo} ${(qq)machine}" | h-daily-sync-on "${machine}")" ;;
+        reopen)
+            out="$(ec "ds-conflict-show ${(qq)repo} ${(qq)machine} fresh" | h-daily-sync-on "${machine}")" ;;
+        abort-quiet)
+            #: The repository was left blocked and asked about already: just close what apply-answer opened.
+            out="$(ec "ds-conflict-abort ${(qq)repo}" | h-daily-sync-on "${machine}")"
+            ec "${out}"
+            return 0 ;;
         abort)
             out="$(ec "ds-conflict-abort ${(qq)repo}" | h-daily-sync-on "${machine}")"
             ec "LEFT-BLOCKED ${machine} ${repo}" >> "${run}/conflicts.log"
@@ -981,19 +994,25 @@ function h-daily-sync-conflict-hint {
 
 function h-daily-sync-desk-ask {
     : "usage: h-daily-sync-desk-ask <machine> <repo> ; file a blocked conflict on agent-desk, one choice per hunk"
-    #: The user's answer is typed back into this agent, whose instructions say how to apply it.
-    local machine="$1" repo="$2" run hunks choices body
+    #: The answer runs `daily-sync apply-answer' on this machine first, which applies it
+    #: when every hunk has a plain pick; anything else reaches this agent, whose
+    #: instructions say how to apply it.
+    local machine="$1" repo="$2" run hunks choices sidecar body on_answer
     run="$(h-daily-sync-run-dir)" @RET
     hunks="${run}/hunks-${machine}-${repo//\//_}.txt"
     (( ${+commands[agent-desk]} )) && [[ -r "${hunks}" ]] || return 1
     choices="${run}/choices-${machine}-${repo//\//_}.json"
-    body="$(command python3 - "${hunks}" "${choices}" "${machine}" "${repo}" <<'DS_PY'
+    #: One sidecar per question: an older question's answer must not be checked against a newer one.
+    sidecar="${run}/answer-${machine}-${repo//\//_}-$(command date +%s).json"
+    body="$(command python3 - "${hunks}" "${choices}" "${machine}" "${repo}" "${sidecar}" "${run}" <<'DS_PY'
 import json, re, sys
-src, out, machine, repo = sys.argv[1:5]
+src, out, machine, repo, sidecar, run = sys.argv[1:7]
 text = open(src, encoding='utf-8', errors='replace').read()
+#: golang/daily_sync parses a reopened listing the same way; keep the two in step.
 head = re.compile(r'^### (.+?), hunk (\d+) of (\d+), near line (\d+): (\S+) \(suggested: \d+=(\S+)\)$', re.M)
 nomark = re.compile(r'^### (.+?): no conflict markers', re.M)
-qs, index = [], []
+anyhead = re.compile(r'^### ', re.M)
+qs, index, items = [], [], []
 def clip(s, n=3400):
     return s if len(s) <= n else s[:n] + '\n...'
 opts = lambda: [
@@ -1001,18 +1020,20 @@ opts = lambda: [
     {"key": "local", "label": f"Keep {machine}'s version"},
     {"key": "both", "label": "Keep both, the remote's first"},
     {"key": "both-local-first", "label": f"Keep both, {machine}'s first"}]
-heads = list(head.finditer(text))
-for i, m in enumerate(heads):
+for m in head.finditer(text):
     f, k, n, line, cls, sug = m.groups()
-    end = heads[i + 1].start() if i + 1 < len(heads) else len(text)
+    nxt = anyhead.search(text, m.end())
+    end = nxt.start() if nxt else len(text)
     parts = text[m.end():end].split('\nNEXT:')[0].strip('\n')
     qs.append({"text": f"`{f}`, hunk {k} of {n}, near line {line} ({cls}):\n\n```\n{clip(parts)}\n```",
                "options": opts(), "recommended": sug if sug in ('upstream', 'local', 'both', 'both-local-first') else ""})
+    items.append({"file": f, "hunk": int(k), "total": int(n), "whole": False, "body": parts, "options": opts()})
     index.append(f"{len(qs)}. {f} hunk {k}")
 for m in nomark.finditer(text):
     f = m.group(1)
     qs.append({"text": f"`{f}` has no conflict markers (binary, or deleted on one side): keep which side whole?",
                "options": opts()[:2]})
+    items.append({"file": f, "hunk": 0, "total": 0, "whole": True, "body": "", "options": opts()[:2]})
     index.append(f"{len(qs)}. {f} (whole file)")
 if not qs:
     sys.exit(1)
@@ -1020,24 +1041,59 @@ for q in qs:
     if not q.get("recommended"):
         q.pop("recommended", None)
 json.dump({"questions": qs[:30]}, open(out, 'w'))
+json.dump({"machine": machine, "repo": repo, "run": run, "items": items[:30], "more": max(0, len(items) - 30)},
+          open(sidecar, 'w'), indent=1)
 print("\n".join(index[:30]))
 if len(qs) > 30:
     print(f"(and {len(qs) - 30} more hunks, asked once these are resolved)")
 DS_PY
 )" || return 1
+    #: Run by agent-desk under `sh -c' on this machine, with the answer on stdin; zsh loads daily-sync.
+    on_answer="zsh -c 'daily-sync apply-answer \"\$1\"' zsh ${(qq)sidecar}"
     command agent-desk join "sync-$(command date +%Y-%m-%d)/coord" --project daily-sync &>/dev/null
-    command agent-desk ask --blocked --choices "${choices}" \
+    command agent-desk ask --blocked --choices "${choices}" --on-answer "${on_answer}" \
         --title "Sync conflict in ${repo:t} on ${machine}: pick a side per hunk" <<EOF >/dev/null || return 1
 The daily sync could not settle a merge conflict in \`${repo}\` on ${machine}, so the repository is left blocked: nothing there is pulled or pushed until it is resolved.
 
 Each question below is one conflicted hunk, with the three versions: upstream (already on the remote), base (before either side changed it) and local (${machine}'s). The side daily-sync suggests is marked recommended. Leave any hunk unanswered to keep the whole repository blocked.
 
-Your answer goes to the sync agent, which reopens the conflict, applies your choices with \`daily-sync resolve\`, and reports back here.
+When every hunk has a plain pick (no note, no answer in your own words, no message), your answer is applied automatically: the conflict is reopened, checked against these questions, resolved with your picks and synced. Otherwise, or if anything changed since this question, it goes to the sync agent, which applies it by hand and reports back here.
 
 Questions:
 ${body}
 EOF
     ec "(filed on agent-desk: conflict ${machine} ${repo})"
+}
+
+function h-daily-sync-busy {
+    : "Print BUSY <job> for each daily-sync job running now, IDLE when none, UNKNOWN when tmux cannot be reached."
+    local job rc busy=''
+    for job in "${daily_sync_step_job:-daily-sync-step}" "${daily_sync_job}" ; do
+        tmux-job-running-p "${job}"
+        rc=$?
+        if (( rc == 2 )) ; then
+            ec UNKNOWN
+            return 0
+        elif (( rc == 0 )) ; then
+            ec "BUSY ${job}"
+            busy=y
+        fi
+    done
+    [[ -n "${busy}" ]] || ec IDLE
+    return 0
+}
+
+function h-daily-sync-apply-answer {
+    : "usage: daily-sync apply-answer <sidecar.json> ; the answer on stdin. The Go helper in golang/daily_sync."
+    local sidecar="$1"
+    assert-args sidecar @RET
+    #: Appended, so a binary earlier on PATH (a test build) wins over the installed one.
+    (( ${path[(Ie)${HOME}/go/bin]} )) || path+=( "${HOME}/go/bin" )
+    go-local-dep daily_sync "${NIGHTDIR}/golang/daily_sync" || {
+        ec "Not applied: the daily_sync helper is missing and could not be built; handed to the agent."
+        return 70
+    }
+    command daily_sync apply-answer "${sidecar}"
 }
 
 function h-daily-sync-open-conflicts {
@@ -1623,6 +1679,7 @@ function daily-sync {
        daily-sync hold <machine> <repo> <file> <what was found>
        daily-sync conflict <machine> <repo> [abort]
        daily-sync resolve <machine> <repo> [<file> <hunk>=upstream|local|both|both-local-first...]
+       daily-sync apply-answer <sidecar.json> (run by agent-desk, the answer on stdin)
        daily-sync metadata start|status|rerun <directory>...|commit <repo> [<held-back file>...]
 The mechanical half of the daily multi-machine sync; see docs/daily-sync.md."
     local cmd="${1:-}" inner_p="${daily_sync_inner:-n}"
@@ -1654,6 +1711,7 @@ The mechanical half of the daily multi-machine sync; see docs/daily-sync.md."
         hold) h-daily-sync-hold "$@" ;;
         conflict) h-daily-sync-conflict "$@" ;;
         resolve) h-daily-sync-resolve "$@" ;;
+        apply-answer) h-daily-sync-apply-answer "$@" ;;
         converge)
             h-daily-sync-converge @RET
             [[ "$(h-daily-sync-stage)" == begun ]] && h-daily-sync-stage converged
@@ -1685,7 +1743,7 @@ The mechanical half of the daily multi-machine sync; see docs/daily-sync.md."
             h-daily-sync-stage finished
             h-daily-sync-next-hint ;;
         *)
-            ecerr "usage: daily-sync begin|next|status|git|hold|conflict|resolve|converge|metadata|finish"
+            ecerr "usage: daily-sync begin|next|status|git|hold|conflict|resolve|apply-answer|converge|metadata|finish"
             return 64 ;;
     esac
 }

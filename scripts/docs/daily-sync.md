@@ -12,7 +12,8 @@ Source: `zshlang/auto-load/others/daily-sync.zsh`.
 
 ## Roles
 
-- The **local machine** runs the job and is the only one that needs this code.
+- The **local machine** runs the job and is the only one that needs this code
+  (and Go, to build the answer helper `golang/daily_sync`).
 - **Peers** are other full clones of every repository.
 - The **server** has real clones of some notes repositories, read-only clones
   of the public repositories (they only fast-forward there), and **mirrors**:
@@ -59,13 +60,16 @@ only has to follow them from `begin` to `ALL DONE`.
   parts (upstream, base, local) with a class and a suggested choice; see
   Conflicts below. `abort` leaves the repository blocked and asks the user on
   agent-desk, one multiple-choice question per hunk (Telegram when agent-desk
-  is missing).
+  is missing). `reopen` and `abort-quiet` are for `apply-answer`.
 - `daily-sync resolve <machine> <repo> <file> <hunk>=<choice>...`: resolves the
   hunks of one file by choice, so the agent never edits files on another
   machine. Once no file is conflicted it continues the rebase, and prints the
   next commit's hunks if that one conflicts too. A rebase the agent leaves open
   is aborted when the metadata updater starts and at `finish`, so none
   outlives the run.
+- `daily-sync apply-answer <sidecar>`: run by agent-desk when the user answers
+  a conflict question; applies plain picks itself and hands anything else to
+  the agent. See Asking the user.
 - `daily-sync metadata start`: starts `org-paper-metadata-updater` over the
   clean notes repositories as the tmux job `daily-sync-metadata`. When it
   finishes, the job runs the review that `daily-sync next` would print and
@@ -146,19 +150,64 @@ A blocked repository becomes one agent-desk question, filed under the project
 `daily-sync` and the run `sync-<date>`. Each hunk is a question with the
 options `upstream`, `local`, `both` and `both-local-first` (only the first two
 for a whole-file conflict); the suggested choice is marked recommended, and the
-hunk text is shown in a code block. The answer arrives at the run's agent as
-`Answer to q-... "Sync conflict in ..."`, one line per hunk (`N. <choice>: ...`,
-or `(no answer)`). The agent reopens the conflict with `daily-sync conflict`,
-checks the hunks still match the question, applies the picks with
-`daily-sync resolve`, runs `daily-sync converge`, and replies on the desk. Any
-hunk left unanswered, or answered in the user's own words, keeps the repository
-blocked.
+hunk text is shown in a code block. The answer is one line per hunk
+(`N. <choice>: <label>`, `(no answer)`, or `Other: <the user's own words>`),
+then any general message.
+
+Next to the question, `h-daily-sync-desk-ask` writes a **sidecar**,
+`answer-<machine>-<repo>-<time>.json` in the run directory: the machine, the
+repository, the run directory and, for each question in order, the file, the
+hunk number, the file's hunk count and the hunk's listing as it was asked. The
+question carries `--on-answer`, so when the user answers, agent-desk runs
+`daily-sync apply-answer <sidecar>` on the machine that asked, with the answer
+on stdin, before any agent hears of it. That runs the Go helper
+`golang/daily_sync`, which drives the zsh commands:
+
+1. It reads the answer. It goes on only when every hunk has a plain pick: no
+   `(no answer)`, no `Other:`, no `Note:`, no general message, and every line
+   one of its question's options.
+2. It refuses while a daily-sync job runs (the slow-step job or the metadata
+   updater), and takes a lock (`apply-answer.lock` next to the run
+   directories) so two answers never run at once.
+3. `daily-sync conflict <machine> <repo> reopen` repeats the conflicted pull.
+   `reopen` is `show` that refuses a rebase or merge already in progress
+   (`ALREADY-OPEN`): someone else's. The hunks must match the sidecar exactly:
+   the same files, hunk numbers, counts and text.
+4. `daily-sync resolve` per file with the picks; the last file continues the
+   rebase or merge and must print `RESOLVED`.
+5. `daily-sync converge`, as a slow step that it waits for as long as the
+   desk's 10 minutes allow. If it is still running then, the step job reports
+   to the run's agent as usual.
+
+Every zsh call runs with `daily_sync_run` set to the sidecar's run directory,
+so an answer given on a later day logs to the run that asked. On any doubt
+(an answer that is not plain picks, a hunk that changed since the question, a
+pull that now goes through or fails, an `ERROR`, `CONTINUE-FAILED` or
+`NEXT-COMMIT-CONFLICTS` while resolving) it closes what it reopened with
+`daily-sync conflict <machine> <repo> abort-quiet`, which aborts without
+asking again, and exits nonzero. The desk then hands the answer and the
+helper's output to the run's agent, which applies it by hand as before: it
+reopens the conflict with `daily-sync conflict`, checks the hunks, resolves
+with `daily-sync resolve` and converges. A clean run exits 0 and wakes no
+agent; it also exits nonzero when converge still reports the repository as
+`CONFLICT`, `BLOCKED`, `PULL-FAILED` or `PUSH-FAILED`.
+
+The output's first line is the verdict the dashboard shows on hover, such as
+`Applied 3 pick(s) to <repo> on <machine>; converged.` or `Not applied: <file>,
+hunk 2 of 3 changed since the question; handed to the agent.` The full log of
+every call is `answer-<machine>-<repo>.log` in the run directory.
+
+Run the helper's tests with `go test ./...` in `golang/daily_sync`. The
+end-to-end tests stage real rebase conflicts between two clones of a bare
+repository under `$TMPDIR` and drive the real zsh functions with a scratch
+configuration and a stub `agent-desk`; `go test -short ./...` skips them.
 
 ## State
 
 A run keeps its state in `~/.agents/runs/daily-sync/<date>/`: `stage`, `agent`,
 the ids of its heartbeats, `converge.log`, `status.log`, `held`, `commits.log`,
-`conflicts.log`, the updater's `rc-*` files and `DONE`, the pending slow step
+`conflicts.log`, the conflict questions' `hunks-*`, `choices-*` and `answer-*`
+files, the updater's `rc-*` files and `DONE`, the pending slow step
 (`step.*`), and `stderr.log` with the stderr of every generated script. Set
 `daily_sync_trace=y` to add an xtrace to that log.
 
