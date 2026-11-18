@@ -21,3 +21,11 @@
 ## Workflow Guidelines
 
 -  Do not launch large reviewer fan-outs (many review plus verify agents) without user confirmation. Give the user to choose from among various levels of fan-out. Large review fanouts burn quota very fast and slow the development cycle.
+
+# Paseo Harness Bugs
+
+```
+The user doesn't want to proceed with this tool use. The tool use was rejected (eg. If it was a file edit, the new_string was NOT written to the file). STOP what you are doing and wait for the user to tell you how to proceed.
+```
+
+This is a Paseo bug, any steers mid-task causes this message.

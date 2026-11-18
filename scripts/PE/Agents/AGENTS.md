@@ -9,8 +9,6 @@
   - If a `readme.org` (or `readme.md`) file exists, keep it updated AND streamlined: README files are meant for humans. These files should be concise and let humans know why this project might provide value for them and teach how to try it out quickly, with links to other docs for more details.
   - Avoid using tables in docs. They can be difficult to read in plain-text on a laptop screen.
   
-- Before asking the user a multiple-choice question, first explain the choices in detail then ask the question. This way the user can scroll back and see the technical details of each answer if needed.
-
 - Stay on the current branch and worktree unless the user explicitly asks you to switch.
 
 - Do **not** use Superpowers’ Visual Companion skill unless the user explicitly asks you to.
@@ -76,22 +74,12 @@ data falls outside this research scope.
 
 ## Web Pages: Put a Content Hash in Every Asset URL
 
-Do not rely on `Cache-Control` to get a changed script or stylesheet to readers.
-A layer between the server and the browser can rewrite it: Cloudflare turned an
-origin's `no-cache` into `max-age=14400` on every `.js` and `.css` (seen
-2026-10), so a deploy could leave a reader on the old `app.js` for four hours. A
-URL that changes whenever the content does cannot be served stale by any cache.
-
-- Reference each script, stylesheet and other changing asset by a URL that
-  carries a short hash of its content, `app.js?v=ab12cd34` or
-  `app.ab12cd34.js`. Compute it in the generator or build step, never by hand.
-- The query form is enough when every cache keys on the query string, as
-  Cloudflare does by default (checked: a new `?v=` is a `MISS`). It needs no
-  renaming and leaves no old files behind. Hash the filename instead when some
-  layer ignores the query, and then prune the old files.
-- Keep stable names for what is found by URL: the HTML page itself (serve it
-  `no-cache`), a service worker script, a web app manifest, and the icons that
-  manifests and home screens point to.
+Do not rely on `Cache-Control`: Cloudflare rewrote an origin's `no-cache` into
+four hours of caching on every `.js` and `.css`. Reference each changing asset
+as `app.js?v=<content hash>` (Cloudflare keys on the query), computed in the
+build step, never by hand; hash the filename instead where a layer ignores the
+query. Keep stable names for the HTML page (served `no-cache`), service
+workers, manifests and their icons.
 
 ## VPS / Local Machine Detection
 
@@ -106,37 +94,23 @@ URL that changes whenever the content does cannot be served stale by any cache.
 
 ## Matching Processes: `pgrep -f` / `pkill -f` Match You Too
 
-`-f` matches against the whole command line, and your own shell's command
-line contains the pattern you just typed. So `pkill -f emacs` kills the shell
-running it, and `pgrep -f install.sh` reports "still running" forever because
-it is finding itself.
+`-f` matches the whole command line, including your own shell's: `pkill -f
+emacs` kills the shell running it, and `pgrep -f x` finds itself forever.
 
-- Prefer `pgrep -x NAME` (exact process name), or an explicit PID list.
-- When `-f` is unavoidable, use a pattern that cannot appear in your own
-  command line (`daemon=night-verify`, not `emacs`), and skip `$$`.
-- Verify a "nothing is running" conclusion some other way — check that the
-  resource is actually free (GPU memory, port, lock file), not just that a
-  pattern failed to match.
-
-**Never pass a variable to `pgrep -f`, `pkill -f` or `killall`.** A harness
-helper once received an object instead of a path and ran
-`pgrep -f '[object Object]'`, a bracket expression that matches nearly every
-command line; the loop then SIGKILLed ssh-agent, Hammerspoon, kitty, Redis and
-other sessions. Match a literal, validate it is non-empty and specific (an
-absolute scratch path, a unique token), and filter a `ps` listing on it in
-code rather than handing it to a regex. Print the PIDs before killing them.
-
-**bun runs TypeScript without type-checking.** The bug above was a wrong
-argument count that `tsc --noEmit` would have refused. Type-check before
-running any ad-hoc `.ts` script under bun, especially one that kills processes.
-
-**Killing a parent does not kill its children.** After terminating a process
-tree, re-check for orphans and kill them by PID. A `doom sync --rebuild` that
-outlived the parent I had killed went on rewriting the package tree while I
-believed it was stopped, and corrupted it.
-
-This is worth its own rule because it is silent: the failure mode is a
-command that reports success while doing the opposite of what you intended.
+- Prefer `pgrep -x NAME` or an explicit PID list. When `-f` is unavoidable,
+  use a pattern that cannot appear in your own command line, and skip `$$`.
+- Confirm "nothing is running" by checking the resource (port, GPU memory,
+  lock file), not by a pattern failing to match.
+- **Never pass a variable to `pgrep -f`, `pkill -f` or `killall`.** A helper
+  once ran `pgrep -f '[object Object]'`, which matches nearly everything, and
+  SIGKILLed ssh-agent, Hammerspoon and other sessions. Match a validated,
+  specific literal, filter a `ps` listing in code, and print PIDs before
+  killing.
+- bun runs TypeScript without type-checking; run `tsc --noEmit` first on any
+  ad-hoc `.ts` script, especially one that kills processes.
+- Killing a parent does not kill its children. Re-check for orphans and kill
+  them by PID: an orphaned `doom sync --rebuild` once corrupted the package
+  tree while reported stopped.
 
 ## Use `command ...` When You Mean the Real Binary
 
@@ -165,26 +139,16 @@ versions. When you need GNU flags or behaviour, call the g-prefixed GNU tools:
 
 ## Background Jobs
 
-For a job that must outlive your shell and session:
+For a job that must outlive your session (details: `~/scripts/docs/background-jobs.md`):
 
-- `tmux-job-start NAME [VAR=val...] cmd...` runs it in tmux session NAME, in
-  your working directory, forwarding only the leading `VAR=val` arguments; its
-  output stays in the pane (`tmux attach`, `capture-pane`). It refuses a NAME
-  that is still running; `tmux-job-status NAME`, and `tmux-job-stop NAME` kills
-  the process tree. Prefer it for a job that must run once or whose output
-  someone will read. A sandbox (Codex's) cannot reach the tmux server: there
-  the status is `UNKNOWN` with exit 2, never proof the job is gone. Run all
-  three with the same elevated access you started the job with.
-- `awaysh-bnamed NAME cmd...` is fire-and-forget under BrishGarden, in the
-  garden's working directory and environment (pass absolute paths), with output
-  on `/dev/null` unless the command redirects it. NAME is only a `ps` marker
-  (`zsh NAME_MARKER ...`, for `kill-marker NAME`), not unique: a second call
-  starts a second job. Brish sees edited functions only after `brishz-restart`;
-  when it may be stale use `awaysh-v3 cmd...`, a setsid'ed `zsh -c` in your
-  working directory and environment that loads the functions fresh, with no
-  marker and output on `/dev/null`.
+- `tmux-job-start NAME [VAR=val...] cmd...`, with `tmux-job-status` and
+  `tmux-job-stop`: for a job that must run once or whose output someone reads.
+  Inside a sandbox the status is `UNKNOWN` (exit 2), never proof it is gone.
+- `awaysh-bnamed NAME cmd...`: fire-and-forget under BrishGarden, output on
+  `/dev/null`, absolute paths only. `awaysh-v3 cmd...` when the garden may
+  hold stale functions.
 - A job whose completion must notify you stays a harness-tracked background
-  task (Claude Code's `run_in_background`, for example); none of these can.
+  task; none of these can.
 
 ## Upstream Paseo Threads
 
@@ -227,93 +191,51 @@ it. A change the YPaseo fork carries also goes in the fork's `YPASEO.md`.
 
 ## Concurrent Sessions
 
-Another agent or a human may be staging and committing in the same repository
-while you work. The index is shared state: a plain `git commit` picks up
-whatever *they* staged, and whatever you build in it (`git add -p`,
-`git rm --cached`) can land in *their* next commit before you make yours.
-`git commit -- <paths>` avoids the first and undoes the second: it takes the
-named paths from disk, so it re-adds a file you untracked and commits the
-whole of a file you staged in part.
-
-So commit with `git commit-own`, never `git commit`. It builds the commit in a
-private index from the paths you name, stages nothing in the shared one, and
-leaves what others staged alone:
+Other sessions may be committing in the same repository, and the index is
+shared: `git commit` takes what *they* staged, and what you stage can land in
+*their* commit. So commit with `git commit-own`, never `git commit` or
+`git add -p`. It builds the commit in a private index from the paths you name
+(`vcsh <repo> commit-own` in a vcsh repository):
 
 ```
 git commit-own -m "subject" -m "body" -- <paths>
-git commit-own -m "..." -- .gitignore --untrack <path>   #: stop tracking; the file stays on disk
-git commit-own --list-hunks -- <file>                     #: number a file's change blocks against HEAD
-git commit-own -m "..." --hunks <file>:1,3                #: part of a file: only those blocks (or 2-4, @id)
-git commit-own -m "..." --patch <file.patch>              #: finer cuts: a patch against HEAD
-git commit-own --dry-run -- <paths>                       #: what would be committed
-git commit-own --amend -- <paths>                         #: fold into your own last commit, before it is pushed
+git commit-own -m "..." --hunks <file>:1,3   #: part of a file; --list-hunks numbers them
 ```
 
-In a vcsh repository it is `vcsh <repo> commit-own ...`. `git commit-own -h`
-lists the options, and `~/scripts/docs/git-commit-own.md` explains them.
+`git commit-own -h` and `~/scripts/docs/git-commit-own.md` cover untracking,
+patches, `--dry-run` and `--amend`.
 
-- Name the files you changed. A directory takes in every new file under it,
-  and the whole work tree (`.`) is refused.
-- A path that matches nothing is an error and nothing is committed. Fix the
-  path; do not work around it.
-- Before committing a file another session may also have edited, read
-  `git diff -- <paths>`: the file is committed as it is on disk.
-- It prints the commit's `--stat`. Check that only your paths landed.
-- If signing fails, it says so; retry with `--no-gpg-sign` (see General Rules).
-- `--amend` refuses a pushed commit. Add `--rewrite-pushed` only when I asked
-  for a force-push, then push with `--force-with-lease`.
-- Where `git commit-own` is missing (a host without `~/scripts`), use
-  `git commit -- <paths>`, and do not untrack or commit part of a file there
-  without telling me.
-- Expect the mirror case too: work you leave uncommitted can be swept into
-  someone else's commit. Commit your own work promptly rather than letting it
-  sit in the worktree.
-- If a commit does end up mixing their work with yours, do not rewrite or
-  force-push to fix it. They may already be working from that history. Report
-  it and let me decide.
-- Use your own judgement on when you can preemptively commit concurrent edits as their own commits. E.g., small finished changes made by the user should be committed by you.
+- Name the files you changed; the whole work tree (`.`) is refused. A path
+  that matches nothing is an error: fix the path.
+- Read `git diff -- <paths>` first: a file is committed as it is on disk. Then
+  check the printed `--stat` holds only your paths.
+- If signing fails, retry with `--no-gpg-sign`. `--amend` refuses a pushed
+  commit unless I asked for a force-push (`--rewrite-pushed`, then
+  `--force-with-lease`).
+- Without `git commit-own`, use `git commit -- <paths>`, and tell me before
+  untracking or committing part of a file.
+- Commit your own work promptly, or someone else's commit may sweep it up. If
+  a commit mixes their work with yours, do not rewrite it; report it.
+- Use your judgement to commit others' small finished edits (e.g., mine) as
+  their own commits.
 
 ## Holds: Claiming a Resource Exclusively
 
-When you are doing something atomic that a parallel session would ruin — a
-history rewrite, a large refactor across a whole repo, an interactive migration
-— take a **hold** on the resource first, and release it the moment you are
-done:
+Before something atomic that a parallel session would ruin (a history rewrite,
+a repo-wide refactor), take a hold, and release it the moment you are done,
+including when you stop early. It lasts until released or your process dies.
+Details: `~/scripts/docs/holds.md`.
 
 ```
-hold-acquire repo:~/scripts --reason "what you are doing"
-hold-status                        #: who holds what, and why
+hold-acquire repo:~/scripts --reason "what you are doing"   #: vcsh: add --match "vcsh night.sh"
+hold-status
 hold-release repo:~/scripts
 ```
 
-A `PreToolUse` hook watches for this, and it answers at two strengths, because
-only one of the two signals is reliable:
-
-- An `Edit`, `Write`, `MultiEdit` or `NotebookEdit` whose path is inside a held
-  path is **denied**. That path is structured data, so it proves a write.
-- A `Bash` call that names the resource — in the command text, in a `--match`
-  literal, or by running inside the held directory — is **warned about, and
-  then runs**. The guard only sees text, so it cannot tell a `grep` from a
-  `rm`, and denying both meant an agent could not read a file it was asked
-  about.
-
-**A warning is yours to act on.** Nothing stops the next command, so when one
-arrives, run `hold-status`, read the resource and reason, and keep off it:
-read freely, but create, modify and delete nothing there until it is released.
-
-**Releasing is your job.** A hold lasts until you release it or until your
-process dies — there is no clock running underneath it, so forgetting one leaves
-it standing. Release it the moment you are done, including when you stop early
-or hand back unfinished. Do not pass `--ttl` unless you specifically want a hard
-deadline; the default is the right answer almost always.
-
-For a vcsh repository, add `--match "vcsh night.sh"`: the guard matches text,
-and that command names the path nowhere. See `~/scripts/docs/holds.md`.
-
-If a hold blocks or warns you, do not delete the file to get past it, and do not
-wait for it to lapse — it may not. Tell me who holds it and what you needed, and
-I will release it or tell you to work elsewhere. The `hold-*` commands
-themselves are never blocked, so you can always inspect one.
+A hook denies edits inside a held path and only *warns* on shell commands that
+name it. A warning is yours to act on: run `hold-status`, then read freely but
+change nothing there. Never delete a hold or wait for it to lapse; tell me who
+holds it and what you needed.
 
 # Private Information
 
@@ -355,40 +277,12 @@ model.
 
 # Sharing the Screen (macOS)
 
-We often work on the same machine at the same time. When you need to drive the
-GUI yourself (clicking through an app, typing into a window, taking screenshots
-that must not catch my windows, anything where me touching the keyboard would
-corrupt your result), take the machine's screen lock first. Do not ask me to
-stay away in chat, and do not silently steal focus.
-
-```
-agent-desk screen take --reason "what you are doing" --for 20m   # at most 2h; again to renew
-agent-desk screen take --reason "..." --wait --timeout 1h        # block until granted or denied
-agent-desk screen release                                        # the moment you are done
-agent-desk screen status
-```
-
-- If I have been idle for 30 minutes, you get it at once and my banner goes
-  up. Otherwise `take` files a request in my Needs you and exits 3: do other
-  work, or `--wait`, until I approve. A denial means not now; do not ask again
-  for 10 minutes.
-- Release it the moment you no longer need it, including when you stop early
-  or hand back with the job unfinished. It expires on its own after `--for`.
-- Say in the reason what you are actually doing, not just "working". I decide
-  whether to approve based on that line.
-- This only applies to work that interferes with me using the machine. A
-  headless browser taking screenshots does not, so it needs no lock.
-
-If `agent-desk` is missing on the machine, fall back to the bare banner
-(`~/scripts/hammerspoon/core/agent-banner.lua`), with `-q` before `-c` and an
-empty stdin, or `hs -c` hangs:
-
-```
-hs -q -c 'agentBannerOn("what you are doing", 900)' </dev/null   # seconds
-hs -q -c 'agentBannerOff()' </dev/null
-```
-
-If `hs` is missing too, just say what you need instead.
+Before driving the GUI (clicking, typing into another app, taking focus), take
+the screen lock with `agent-desk screen take --reason "what you are doing"`
+and `agent-desk screen release` the moment you are done; the `agent-desk`
+skill has the rules. Headless work needs no lock. Without `agent-desk`, use
+`hs -q -c 'agentBannerOn("what you are doing", 900)' </dev/null` and
+`agentBannerOff()`; without `hs`, say what you need.
 
 # Unexpected File Changes
 
@@ -468,30 +362,9 @@ opinion. If you are an expensive model (e.g., Fable or Astra), start by reading
 it to route substantial mechanical work to the preferred weaker workers. It
 also covers peer and stronger modes, account boundaries, and backend selection.
 
-Inside Paseo (`PASEO_AGENT_ID` is set), pick the Paseo skill by job:
-
-- `paseo`: create, prompt, update and archive agents; workspaces, worktrees,
-  workspace scripts, schedules and heartbeats.
-- `paseo-help`: questions about Paseo itself, such as setup, providers,
-  connectivity, logs and troubleshooting.
-- `paseo-advisor`: one agent's read-only second opinion on the current task.
-- `paseo-committee`: two high-reasoning agents for root-cause analysis and a
-  plan when you are stuck or the plan is hard.
-- `paseo-handoff`: transfer the task, with a full briefing and its ownership,
-  to another agent.
-- `paseo-model-update`: report which model and effort you are running, or
-  switch them. A switch stays within your current CLI, such as Claude to
-  another Claude model or effort; moving to another one, such as Claude to
-  GPT, means handing the task to a new agent.
-- `paseo-plugin`: build or troubleshoot Paseo plugins.
-- `paseo-compact`: compact an agent's context, your own or another agent's,
-  by sending it `/compact` through Paseo. A long-running agent compacts
-  itself with it at a natural endpoint, after writing its critical state to
-  disk, and only once its context reaches the floor in `~/.compaction.yaml`
-  (default 128k tokens). You need to proactively use this skill.
-- `paseo-cache-warmer`: keep a long-lived agent's prompt cache warm with
-  keepalive heartbeats while work runs, and decide when that pays. It
-  can compact with `paseo-compact` first. When you know you are going to be idle for a few hours, it is critical that either a cache warming heartbeat is set up or you compact yourself and relevant idle subagents.
+Inside Paseo (`PASEO_AGENT_ID` is set), pick the `paseo-*` skill whose
+description fits the job: operating agents, help, advisor, committee, handoff,
+model update, plugins, compaction or cache warming.
 
 Inside Paseo, Paseo is the backend for every agent you launch that is not an
 in-process subagent: another provider such as Codex, another Claude account, or
@@ -500,34 +373,22 @@ from a profile `list_profiles` returns. Use `tmux-subagents` only when the user
 asks for tmux or Paseo lacks the provider. `delegate` still decides the worker's
 model and account.
 
-# Long Runs and Asynchronous Work
+# Long Runs, Asynchronous Work and Token Efficiency
 
 - Before launching asynchronous workers or jobs, use `event-driven-agents` and
-  arrange completion notifications in the same turn. Read its fleet reference
-  only when supervising many workers or jobs for hours. If unavailable, use
-  verified native completion notifications or a harness-tracked waiter.
-- Before substantial work likely to cross compaction or coordinator replacement,
-  use `long-run-handoff`; also use it when recovering an existing run. Keep
-  durable state outside repositories under `~/.agents/runs/<project>/<run>/`.
-  If unavailable, preserve the owner's instructions, decisions, live work,
-  result paths and next actions there, then verify live state before resuming.
-- Before sustained agent work or a burst of worker launches, use
-  `quota-management` to check headroom and arrange monitoring. Stop monitoring
-  when the run becomes idle. If unavailable, use verified usage readers when
-  available; treat missing data as unknown and checkpoint before exhaustion.
-- Coordinators should always pay attention to development velocity, and proactively offer suggestions to streamline and improve the coordination workflow to the user or their parent coordinators.
-
-# Token Efficiency
-
-- See `paseo-compact`.
-- Avoid busy waiting for conditions when possible. Use a script that wakes up the waiting agent when the conditions are fulfilled. Follow `event-driven-agents`: arm the completion notification at launch and never poll with model turns.
-- Have cache warming in sight: Claude cache goes cold after about 1h, and GPT after about 30m. We should have regular cache-warming low-token pings that keep the caches warm when we know the session is likely to continue soon, e.g., when it is waiting for a condition that is likely to be fulfilled under 24 hours. See `paseo-cache-warmer`.
-- If we can engineer tools or improve our workflow to increase token efficiency, offer them to the user proactively.
-
-# Paseo Harness Bugs
-
-```
-The user doesn't want to proceed with this tool use. The tool use was rejected (eg. If it was a file edit, the new_string was NOT written to the file). STOP what you are doing and wait for the user to tell you how to proceed.
-```
-
-This is a Paseo bug, any steers mid-task causes this message.
+  arm completion notifications in the same turn. Never poll with model turns.
+  If unavailable, use native completion notifications or a harness-tracked
+  waiter.
+- Before work likely to cross compaction or coordinator replacement, or when
+  recovering a run, use `long-run-handoff`. Keep durable state under
+  `~/.agents/runs/<project>/<run>/`, outside repositories.
+- Before sustained agent work or a burst of launches, use `quota-management`
+  to check headroom and monitor it; stop monitoring once idle. Treat missing
+  usage data as unknown and checkpoint before exhaustion.
+- Inside Paseo, compact proactively with `paseo-compact` at natural endpoints,
+  once context passes the floor in `~/.compaction.yaml` (default 128k). Before
+  idling for hours while the session will likely resume within a day, either
+  set up `paseo-cache-warmer` or compact yourself and idle subagents (Claude's
+  cache goes cold after about 1h, GPT's after about 30m).
+- Watch development velocity and token efficiency, and proactively offer
+  tools or workflow changes that improve either.
