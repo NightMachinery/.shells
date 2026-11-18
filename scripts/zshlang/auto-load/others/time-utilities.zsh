@@ -80,7 +80,8 @@ function timer {
                 header="${header}: $msg"
             fi
 
-            notif-os "$header" ""
+            #: The one caller that bypasses Do Not Disturb by default.
+            notif_ignore_dnd_p="${notif_ignore_dnd_p:-y}" notif-os "$header" ""
         fi
 
         mark-me-if-unmarked "TIMER"

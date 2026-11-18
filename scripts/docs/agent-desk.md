@@ -43,8 +43,8 @@ answered.
   - `desktop`: one Agent Desk notification per item. Its group is the event
     id, so one question never replaces another, and the group is the handle.
     The title is the item's title; the body is its path and level, plus
-    `@host` for an item merged from another machine. A blocked question
-    ignores Do Not Disturb; the rest respect it. Clicking runs
+    `@host` for an item merged from another machine. All of them respect Do
+    Not Disturb, blocked questions included. Clicking runs
     `agent-desk open <id>`.
   - `remote`: one rich Telegram message through [agfi:tsend-tracked]: the
     item's title, its path, what it is, the agent's title, a link to its

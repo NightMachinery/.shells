@@ -108,9 +108,15 @@ See [agent-done.md](agent-done.md).
 
 ## DND and identity
 
-Mail, agent bells, and Agent Done respect Do Not Disturb by default. Mail enables
+`notif-os` respects Do Not Disturb unless `notif_ignore_dnd_p=y`. Only
+`timer` (and `alarm-at`, which runs it) sets that by default. Mail enables
 bypass only through `bypass_dnd: true` in its JSON settings. Agent bells accept an explicit
-`notif_ignore_dnd_p=y bell-claude` (or `bell-codex`) call.
+`notif_ignore_dnd_p=y bell-claude` (or `bell-codex`) call. Agent Desk never
+bypasses.
+
+Since about 2026-11-11 the bypass delivers nothing on mb2's macOS: the app
+waits for a delivery that never comes and exits 4. `notif-os` then posts
+again without it, so Focus may hold the notification but it is not lost.
 
 Optional bypass uses terminal-notifier 2's private `_ignoresDoNotDisturb` API.
 Newer terminal-notifier versions ignore the corresponding option, which is why

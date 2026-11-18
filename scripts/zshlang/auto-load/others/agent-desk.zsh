@@ -222,9 +222,8 @@ function h-agent-desk-notify-desktop {
     ##
     local -A f=( "${(@kv)agent_desk_f}" )
 
-    local what="${f[level]}" dnd=n
+    local what="${f[level]}"
     case "${f[kind]}" in
-        ask) [[ "${f[level]}" == blocked ]] && dnd=y ;;
         tell) what=notice ; [[ "${f[class]}" == response ]] && what=response ;;
         done) what=done ;;
     esac
@@ -236,7 +235,7 @@ function h-agent-desk-notify-desktop {
 
     local -a notif_on_click=()
     test -n "${f[bin]}" && notif_on_click=( "${f[bin]}" open "${f[display]}" )
-    notif_app=desk notif_ignore_dnd_p="${dnd}" notif_tlg=n \
+    notif_app=desk notif_ignore_dnd_p=n notif_tlg=n \
         notif_group="${group}" notif_title="${title}" \
         notif_body="${body}" notif_subtitle='' notif_image='' \
         notif "${title}" >/dev/null 2>&1 || true

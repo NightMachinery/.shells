@@ -56,7 +56,7 @@
     check group "${card[2]}" agent-desk-01JEXAMPLE0000000000000001
     check title "${card[3]}" 'Which split for the rerun?'
     check body "${card[4]}" 'example-proj/rerun-nov/coord · blocked'
-    check blocked-ignores-dnd "${card[5]}" y
+    check blocked-respects-dnd "${card[5]}" n
     check no-tlg-through-notif "${card[6]}" n
     check click "${card[7,-1]}" '/opt/example/bin/agent-desk open q-7f3a'
     check desktop-sends-no-telegram "$(tsend-calls)" ''

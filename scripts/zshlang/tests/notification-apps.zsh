@@ -33,6 +33,10 @@ printf "%s\\n" "$0" "$@" >> "$TEST_NOTIFY_LOG"' > "$app_file"
     [[ "$log" != *-ignoreDnD* ]] || exit 1
     [[ "$log" == *'\[title]'* && "$log" == *'\$(printf inert)'* && "$log" == *'\[source]'* ]] || exit 1
     command rm "$TEST_NOTIFY_LOG"
+    unset notif_ignore_dnd_p
+    notif_app=agents notif-os title message || exit 1
+    [[ "$(<"$TEST_NOTIFY_LOG")" != *-ignoreDnD* ]] || exit 1
+    command rm "$TEST_NOTIFY_LOG"
     notif_app=agents notif_ignore_dnd_p=y notif-os title message || exit 1
     [[ "$(<"$TEST_NOTIFY_LOG")" == *-ignoreDnD* ]] || exit 1
     command rm "$TEST_NOTIFY_LOG"

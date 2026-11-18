@@ -74,10 +74,9 @@ function notif-os-remove {
 function notif-os {
     local title="$1" msg="$2"
     local subtitle="${notif_subtitle:-}"
-    #: On by default: a notification raised by our own code is almost always worth
-    #: seeing, whereas Do Not Disturb is aimed at calls and social apps. Override per
-    #: call with `notif_ignore_dnd_p=n`.
-    local ignore_dnd="${notif_ignore_dnd_p:-y}"
+    #: Off by default: Do Not Disturb holds the notification in Notification
+    #: Center. Only [agfi:timer] opts in, with `notif_ignore_dnd_p=y`.
+    local ignore_dnd="${notif_ignore_dnd_p:-n}"
     #: Path to an image shown inside the notification body. See [agfi:app-icon-get].
     local image="${notif_image}"
     #: Notifications sharing a group replace each other: posting removes the
