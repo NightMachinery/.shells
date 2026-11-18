@@ -670,32 +670,72 @@ function h-claude-code-usage-run {
     $proxyenv revaldbg command claude_code_usage.py "$@"
 }
 
+function h-claude-code-usage-agent-quotas-p {
+    #: Whether this call can be answered by the agent-quotas daemon: it is up,
+    #: and every flag the caller passed is one its =claude-code-usage=
+    #: subcommand knows. Anything else (=--relogin=, =--cache-dir=,
+    #: =--keychain-*=, ...) still goes to the Python, which honours it.
+    #: Usage: h-claude-code-usage-agent-quotas-p [user-arg...]
+    ##
+    h-agent-quotas-args-ok '--all --cloud-credit --color= --config-dir= --dark-mode= --direct --json --no-relogin --profile= --profile-label= --refresh --true-color=' "$@" &&
+        h-agent-quotas-p
+}
+
+function h-claude-code-usage-agent-quotas {
+    #: Runs =agent-quotas claude-code-usage= with the same knobs
+    #: [agfi:h-claude-code-usage-argv-common] gives the Python. No garden and
+    #: no token in the environment: the daemon reads the Keychain from the GUI
+    #: session, so it answers over ssh as well. =--timeout=, =--cache-ttl= and
+    #: the relogin switch are the daemon's business and are not passed.
+    #: =deus= reaches it as =deusvult= in the environment.
+    #: Usage: h-claude-code-usage-agent-quotas <arg>...
+    ##
+    local refresh_p="${claude_code_usage_refresh_p:-n}"
+    local json_p="${claude_code_usage_json_p:-n}"
+    local strip_ansi_p="${claude_code_usage_strip_ansi_p:-n}"
+
+    local args=()
+    bool "${refresh_p}" && args+=(--refresh)
+    bool "${json_p}" && args+=(--json)
+    bool "${strip_ansi_p}" && args+=(--color never)
+
+    #: Our flags first, so the caller's explicit ones win (last wins, as in
+    #: argparse).
+    command agent-quotas claude-code-usage "${args[@]}" "$@"
+}
+
 function claude-code-usage {
     #: Shows the usage stats of one Claude Code profile's plan (like the in-app
     #: =/usage=). [agfi:claude-code-usage-all] does every registered profile at
     #: once, and is what the bare =ccu=/=ccs= aliases run.
-    #: See =docs/claude_code_usage.md=.
+    #: Asks the agent-quotas daemon when it answers, else runs
+    #: =claude_code_usage.py=; see =docs/claude_code_usage.md=.
     ##
     local profile="${claude_code_usage_profile:-default}"
     local arm_p="${claude_code_usage_arm_p:-n}"
 
-    ensure-cmd claude_code_usage.py @RET
     h-claude-code-profile-assert "${profile}" @RET
 
-    local common
-    common=("${(@f)$(h-claude-code-usage-argv-common)}") @RET
-
-    eval "$(h-claude-code-usage-token-env-load "${profile}")"
-
-    local script_args=(
-        --profile-label "${profile}"
-        --config-dir "${claude_code_profiles[$profile]}"
-        "${common[@]}"
-    )
-
-    #: =script_args= before user args so explicit CLI flags win (argparse last-wins).
     local retcode=0
-    h-claude-code-usage-run "${script_args[@]}" "$@" || retcode=$?
+    if h-claude-code-usage-agent-quotas-p "$@" ; then
+        h-claude-code-usage-agent-quotas --profile-label "${profile}" "$@" || retcode=$?
+    else
+        ensure-cmd claude_code_usage.py @RET
+
+        local common
+        common=("${(@f)$(h-claude-code-usage-argv-common)}") @RET
+
+        eval "$(h-claude-code-usage-token-env-load "${profile}")"
+
+        local script_args=(
+            --profile-label "${profile}"
+            --config-dir "${claude_code_profiles[$profile]}"
+            "${common[@]}"
+        )
+
+        #: =script_args= before user args so explicit CLI flags win (argparse last-wins).
+        h-claude-code-usage-run "${script_args[@]}" "$@" || retcode=$?
+    fi
 
     if (( retcode == 0 )) && bool "${arm_p}" ; then
         #: After the report, so the human output is not held up and the
@@ -750,6 +790,8 @@ function claude-code-usage-all {
     #: files. Fanning out in the shell instead would mean a process per profile
     #: whose stdout is a pipe rather than the terminal, and =--color auto= would
     #: then quietly resolve to "no colour" for the command run most often.
+    #: With the agent-quotas daemon up there is no fan-out at all: it already
+    #: holds every profile's reading.
     ##
     bella_zsh_disable1
 
@@ -758,23 +800,34 @@ function claude-code-usage-all {
 
     local arm_p="${claude_code_usage_arm_p:-n}"
 
-    ensure-cmd claude_code_usage.py @RET
-
-    local common
-    common=("${(@f)$(h-claude-code-usage-argv-common)}") @RET
-
-    eval "$(h-claude-code-usage-token-env-load "${profiles[@]}")"
-
-    local script_args=(--all "${common[@]}")
     local p
     for p in "${profiles[@]}" ; do
         h-claude-code-profile-assert "${p}" @RET
-
-        script_args+=(--profile "${p}=${claude_code_profiles[$p]}")
     done
 
     local retcode=0
-    h-claude-code-usage-run "${script_args[@]}" "$@" || retcode=$?
+    if h-claude-code-usage-agent-quotas-p "$@" ; then
+        #: The profiles named, so the set and its order stay the shell's.
+        local aq_args=(--all)
+        for p in "${profiles[@]}" ; do
+            aq_args+=(--profile "${p}")
+        done
+        h-claude-code-usage-agent-quotas "${aq_args[@]}" "$@" || retcode=$?
+    else
+        ensure-cmd claude_code_usage.py @RET
+
+        local common
+        common=("${(@f)$(h-claude-code-usage-argv-common)}") @RET
+
+        eval "$(h-claude-code-usage-token-env-load "${profiles[@]}")"
+
+        local script_args=(--all "${common[@]}")
+        for p in "${profiles[@]}" ; do
+            script_args+=(--profile "${p}=${claude_code_profiles[$p]}")
+        done
+
+        h-claude-code-usage-run "${script_args[@]}" "$@" || retcode=$?
+    fi
 
     if bool "${arm_p}" ; then
         #: Not gated on the exit status, unlike the single-profile case: with

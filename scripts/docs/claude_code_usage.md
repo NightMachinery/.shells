@@ -6,6 +6,10 @@ utilization, model-scoped weekly windows, reset times) in either human-readable
 or JSON form. The zsh wrapper is `claude-code-usage` (alias `ccu`) in
 `zshlang/auto-load/others/claude.zsh`.
 
+When the [agent-quotas](https://github.com/NightMachinery/agent-quotas) daemon
+answers, the wrapper asks it instead (`agent-quotas claude-code-usage`, same
+report and JSON) and this script is only the fallback; see "Zsh wrapper" below.
+
 ## Data source
 
 The script queries `GET https://api.anthropic.com/api/oauth/usage`, the same
@@ -531,6 +535,11 @@ The flag is `--relogin` / `--no-relogin`; from zsh, the wrapper knob
 
 ## GUI-less sessions
 
+With the agent-quotas daemon running none of this section applies: the daemon
+runs under launchd in the GUI session, reads the Keychain there, and answers an
+ssh session over its socket, so the wrapper needs neither the garden nor a
+token. What follows is the fallback path, for a host without the daemon.
+
 In a GUI-detached session — an inbound ssh session, or a `tmux` without
 `pam_reattach` — the Keychain is not reachable, and the way it fails is
 misleading. There are two layers to it, and they were measured rather than
@@ -687,6 +696,18 @@ profile never costs the others their report.
 `claude-code-usage` in `zshlang/auto-load/others/claude.zsh` reports one
 profile; `claude-code-usage-all` reports every registered profile, and is what
 the bare `ccu` / `ccs` / `claude-code-status` names run.
+
+Both ask the agent-quotas daemon first (`h-claude-code-usage-agent-quotas-p`):
+when `agent-quotas health` succeeds and every flag the caller passed is one
+`agent-quotas claude-code-usage` knows, the call becomes
+`agent-quotas claude-code-usage [--all --profile NAME...] [--refresh] [--json] [--color never] ARGS`.
+`claude_code_usage_refresh_p`, `_json_p` and `_strip_ansi_p` map to those
+flags; `deus` reaches the daemon as `deusvult`. The timeout, cache TTL and
+relogin knobs are the daemon's business and are not passed. A call with any
+other flag (`--relogin`, `--cache-dir`, `--keychain-*`, ...) and every call on a
+host where the daemon does not answer runs the Python exactly as before.
+`agent_quotas_p=n` forces the Python, e.g. to compare the two. The check runs on
+every call, so stopping or installing the daemon takes effect at once.
 
 Profiles are read from the `claude_code_profiles` associative array, which maps
 a profile name to its `CLAUDE_CONFIG_DIR` (empty for the default profile), and
