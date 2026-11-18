@@ -356,43 +356,39 @@ model.
 # Sharing the Screen (macOS)
 
 We often work on the same machine at the same time. When you need to drive the
-GUI yourself — clicking through an app, taking screenshots that must not catch
-my windows, anything where me touching the keyboard would corrupt your result —
-do not ask me to stay away and do not silently steal focus. Put up a banner:
+GUI yourself (clicking through an app, typing into a window, taking screenshots
+that must not catch my windows, anything where me touching the keyboard would
+corrupt your result), take the machine's screen lock first. Do not ask me to
+stay away in chat, and do not silently steal focus.
 
 ```
-hs -q -c 'agentBannerOn("what you are doing", 900)' </dev/null   # seconds; omit for 30 min
-hs -q -c 'agentBannerOff()' </dev/null                            # as soon as you are done
-hs -q -c 'return agentBannerActive()' </dev/null
+agent-desk screen take --reason "what you are doing" --for 20m   # at most 2h; again to renew
+agent-desk screen take --reason "..." --wait --timeout 1h        # block until granted or denied
+agent-desk screen release                                        # the moment you are done
+agent-desk screen status
 ```
 
-This only applies if your work actively interferes with me using the machine. If you are using, e.g., a headless browser to take screenshots, that won’t disturb me, so you shouldn't put up a banner.
+- If I have been idle for 30 minutes, you get it at once and my banner goes
+  up. Otherwise `take` files a request in my Needs you and exits 3: do other
+  work, or `--wait`, until I approve. A denial means not now; do not ask again
+  for 10 minutes.
+- Release it the moment you no longer need it, including when you stop early
+  or hand back with the job unfinished. It expires on its own after `--for`.
+- Say in the reason what you are actually doing, not just "working". I decide
+  whether to approve based on that line.
+- This only applies to work that interferes with me using the machine. A
+  headless browser taking screenshots does not, so it needs no lock.
 
-`-q` because without it Hammerspoon relays everything printed to its console
-back to you for the duration of the command, so an unrelated hotkey logging a
-line lands in the middle of your output. It has to come before `-c`. (From zsh
-the `hammerspoon` function passes it for you, but your shell is not zsh.)
+If `agent-desk` is missing on the machine, fall back to the bare banner
+(`~/scripts/hammerspoon/core/agent-banner.lua`), with `-q` before `-c` and an
+empty stdin, or `hs -c` hangs:
 
-`</dev/null` because `hs -c` still reads stdin to its end whenever stdin is
-not a terminal. In a background shell, whose stdin never closes, the call
-hangs until something kills it, and its answer is lost. Give every `hs -c`
-an empty stdin.
+```
+hs -q -c 'agentBannerOn("what you are doing", 900)' </dev/null   # seconds
+hs -q -c 'agentBannerOff()' </dev/null
+```
 
-It covers every screen for a moment so I cannot miss it, then collapses to a
-strip across the top of each one, on every space. It never takes focus and
-never swallows clicks. Turning it off flashes "Screen is yours" the same way.
-Source: `~/scripts/hammerspoon/core/agent-banner.lua`.
-
-- Turn it off the moment you no longer need it, including when you stop early
-  or hand back with the job unfinished.
-- It always expires on its own, so a crash cannot leave the screen branded.
-  Call `agentBannerOn` again to refresh the countdown during a long stretch;
-  re-sending the same message will not re-flash.
-- Say in the message what you are actually doing, not just "working". I decide
-  whether to wait based on that line.
-
-If `hs` is missing, the machine has no Hammerspoon; just say what you need
-instead.
+If `hs` is missing too, just say what you need instead.
 
 # Unexpected File Changes
 
