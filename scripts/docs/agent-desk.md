@@ -76,6 +76,10 @@ answered.
   usage through the quota-management skill's readers, for
   `agent-desk task nudge`. That command needs a scheduler; the crontab line
   is `20 */3 * * * "$HOME/go/bin/agent-desk" task nudge >/dev/null 2>&1`.
+- `[quota] stopped_command` is [agfi:paseo-auto-continue-stopped] (the Paseo
+  agents stopped at a usage limit), and [agfi:agent-desk-auto-continue]
+  (`auto_continue_command`) lists, registers and unregisters agents with the
+  Paseo auto-continue watcher, for the dashboard's "Out of quota" section.
 - [agfi:agent-desk-screen-banner] (`[screen] banner_on`, `banner_off`): the
   Hammerspoon agent banner (`agentBannerOn` with the agent's reason and how
   long it holds the screen, and `agentBannerOff`) for agent-desk's screen lock,

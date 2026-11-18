@@ -65,6 +65,10 @@ agent_desk_ssh_hosts."
         "launch_command = $(h-agent-desk-toml-str "$z agent-desk-task-launch")"
         "quota_command = $(h-agent-desk-toml-str "$z agent-desk-quota-json")"
     )
+    lines+=( '' '[quota]'
+        "stopped_command = $(h-agent-desk-toml-str "$z paseo-auto-continue-stopped")"
+        "auto_continue_command = $(h-agent-desk-toml-str "$z 'agent-desk-auto-continue \"\$@\"' zsh \"\$@\"")"
+    )
     if (( ${+commands[hs]} )) ; then
         lines+=( '' '[screen]'
             "banner_on = $(h-agent-desk-toml-str "$z 'agent-desk-screen-banner on'")"
@@ -73,6 +77,16 @@ agent_desk_ssh_hosts."
     fi
     print -rl -- "${lines[@]}" > "${file}" @RET
     ec "${file}"
+}
+
+function agent-desk-auto-continue {
+    : "[quota] auto_continue_command: list prints the Paseo agents registered to resume themselves when their quota returns; on|off ID registers or unregisters one (paseo-auto-continue)."
+    case "$1" in
+        (list) h-paseo-auto-continue list | command cut -f1 ;;
+        (on) paseo-auto-continue-on "$2" ;;
+        (off) paseo-auto-continue-off "$2" ;;
+        (*) ecerr "usage: agent-desk-auto-continue list|on ID|off ID" ; return 2 ;;
+    esac
 }
 
 function agent-desk-screen-banner {
