@@ -28,6 +28,10 @@ source "${paseo_agents_test_root}/zshlang/auto-load/others/codex-session.zsh"
 source "${paseo_agents_test_root}/zshlang/auto-load/others/codex.zsh"
 unalias ecerr 2>/dev/null || true
 function ecerr { print -ru2 -- "$@"; }
+#: reval-ec reads the colour settings, which an interactive shell always has set.
+typeset -g color_p="" isColor_override=n
+#: The send behaviour falls back to steer when neither setting is given.
+unset PASEO_SEND_BEHAVIOR agent_usage_send_behavior
 setopt nounset
 
 typeset -g t="${paseo_agents_test_tmp}"
@@ -161,7 +165,7 @@ function paseo-agents-test-send {
 }
 
 out="$(paseo-agents-test-send '{"Archived":false,"Status":"idle","PendingPermissions":[]}' "paseo:${a_idle}")"
-expect-eq "${out}" "inspect ${a_idle} --home ${paseo_home} --json"$'\n'"send ${a_idle} --prompt Continue. --no-wait --json --home ${paseo_home}" \
+expect-eq "${out}" "inspect ${a_idle} --home ${paseo_home} --json"$'\n'"send ${a_idle} --prompt Continue. --no-wait --behavior steer --json --home ${paseo_home}" \
     'an idle agent is sent to'
 
 for case in '{"Archived":true,"Status":"idle"}' '{"Archived":false,"Status":"running"}' \
@@ -175,7 +179,7 @@ done
 command mkdir -p -- "${t}/gone"
 out="$(builtin cd -q -- "${t}/gone" && command rmdir -- "${t}/gone" &&
     paseo-agents-test-send '{"Archived":false,"Status":"idle","PendingPermissions":[]}' "paseo:${a_idle}")"
-expect-eq "${out}" "inspect ${a_idle} --home ${paseo_home} --json"$'\n'"send ${a_idle} --prompt Continue. --no-wait --json --home ${paseo_home}" \
+expect-eq "${out}" "inspect ${a_idle} --home ${paseo_home} --json"$'\n'"send ${a_idle} --prompt Continue. --no-wait --behavior steer --json --home ${paseo_home}" \
     'a send armed from a removed directory still goes out'
 
 out="$(paseo-agents-test-send '{}' 'paseo:not-a-uuid')"
