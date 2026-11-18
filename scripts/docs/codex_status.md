@@ -2,6 +2,17 @@
 
 `python/codex_status.py` starts `codex app-server` and prints account rate-limit status in either human-readable or JSON form.
 
+The zsh `codex-status` wrapper asks the
+[agent-quotas](https://github.com/NightMachinery/agent-quotas) daemon instead
+(`agent-quotas codex-status`, the same report and JSON) whenever it answers and
+the call needs nothing only this script does: `swap`, `codex_status_profile`,
+`codex_status_args`, `--limits`/`codex_status_limits`, a `CODEX_HOME` other
+than `~/.codex`, or a flag the daemon's subcommand does not know
+(`--retries`, `--timeout`, `--from-json`, ...). Everything else, and every call
+on a host without the daemon, runs this script as before; `agent_quotas_p=n`
+forces it. `h-codex-status-arm-auth` and `h-codex-status-gauges` read
+`codex-status --json`, so they follow the same choice.
+
 Use `--retries N` to retry failed status checks `N` times after the first
 attempt. Retries are per auth source, so `--all --retries 10` gives each auth
 file up to 10 retry attempts before reporting its final error. The zsh

@@ -34,7 +34,9 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import shlex
+import shutil
 import subprocess
 import sys
 import time
@@ -44,7 +46,33 @@ from typing import Any
 from libs.codex_rate_limits import block_state, get_codex_limit
 
 
+#: The agent-quotas daemon answers from its cache with the same document, so a
+#: loop that waits hours costs no extra Codex start-ups. The script is the
+#: fallback for a host where the daemon is not installed or not answering.
+AGENT_QUOTAS_STATUS_CMD = ["agent-quotas", "codex-status", "--json"]
 DEFAULT_STATUS_CMD = ["codex_status.py", "--json"]
+
+
+def agent_quotas_up() -> bool:
+    """Whether agent-quotas is installed, not switched off, and its daemon answers."""
+    if os.environ.get("agent_quotas_p") == "n" or not shutil.which("agent-quotas"):
+        return False
+    try:
+        proc = subprocess.run(
+            ["agent-quotas", "health"],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            timeout=10,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return False
+    return proc.returncode == 0
+
+
+def default_status_cmd() -> list[str]:
+    #: Decided on every read rather than once: the daemon may be started or
+    #: stopped while a loop sleeps through a reset.
+    return AGENT_QUOTAS_STATUS_CMD if agent_quotas_up() else DEFAULT_STATUS_CMD
 
 
 WRAPPER_OPTIONS_TAKING_VALUE = {
@@ -149,9 +177,9 @@ def decide_wait(status: dict[str, Any]) -> WaitDecision:
     )
 
 
-def wait_until_available(status_cmd: list[str], poll_after_sleep: bool = True) -> None:
+def wait_until_available(status_cmd: list[str] | None, poll_after_sleep: bool = True) -> None:
     while True:
-        status = run_json(status_cmd)
+        status = run_json(status_cmd or default_status_cmd())
         decision = decide_wait(status)
 
         if not decision.should_wait:
@@ -314,8 +342,11 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
 
     parser.add_argument(
         "--status-cmd",
-        default=" ".join(DEFAULT_STATUS_CMD),
-        help='Command used to check Codex status. Default: "codex_status.py --json".',
+        default=None,
+        help=(
+            'Command used to check Codex status. Default: "agent-quotas codex-status --json" '
+            'when the agent-quotas daemon answers, else "codex_status.py --json".'
+        ),
     )
 
     parser.add_argument(
@@ -339,7 +370,7 @@ def main() -> int:
         raise SystemExit("-n/--count must be >= 1")
 
     prompt = read_prompt(args.prompt)
-    status_cmd = shlex.split(args.status_cmd)
+    status_cmd = shlex.split(args.status_cmd) if args.status_cmd else None
 
     failures = 0
 

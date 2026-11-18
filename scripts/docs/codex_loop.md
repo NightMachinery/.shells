@@ -8,9 +8,12 @@ iteration count. `codex_loop.py --help` has the argument details.
 
 ## Waiting
 
-Before each run it shells out to `--status-cmd` (default
-`codex_status.py --json`), parses the report, and either proceeds or sleeps
-until the reset.
+Before each run it shells out to `--status-cmd`, parses the report, and either
+proceeds or sleeps until the reset. The default is `agent-quotas codex-status
+--json` when the [agent-quotas](https://github.com/NightMachinery/agent-quotas)
+daemon answers (the same document, from its cache), else
+`codex_status.py --json`. The choice is made on every read, and
+`agent_quotas_p=n` in the environment forces the script.
 
 The decision comes from `python/libs/codex_rate_limits.py`, shared with
 `codex_status.py`, so the loop and the report cannot disagree about whether an

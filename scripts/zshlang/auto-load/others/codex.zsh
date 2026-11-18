@@ -229,8 +229,55 @@ function codex-clean-text {
         cat-copy-if-tty
 }
 ##
+function h-codex-status-agent-quotas-p {
+    #: Whether this =codex-status= call can be answered by the agent-quotas
+    #: daemon. Not when it asks for something only =codex_status.py= does:
+    #: `swap' (it rewrites `auth.json'), a Codex profile, extra Codex args, the
+    #: per-family =--limits= regex, a second =CODEX_HOME=, or any flag the
+    #: =agent-quotas codex-status= subcommand does not know.
+    #: Usage: h-codex-status-agent-quotas-p [user-arg...]
+    ##
+    local profile="${codex_status_profile:-}"
+    local limits="${codex_status_limits:-${CODEX_STATUS_LIMITS:-}}"
+    local codex_home="${CODEX_HOME:-}"
+    ensure-array codex_status_args
+
+    [[ "${1}" == status ]] && shift
+    test -z "${profile}" || return 1
+    test -z "${limits}" || return 1
+    (( ${#codex_status_args} == 0 )) || return 1
+    #: The daemon reads the default home; a session on another one keeps the
+    #: script, which reads whatever =CODEX_HOME= says.
+    if test -n "${codex_home}" && [[ "${codex_home:A}" != "${${:-${HOME}/.codex}:A}" ]] ; then
+        return 1
+    fi
+
+    h-agent-quotas-args-ok '--all --no-all --color= --dark-mode= --dark-theme= --direct --full-pct= --json --light-theme= --refresh --true-color=' "$@" &&
+        h-agent-quotas-p
+}
+
 function codex-status {
+    : "usage: codex-status [status|swap] [flags...]
+Every Codex auth snapshot's identity and rate limits; see docs/codex_status.md."
+    #: Asks the agent-quotas daemon when it answers
+    #: ([agfi:h-codex-status-agent-quotas-p]), else runs =codex_status.py=.
+    ##
     bella_zsh_disable1
+
+    if h-codex-status-agent-quotas-p "$@" ; then
+        local aq_strip_ansi_p="${codex_status_strip_ansi_p:-n}"
+        local aq_full_pct="${codex_status_full_pct:-}"
+
+        [[ "${1}" == status ]] && shift
+        local aq_args=()
+        bool "${aq_strip_ansi_p}" && aq_args+=(--color never)
+        test -n "${aq_full_pct}" && aq_args+=(--full-pct "${aq_full_pct}")
+
+        #: Ours first, so the caller's explicit flags win. =deus= reaches it
+        #: as =deusvult=; the timeout and retries are the daemon's business.
+        command agent-quotas codex-status "${aq_args[@]}" "$@"
+        return $?
+    fi
 
     local codex_status_timeout_s="${codex_status_timeout_s:-60}"
     local codex_status_retries="${codex_status_retries:-10}"
