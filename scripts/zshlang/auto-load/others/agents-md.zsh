@@ -479,9 +479,13 @@ function h-agents-md-doctor-lines {
     : "usage: h-agents-md-doctor-lines <assembled>; warns when it has too many lines or bytes"
     local lines="${#${(@f)1}}"
     #: Claude Code's docs ask for under 200 lines; adherence drops on longer
-    #: files, and every agent pays the context either way.
-    if (( lines > 200 )) ; then
-        ecerr "  OVERSIZED: ${lines} lines, trim the sources"
+    #: files, and every agent pays the context either way. The files have long
+    #: been well past that, so a 200-line warning fired every time and was
+    #: ignored; the default sits above today's size (about 500 lines) to catch
+    #: growth instead. The byte check below is the one tied to a hard limit.
+    local max_lines="${agents_md_max_lines:-600}"
+    if (( lines > max_lines )) ; then
+        ecerr "  OVERSIZED: ${lines} lines (warning at ${max_lines}), trim the sources"
     fi
 
     #: Codex counts the global file against `project_doc_max_bytes` (32 KiB by
