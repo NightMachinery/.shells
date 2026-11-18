@@ -9,6 +9,10 @@ plan_mode_reasoning_effort = "high"
 personality = "pragmatic"
 approvals_reviewer = "auto_review"
 web_search = "cached"
+# Codex counts the global ~/.codex/AGENTS.md (assembled from PE/Agents, ~37 KB)
+# against this budget, and project AGENTS.md files only get what is left: at
+# the 32 KiB default they were truncated to nothing.
+project_doc_max_bytes = 131072
 service_tier = "default"
 project_root_markers = [".git", ".agent-root", "pyproject.toml", "package.json"]
 notify = ["zsh", "-fc", "exec \"${BRISHZGO_BIN:-$HOME/go/bin/brishzgo}\" -- h-codex-notify \"--pane=$TMUX_PANE\" \"--node=${TMUX_SUBAGENT_NODE:+1}\" \"--paseo=$PASEO_AGENT_ID\" \"$1\"", "codex-notify"]
@@ -20,7 +24,6 @@ max_concurrent_threads_per_session = 64
 apps = false
 unified_exec = true
 steer = true
-multi_agent = true
 js_repl = false
 
 [tui]
