@@ -644,11 +644,14 @@ def main():
             raise HandoffError('Agent is unavailable or archived')
         state = {'version': 1, 'enabled': True, 'home': str(home), 'agent_id': agent_id,
                  'binding': binding(snapshot, home), 'poll': args.poll,
-                 'status': 'waiting for a quota-failed turn', 'registered_at': time.time()}
+                 'status': 'waiting for a quota-failed turn', 'registered_at': time.time(),
+                 'set_by': 'cli'}
         stored_agent(agent_id, home)  # Establish readable local record first.
         with locked(path.with_suffix('.lock')):
             if path.exists():
                 previous = read_json(path)
+                if 'cache' in previous:
+                    state['cache'] = previous['cache']
                 if previous.get('enabled') and previous.get('binding') == state['binding']:
                     state.update(claimed_failure=previous.get('claimed_failure'),
                                  status=previous.get('status', state['status']))
@@ -663,12 +666,18 @@ def main():
         print('auto-continue on: ' + state['binding']['agent'] + '/' + state['binding']['profile']
               + ', target: paseo:' + agent_id + ', poll: ' + str(args.poll) + 's')
     elif args.action == 'off':
-        if not path.exists():
-            print('auto-continue was not on for this Paseo agent')
-            return
         with locked(path.with_suffix('.lock')):
-            state = read_json(path)
-            state.update(enabled=False, status='off')
+            try:
+                state = read_json(path)
+            except FileNotFoundError:
+                try:
+                    stored_agent(agent_id, home)
+                except HandoffError:
+                    print('auto-continue was not on for this Paseo agent')
+                    return
+                state = {'version': 1, 'home': str(home), 'agent_id': agent_id,
+                         'poll': 300, 'registered_at': time.time()}
+            state.update(enabled=False, status='off', set_by='cli')
             atomic_write(path, state)
         # Disabled before return. The worker exits on its next tick; there is
         # no need to kill a process tree or race an in-flight send.
@@ -678,6 +687,9 @@ def main():
             print('this Paseo agent: off')
             return
         state = read_json(path)
+        if not state.get('binding') and not state.get('enabled'):
+            print('this Paseo agent: off')
+            return
         print('this Paseo agent: ' + ('on' if state['enabled'] else 'off') + ', ' + state['status'])
         print('profile: ' + state['binding']['agent'] + '/' + state['binding']['profile'])
         print('target: paseo:' + agent_id + ', poll: ' + str(state['poll']) + 's')

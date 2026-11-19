@@ -15,7 +15,7 @@ class PaseoAutoContinueTests(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
-        self.home = Path(self.temp.name) / 'daemon'
+        self.home = Path(self.temp.name).resolve() / 'daemon'
         self.home.mkdir()
         self.provider = 'codex-work'
         self.config = {'agents': {'providers': {self.provider: {
@@ -316,7 +316,7 @@ class PaseoAutoContinueTests(unittest.TestCase):
         self.assertEqual(argv[argv.index('--config-dir') + 1], str(Path.home() / '.claude'))
 
     def test_repeated_on_preserves_consumed_failure(self):
-        self.state.update(claimed_failure='already-sent', status='already continued')
+        self.state.update(claimed_failure='already-sent', status='already continued', cache={'policy': 'warm'})
         mod.atomic_write(self.path, self.state)
         # main derives its file name from daemon home + exact agent UUID.
         agent_id = '00000000-0000-4000-8000-000000000001'
@@ -331,7 +331,24 @@ class PaseoAutoContinueTests(unittest.TestCase):
              patch.object(mod, 'stored_agent', return_value=self.record), \
              patch.object(mod, 'start_worker'):
             mod.main()
-        self.assertEqual(mod.read_json(target)['claimed_failure'], 'already-sent')
+        state = mod.read_json(target)
+        self.assertEqual(state['claimed_failure'], 'already-sent')
+        self.assertEqual(state['cache'], {'policy': 'warm'})
+        self.assertEqual(state['set_by'], 'cli')
+
+    def test_off_records_a_decision_without_prior_registration(self):
+        agent_id = '00000000-0000-4000-8000-000000000001'
+        directory = Path(self.temp.name) / 'private'
+        target = directory / (mod.digest(str(self.home))[:16] + '-' + agent_id + '.json')
+        args = [agent_id, '--home', str(self.home), '--state-dir', str(directory)]
+        with patch.object(sys, 'argv', ['watcher', 'off', *args]), \
+             patch.object(mod, 'stored_agent', return_value={'id': agent_id}):
+            mod.main()
+        state = mod.read_json(target)
+        self.assertFalse(state['enabled'])
+        self.assertEqual(state['set_by'], 'cli')
+        with patch.object(sys, 'argv', ['watcher', 'status', *args]):
+            mod.main()
 
     def test_registrations_lists_enabled_only(self):
         directory = Path(self.temp.name) / 'regs'
