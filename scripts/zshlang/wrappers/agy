@@ -1,0 +1,37 @@
+#!/bin/sh
+##
+# agy on PATH: the real Antigravity CLI, always with file token storage.
+#
+# agy keeps its sign-in in one of two places. Under SSH it uses
+# <Gemini root>/antigravity-cli/antigravity-oauth-token (file auth); anywhere
+# else it uses the macOS keychain. Our launchers ([agfi:h-agy-account-argv])
+# and Paseo's agy-acp provider all choose the file by setting
+# SSH_CONNECTION=agy-file-auth. Anything that finds agy through PATH without
+# them gets the keychain: Paseo's built-in `antigravity' provider probing
+# `agy models', or Paseo's tests in a worktree.
+#
+# That mix signs account m out. When a keychain-mode run has to refresh an
+# expired keychain token, the file token disappears moments later. Measured on
+# one Mac: in all six sign-outs between 2026-11-13 and 2026-11-19, a keychain-mode
+# run refreshed its token seconds to minutes before file-mode runs found no
+# token. Long-lived file-mode sessions used to rewrite the file on their hourly
+# refresh, which hid the problem; once they exited, the loss became permanent
+# until the next sign-in.
+#
+# So this sits ahead of ~/.local/bin in PATH and gives every PATH caller the
+# same file auth. A real SSH session keeps its own value. AGY_REAL_BIN
+# overrides the binary; agy's self-updater replaces ~/.local/bin/agy, never
+# this file. See docs/agy_status.md, "File authentication".
+##
+real="${AGY_REAL_BIN:-${HOME}/.local/bin/agy}"
+if [ "${real}" -ef "$0" ] ; then
+    echo "agy (wrapper): AGY_REAL_BIN points back at this wrapper: ${real}" >&2
+    exit 127
+fi
+if ! [ -x "${real}" ] ; then
+    echo "agy (wrapper): the real agy is not at ${real}; set AGY_REAL_BIN" >&2
+    exit 127
+fi
+SSH_CONNECTION="${SSH_CONNECTION:-agy-file-auth}"
+export SSH_CONNECTION
+exec "${real}" "$@"

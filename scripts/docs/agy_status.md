@@ -61,8 +61,31 @@ terminals retain their old function definitions.
 All shell launchers, login verification and print-mode quota calls inject
 `SSH_CONNECTION=agy-file-auth` only into the agy process (preserving a real SSH
 value when present). This is the native CLI's verified file-storage trigger.
-No global SSH environment is changed. A direct `command agy` deliberately
-bypasses shell wrappers and therefore bypasses this guarantee.
+No global SSH environment is changed.
+
+Programs that find agy through `PATH` get the same treatment from
+`zshlang/wrappers/agy`, a shim that comes before `~/.local/bin` in `PATH`. It
+sets the variable and execs the real binary (`AGY_REAL_BIN`, default
+`~/.local/bin/agy`). That covers `command agy`, Paseo's built-in `antigravity`
+provider (whose status check runs `agy --version` and `agy models`) and Paseo
+test daemons. Only a caller that names `~/.local/bin/agy` itself bypasses
+the shim. The `agy-acp` provider does this, but it sets the variable itself.
+
+Without the shim, account `m` kept getting signed out. Any run without the
+variable reads its token from the macOS keychain instead. When such a run has
+to refresh an expired keychain token, the file token disappears moments later.
+On one Mac, each of six sign-outs between 2026-11-13 and 2026-11-19 followed such
+a refresh, by seconds to minutes. Most came from the Paseo daemon, whose
+working directory was `~/tmp/.codex-status`, so its probes logged that path
+as their workspace. Long-lived agy sessions used to rewrite the file on their
+hourly refresh, which hid the loss. After they exited on 2026-11-18, every
+loss lasted until the next sign-in. The refresh-then-loss link is inferred
+from agy's logs, not read from its closed-source code. Its composite token
+storage does contain functions named `healKeyringTokenFromFile` and
+`keyringStateToMigrate`. To diagnose a new sign-out, list the
+`antigravity-cli/log/cli-*.log` files that lack the line `Using file-based
+token storage` and also contain `expired=true`. Each such file is a keychain
+run that refreshed a token.
 
 Installed agy 1.4.2 also accepts hidden `--gemini_dir=<absolute root>` and
 `--app_data_dir=antigravity-cli` flags. The launchers supply both and reject
