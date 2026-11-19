@@ -251,13 +251,9 @@ every later cycle. Three things close that:
 - **`/done` unregisters.** [agfi:agent-done] calls
   [agfi:agent-auto-continue-off] for the session it ends.
 
-And one safety net: the text typed is `agent_auto_continue_text`, which by
-default asks the session to run `agent-auto-continue-off` only if nothing at
-all remains of its work, including items waiting on other agents or on the
-user. A wrong resume that slips past the gate then happens once, not at every
-reset. The condition is strict because the looser "if the task is already
-finished" was read as "once this batch of requests is done", and a coordinator
-switched itself off with half its run still ahead.
+The default resume prompt asks for a brief reply if work is already complete.
+An agent can leave its registration enabled. Use `/auto-continue off` to opt
+out of future attempts.
 
 Trade-offs, stated: the gate is a heuristic. A session that finished a few
 minutes before the limit hit is still resumed, and pays one short reply; a
@@ -301,7 +297,7 @@ All `typeset -g` in `agent-auto-continue.zsh`, defaults in the code:
 - `agent_auto_continue_frontmost_p` — what `--frontmost` sets.
 - `agent_auto_continue_activity_slack_s` — added to the poll interval to form
   the activity window a registration must fall in to be resumed.
-- `agent_auto_continue_text` — what gets typed; self-limiting by default.
+- `agent_auto_continue_text` — the prompt typed when a native session resumes.
 - `codex_status_arm_full_pct` — in `codex.zsh`; the utilization at which one
   auth's window counts as blocking.
 

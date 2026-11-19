@@ -3,7 +3,9 @@
 The shared `/auto-continue` skill recognizes `PASEO_AGENT_ID` and registers
 that Paseo agent instead of a terminal. It supports Claude (Default), Claude
 (Work), and Codex providers, including aliases with their own `CODEX_HOME`.
-Nothing is enabled until you opt in.
+Enable it explicitly or set `paseo.default_auto_continue` in agent-quotas to
+enable recently active main agents with no prior decision. The default option
+ships disabled. An explicit `off` opts the agent out.
 
 Inside a Paseo agent, use `/auto-continue`, `/auto-continue status`, and
 `/auto-continue off`. The underlying functions are
@@ -95,10 +97,9 @@ then records that turn as claimed and calls:
 paseo send AGENT_UUID 'Continue.' --home DAEMON_HOME --no-wait --json
 ```
 
-The message is plain `Continue.`: only a turn that failed on the limit is
-resumed, so the run was interrupted, and an "if finished, turn yourself off"
-clause would only invite an agent to stop a run that is half done. One failed turn
-gets at most one automatic send, including across watcher restarts. If a send
+The message is plain `Continue.`. The agent can keep its registration after
+finishing work because a completed turn does not trigger a resume. One failed
+turn gets at most one automatic send, including across watcher restarts. If a send
 fails or times out, its outcome may be uncertain, so the watcher disables
 itself rather than sending again. Inspect the agent before explicitly arming
 it again. Repeating `on` for an already enabled registration preserves the
@@ -122,6 +123,8 @@ full UUID (argument or `PASEO_AGENT_ID`), `agent_quotas_p=n`, or a host without
 the daemon uses the script and its worker as described below. Workers started
 before the switch keep running until they are stopped; both take the lock and
 record the claim before sending, so a failed turn is still resumed at most once.
+The agent-quotas engine skips keeper pings that failed on quota. The legacy
+Python worker lacks this filter.
 
 Each registration has a detached tmux worker named
 `paseo-auto-continue-<hash>`, which outlives the originating shell. State lives

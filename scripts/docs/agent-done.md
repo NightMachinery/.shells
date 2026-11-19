@@ -391,10 +391,10 @@ would be archived despite its pin. In either case
 [agfi:h-agent-done-paseo-blocker] says why, the report is still saved, and
 `agent-done` returns 2 having ended nothing.
 
-A session ending this way is finished, so `agent-done` also forgets its
-`/auto-continue` registration ([agfi:agent-auto-continue-off]), if it has one:
-a finished session must not be typed into at the next usage-limit reset because
-it once asked to be. See `docs/agent-auto-continue.md`.
+`agent-done` also disables the ending session's auto-continue registration
+using [agfi:agent-auto-continue-off]. Finishing a work turn in a live Paseo
+agent requires no registration cleanup. See [auto-continue for
+Paseo](paseo-auto-continue.md).
 
 ## Why the summary needs all this
 

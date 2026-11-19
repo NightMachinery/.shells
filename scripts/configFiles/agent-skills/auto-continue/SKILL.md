@@ -1,6 +1,6 @@
 ---
 name: auto-continue
-description: Arm this session to resume itself when its usage limit resets. Registers the current session with a watcher that polls the account's usage and, once it is blocked, sends Continue. to this session after the reset, through Paseo when running there. Use when the user types /auto-continue, /auto-continue off or /auto-continue status.
+description: Register this session to resume when its usage limit resets. Paseo resumes the agent's own quota-failed work turn when its account has room. Use when the user types /auto-continue, /auto-continue off or /auto-continue status.
 argument-hint: "[off|status|--frontmost]"
 ---
 
@@ -32,15 +32,16 @@ the user wants, so do not paraphrase them. A gray line saying usage is already
 possible is expected: it is the first check, and it means the account's usage
 could be read.
 
-For a Paseo target, explain once that its own quota-failed turn is watched and
-resumed through Paseo when its bound profile has usable quota. No keyboard
-idle gate applies, and `/auto-continue off` disables it. Do not promise a
-terminal watcher or a scheduled deadline for Paseo.
+For a Paseo target, explain once that the watcher resumes that agent’s own
+quota-failed turn when its profile has usable quota. The agent-quotas daemon
+skips keeper pings. A completed turn needs no cleanup. Use
+`/auto-continue off` to opt out of future resumes.
 
 For other targets, once, in one or two sentences: a watcher now polls this account's usage;
 when it is blocked, a job is armed for the reset that types `Continue.` into
 this session. With `--frontmost` it only types once the keyboard has been idle
-for a while, and otherwise sends a notification instead. `/auto-continue off` undoes it.
+for a while, and otherwise sends a notification instead. The native
+activity check can still resume a terminal whose work already finished.
 
 Do nothing else. Do not edit hooks or settings, do not start anything yourself,
 and do not continue with other work unless the user asked for that separately.
