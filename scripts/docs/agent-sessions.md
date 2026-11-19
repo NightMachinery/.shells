@@ -769,6 +769,39 @@ and [agfi:agent-session-register] can record a background session's transcript
 against an agent-view window that lists several sessions, since the viewer
 counts as an agent process for its guard.
 
+## Progress, and one conversion per session
+
+Every way of opening a transcript as a document (`agent-view-session-transcript*`,
+the pickers' alt+enter, the ⌘⇧O hotkey and `paseo-view-transcript*`) runs its
+converter through `h-agent-view-transcript-run`. Two things come with it.
+
+**Progress.** The renderer keeps `<percent> <phase> <done> <total>` in a file
+while it works (`agent_session ... render -progress-file`, see "Progress" in
+`golang/agent_session/readme.org`), and the run polls it. When stderr is a
+terminal the progress is one line, redrawn in place (`42%  pandoc 12.3/33.2
+MB`); otherwise it is a Hammerspoon band named after the session, which the
+background jobs already used. The phases are reading the transcript (bytes),
+rendering turns (turns) and pandoc (bytes). `agent_view_progress=tty|hs|none`
+forces a mode and `agent_view_progress_interval` sets the poll interval (0.3s
+on a terminal, 1s for the band).
+
+**One conversion per session.** A *claim file* per session, named after the
+transcript's id under `${XDG_RUNTIME_DIR:-$TMPDIR}/agent-view-locks/`, records
+the conversion subshell's pid, a run token and the process start time. A new
+run for the same transcript, from whichever entry point, reads the claim,
+checks that the pid still has the recorded start time (so a reused pid is never
+touched), kills that process tree with `kill-withchildren -KILL`, and records
+itself. The claim is taken under `zsystem flock`, an fcntl lock that dies with
+its process, so two runs started together cannot both miss each other. The
+superseded run finds a token that is not its own, removes its temp directory
+and returns quietly (status 0 from the public functions, 3 from the helper)
+without opening anything. Different sessions never share a claim, so they run
+in parallel.
+
+The ⌘⇧O and alt+enter keys keep their toggle meaning (press again on the same
+window or row cancels); the claim adds that any *other* entry point for the same
+transcript replaces the running conversion.
+
 ## Hooks, the registry, and trust
 
 The registry is insurance, not the mechanism. [agfi:agent-session-register]

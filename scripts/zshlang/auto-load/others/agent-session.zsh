@@ -162,6 +162,11 @@ function h-agent-session-render {
     else
         render_args+=(-subagents=false)
     fi
+    #: Set by [agfi:h-agent-view-transcript-run], which polls it to draw the
+    #: progress line or band.
+    if test -n "${agent_session_progress_file:-}" ; then
+        render_args+=("-progress-file=${agent_session_progress_file}")
+    fi
 
     assert agent_session "${agent}" render "${render_args[@]}" "${input}" @RET
 }
@@ -405,9 +410,171 @@ function h-agent-view-session-transcript {
     if test -e "${out_file}" ; then
         out_file="${tmp_dir}/${name}-${${session_file:t:r}[1,8]}.${ext}"
     fi
-    "${converter}" "${session_file}" "${out_file}" @RET
 
-    emc-open "${out_file}" @RET
+    #: Keyed and banded exactly as the pickers' alt+enter is, so a run from
+    #: here and one from there replace each other and share one band.
+    local key band ret=0
+    key="$(h-agent-view-transcript-key "${session_file}")" @RET
+    band="$(h-agent-view-name-of "${key}")" @RET
+    h-agent-view-transcript-run "${band}" 'run again to restart' \
+        "${converter}" "${session_file}" "${out_file}" || ret=$?
+    if (( ret == 3 )) ; then
+        ecerr "$0: superseded by a newer run for this session"
+        h-agent-view-rm-tmp "${tmp_dir}"
+        return 0
+    elif (( ret != 0 )) ; then
+        h-agent-view-fail "${band}" "${tmp_dir}" "conversion failed: ${name}"
+        return "${ret}"
+    fi
+
+    if ! emc-open "${out_file}" ; then
+        h-agent-view-fail "${band}" '' "emacs did not open ${out_file:t}"
+        return 1
+    fi
+    h-agent-view-dismiss "${band}"
+}
+
+##
+#: Progress, and one conversion per session
+#:
+#: A large transcript takes seconds to minutes to convert, so every entry point
+#: runs its converter through [agfi:h-agent-view-transcript-run]: it shows how
+#: far the renderer has got (=-progress-file=, see "Progress" in
+#: =golang/agent_session/readme.org=), on stderr when that is a terminal and in
+#: a Hammerspoon band otherwise, and a second run for the same session cancels
+#: the first. See =docs/agent-sessions.md=.
+##
+function h-agent-view-lock-dir {
+    #: Where the per-session claims live. Per user, never shared.
+    ##
+    local d="${agent_view_lock_dir:-${XDG_RUNTIME_DIR:-${TMPDIR:-/tmp}}/agent-view-locks}"
+    command mkdir -p -m 700 -- "${d}" @RET
+    ec "${d}"
+}
+
+function h-agent-view-proc-start {
+    #: A process's start time, which together with its pid identifies it: a
+    #: recorded pid alone may have been reused by an unrelated process.
+    ##
+    command ps -o lstart= -p "${1}" 2>/dev/null
+}
+
+function h-agent-view-supersede {
+    #: Kills the conversion a claim file records, if it is still the process
+    #: that was recorded. The whole tree goes, pandoc children included.
+    #: Usage: h-agent-view-supersede <claim file>
+    ##
+    local claim="${1}"
+    test -r "${claim}" || return 0
+
+    local -a f
+    f=( ${=$(<"${claim}")} )
+    local pid="${f[1]}" started="${f[3,-1]}"
+    [[ "${pid}" == <-> ]] && test -n "${started}" || return 0
+    #: Compared word by word: the recorded copy went through the same split.
+    [[ "${${=$(h-agent-view-proc-start "${pid}")}}" == "${started}" ]] || return 0
+
+    silent kill-withchildren -KILL "${pid}" || true
+}
+
+function h-agent-view-progress-text {
+    #: `42%  pandoc 12.3/33.2 MB' from a renderer progress line
+    #: `<percent> <phase> <done> <total>'.
+    ##
+    local -a f
+    f=( ${=1} )
+    (( ${#f} == 4 )) || return 1
+    case "${f[2]}" in
+        done) ec "100%  finishing" ;;
+        render) ec "${f[1]}%  render ${f[3]}/${f[4]} turns" ;;
+        *) printf '%s%%  %s %.1f/%.1f MB\n' "${f[1]}" "${f[2]}" \
+               $(( f[3] / 1048576.0 )) $(( f[4] / 1048576.0 )) ;;
+    esac
+}
+
+function h-agent-view-transcript-run {
+    : "usage: h-agent-view-transcript-run <band> <hint> <converter> <transcript> <out>
+Runs <converter> <transcript> <out> with a progress display. Returns 3 when a
+newer run for the same transcript cancelled this one."
+    #: The claim is a file per session key under [agfi:h-agent-view-lock-dir]:
+    #: `<pid> <token> <start time>' of the conversion subshell. Claiming reads
+    #: the previous claim, kills what it names (see
+    #: [agfi:h-agent-view-supersede]), starts our subshell and records it, all
+    #: under a `zsystem flock', so two runs started together cannot both miss
+    #: each other. The fcntl lock dies with its process, so a killed run never
+    #: leaves it held. Whoever finds the claim no longer naming its own token
+    #: has been superseded, and leaves the display and the emacs open to the
+    #: newer run.
+    #:
+    #: The mode is `agent_view_progress': tty (a line on stderr, redrawn in
+    #: place), hs (the band named <band>, through [agfi:h-agent-view-banner]),
+    #: none, or auto, which picks tty when stderr is a terminal.
+    ##
+    local mode="${agent_view_progress:-auto}"
+    local band="${1}" hint="${2}" converter="${3}" transcript="${4}" out="${5}"
+    assert-args band converter transcript out @RET
+    if [[ "${mode}" == auto ]] ; then
+        if [[ -t 2 ]] ; then mode=tty ; else mode=hs ; fi
+    fi
+    local interval="${agent_view_progress_interval:-${${mode:#hs}:+0.3}}"
+    interval="${interval:-1}"
+
+    setopt localoptions localtraps nomonitor nonotify
+    zmodload zsh/system zsh/datetime @RET
+
+    local key dir claim
+    key="$(h-agent-view-transcript-key "${transcript}")" @RET
+    dir="$(h-agent-view-lock-dir)" @RET
+    claim="${dir}/${key}.pid"
+    local token="${sysparams[pid]}-${EPOCHREALTIME}"
+    local progress_file="${out:h}/.${out:t}.progress"
+    local label="$(h-agent-session-label-of "${transcript}") → ${out:e}: *${out:t:r}*"
+
+    local fd cpid=''
+    #: zsystem opens, never creates, the file it locks.
+    : >> "${claim}.flock"
+    zsystem flock -t 30 -f fd "${claim}.flock" @RET
+    {
+        h-agent-view-supersede "${claim}"
+        (
+            local agent_session_progress_file="${progress_file}"
+            "${converter}" "${transcript}" "${out}"
+        ) &
+        cpid=$!
+        print -r -- "${cpid} ${token} $(h-agent-view-proc-start "${cpid}")" > "${claim}.${token}"
+        command mv -f -- "${claim}.${token}" "${claim}"
+    } always {
+        zsystem flock -u "${fd}"
+    }
+
+    #: Interrupted (Ctrl-C, a killed caller): the conversion is ours to stop.
+    trap 'silent kill-withchildren -KILL "${cpid}" ; [[ "$(<"${claim}")" == "${cpid} ${token} "* ]] && command rm -f -- "${claim}" ; return 130' INT TERM HUP
+
+    local line last='' text
+    while kill -0 "${cpid}" 2>/dev/null ; do
+        line=''
+        test -r "${progress_file}" && line="$(<"${progress_file}")"
+        if test -n "${line}" && [[ "${line}" != "${last}" ]] ; then
+            last="${line}"
+            text="$(h-agent-view-progress-text "${line}")" || text=''
+            case "${mode}" in
+                tty) printf '\r\e[K%s' "${out:t:r}: ${text}" >&2 ;;
+                hs) h-agent-view-banner "${band}" notice 600 0 "**${label}**   ${text}   (${hint})" ;;
+            esac
+        fi
+        sleep "${interval}"
+    done
+    local ret=0 now=''
+    wait "${cpid}" || ret=$?
+    [[ "${mode}" == tty ]] && printf '\r\e[K' >&2
+    command rm -f -- "${progress_file}"
+
+    test -r "${claim}" && now="$(<"${claim}")"
+    if [[ "${now}" != "${cpid} ${token} "* ]] ; then
+        return 3
+    fi
+    command rm -f -- "${claim}"
+    return "${ret}"
 }
 
 function h-agent-view-session-transcript-fz {
@@ -1771,7 +1938,20 @@ function h-agent-view-convert {
     #: this without anything being exported. An explicit setting wins.
     local agent_session_render_jobs="${agent_session_render_jobs:-${claude_code_session_render_jobs:-$(h-agent-view-jobs-share)}}"
 
-    if ! h-agent-session-to-org "${transcript}" "${out_file}" ; then
+    #: The tmux job has no terminal, so the progress goes to this band.
+    local ret=0
+    agent_view_progress=hs h-agent-view-transcript-run "${name}" "${hint} again cancels" \
+        h-agent-session-to-org "${transcript}" "${out_file}" || ret=$?
+    if (( ret == 3 )) ; then
+        #: A newer run for this transcript owns the emacs open, and the band
+        #: when it is the transcript's own; a hotkey's per-window band is not.
+        silent tmux set-option -u -t "${name}" '@ccv_tmp' || true
+        if [[ "${name}" != "$(h-agent-view-name-of "$(h-agent-view-transcript-key "${transcript}")")" ]] ; then
+            h-agent-view-dismiss "${name}"
+        fi
+        h-agent-view-rm-tmp "${tmp_dir}"
+        return 0
+    elif (( ret != 0 )) ; then
         h-agent-view-fail "${name}" "${tmp_dir}" "conversion failed: ${title}"
         return 1
     fi
