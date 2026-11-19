@@ -155,6 +155,22 @@ answered with their first heading when `config/rules` was linked and "NO"
 without it. Workspace instructions (an `AGENTS.md` in the repository agy runs
 in) are a separate mechanism and still apply; for a bare chat, start elsewhere.
 
+`agy-api-NAME-add-to-paseo` makes both variants Paseo providers on this
+machine's daemon: `agy-api-NAME` and `agy-api-NAME-light` (underscores in NAME
+become hyphens, as Paseo requires). Each runs `agy acp --sandbox` in the
+profile's root with the environment `agy-api` gives it, so Auto mode and the OS
+sandbox apply, and agy's permission requests appear in the Paseo app; there is
+no permission hook. Rerun it after signing in with another project. It refuses
+key-route profiles, because the key would have to sit in Paseo's
+`config.json`; only the project ID and file paths go there.
+`python/paseo_providers_set.py` edits `agents.providers` in place (other
+providers and any options set by hand are kept, the old file stays as
+`config.json.bak`), and `paseo daemon reload` applies it without a restart;
+the command fails if the reload does not report `agents.providers` applied.
+Paseo offers no per-provider setter: `paseo daemon config set` cannot address
+one provider, only the whole map. Providers are per daemon, so run it on each
+Mac whose Paseo should offer them, after signing in there.
+
 Otherwise, credentials are variables named after the profile. Put them in
 `~/.privateShell`. They need not be exported: the launcher reads them and
 exports them only to the agy it starts, never on its command line. A variable

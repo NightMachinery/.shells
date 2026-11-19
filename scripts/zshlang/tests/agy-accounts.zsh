@@ -389,4 +389,47 @@ api_rc=0
 AGY_API_KEY_WORK_LIGHT=k agy-api work_light models 2>/dev/null || api_rc=$?
 (( api_rc == 2 )) || fail 'reserved _light profile name accepted'
 
-print -r -- 'ok: launch isolation, named accounts, configuration, status JSON, best, cache-only, login recovery, API profiles, Vertex sign-in and light profiles'
+# Paseo providers: only our entries change, options set by hand survive, and
+# the daemon reloads them.
+typeset -gx PASEO_HOME="${test_tmp}/paseo" AGY_REAL_BIN="${test_tmp}/bin/agy"
+command mkdir -p "${PASEO_HOME}"
+print -r -- '{"daemon":{"listen":"x"},"agents":{"providers":{"agy-acp":{"extends":"acp","label":"other","command":["x"]},"agy-api-work":{"extends":"acp","label":"old","command":["old"],"options":{"handSet":1}}}}}' > "${PASEO_HOME}/config.json"
+command cat > "${test_tmp}/bin/paseo" <<'SH'
+#!/bin/sh
+printf '%s\n' "$*" >> "${PASEO_HOME}/calls"
+echo "{\"appliedPaths\":[${AGY_TEST_PASEO_APPLIED-\"agents.providers\"}]}"
+SH
+command chmod +x "${test_tmp}/bin/paseo"
+rehash   #: the real paseo is already hashed
+(( ${+functions[agy-api-work-add-to-paseo]} )) || fail 'generated add-to-paseo command'
+typeset -g paseo_before="$(<"${PASEO_HOME}/config.json")"
+for api_case in key-route no-credentials ; do
+    api_rc=0
+    case "${api_case}" in
+        key-route) AGY_API_KEY_SPARE=k agy-api-add-to-paseo spare 2>/dev/null || api_rc=$? ;;
+        no-credentials) AGY_API_PROJECT_NOCREDS=p agy-api-add-to-paseo nocreds 2>/dev/null || api_rc=$? ;;
+    esac
+    (( api_rc == 2 )) || fail "add-to-paseo ${api_case} went ahead"
+done
+[[ "$(<"${PASEO_HOME}/config.json")" == "${paseo_before}" && ! -e "${PASEO_HOME}/calls" ]] || fail 'refused add-to-paseo touched Paseo'
+agy-api-work-add-to-paseo >/dev/null
+command jq --exit-status --arg agy "${AGY_REAL_BIN}" --arg root "${AGY_ACCOUNTS_DIR}/api_work" \
+    --arg light "${AGY_ACCOUNTS_DIR}/api_work_light" --arg adc "${api_gcloud}/application_default_credentials.json" '
+    .daemon.listen == "x" and .agents.providers["agy-acp"].label == "other" and
+    (.agents.providers["agy-api-work"] | .extends == "acp" and
+        .command == [$agy, "acp", "--sandbox", "--gemini_dir=\($root)", "--app_data_dir=antigravity-cli"] and
+        .env.AGY_ACCOUNT_ID == "api_work" and .env.AGY_ADC_AUTH == "1" and
+        .env.GOOGLE_CLOUD_PROJECT == "fixture-login-project" and .env.GOOGLE_APPLICATION_CREDENTIALS == $adc and
+        .env.SSH_CONNECTION == "agy-file-auth" and .options == {handSet: 1, probeModelThinking: true}) and
+    (.agents.providers["agy-api-work-light"] | .env.ANTIGRAVITY_GEMINI_DIR == $light and
+        .command[3] == "--gemini_dir=\($light)" and .env.AGY_ACCOUNT_ID == "api_work_light") and
+    ([.. | strings | select(test("fixture-token|authorized_user"))] | length == 0)' \
+    "${PASEO_HOME}/config.json" >/dev/null || fail 'Paseo provider entries'
+[[ -s "${PASEO_HOME}/config.json.bak" ]] || fail 'no config backup'
+[[ "$(<"${PASEO_HOME}/calls")" == "daemon reload --json --home ${PASEO_HOME}" ]] || fail 'daemon not reloaded'
+api_rc=0
+AGY_TEST_PASEO_APPLIED='' agy-api-work-add-to-paseo >/dev/null 2>&1 || api_rc=$?
+(( api_rc == 1 )) || fail 'unapplied reload not reported'
+unset PASEO_HOME AGY_REAL_BIN
+
+print -r -- 'ok: launch isolation, named accounts, configuration, status JSON, best, cache-only, login recovery, API profiles, Vertex sign-in, light profiles and Paseo providers'

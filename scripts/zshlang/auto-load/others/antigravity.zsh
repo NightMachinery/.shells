@@ -442,6 +442,7 @@ function agy-api-refresh {
         aliasfn "agy-api-${name}-light" agy-api --light "${name}"
         aliasfn "agy-api-${name}-light-t" h-tmuxnewsh2-attach-z-with-cmd "agy-api-${name}-light"
         aliasfn "agy-api-${name}-login" agy-api-login "${name}"
+        aliasfn "agy-api-${name}-add-to-paseo" agy-api-add-to-paseo "${name}"
     done
 }
 
@@ -577,6 +578,35 @@ function h-agy-api-settings {
     fi
 }
 
+function h-agy-api-credentials {
+    #: Usage: NAME; reply=( KEY PROJECT CREDENTIALS_FILE LOCATION ) for profile
+    #: NAME, exactly one of KEY and PROJECT set. The variables win over what a
+    #: browser sign-in (agy-api-NAME-login) stored.
+    local name="${1}" up="${(U)1}"
+    local key_var="AGY_API_KEY_${up}" project_var="AGY_API_PROJECT_${up}"
+    local location_var="AGY_API_LOCATION_${up}" credentials_var="AGY_API_CREDENTIALS_${up}"
+    local key="${(P)key_var}" project="${(P)project_var}" credentials="${(P)credentials_var}"
+    local gcloud_dir
+    gcloud_dir="$(h-agy-api-gcloud-dir "${name}")" @RET
+    if test -z "${project}" && test -r "${gcloud_dir}/project" ; then
+        project="$(<"${gcloud_dir}/project")"
+    fi
+    if test -z "${credentials}" && test -r "${gcloud_dir}/application_default_credentials.json" ; then
+        credentials="${gcloud_dir}/application_default_credentials.json"
+    fi
+    if test -n "${key}" && test -n "${project}" ; then
+        ecerr "agy-api: ${name}: ${key_var} and a Vertex AI project (${project_var} or agy-api-${name}-login) are both set; keep one"
+        return 2
+    elif test -z "${key}" && test -z "${project}" ; then
+        ecerr "agy-api: ${name}: no credentials; run agy-api-${name}-login (Vertex AI), or set ${key_var} (Gemini API key)"
+        return 2
+    elif test -n "${credentials}" && ! test -r "${credentials}" ; then
+        ecerr "agy-api: ${name}: ${credentials_var} is not a readable file: ${credentials}"
+        return 2
+    fi
+    reply=( "${key}" "${project}" "${credentials:+${credentials:A}}" "${(P)location_var:-global}" )
+}
+
 function agy-api {
     : "usage: agy-api [--light] NAME [agy arguments...]; agy billed to an API key or a Vertex AI project.
 --light runs it without the global instructions (AGENTS.md rules), for plain chat."
@@ -588,31 +618,9 @@ function agy-api {
     local name="${1}"
     h-agy-api-name-check "${name}" @RET
     shift
-    local up="${(U)name}"
-    local key_var="AGY_API_KEY_${up}" project_var="AGY_API_PROJECT_${up}"
-    local location_var="AGY_API_LOCATION_${up}" credentials_var="AGY_API_CREDENTIALS_${up}"
-    local key="${(P)key_var}" project="${(P)project_var}" credentials="${(P)credentials_var}"
-    #: A browser sign-in (agy-api-NAME-login) supplies what the variables do
-    #: not; the variables win.
-    local gcloud_dir
-    gcloud_dir="$(h-agy-api-gcloud-dir "${name}")" @RET
-    if test -z "${project}" && test -r "${gcloud_dir}/project" ; then
-        project="$(<"${gcloud_dir}/project")"
-    fi
-    if test -z "${credentials}" && test -r "${gcloud_dir}/application_default_credentials.json" ; then
-        credentials="${gcloud_dir}/application_default_credentials.json"
-    fi
-    if test -n "${key}" && test -n "${project}" ; then
-        ecerr "$0: ${name}: ${key_var} and a Vertex AI project (${project_var} or agy-api-${name}-login) are both set; keep one"
-        return 2
-    elif test -z "${key}" && test -z "${project}" ; then
-        ecerr "$0: ${name}: no credentials; run agy-api-${name}-login PROJECT_ID (Vertex AI), or set ${key_var} (Gemini API key)"
-        return 2
-    elif test -n "${credentials}" && ! test -r "${credentials}" ; then
-        ecerr "$0: ${name}: ${credentials_var} is not a readable file: ${credentials}"
-        return 2
-    fi
     local -a reply
+    h-agy-api-credentials "${name}" @RET
+    local key="${reply[1]}" project="${reply[2]}" credentials="${reply[3]}" location="${reply[4]}"
     h-agy-account-info "api_${name}${suffix}" @RET
     local id="${reply[1]}" label="${reply[2]}" cli="${reply[4]}"
     if ! test -d "${cli}" ; then
@@ -629,9 +637,9 @@ function agy-api {
     else
         h-agy-api-settings "${cli}/settings.json" '' @RET
         local -x AGY_ADC_AUTH=1 GOOGLE_CLOUD_PROJECT="${project}"
-        local -x GOOGLE_CLOUD_LOCATION="${(P)location_var:-global}"
+        local -x GOOGLE_CLOUD_LOCATION="${location}"
         if test -n "${credentials}" ; then
-            local -x GOOGLE_APPLICATION_CREDENTIALS="${credentials:A}"
+            local -x GOOGLE_APPLICATION_CREDENTIALS="${credentials}"
         fi
         drop=( GEMINI_API_KEY GOOGLE_API_KEY GOOGLE_GENAI_USE_VERTEXAI )
     fi
@@ -644,6 +652,74 @@ function agy-api {
     reply=( "${reply[1]}" "${unset_args[@]}" "${(@)reply[2,-1]}" )
     agent_launch_glyph="🪐/${label} " agent_launch_echo_p=y \
         h-agent-launch agy "${reply[@]}"
+}
+
+function agy-api-add-to-paseo {
+    : "usage: agy-api-add-to-paseo NAME; adds or updates the Paseo providers agy-api-NAME and agy-api-NAME-light on this machine's daemon.
+Rerun it after signing in again with another project. Vertex AI profiles only: a Gemini API key would have to be stored in Paseo's config."
+    local name="${1}"
+    h-agy-api-name-check "${name}" @RET
+    local -a reply
+    h-agy-api-credentials "${name}" @RET
+    local key="${reply[1]}" project="${reply[2]}" credentials="${reply[3]}" location="${reply[4]}"
+    if test -n "${key}" ; then
+        ecerr "$0: ${name} bills a Gemini API key, which a Paseo provider would have to store in Paseo's config.json; sign in with agy-api-${name}-login (Vertex AI) instead"
+        return 2
+    elif test -z "${credentials}" ; then
+        ecerr "$0: ${name}: no credentials file for Paseo to pass on; run agy-api-${name}-login first"
+        return 2
+    fi
+    local agy="${AGY_REAL_BIN:-${HOME}/.local/bin/agy}"
+    if ! test -x "${agy}" ; then
+        ecerr "$0: the real agy is not at ${agy}; set AGY_REAL_BIN"
+        return 127
+    fi
+    if ! (( ${+commands[paseo]} )) ; then
+        ecerr "$0: paseo is not installed"
+        return 127
+    fi
+    local home="${PASEO_HOME:-${HOME}/.paseo}"
+    if ! test -f "${home}/config.json" ; then
+        ecerr "$0: no Paseo config at ${home}/config.json"
+        return 1
+    fi
+    #: Each variant runs `agy acp --sandbox' in the profile's own root, with
+    #: the same environment agy-api gives it. Only the project id and file
+    #: paths land in config.json. No permission hook: these are the user's own
+    #: chats, so agy's requests surface in the Paseo app.
+    local entries='{}' suffix id label root cache provider
+    for suffix in '' _light ; do
+        h-agy-account-info "api_${name}${suffix}" @RET
+        id="${reply[1]}" label="${reply[2]}" root="${reply[3]}" cache="${reply[5]}"
+        if ! test -d "${reply[4]}" ; then
+            agy-account-prepare "${id}" @RET
+        fi
+        h-agy-api-settings "${reply[4]}/settings.json" '' @RET
+        provider="agy-api-${name//_/-}${suffix:+-light}"
+        entries="$(print -r -- "${entries}" | command jq --compact-output \
+            --arg provider "${provider}" --arg agy "${agy}" --arg root "${root}" --arg id "${id}" \
+            --arg label "${label}" --arg cache "${cache}" --arg project "${project}" \
+            --arg location "${location}" --arg adc "${credentials}" \
+            --arg title "Antigravity API (${name//_/ }${suffix:+, light})" \
+            --arg about "agy billed to Vertex AI project ${project}${suffix:+, without the global instructions}" '
+            .[$provider] = {extends: "acp", label: $title, description: $about,
+                command: [$agy, "acp", "--sandbox", "--gemini_dir=\($root)", "--app_data_dir=antigravity-cli"],
+                env: {ANTIGRAVITY_GEMINI_DIR: $root, AGY_ACCOUNT_ID: $id, AGY_ACCOUNT_LABEL: $label,
+                    agy_status_cache_file: $cache, SSH_CONNECTION: "agy-file-auth",
+                    AGY_ADC_AUTH: "1", GOOGLE_CLOUD_PROJECT: $project,
+                    GOOGLE_CLOUD_LOCATION: $location, GOOGLE_APPLICATION_CREDENTIALS: $adc},
+                options: {probeModelThinking: true}}')" @RET
+    done
+    command python3 "${NIGHTDIR:-${HOME}/scripts}/python/paseo_providers_set.py" \
+        "${home}/config.json" "${entries}" @RET
+    #: The daemon does not watch config.json; a reload applies providers live.
+    local reload
+    reload="$(command paseo daemon reload --json --home "${home}")"
+    if ! print -r -- "${reload}" | command jq --exit-status '.appliedPaths | index("agents.providers")' >/dev/null 2>&1 ; then
+        ecerr "$0: the daemon did not apply agents.providers: ${reload}"
+        return 1
+    fi
+    ec "Paseo providers on this machine: $(print -r -- "${entries}" | command jq -r 'keys | join(", ")'). Check with: paseo provider diagnostic agy-api-${name//_/-}"
 }
 
 agy-api-refresh
