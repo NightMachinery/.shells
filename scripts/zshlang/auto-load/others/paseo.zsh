@@ -706,13 +706,279 @@ Clear the pin with keep=false; the CLI has no label-delete option."
     command paseo agent update "${1}" --label keep=false
 }
 
+##
+#: From a Paseo agent id to the native transcript it runs. See
+#: =docs/paseo-transcript.md=.
+##
+function h-paseo-agent-record {
+    : "usage: h-paseo-agent-record <id or unique prefix>
+The stored record of one agent, archived ones included."
+    setopt localoptions bareglobqual
+
+    local id="${(L)1}"
+    if [[ ! "${id}" =~ '^[0-9a-f][0-9a-f-]*$' ]] ; then
+        ecerr "$0: not a Paseo agent id: ${1}"
+        return 64
+    fi
+    local home
+    home="$(h-paseo-home)" @RET
+
+    local -a hits
+    hits=( "${home}"/agents/"${id}"*.json(N.) "${home}"/agents/*/"${id}"*.json(N.) )
+    if (( ${#hits} == 0 )) ; then
+        ecerr "$0: no Paseo agent matches: ${id}"
+        return 1
+    elif (( ${#hits} > 1 )) ; then
+        ecerr "$0: ${#hits} Paseo agents match ${id}: ${(j:, :)${hits[@]:t:r}}"
+        return 1
+    fi
+    ec "${hits[1]}"
+}
+
+function h-paseo-native-rows {
+    : "usage: h-paseo-native-rows <record>...
+One tab separated row per record: id, native agent (claude, codex or -), native
+home (empty for the default), session ids (comma separated), cwd, provider,
+status, archivedAt, title, keep (true/false), parent id."
+    #: The provider is followed through the config's `extends' chain to claude
+    #: or codex, as Paseo does, and the first CLAUDE_CONFIG_DIR or CODEX_HOME
+    #: met on the way is the native home; see
+    #: =internal/paseo/provider.go= in agent-quotas, which this mirrors. A
+    #: record whose provider no longer resolves (a deleted handoff alias)
+    #: falls back to the native agent Paseo stored on it. Every id field that
+    #: could name the native session is offered, Codex's thread id first.
+    ##
+    (( $# )) || return 0
+    ensure-cmd jq @RET
+    local home cfg provs='{}'
+    home="$(h-paseo-home)" @RET
+    cfg="${home}/config.json"
+    if test -r "${cfg}" ; then
+        provs="$(command jq --compact-output '.agents.providers // {}' "${cfg}")" || provs='{}'
+    fi
+
+    command jq --raw-output --argjson provs "${provs}" '
+        def walk_to($n; $env; $d):
+          if $d > 16 or ($n | type) != "string" then null
+          elif $n == "claude" or $n == "codex" then
+            {agent: $n, env: ((($provs[$n].env // {}) | objects) + $env)}
+          elif ($provs[$n] | type) == "object" then
+            walk_to($provs[$n].extends; ((($provs[$n].env // {}) | objects) + $env); $d + 1)
+          else null end;
+        (walk_to(.provider; {}; 0)) as $n
+        | ($n.agent // (.persistence.metadata.provider // "" | select(. == "claude" or . == "codex")) // "-") as $agent
+        | (if $agent == "claude" then $n.env.CLAUDE_CONFIG_DIR
+           elif $agent == "codex" then $n.env.CODEX_HOME else null end // "") as $native_home
+        | ([.persistence.metadata.threadId?, .persistence.sessionId?,
+            .persistence.nativeHandle?, .runtimeInfo.sessionId?]
+           | map(select(type == "string" and test("^[0-9A-Fa-f][0-9A-Fa-f-]{7,}$")) | ascii_downcase)
+           | reduce .[] as $i ([]; if index([$i]) then . else . + [$i] end)) as $ids
+        | [ .id, $agent, $native_home, ($ids | join(",")), (.cwd // "-"), (.provider // "-"),
+            (.lastStatus // "-"), (.archivedAt // "-"), (.title // "-"),
+            ((.labels.keep // "") | tostring | ascii_downcase == "true"),
+            (.labels["paseo.parent-agent-id"] // "-") ]
+        | map(tostring | gsub("[\t\n]"; " ")) | join("\t")' "$@"
+}
+
+function h-paseo-native-files {
+    : "usage: h-paseo-native-files <native agent> <native home> <ids>
+The native files of one session, the main transcript first: for Claude the
+transcript and its directory of subagent transcripts, for Codex every rollout
+of the thread in sessions/ and archived_sessions/. Prints nothing when none is
+on disk."
+    #: The provider's own home is searched first; only when it holds nothing
+    #: are the other homes this host knows tried, since a provider that sets
+    #: no home ran with whatever the daemon had.
+    ##
+    setopt localoptions bareglobqual
+    local agent="${1}" native_home="${2/#\~/${HOME}}" ids="${3}"
+
+    local -a homes hits
+    local h id
+    case "${agent}" in
+        claude) homes=( "${native_home:-${HOME}/.claude}/projects" ) ;;
+        codex) homes=( "${native_home:-${HOME}/.codex}/sessions" ) ;;
+        *) return 1 ;;
+    esac
+    local round
+    for round in own other ; do
+        if [[ "${round}" == other ]] ; then
+            homes=( ${(f)"$(h-agent-session-call "${agent}" roots 2>/dev/null)"} )
+        fi
+        for h in "${homes[@]}" ; do
+            test -n "${h}" || continue
+            for id in ${(s:,:)ids} ; do
+                case "${agent}" in
+                    claude)
+                        hits+=( "${h}"/*/"${id}".jsonl(N.) "${h}"/*/"${id}"(N/) ) ;;
+                    codex)
+                        hits+=( "${h}"/*/*/*/rollout-*-"${id}".jsonl(N.)
+                                "${h:h}"/archived_sessions/rollout-*-"${id}".jsonl(N.) ) ;;
+                esac
+            done
+        done
+        (( ${#hits} )) && break
+    done
+    (( ${#hits} )) || return 0
+    print -rl -- "${(@u)hits}"
+}
+
+function paseo-transcript-path {
+    : "usage: paseo-transcript-path [ID]
+The native transcript of a Paseo agent (id or unique prefix; default
+\$PASEO_AGENT_ID). Fails, saying why, for an unsupported provider or a
+transcript that is not on disk."
+    local id="${1:-${PASEO_AGENT_ID:-}}"
+    if test -z "${id}" ; then
+        ecerr "$0: no agent id given, and PASEO_AGENT_ID is unset"
+        return 64
+    fi
+    local record row
+    record="$(h-paseo-agent-record "${id}")" @RET
+    row="$(h-paseo-native-rows "${record}")" @RET
+    local -a f
+    f=( "${(@ps:\t:)row}" )
+    if [[ "${f[2]}" == '-' ]] ; then
+        ecerr "$0: agent ${f[1]} runs on provider ${f[6]}, which is not Claude Code or Codex; its transcript cannot be found"
+        return 1
+    fi
+    if test -z "${f[4]}" ; then
+        ecerr "$0: agent ${f[1]} has no native session id yet"
+        return 1
+    fi
+    local p1
+    for p1 in ${(f)"$(h-paseo-native-files "${f[2]}" "${f[3]}" "${f[4]}")"} ; do
+        if [[ "${p1}" == *.jsonl ]] ; then
+            ec "${p1}"
+            return 0
+        fi
+    done
+    ecerr "$0: no ${f[2]} transcript on disk for agent ${f[1]} (session ${f[4]})"
+    return 1
+}
+
+function h-paseo-view-transcript {
+    #: Usage: h-paseo-view-transcript <converter> <ext> [ID]
+    local converter="${1}" ext="${2}" transcript
+    if ! transcript="$(paseo-transcript-path "${3:-}" 2>&1)" ; then
+        #: Launched from the desktop app, stderr goes nowhere a person looks.
+        ecerr "${transcript}"
+        [[ -t 2 ]] || h-agent-view-banner paseo-view-transcript crit 8 0.35 "**Paseo transcript**: ${transcript#*: }"
+        return 1
+    fi
+    h-agent-view-session-transcript "${converter}" "${ext}" "${transcript}"
+}
+
+function paseo-view-transcript {
+    : "usage: paseo-view-transcript [ID]
+Converts a Paseo agent's native transcript to org and opens it in emacs, with
+progress; running it again for the same session restarts it. ID defaults to
+\$PASEO_AGENT_ID."
+    h-paseo-view-transcript h-agent-session-to-org org "$@"
+}
+
+function paseo-view-transcript-md {
+    : "usage: paseo-view-transcript-md [ID]
+Like paseo-view-transcript, as markdown."
+    h-paseo-view-transcript h-agent-session-to-md md "$@"
+}
+
+function paseo-view-transcript-raw {
+    : "usage: paseo-view-transcript-raw [ID]
+Opens a Paseo agent's native transcript itself in emacs."
+    local transcript
+    transcript="$(paseo-transcript-path "$@")" @RET
+    emc-open "${transcript}"
+}
+
+function paseo-view-transcript-fz {
+    : "usage: paseo-view-transcript-fz [query]
+Picks a Paseo agent (title, status, provider, cwd) and opens its transcript as
+org. alt-m opens markdown, alt-r the raw transcript."
+    ensure-cmd jq @RET
+    local rows sel
+    rows="$(paseo-ls --json | command jq --raw-output '
+        sort_by(.lastActivityAt // "") | reverse | .[]
+        | [ .id, .title, .status, .provider, .cwd ] | map(tostring | gsub("[\t\n]"; " ")) | join("\t")')" @RET
+    test -n "${rows}" || { ecerr "$0: no Paseo agents"; return 1; }
+    sel="$(ec "${rows}" | fzf-gateway --delimiter=$'\t' --with-nth=2.. --query "${*}" \
+        --expect=alt-m,alt-r --header='TITLE | STATUS | PROVIDER | CWD; enter org, alt-m markdown, alt-r raw')" @RET
+    local key="${${(@f)sel}[1]}" row="${${(@f)sel}[2]}"
+    test -n "${row}" || return 0
+    case "${key}" in
+        alt-m) paseo-view-transcript-md "${row%%$'\t'*}" ;;
+        alt-r) paseo-view-transcript-raw "${row%%$'\t'*}" ;;
+        *) paseo-view-transcript "${row%%$'\t'*}" ;;
+    esac
+}
+
+##
+#: Deleting archived sessions for good. See =docs/paseo-transcript-delete.md=.
+##
+function h-paseo-transcript-delete-catalog {
+    : "usage: h-paseo-transcript-delete-catalog <dir>
+Writes <dir>/rows (the picker's rows, oldest archive first) and <dir>/files
+(id TAB native path) for the archived agents that may be deleted."
+    #: Eligible: archived, not internal, not pinned (keep), a Claude Code or
+    #: Codex provider, no other record (archived or not) naming the same native
+    #: session, and no other record naming it as its parent, since deleting a
+    #: parent must not cascade.
+    ##
+    setopt localoptions bareglobqual
+    local out="${1}"
+    assert-args out @RET
+    local home
+    home="$(h-paseo-home)" @RET
+    local -a records
+    records=( "${home}"/agents/*.json(N.) "${home}"/agents/*/*.json(N.) )
+    : > "${out}/rows" ; : > "${out}/files"
+    (( ${#records} )) || return 0
+
+    local all
+    all="$(h-paseo-native-rows "${records[@]}")" @RET
+    local -A owners parents
+    local row id
+    local -a f
+    for row in ${(f)all} ; do
+        f=( "${(@ps:\t:)row}" )
+        for id in ${(s:,:)f[4]} ; do
+            owners[${id}]="${owners[${id}]:+${owners[${id}]} }${f[1]}"
+        done
+        [[ "${f[11]}" != '-' ]] && parents[${f[11]}]=1
+    done
+
+    local shared p1 size total
+    local -a lines files
+    for row in ${(f)all} ; do
+        f=( "${(@ps:\t:)row}" )
+        [[ "${f[8]}" != '-' && "${f[2]}" != '-' && "${f[10]}" != true ]] || continue
+        (( ${+parents[${f[1]}]} )) && continue
+        shared=n
+        for id in ${(s:,:)f[4]} ; do
+            [[ "${owners[${id}]}" == "${f[1]}" ]] || shared=y
+        done
+        [[ "${shared}" == n ]] || continue
+
+        files=( ${(f)"$(h-paseo-native-files "${f[2]}" "${f[3]}" "${f[4]}")"} )
+        total=0
+        for p1 in "${files[@]}" ; do
+            print -r -- "${f[1]}"$'\t'"${p1}" >> "${out}/files"
+            size="$(command du -sk -- "${p1}" 2>/dev/null)" && total=$(( total + ${size%%[[:space:]]*} ))
+        done
+        lines+=( "${f[8]}"$'\t'"${f[1]}"$'\t'"${f[1][1,8]}"$'\t'"${f[8]}"$'\t'"${f[6]}"$'\t'"$(( total / 1024.0 ))"$'\t'"${f[9]}"$'\t'"${f[5]}" )
+    done
+    (( ${#lines} )) || return 0
+    #: Sorted on the ISO timestamp in front, which is then dropped.
+    print -rl -- "${(@o)lines}" | command cut -f2- \
+        | command awk -F'\t' -v OFS='\t' '{ $5 = sprintf("%.1fM", $5) ; print }' > "${out}/rows"
+}
+
 function paseo-transcript-delete-fz {
     : "usage: paseo-transcript-delete-fz [--dry-run] [--yes] [--filter TEXT] [QUERY]
 Pick archived Paseo sessions and permanently delete their Paseo and native transcripts."
     emulate -L zsh
     setopt pipefail
-    local root="${NIGHTDIR:-${HOME}/scripts}" home helper
-    local dry=n yes=n filter='' filter_p=n query='' rows selected row tmp
+    local home dry=n yes=n filter='' filter_p=n query='' selected row tmp
     local -a ids=() fz_args=()
     while (( $# )) ; do
         case "${1}" in
@@ -739,29 +1005,38 @@ and remote PASEO_HOST targets are refused. See docs/paseo-transcript-delete.md.'
         esac
         shift
     done
-    ensure-cmd python3 fzf @RET
+    ensure-cmd fzf jq @RET
     home="$(h-paseo-home)" @RET
-    helper="${root}/python/paseo_transcript_delete.py"
     tmp="$(command mktemp -d "${TMPDIR:-/tmp}/paseo-transcript-delete.XXXXXXXX")" @RET
     {
-        command python3 "${helper}" --home "${home}" catalog > "${tmp}/catalog.json" @RET
-        rows="$(command python3 "${helper}" --home "${home}" rows "${tmp}/catalog.json")" @RET
-        if [[ -z "${rows}" ]] ; then
+        h-paseo-transcript-delete-catalog "${tmp}" @RET
+        if [[ ! -s "${tmp}/rows" ]] ; then
             print -r -- 'No eligible archived sessions.'
             return 0
         fi
-        local preview="$(gquote python3 "${helper}" --home "${home}" preview "${tmp}/catalog.json") {1}"
+        local preview="command awk -F'\t' -v id={1} '\$1 == id { print \$2 }' $(gquote "${tmp}/files")"
         fz_args=(--multi --no-sort --delimiter=$'\t' --with-nth=2.. \
             --query "${query}" --header='ARCHIVED: ID | ARCHIVED AT | PROVIDER | NATIVE SIZE | TITLE | CWD; Tab selects; Enter reviews deletion' \
             --preview "${preview}" --preview-window=down,60%,wrap)
         [[ "${filter_p}" == y ]] && fz_args+=(--filter "${filter}")
-        selected="$(print -r -- "${rows}" | fzf-gateway "${fz_args[@]}")" || return $?
+        selected="$(fzf-gateway "${fz_args[@]}" < "${tmp}/rows")" || return $?
         [[ -n "${selected}" ]] || return 0
         for row in "${(@f)selected}" ; do
             ids+=("${row%%$'\t'*}")
         done
-        command python3 "${helper}" --home "${home}" review "${tmp}/catalog.json" "${ids[@]}" > "${tmp}/selected.json" @RET
-        command python3 "${helper}" --home "${home}" show "${tmp}/selected.json" @RET
+
+        local id p1
+        local -a doomed
+        for id in "${ids[@]}" ; do
+            print -r -- "${id}  $(command awk -F'\t' -v id="${id}" '$1 == id { print $5 " " $6 }' "${tmp}/rows")"
+            doomed=( ${(f)"$(command awk -F'\t' -v id="${id}" '$1 == id { print $2 }' "${tmp}/files")"} )
+            if (( ${#doomed} == 0 )) ; then
+                print -r -- '    (no native files on disk)'
+            fi
+            for p1 in "${doomed[@]}" ; do
+                print -r -- "    ${p1}"
+            done
+        done
         [[ "${dry}" == y ]] && return 0
         ensure-cmd paseo @RET
         if [[ "${yes}" != y ]] ; then
@@ -771,7 +1046,24 @@ and remote PASEO_HOST targets are refused. See docs/paseo-transcript-delete.md.'
             fi
             ask "Permanently delete these ${#ids} archived sessions and their native transcripts?" N || return 1
         fi
-        command python3 "${helper}" --home "${home}" delete "${tmp}/selected.json"
+
+        local failed=0
+        for id in "${ids[@]}" ; do
+            #: The record goes first: a record left pointing at deleted files is
+            #: worse than files left behind by a record that is gone.
+            if ! command paseo agent delete "${id}" --home "${home}" > /dev/null ; then
+                ecerr "$0: paseo agent delete failed for ${id}; its native files are kept"
+                failed=$(( failed + 1 ))
+                continue
+            fi
+            doomed=( ${(f)"$(command awk -F'\t' -v id="${id}" '$1 == id { print $2 }' "${tmp}/files")"} )
+            for p1 in "${doomed[@]}" ; do
+                test -n "${p1}" || continue
+                command rm -rf -- "${p1}" || failed=$(( failed + 1 ))
+            done
+            print -r -- "deleted ${id}"
+        done
+        (( failed == 0 ))
     } always {
         command rm -rf -- "${tmp}"
     }
