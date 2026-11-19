@@ -191,8 +191,10 @@ function h-agent-desk-fields {
         agent_title "${f[18]-}" cause "${f[19]-}" )
     #: Read apart from the rest: a Telegram handle holds a tab.
     agent_desk_f[handle]="$(print -r -- "${json}" | command jq --raw-output '.handle // ""')" || agent_desk_f[handle]=''
-    typeset -g agent_desk_body
+    typeset -g agent_desk_body agent_desk_refs
     agent_desk_body="$(print -r -- "${json}" | command jq --raw-output '.event.body // ""')" || agent_desk_body=''
+    #: The id mentions in the title and body, mapped to their pages.
+    agent_desk_refs="$(print -r -- "${json}" | command jq --compact-output '.refs // {}')" || agent_desk_refs='{}'
     test -n "${agent_desk_f[id]}${agent_desk_f[path]}"
 }
 
@@ -256,14 +258,56 @@ function h-agent-desk-notify-remote {
     local -A f=( "${(@kv)agent_desk_f}" )
     local dest="${f[dest]:-${tlg_notifs-}}"
     local title="${f[title]:-${f[display]}}"
+    title="$(h-agent-desk-link-ids "${agent_desk_refs:-{\}}" <<<"${title}")" || title="${f[title]:-${f[display]}}"
     local -a lines=( "**${title}**" "${f[path]} · $(h-agent-desk-what)${f[agent_title]:+ · ${f[agent_title]}} · ${f[display]}" )
     test -n "${f[url]}" && lines+=( '' "[Open on the desk](${f[url]})" )
     local body="${agent_desk_body}"
     if test -n "$body" ; then
         (( ${#body} > agent_desk_tlg_body_max )) && body="${body[1,agent_desk_tlg_body_max]}…"
+        body="$(h-agent-desk-link-ids "${agent_desk_refs:-{\}}" <<<"${body}")" || body="${agent_desk_body}"
         lines+=( '' '<details><summary>Details</summary>' '' "$body" '' '</details>' )
     fi
     tsend-tracked "$dest" rich "${(F)lines}"
+}
+
+function h-agent-desk-link-ids {
+    : "usage: h-agent-desk-link-ids REFS_JSON <<<TEXT
+Prints TEXT with each id mention named in REFS_JSON (the notify payload's
+refs: id to page URL) turned into a Markdown link [q-8tqk](url): plain
+mentions, and inline code spans that are exactly one id. Fenced code blocks,
+longer code spans and existing links are left as they are."
+    command python3 -c '
+import json, re, sys
+refs = json.loads(sys.argv[1] or "{}")
+text = sys.stdin.read()
+if text.endswith("\n"):
+    text = text[:-1]
+ID = re.compile(r"\b[a-z]-[0-9a-hjkmnp-tv-z]{4,}\b")
+def plain(s):
+    return ID.sub(lambda m: "[%s](%s)" % (m.group(0), refs[m.group(0)]) if m.group(0) in refs else m.group(0), s)
+def line(s):
+    out, rest = [], s
+    while rest:
+        m = re.search(r"`[^`]*`|\[[^\]]*\]\([^)]*\)", rest)
+        if not m:
+            out.append(plain(rest))
+            break
+        out.append(plain(rest[:m.start()]))
+        tok = m.group(0)
+        inner = tok[1:-1] if tok.startswith("`") else None
+        out.append("[%s](%s)" % (inner, refs[inner]) if inner in refs else tok)
+        rest = rest[m.end():]
+    return "".join(out)
+fence = False
+lines = []
+for l in text.split("\n"):
+    if l.lstrip().startswith("```"):
+        fence = not fence
+        lines.append(l)
+        continue
+    lines.append(l if fence else line(l))
+print("\n".join(lines))
+' "$1"
 }
 
 function agent-desk-away-p {
