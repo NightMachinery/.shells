@@ -7,6 +7,17 @@ only resumes that agent's own quota-failed turn. See
 [Auto-continue for Paseo](paseo-auto-continue.md) for usage and differences
 (including direct delivery without the keyboard idle gate).
 
+**Where the agent-quotas daemon runs with `native.enabled` on**,
+it owns native auto-continue as well: `agent-auto-continue-on`,
+`-off`, `-status`, `-list` and `-check` forward to `agent-quotas continue ...`,
+and the Claude Code `StopFailure` and Antigravity `Stop` hook lines call
+`agent-quotas hook claude|agy` directly. The watchers and armed jobs described
+below are then unused. They remain the fallback: when the binary is missing,
+`native.enabled` is off, or the daemon does not answer, the same names run the
+implementation in this file ([agfi:h-agent-auto-continue-daemon-p]). Rollback:
+set `native.enabled` to false in `~/.config/agent-quotas/config.json` and run
+`agent-quotas restart`.
+
 `/auto-continue` is one skill, shared by Claude Code (both seats), Codex and
 Antigravity, the same way `/done` is. Typed in a running session it registers
 that session to be resumed when its account's usage limit resets, and makes

@@ -519,7 +519,25 @@ function h-agent-auto-continue-here {
     printf '%s\t%s\t%s\t%s\n' "${agent}" "${id}" "${transcript}" "${scope}"
 }
 
+function h-agent-auto-continue-daemon-p {
+    #: Whether the agent-quotas daemon owns native auto-continue: its binary is
+    #: installed, `native.enabled' is on in its config, and it answers. Then the
+    #: public entry points below forward to `agent-quotas continue', and this
+    #: file's watchers and armed jobs stay unused; otherwise they run as before
+    #: (the fallback when the daemon is down or uninstalled). See
+    #: docs/agent-auto-continue.md.
+    ##
+    (( ${+commands[agent-quotas]} )) || return 1
+    local config="${XDG_CONFIG_HOME:-${HOME}/.config}/agent-quotas/config.json"
+    command jq -e '.native.enabled == true' "${config}" >/dev/null 2>&1 || return 1
+    command agent-quotas health >/dev/null 2>&1
+}
+
 function agent-auto-continue-on {
+    if h-agent-auto-continue-daemon-p ; then
+        command agent-quotas continue on "$@"
+        return $?
+    fi
     if [[ -n "${PASEO_AGENT_ID:-}" ]] ; then
         paseo-auto-continue-on "$@"
         return $?
@@ -595,6 +613,10 @@ function h-agent-auto-continue-register {
 }
 
 function agent-auto-continue-off {
+    if h-agent-auto-continue-daemon-p ; then
+        command agent-quotas continue off "$@"
+        return $?
+    fi
     if [[ -n "${PASEO_AGENT_ID:-}" ]] ; then
         paseo-auto-continue-off "$@"
         return $?
@@ -653,6 +675,10 @@ function h-agent-auto-continue-unregister {
 }
 
 function agent-auto-continue-status {
+    if h-agent-auto-continue-daemon-p ; then
+        command agent-quotas continue status "$@"
+        return $?
+    fi
     if [[ -n "${PASEO_AGENT_ID:-}" ]] ; then
         paseo-auto-continue-status "$@"
         return $?
@@ -702,6 +728,10 @@ function h-agent-auto-continue-scope-status {
 }
 
 function agent-auto-continue-list {
+    if h-agent-auto-continue-daemon-p ; then
+        command agent-quotas continue list "$@"
+        return $?
+    fi
     : "usage: agent-auto-continue-list [--prune]
 Every registered session, grouped by scope and marked live or dead, then the
 watchers and armed jobs. --prune forgets the dead ones."
@@ -1157,6 +1187,10 @@ function h-agent-auto-continue-arm-group {
 }
 
 function agent-auto-continue-check {
+    if h-agent-auto-continue-daemon-p ; then
+        command agent-quotas continue check "$@"
+        return $?
+    fi
     : "usage: agent-auto-continue-check <scope>
 Arms the scope's resume job if the scope's usage is blocked, over every
 registered session's target; cancels it when nothing is registered."
@@ -1307,6 +1341,14 @@ function agent-auto-continue-hook {
 
     local agent="${1}"
     test -n "${agent}" || return 0
+
+    #: Sessions started before the hook lines moved to `agent-quotas hook'
+    #: still arrive here; hand them to the daemon too.
+    if h-agent-auto-continue-daemon-p ; then
+        print -rn -- "$(h-agent-hook-payload "${3}")" |
+            command agent-quotas hook "${agent}" "${2}" >/dev/null 2>&1
+        return 0
+    fi
 
     local input
     input="$(h-agent-hook-payload "${3}")"

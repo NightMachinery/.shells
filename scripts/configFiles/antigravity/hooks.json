@@ -35,7 +35,7 @@
     "Stop": [
       {
         "type": "command",
-        "command": "python3 \"${NIGHTDIR:-$HOME/scripts}/python/agy_hook.py\" continue \"$TMUX_PANE\" 2>/dev/null || printf '{}\\n'",
+        "command": "aq=\"${AGENT_QUOTAS_BIN:-$HOME/go/bin/agent-quotas}\"; if [ -x \"$aq\" ]; then \"$aq\" hook agy \"$TMUX_PANE\" 2>/dev/null || printf '{}\\n'; else python3 \"${NIGHTDIR:-$HOME/scripts}/python/agy_hook.py\" continue \"$TMUX_PANE\" 2>/dev/null || printf '{}\\n'; fi",
         "timeout": 5
       }
     ]

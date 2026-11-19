@@ -95,7 +95,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "brishz_async=y brishz_in=MAGIC_READ_STDIN \"${BRISHZGO_BIN:-$HOME/go/bin/brishzgo}\" -- agent-auto-continue-hook claude \"$TMUX_PANE\" >/dev/null 2>&1"
+            "command": "aq=\"${AGENT_QUOTAS_BIN:-$HOME/go/bin/agent-quotas}\"; if [ -x \"$aq\" ]; then \"$aq\" hook claude \"$TMUX_PANE\"; else brishz_async=y brishz_in=MAGIC_READ_STDIN \"${BRISHZGO_BIN:-$HOME/go/bin/brishzgo}\" -- agent-auto-continue-hook claude \"$TMUX_PANE\"; fi >/dev/null 2>&1"
           }
         ]
       },
