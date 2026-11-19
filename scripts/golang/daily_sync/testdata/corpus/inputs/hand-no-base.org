@@ -1,0 +1,7 @@
+top
+<<<<<<< HEAD
+up line
+=======
+local line
+>>>>>>> abc (local)
+bottom

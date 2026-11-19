@@ -1,0 +1,51 @@
+<<<<<<< a
+remote only
+||||||| b
+base 1
+abc
+base 2
+abcd
+base 3
+#+title:
+base 4
+#+TITLE
+base 5
+:drawer:
+base 6
+#+end_src
+base 7
+**
+base 8
+*** -
+base 9
+#+begin_src x
+base 10
+:a b:
+base 11
+*  -
+base 12
+=======
+local 1
+abc
+local 2
+abcd
+local 3
+#+title:
+local 4
+#+TITLE
+local 5
+:drawer:
+local 6
+#+end_src
+local 7
+**
+local 8
+*** -
+local 9
+#+begin_src x
+local 10
+:a b:
+local 11
+*  -
+local 12
+>>>>>>> c

@@ -1,0 +1,18 @@
+<<<<<<< a
+xy line
+||||||| b
+x y line, base
+=======
+x y line
+>>>>>>> c
+<<<<<<< a
+remote one
+||||||| b
+unique base one
+abc
+unique base two
+=======
+new local one
+abc
+new local two
+>>>>>>> c

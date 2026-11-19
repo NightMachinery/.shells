@@ -1,0 +1,15 @@
+* Heading
+some context that stays
+more context that stays
+and a third context line
+<<<<<<< HEAD
+x line up
+=======
+after rule
+=======
+x line loc
+||||||| not base
+>>>>>>> 8b8acf5 (local edit)
+closing context one
+closing context two
+closing context three

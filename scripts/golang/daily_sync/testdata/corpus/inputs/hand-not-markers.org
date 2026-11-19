@@ -1,0 +1,10 @@
+a
+<<<<<<< opens
+up
+=======x
+======= labelled
+|||||||y
+loc?
+>>>>>>>z
+>>>>>>> closes
+b

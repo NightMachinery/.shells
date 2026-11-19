@@ -1,0 +1,4 @@
+just text
+<<<<<<<< eight is not a marker
+<<<<<<<x neither
+=======

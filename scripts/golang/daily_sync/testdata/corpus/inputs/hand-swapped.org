@@ -1,0 +1,22 @@
+<<<<<<< a
+alpha line one
+beta line two
+gamma, remote
+||||||| b
+alpha line one
+beta line two
+=======
+beta line two
+alpha line one
+>>>>>>> c
+<<<<<<< a
+first kept
+second kept
+||||||| b
+second kept
+first kept
+=======
+second kept
+first kept
+local extra
+>>>>>>> c

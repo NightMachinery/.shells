@@ -1,0 +1,18 @@
+* Heading
+some context that stays
+more context that stays
+and a third context line
+<<<<<<< HEAD
+ 
+  	 
+||||||| 49e747e
+   
+	
+=======
+		
+
+>>>>>>> af08299ee7c29df0c4c4cc441dabf75acb2a7399
+value
+closing context one
+closing context two
+closing context three

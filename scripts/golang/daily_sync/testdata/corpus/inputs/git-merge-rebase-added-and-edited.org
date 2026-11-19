@@ -1,0 +1,14 @@
+* Heading
+some context that stays
+more context that stays
+and a third context line
+entry one
+<<<<<<< HEAD
+entry two
+entry three, added remotely
+=======
+entry two, edited locally
+>>>>>>> 8b8acf5 (local edit)
+closing context one
+closing context two
+closing context three

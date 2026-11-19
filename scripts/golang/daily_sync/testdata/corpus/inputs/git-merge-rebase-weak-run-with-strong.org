@@ -1,0 +1,17 @@
+* Heading
+some context that stays
+more context that stays
+and a third context line
+new local intro
+#+begin_quote
+shared strong sentence
+#+end_quote
+<<<<<<< HEAD
+remote addition
+=======
+
+ok
+>>>>>>> 8b8acf5 (local edit)
+closing context one
+closing context two
+closing context three

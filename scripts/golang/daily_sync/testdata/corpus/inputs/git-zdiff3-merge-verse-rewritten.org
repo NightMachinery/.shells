@@ -1,0 +1,22 @@
+* Heading
+some context that stays
+more context that stays
+and a third context line
+#+begin_verse
+<<<<<<< HEAD
+a new poem line
+#+end_verse
+
+#+begin_verse
+another new poem
+||||||| 49e747e
+an old poem line
+=======
+an old poem line, revised
+>>>>>>> af08299ee7c29df0c4c4cc441dabf75acb2a7399
+#+end_verse
+
+remote prose
+closing context one
+closing context two
+closing context three

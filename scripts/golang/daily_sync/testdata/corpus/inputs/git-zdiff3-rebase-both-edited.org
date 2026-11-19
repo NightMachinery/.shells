@@ -1,0 +1,14 @@
+* Heading
+some context that stays
+more context that stays
+and a third context line
+<<<<<<< HEAD
+alpha line remote
+||||||| parent of 8b8acf5 (local edit)
+alpha line
+=======
+alpha line local
+>>>>>>> 8b8acf5 (local edit)
+closing context one
+closing context two
+closing context three

@@ -1,0 +1,6 @@
+<<<<<<< a
+remote new
+||||||| base
+=======
+local new
+>>>>>>> b

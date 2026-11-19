@@ -1,0 +1,15 @@
+* Heading
+some context that stays
+more context that stays
+and a third context line
+<<<<<<< HEAD
+doomed line one, edited
+doomed line two
+||||||| 49e747e
+doomed line one
+doomed line two
+=======
+>>>>>>> af08299ee7c29df0c4c4cc441dabf75acb2a7399
+closing context one
+closing context two
+closing context three

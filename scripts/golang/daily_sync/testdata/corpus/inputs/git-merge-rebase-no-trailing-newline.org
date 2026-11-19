@@ -1,0 +1,9 @@
+* Heading
+some context that stays
+more context that stays
+and a third context line
+<<<<<<< HEAD
+last line, remote
+=======
+last line, local
+>>>>>>> 8b8acf5 (local edit)

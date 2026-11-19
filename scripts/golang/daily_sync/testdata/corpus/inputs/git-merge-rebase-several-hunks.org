@@ -1,0 +1,23 @@
+<<<<<<< HEAD
+top one remote
+=======
+top one local
+>>>>>>> 8b8acf5 (local edit)
+* Heading
+some context that stays
+more context that stays
+and a third context line
+<<<<<<< HEAD
+mid one remote
+closing context one
+closing context two
+closing context three
+bottom one remote
+=======
+mid one local
+closing context one
+closing context two
+closing context three
+bottom one
+bottom two local
+>>>>>>> 8b8acf5 (local edit)

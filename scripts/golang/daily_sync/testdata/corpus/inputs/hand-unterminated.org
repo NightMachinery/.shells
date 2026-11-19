@@ -1,0 +1,8 @@
+top
+<<<<<<< ours
+up one
+||||||| base
+b
+=======
+loc one
+loc two without newline

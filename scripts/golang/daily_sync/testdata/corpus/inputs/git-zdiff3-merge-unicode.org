@@ -1,0 +1,19 @@
+* Heading
+some context that stays
+more context that stays
+and a third context line
+<<<<<<< HEAD
+Ünïcödé line ✓
+日本語の行です
+→ ok
+||||||| 49e747e
+Ünïcödé line ✓
+日本語の行
+=======
+Ünïcödé line ✓ (fern)
+日本語の行
+äb
+>>>>>>> af08299ee7c29df0c4c4cc441dabf75acb2a7399
+closing context one
+closing context two
+closing context three

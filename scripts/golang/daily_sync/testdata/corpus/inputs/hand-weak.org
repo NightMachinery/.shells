@@ -1,0 +1,24 @@
+<<<<<<< a
+#+begin_verse
+shared poem line
+#+end_verse
+
+||||||| b
+#+BEGIN_VERSE
+#+end_verse
+=======
+#+begin_verse
+
+#+end_verse
+#+begin_src python
+:x:
+*
+** 
+**_
+* -
+#+key:
+#+key::
+ab
+ 	
+
+>>>>>>> c

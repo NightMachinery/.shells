@@ -1,0 +1,10 @@
+* Log
+
+first entry
+
+<<<<<<< HEAD
+local entry
+||||||| 49e747e
+=======
+remote entry
+>>>>>>> af08299ee7c29df0c4c4cc441dabf75acb2a7399

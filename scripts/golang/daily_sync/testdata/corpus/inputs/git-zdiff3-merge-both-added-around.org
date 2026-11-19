@@ -1,0 +1,15 @@
+* Heading
+some context that stays
+more context that stays
+and a third context line
+local line above
+kept line in the middle
+<<<<<<< HEAD
+local line below
+||||||| 49e747e
+=======
+remote line below
+>>>>>>> af08299ee7c29df0c4c4cc441dabf75acb2a7399
+closing context one
+closing context two
+closing context three

@@ -1,0 +1,14 @@
+* Heading
+some context that stays
+more context that stays
+and a third context line
+<<<<<<< HEAD
+a b c line
+||||||| parent of 8b8acf5 (local edit)
+a b c line
+=======
+a b c line
+>>>>>>> 8b8acf5 (local edit)
+closing context one
+closing context two
+closing context three
