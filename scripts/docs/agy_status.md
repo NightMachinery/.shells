@@ -106,7 +106,8 @@ file credentials from a live verified sign-in.
 
 `agy-api NAME` runs agy billed to a Google API key or a Google Cloud project
 instead of a subscription. The shell generates `agy-api-personal`,
-`agy-api-work`, their `-t` tmux variants and their `-login` commands. For
+`agy-api-work`, their `-light` variants (below), `-t` tmux variants and
+`-login` commands. For
 other names, set `AGY_API_PROFILES` (default `personal work`) and run
 `agy-api-refresh`.
 
@@ -141,6 +142,18 @@ skills and history). It is never in `AGY_ACCOUNTS`, so `agy-status` and
 `agy-best` leave it out: an API profile has no quota buckets to report. The
 conversations it starts are recorded as owned by `api_NAME`, and the resume
 helpers bring them back through `agy-api-NAME`.
+
+`agy-api-NAME-light` (`agy-api --light NAME`) is the same profile without the
+global instructions, for plain chat. It runs in a second hidden account,
+`api_NAME_light`, which shares the credentials, skills, hooks and history but
+links none of `config/rules`, `GEMINI.md`, `AGENTS.md` or `rules`, and a
+reconcile removes such links if they were made earlier. Its conversations
+resume through `agy-api-NAME-light`, and profile names ending in `_light` are
+reserved for it. agy reads the global rules only through those links: on
+2026-11-19 a Flash Low run asked whether its instructions held user rules
+answered with their first heading when `config/rules` was linked and "NO"
+without it. Workspace instructions (an `AGENTS.md` in the repository agy runs
+in) are a separate mechanism and still apply; for a bare chat, start elsewhere.
 
 Otherwise, credentials are variables named after the profile. Put them in
 `~/.privateShell`. They need not be exported: the launcher reads them and

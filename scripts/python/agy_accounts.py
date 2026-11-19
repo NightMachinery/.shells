@@ -22,6 +22,10 @@ SHARED = (
     "antigravity-cli/annotations",
 )
 
+#: A light account (an API profile's -light variant) shares everything above
+#: except the global instructions, so a chat starts without them.
+LIGHT_SKIP = frozenset(("GEMINI.md", "AGENTS.md", "rules", "config/rules"))
+
 
 def record_owner(directory: Path, conversation: str, account: str) -> None:
     if not re.fullmatch(r"[a-zA-Z0-9_-]+", conversation):
@@ -57,7 +61,7 @@ def seed_owners(directory: Path, shared: Path, account="m") -> None:
     marker.touch(exist_ok=True)
 
 
-def prepare(destination: Path, shared: Path) -> None:
+def prepare(destination: Path, shared: Path, light: bool = False) -> None:
     destination, shared = destination.resolve(), shared.resolve()
     if destination == shared:
         return  # The original account stays exactly where it is.
@@ -70,6 +74,10 @@ def prepare(destination: Path, shared: Path) -> None:
     links, stale = [], []
     for relative in SHARED:
         source, target = shared / relative, destination / relative
+        if light and relative in LIGHT_SKIP:
+            if target.is_symlink() and os.readlink(target) == str(source):
+                stale.append(target)  # ours, from before the account was light
+            continue
         if not source.exists():
             # A link left pointing at a shared file that is gone (such as the
             # retired GEMINI.md) is ours to drop; anything else stays.
@@ -121,9 +129,10 @@ def main() -> int:
     parser.add_argument("--gemini-dir", type=Path, required=True)
     parser.add_argument("--shared-dir", type=Path, required=True)
     parser.add_argument("--owners-dir", type=Path)
+    parser.add_argument("--light", action="store_true", help="do not link the global instructions")
     args = parser.parse_args()
     try:
-        prepare(args.gemini_dir, args.shared_dir)
+        prepare(args.gemini_dir, args.shared_dir, args.light)
         if args.owners_dir:
             seed_owners(args.owners_dir, args.shared_dir)
     except (OSError, ValueError, TypeError, AttributeError) as error:

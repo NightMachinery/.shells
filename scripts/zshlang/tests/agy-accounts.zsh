@@ -362,4 +362,31 @@ AGY_TEST_VERTEX_STATE=DISABLED agy-api-work-login 2>/dev/null >&2 || api_rc=$?
 [[ "$(command tail -n 2 "${AGY_TEST_GCLOUD_CALLS}" | command head -n 1)" == "${api_gcloud}|fixture-login-project|auth application-default login" ]] ||
     fail 'second login did not reuse the stored project'
 
-print -r -- 'ok: launch isolation, named accounts, configuration, status JSON, best, cache-only, login recovery, API profiles and Vertex sign-in'
+# -light: the same credentials and shared history, without the global
+# instructions (config/rules, GEMINI.md, AGENTS.md).
+(( ${+functions[agy-api-work-light]} && ${+functions[agy-api-work-light-t]} )) || fail 'generated light launchers'
+command mkdir -p "${AGY_SHARED_GEMINI_DIR}/config/rules"
+agy-api-work-light models
+command jq --exit-status --arg root "${AGY_ACCOUNTS_DIR}/api_work_light" \
+    --arg adc "${api_gcloud}/application_default_credentials.json" '
+    .account == "api_work_light" and .root == $root and
+    .env.GOOGLE_CLOUD_PROJECT == "fixture-login-project" and
+    .env.GOOGLE_APPLICATION_CREDENTIALS == $adc' "${AGY_TEST_CALLS}" >/dev/null || fail 'light route'
+typeset -g light_root="${AGY_ACCOUNTS_DIR}/api_work_light"
+[[ ! -e "${light_root}/config/rules" && ! -e "${light_root}/GEMINI.md" ]] || fail 'light profile has global instructions'
+[[ -L "${light_root}/config/hooks.json" ]] || fail 'light profile lost the shared hooks'
+AGY_API_KEY_SPARE=k agy-api spare models
+[[ -L "${AGY_ACCOUNTS_DIR}/api_spare/config/rules" && -L "${AGY_ACCOUNTS_DIR}/api_spare/GEMINI.md" ]] ||
+    fail 'full profile lacks the global instructions'
+#: A light root that once linked the rules loses the link on reconcile.
+command ln -s "${AGY_SHARED_GEMINI_DIR:A}/config/rules" "${light_root}/config/rules"
+agy-account-prepare api_work_light
+[[ ! -e "${light_root}/config/rules" ]] || fail 'light reconcile kept the rules link'
+h-agy-account-info api_work_light
+[[ "${reply[2]}" == api-work-light ]] || fail 'light label'
+[[ "$(h-agy-account-launcher api_work_light)" == agy-api-work-light ]] || fail 'light resume launcher'
+api_rc=0
+AGY_API_KEY_WORK_LIGHT=k agy-api work_light models 2>/dev/null || api_rc=$?
+(( api_rc == 2 )) || fail 'reserved _light profile name accepted'
+
+print -r -- 'ok: launch isolation, named accounts, configuration, status JSON, best, cache-only, login recovery, API profiles, Vertex sign-in and light profiles'

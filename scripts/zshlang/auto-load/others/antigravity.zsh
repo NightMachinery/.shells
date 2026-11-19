@@ -76,13 +76,19 @@ function h-agy-account-info {
         fi
     fi
     local default_label="${id}"
-    [[ "${id}" != api_* ]] || default_label="api-${id#api_}"
+    if [[ "${id}" == api_*_light ]] ; then
+        default_label="api-${${id#api_}%_light}-light"
+    elif [[ "${id}" == api_* ]] ; then
+        default_label="api-${id#api_}"
+    fi
     reply=( "${id}" "${(P)label_var:-${(P)name_var:-${default_label}}}" "${root}" "${root}/antigravity-cli" "${cache}" )
 }
 
 function h-agy-account-launcher {
     #: The launcher that resumes a conversation owned by account ID.
-    if [[ "${1}" == api_* ]] ; then
+    if [[ "${1}" == api_*_light ]] ; then
+        ec "agy-api-${${1#api_}%_light}-light"
+    elif [[ "${1}" == api_* ]] ; then
         ec "agy-api-${1#api_}"
     else
         ec "agy-${1}"
@@ -133,9 +139,12 @@ function agy-account-prepare {
     local -a reply
     h-agy-account-info "${1}" @RET
     ensure-cmd python3 @RET
+    #: An API profile's -light variant gets no global instructions.
+    local -a light=()
+    [[ "${reply[1]}" != api_*_light ]] || light=( --light )
     command python3 "${NIGHTDIR:-${HOME}/scripts}/python/agy_accounts.py" \
         --gemini-dir "${reply[3]}" --shared-dir "${AGY_SHARED_GEMINI_DIR:-${HOME}/.gemini}" \
-        --owners-dir "${AGY_ACCOUNTS_DIR:-${HOME}/.agy-accounts}/history-owners"
+        --owners-dir "${AGY_ACCOUNTS_DIR:-${HOME}/.agy-accounts}/history-owners" "${light[@]}"
 }
 
 function h-agy-account-argv {
@@ -424,17 +433,25 @@ function agy-account-hook {
 #: which belong in ~/.privateShell, never here, or from a browser sign-in
 #: ([agfi:agy-api-login]). See docs/agy_status.md, "API-billed profiles".
 function agy-api-refresh {
-    : "generates agy-api-<name>, agy-api-<name>-t and agy-api-<name>-login from AGY_API_PROFILES"
+    : "generates agy-api-<name>[-light][-t] and agy-api-<name>-login from AGY_API_PROFILES"
     local name
     for name in ${=AGY_API_PROFILES:-personal work} ; do
-        if [[ "${name}" != [a-z][a-z0-9_]# ]] ; then
-            ecerr "$0: invalid profile name: ${name}"
-            return 2
-        fi
+        h-agy-api-name-check "${name}" @RET
         aliasfn "agy-api-${name}" agy-api "${name}"
         aliasfn "agy-api-${name}-t" h-tmuxnewsh2-attach-z-with-cmd "agy-api-${name}"
+        aliasfn "agy-api-${name}-light" agy-api --light "${name}"
+        aliasfn "agy-api-${name}-light-t" h-tmuxnewsh2-attach-z-with-cmd "agy-api-${name}-light"
         aliasfn "agy-api-${name}-login" agy-api-login "${name}"
     done
+}
+
+function h-agy-api-name-check {
+    #: Profile names: lowercase words. A trailing _light is reserved, because
+    #: the -light variant of profile NAME is the hidden account api_NAME_light.
+    if [[ "${1}" != [a-z][a-z0-9_]# || "${1}" == *_light ]] ; then
+        ecerr "agy-api: invalid profile name: ${1:-<none>}"
+        return 2
+    fi
 }
 
 function h-agy-api-gcloud-dir {
@@ -465,10 +482,7 @@ function agy-api-login {
     : "usage: agy-api-login NAME [PROJECT]; signs profile NAME in to Vertex AI through Google in the browser.
 Without PROJECT, and with none saved, it offers the signed-in account's projects in fzf."
     local name="${1}" project="${2}"
-    if [[ "${name}" != [a-z][a-z0-9_]# ]] ; then
-        ecerr "$0: invalid profile name: ${name:-<none>}"
-        return 2
-    fi
+    h-agy-api-name-check "${name}" @RET
     local up="${(U)name}"
     local key_var="AGY_API_KEY_${up}" project_var="AGY_API_PROJECT_${up}"
     if test -n "${(P)key_var}" ; then
@@ -564,12 +578,15 @@ function h-agy-api-settings {
 }
 
 function agy-api {
-    : "usage: agy-api NAME [agy arguments...]; agy billed to an API key or a Vertex AI project"
-    local name="${1}"
-    if [[ "${name}" != [a-z][a-z0-9_]# ]] ; then
-        ecerr "$0: invalid profile name: ${name:-<none>}"
-        return 2
+    : "usage: agy-api [--light] NAME [agy arguments...]; agy billed to an API key or a Vertex AI project.
+--light runs it without the global instructions (AGENTS.md rules), for plain chat."
+    local suffix=''
+    if [[ "${1}" == --light ]] ; then
+        suffix=_light
+        shift
     fi
+    local name="${1}"
+    h-agy-api-name-check "${name}" @RET
     shift
     local up="${(U)name}"
     local key_var="AGY_API_KEY_${up}" project_var="AGY_API_PROJECT_${up}"
@@ -596,7 +613,7 @@ function agy-api {
         return 2
     fi
     local -a reply
-    h-agy-account-info "api_${name}" @RET
+    h-agy-account-info "api_${name}${suffix}" @RET
     local id="${reply[1]}" label="${reply[2]}" cli="${reply[4]}"
     if ! test -d "${cli}" ; then
         agy-account-prepare "${id}" @RET
