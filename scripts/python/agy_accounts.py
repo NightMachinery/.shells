@@ -23,8 +23,8 @@ SHARED = (
 )
 
 #: A light account (an API profile's -light variant) shares everything above
-#: except the global instructions, so a chat starts without them.
-LIGHT_SKIP = frozenset(("GEMINI.md", "AGENTS.md", "rules", "config/rules"))
+#: except the global instructions and skills, so a chat starts without them.
+LIGHT_SKIP = frozenset(("GEMINI.md", "AGENTS.md", "rules", "config/rules", "skills", "config/skills"))
 
 
 def record_owner(directory: Path, conversation: str, account: str) -> None:
@@ -129,7 +129,7 @@ def main() -> int:
     parser.add_argument("--gemini-dir", type=Path, required=True)
     parser.add_argument("--shared-dir", type=Path, required=True)
     parser.add_argument("--owners-dir", type=Path)
-    parser.add_argument("--light", action="store_true", help="do not link the global instructions")
+    parser.add_argument("--light", action="store_true", help="do not link the global instructions or skills")
     args = parser.parse_args()
     try:
         prepare(args.gemini_dir, args.shared_dir, args.light)

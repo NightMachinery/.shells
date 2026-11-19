@@ -139,7 +139,7 @@ function agy-account-prepare {
     local -a reply
     h-agy-account-info "${1}" @RET
     ensure-cmd python3 @RET
-    #: An API profile's -light variant gets no global instructions.
+    #: An API profile's -light variant gets no global instructions or skills.
     local -a light=()
     [[ "${reply[1]}" != api_*_light ]] || light=( --light )
     command python3 "${NIGHTDIR:-${HOME}/scripts}/python/agy_accounts.py" \
@@ -609,7 +609,7 @@ function h-agy-api-credentials {
 
 function agy-api {
     : "usage: agy-api [--light] NAME [agy arguments...]; agy billed to an API key or a Vertex AI project.
---light runs it without the global instructions (AGENTS.md rules), for plain chat."
+--light runs it without the global instructions (AGENTS.md rules) or skills, for plain chat."
     local suffix=''
     if [[ "${1}" == --light ]] ; then
         suffix=_light
@@ -623,7 +623,9 @@ function agy-api {
     local key="${reply[1]}" project="${reply[2]}" credentials="${reply[3]}" location="${reply[4]}"
     h-agy-account-info "api_${name}${suffix}" @RET
     local id="${reply[1]}" label="${reply[2]}" cli="${reply[4]}"
-    if ! test -d "${cli}" ; then
+    #: A light root is reconciled on every launch, so it drops links it had
+    #: from before something joined the light exclusions.
+    if ! test -d "${cli}" || [[ "${id}" == api_*_light ]] ; then
         agy-account-prepare "${id}" @RET
     fi
     #: The credentials travel as exported locals: they reach only this agy,
@@ -691,7 +693,7 @@ Rerun it after signing in again with another project. Vertex AI profiles only: a
     for suffix in '' _light ; do
         h-agy-account-info "api_${name}${suffix}" @RET
         id="${reply[1]}" label="${reply[2]}" root="${reply[3]}" cache="${reply[5]}"
-        if ! test -d "${reply[4]}" ; then
+        if ! test -d "${reply[4]}" || [[ "${id}" == api_*_light ]] ; then
             agy-account-prepare "${id}" @RET
         fi
         h-agy-api-settings "${reply[4]}/settings.json" '' @RET
@@ -701,7 +703,7 @@ Rerun it after signing in again with another project. Vertex AI profiles only: a
             --arg label "${label}" --arg cache "${cache}" --arg project "${project}" \
             --arg location "${location}" --arg adc "${credentials}" \
             --arg title "Antigravity API (${name//_/ }${suffix:+, light})" \
-            --arg about "agy billed to Vertex AI project ${project}${suffix:+, without the global instructions}" '
+            --arg about "agy billed to Vertex AI project ${project}${suffix:+, without the global instructions or skills}" '
             .[$provider] = {extends: "acp", label: $title, description: $about,
                 command: [$agy, "acp", "--sandbox", "--gemini_dir=\($root)", "--app_data_dir=antigravity-cli"],
                 env: {ANTIGRAVITY_GEMINI_DIR: $root, AGY_ACCOUNT_ID: $id, AGY_ACCOUNT_LABEL: $label,

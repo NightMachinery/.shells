@@ -365,7 +365,7 @@ AGY_TEST_VERTEX_STATE=DISABLED agy-api-work-login 2>/dev/null >&2 || api_rc=$?
 # -light: the same credentials and shared history, without the global
 # instructions (config/rules, GEMINI.md, AGENTS.md).
 (( ${+functions[agy-api-work-light]} && ${+functions[agy-api-work-light-t]} )) || fail 'generated light launchers'
-command mkdir -p "${AGY_SHARED_GEMINI_DIR}/config/rules"
+command mkdir -p "${AGY_SHARED_GEMINI_DIR}/config/rules" "${AGY_SHARED_GEMINI_DIR}/config/skills"
 agy-api-work-light models
 command jq --exit-status --arg root "${AGY_ACCOUNTS_DIR}/api_work_light" \
     --arg adc "${api_gcloud}/application_default_credentials.json" '
@@ -373,15 +373,18 @@ command jq --exit-status --arg root "${AGY_ACCOUNTS_DIR}/api_work_light" \
     .env.GOOGLE_CLOUD_PROJECT == "fixture-login-project" and
     .env.GOOGLE_APPLICATION_CREDENTIALS == $adc' "${AGY_TEST_CALLS}" >/dev/null || fail 'light route'
 typeset -g light_root="${AGY_ACCOUNTS_DIR}/api_work_light"
-[[ ! -e "${light_root}/config/rules" && ! -e "${light_root}/GEMINI.md" ]] || fail 'light profile has global instructions'
+[[ ! -e "${light_root}/config/rules" && ! -e "${light_root}/GEMINI.md" && ! -e "${light_root}/config/skills" ]] ||
+    fail 'light profile has global instructions or skills'
 [[ -L "${light_root}/config/hooks.json" ]] || fail 'light profile lost the shared hooks'
 AGY_API_KEY_SPARE=k agy-api spare models
-[[ -L "${AGY_ACCOUNTS_DIR}/api_spare/config/rules" && -L "${AGY_ACCOUNTS_DIR}/api_spare/GEMINI.md" ]] ||
-    fail 'full profile lacks the global instructions'
-#: A light root that once linked the rules loses the link on reconcile.
+[[ -L "${AGY_ACCOUNTS_DIR}/api_spare/config/rules" && -L "${AGY_ACCOUNTS_DIR}/api_spare/GEMINI.md" &&
+   -L "${AGY_ACCOUNTS_DIR}/api_spare/config/skills" ]] || fail 'full profile lacks the global instructions or skills'
+#: A light root that once linked the rules or skills loses the links at its
+#: next launch.
 command ln -s "${AGY_SHARED_GEMINI_DIR:A}/config/rules" "${light_root}/config/rules"
-agy-account-prepare api_work_light
-[[ ! -e "${light_root}/config/rules" ]] || fail 'light reconcile kept the rules link'
+command ln -s "${AGY_SHARED_GEMINI_DIR:A}/config/skills" "${light_root}/config/skills"
+agy-api-work-light models
+[[ ! -e "${light_root}/config/rules" && ! -e "${light_root}/config/skills" ]] || fail 'light reconcile kept a link'
 h-agy-account-info api_work_light
 [[ "${reply[2]}" == api-work-light ]] || fail 'light label'
 [[ "$(h-agy-account-launcher api_work_light)" == agy-api-work-light ]] || fail 'light resume launcher'

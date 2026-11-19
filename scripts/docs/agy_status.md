@@ -144,19 +144,26 @@ conversations it starts are recorded as owned by `api_NAME`, and the resume
 helpers bring them back through `agy-api-NAME`.
 
 `agy-api-NAME-light` (`agy-api --light NAME`) is the same profile without the
-global instructions, for plain chat. It runs in a second hidden account,
-`api_NAME_light`, which shares the credentials, skills, hooks and history but
-links none of `config/rules`, `GEMINI.md`, `AGENTS.md` or `rules`, and a
-reconcile removes such links if they were made earlier. Its conversations
-resume through `agy-api-NAME-light`, and profile names ending in `_light` are
-reserved for it. agy reads the global rules only through those links: on
-2026-11-19 a Flash Low run asked whether its instructions held user rules
-answered with their first heading when `config/rules` was linked and "NO"
-without it. Workspace instructions (an `AGENTS.md` in the repository agy runs
-in) are a separate mechanism and still apply; for a bare chat, start elsewhere.
+global instructions or skills, for plain chat. It runs in a second hidden
+account, `api_NAME_light`, which shares the credentials, hooks and history but
+links none of `config/rules`, `config/skills`, `GEMINI.md`, `AGENTS.md`,
+`rules` or `skills`. Every launch reconciles that root, removing such links if
+it has them from before they were excluded. Its conversations resume through
+`agy-api-NAME-light`, and profile names ending in `_light` are reserved for
+it.
+
+agy finds these only through those links. On 2026-11-19, Flash Low runs asked
+about their instructions quoted the rules' first heading with `config/rules`
+linked and answered "NO" without it; with `config/skills` linked they counted
+38 skills (`agent-desk` among them), and without it they named only agy's own
+built-in skills (`agy-customizations`, `antigravity-guide`, `run-workflow`),
+which no link controls and no setting was found to turn off. Workspace
+instructions and skills (an `AGENTS.md`, or skills, in the repository
+agy runs in) are a separate mechanism and still apply; for a bare chat, start
+elsewhere.
 
 `agy-api-NAME-add-to-paseo` makes both variants Paseo providers on this
-machine's daemon: `agy-api-NAME` and `agy-api-NAME-light` (underscores in NAME
+machine's daemon, `agy-api-NAME` and `agy-api-NAME-light` (underscores in NAME
 become hyphens, as Paseo requires). Each runs `agy acp --sandbox` in the
 profile's root with the environment `agy-api` gives it, so Auto mode and the OS
 sandbox apply, and agy's permission requests appear in the Paseo app; there is
