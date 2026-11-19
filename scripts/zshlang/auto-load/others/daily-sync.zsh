@@ -18,6 +18,9 @@ typeset -g daily_sync_job="${daily_sync_job:-daily-sync-metadata}"
 #: (and makes Claude Code report a rejected tool call). Falls back to `PASEO_SEND_BEHAVIOR', then `steer'.
 typeset -g daily_sync_send_behavior="${daily_sync_send_behavior:-}"
 
+#: How the other machines are reached: never a prompt, and a dead link ends in about a minute.
+typeset -ga h_daily_sync_ssh_opts=( -o ConnectTimeout=10 -o BatchMode=yes -o ServerAliveInterval=15 -o ServerAliveCountMax=4 )
+
 #: Sent to every machine ahead of the generated commands. Repositories are named
 #: relative to ~; NIGHTDIR is the vcsh repository rooted at ~ itself.
 typeset -g h_daily_sync_prelude
@@ -319,8 +322,24 @@ function ds-sync {
 
 #: Conflicts. A rebase replays this machine's commits onto the remote, so its
 #: `ours' is the remote and `theirs' is local; a merge (used when tracked files
-#: are dirty) is the other way round. ds-conflict-perl names the sides
+#: are dirty) is the other way round. The conflict engine names the sides
 #: `upstream' and `local' either way.
+#:
+#: The engine is the Go program golang/daily_sync. The local machine builds it
+#: and ships it here before a conflict command (h-daily-sync-engine), and the
+#: generated script names it in ds_engine, so every machine runs the local
+#: machine's version.
+typeset -g ds_engine=''
+
+function ds-engine {
+    #: ds-engine show|resolve <rebase|merge> <label> <path> <name> [<hunk>=<choice>...]
+    if [[ -z "${ds_engine}" || ! -x "${ds_engine}" ]] ; then
+        print -r -- "ERROR: no conflict engine at '${ds_engine}'; daily-sync ships it before a conflict command"
+        return 1
+    fi
+    command "${ds_engine}" conflict "$@"
+}
+
 function ds-conflict-order {
     local -a G
     ds-repo "$1"
@@ -501,7 +520,7 @@ function ds-conflict-print {
     fi
     for f in "${files[@]}" ; do
         if command grep -q -e '^<<<<<<<' -- "${top}/${f}" 2>/dev/null ; then
-            ds-conflict-perl show "${order}" "${label}" "${top}/${f}" "${f}" || print -r -- "ERROR: could not read ${f}"
+            ds-engine show "${order}" "${label}" "${top}/${f}" "${f}" || print -r -- "ERROR: could not read ${f}"
         else
             print -r -- "### ${f}: no conflict markers (binary, or deleted on one side); the only choices are all=upstream and all=local"
         fi
@@ -607,7 +626,7 @@ function ds-conflict-resolve {
     top="$(command "${G[@]}" rev-parse --show-toplevel 2>/dev/null)" || true
     if [[ -n "${file}" ]] ; then
         if command grep -q -e '^<<<<<<<' -- "${top}/${file}" 2>/dev/null ; then
-            ds-conflict-perl resolve "${order}" "${label}" "${top}/${file}" "${file}" "$@" || { print -r -- "ERROR: could not resolve ${file}" ; return 0 }
+            ds-engine resolve "${order}" "${label}" "${top}/${file}" "${file}" "$@" || { print -r -- "ERROR: could not resolve ${file}" ; return 0 }
         else
             case "${1:-}" in
                 all=upstream) stage=2 ; [[ "${order}" == merge ]] && stage=3 ;;
@@ -675,8 +694,159 @@ function h-daily-sync-on {
     } | if [[ "${machine}" == "${daily_sync_local}" ]] ; then
         command zsh -s 2>> "${run}/stderr.log"
     else
-        command ssh -o ConnectTimeout=10 -o BatchMode=yes -o ServerAliveInterval=15 -o ServerAliveCountMax=4 "${machine}" zsh -s 2>> "${run}/stderr.log"
+        command ssh "${h_daily_sync_ssh_opts[@]}" "${machine}" zsh -s 2>> "${run}/stderr.log"
     fi
+}
+
+#: The conflict engine (see ds-engine in the prelude). Cross-built copies are
+#: cached here, named by the source hash `daily_sync version' prints.
+typeset -g daily_sync_engine_cache="${daily_sync_engine_cache:-${HOME}/.cache/daily-sync/build}"
+
+function h-daily-sync-engine-local {
+    : "Print the path of this machine's daily_sync, built if it is older than its source; 1 if it cannot be."
+    setopt local_options extended_glob
+    local dir="${NIGHTDIR}/golang/daily_sync" bin
+    #: Appended, so a binary earlier on PATH (a test build) wins over the installed one.
+    (( ${path[(Ie)${HOME}/go/bin]} )) || path+=( "${HOME}/go/bin" )
+    go-local-dep daily_sync "${dir}" >&2 || return 1
+    bin="$(whence -p daily_sync)" || return 1
+    #: go-local-dep keeps a stale binary when the rebuild fails; the engine must be the source's.
+    local -a newest=( "${dir}"/**/(*.go~*_test.go|go.mod|go.sum)(#q.Nom[1]) )
+    if (( ${#newest} )) && [[ "${newest[1]}" -nt "${bin}" ]] ; then
+        ecerr "$0: ${bin} is older than ${newest[1]}"
+        return 1
+    fi
+    print -r -- "${bin}"
+}
+
+function h-daily-sync-engine-platform {
+    : "usage: h-daily-sync-engine-platform <uname -s> <uname -m> ; prints GOOS GOARCH, or fails"
+    local os arch
+    case "$1" in
+        Darwin) os=darwin ;;
+        Linux) os=linux ;;
+        *) return 1 ;;
+    esac
+    case "$2" in
+        arm64|aarch64) arch=arm64 ;;
+        x86_64|amd64) arch=amd64 ;;
+        *) return 1 ;;
+    esac
+    print -r -- "${os} ${arch}"
+}
+
+function h-daily-sync-engine-build {
+    : "usage: h-daily-sync-engine-build <goos> <goarch> <hash> ; prints the path of a static cross-build"
+    local goos="$1" goarch="$2" hash="$3" cache="${daily_sync_engine_cache}"
+    assert-args goos goarch hash @RET
+    local out="${cache}/daily_sync-${hash}-${goos}-${goarch}" tmp
+    if [[ ! -x "${out}" ]] ; then
+        command mkdir -p -- "${cache}" @RET
+        tmp="${out}.tmp.$$"
+        if ! ( builtin cd -- "${NIGHTDIR}/golang/daily_sync" \
+            && CGO_ENABLED=0 GOOS="${goos}" GOARCH="${goarch}" command go build -trimpath -o "${tmp}" . ) >&2 ; then
+            command rm -f -- "${tmp}"
+            return 1
+        fi
+        command mv -f -- "${tmp}" "${out}" @RET
+        #: Keep the six newest builds.
+        local -a old=( "${cache}"/daily_sync-*(N.om) )
+        if (( ${#old} > 6 )) ; then
+            command rm -f -- "${(@)old[7,-1]}"
+        fi
+    fi
+    print -r -- "${out}"
+}
+
+function h-daily-sync-engine {
+    : "usage: h-daily-sync-engine <machine> ; makes the conflict engine available there and prints its path.
+On failure prints an ERROR line and returns 1. Lazy: only the conflict commands call it, and a run
+remembers in engine-<machine> what it found, so it costs one ssh call per machine and run, plus an
+upload when that machine lacks this version."
+    setopt local_options extended_glob
+    local machine="$1" run bin hash remote_bin uname home got built platform out
+    assert-args machine @RET
+    run="$(h-daily-sync-run-dir)" @RET
+    if ! bin="$(h-daily-sync-engine-local 2>> "${run}/stderr.log")" ; then
+        print -r -- "ERROR: could not build the conflict engine (golang/daily_sync) on ${daily_sync_local}; see ${run}/stderr.log"
+        return 1
+    fi
+    if [[ "${machine}" == "${daily_sync_local}" ]] ; then
+        print -r -- "${bin}"
+        return 0
+    fi
+    hash="$(command "${bin}" version 2>> "${run}/stderr.log")" || hash=''
+    if [[ "${hash}" != [0-9a-f](#c16) ]] ; then
+        print -r -- "ERROR: ${bin} printed no version ('${hash}'); the conflict engine was not shipped to ${machine}"
+        return 1
+    fi
+    remote_bin=".cache/daily-sync/bin/daily_sync-${hash}"
+    local state="${run}/engine-${machine}"
+    local -a lines
+    if [[ -r "${state}" ]] ; then
+        lines=( "${(@f)$(< "${state}")}" )
+        #: Line 1: uname -s -m; 2: the remote ~; 3: the version known to be there.
+        if [[ "${lines[3]:-}" == "${hash}" && -n "${lines[2]:-}" ]] ; then
+            print -r -- "${lines[2]}/${remote_bin}"
+            return 0
+        fi
+    fi
+    #: One call: the platform, ~, and the version of this build if it is there (touched, so pruning keeps it).
+    local probe='uname -s -m && print -r -- "${HOME}" && b="${HOME}/'"${remote_bin}"'" && if [[ -x "${b}" ]] ; then "${b}" version && touch -- "${b}" ; fi ; true'
+    if ! out="$(command ssh "${h_daily_sync_ssh_opts[@]}" "${machine}" "zsh -fc ${(qq)probe}" 2>> "${run}/stderr.log")" ; then
+        print -r -- "ERROR: could not reach ${machine} to ship the conflict engine; see ${run}/stderr.log"
+        return 1
+    fi
+    lines=( "${(@f)out}" )
+    uname="${lines[1]:-}" home="${lines[2]:-}" got="${lines[3]:-}"
+    if [[ -z "${uname}" || "${home}" != /* ]] ; then
+        print -r -- "ERROR: ${machine} gave no platform or home ('${uname}', '${home}'); the conflict engine was not shipped"
+        return 1
+    fi
+    if [[ "${got}" != "${hash}" ]] ; then
+        if ! platform="$(h-daily-sync-engine-platform ${=uname})" ; then
+            print -r -- "ERROR: no conflict engine for ${machine}'s platform (${uname})"
+            return 1
+        fi
+        if ! built="$(h-daily-sync-engine-build ${=platform} "${hash}" 2>> "${run}/stderr.log")" ; then
+            print -r -- "ERROR: could not cross-build the conflict engine for ${machine} (${platform}); see ${run}/stderr.log"
+            return 1
+        fi
+        #: Written to a temporary file and renamed into place, so a broken upload never sits under the
+        #: final name; then only the three newest binaries are kept. Prints the new binary's version.
+        local upload='setopt err_exit
+d="${HOME}/.cache/daily-sync/bin"
+command mkdir -p -- "${d}"
+t="${d}/.upload-'"${hash}"'-$$"
+trap '"'"'command rm -f -- "${t}"'"'"' EXIT
+command cat > "${t}"
+command chmod 755 "${t}"
+command mv -f -- "${t}" "${d}/daily_sync-'"${hash}"'"
+old=( "${d}"/daily_sync-*(N.om) )
+(( ${#old} <= 3 )) || command rm -f -- "${(@)old[4,-1]}"
+"${d}/daily_sync-'"${hash}"'" version'
+        if ! got="$(command ssh "${h_daily_sync_ssh_opts[@]}" "${machine}" "zsh -fc ${(qq)upload}" < "${built}" 2>> "${run}/stderr.log")" ; then
+            print -r -- "ERROR: could not upload the conflict engine to ${machine}; see ${run}/stderr.log"
+            return 1
+        fi
+        if [[ "${got}" != "${hash}" ]] ; then
+            #: The source changed between the local build and the cross-build: drop this build.
+            command rm -f -- "${built}"
+            print -r -- "ERROR: the conflict engine shipped to ${machine} reports version '${got}', not ${hash}; retry the command"
+            return 1
+        fi
+    fi
+    print -rl -- "${uname}" "${home}" "${hash}" >| "${state}"
+    print -r -- "${home}/${remote_bin}"
+}
+
+function h-daily-sync-engine-forget {
+    : "usage: h-daily-sync-engine-forget <machine> <output> ; when the output says the engine was missing there,
+forget that this run shipped it, so the next conflict command checks again"
+    if [[ "$2" == *'ERROR: no conflict engine at '* ]] ; then
+        command rm -f -- "$(h-daily-sync-run-dir)/engine-$1"
+    fi
+    return 0
 }
 
 function h-daily-sync-up-p {
@@ -918,14 +1088,17 @@ ${body}" &>/dev/null )
 function h-daily-sync-conflict {
     : "usage: daily-sync conflict <machine> <repo> [abort]
 For apply-answer: [reopen] refuses a conflict that is already open, [abort-quiet] files nothing."
-    local machine="$1" repo="$2" action="${3:-show}" run out
+    local machine="$1" repo="$2" action="${3:-show}" run out engine
     assert-args machine repo @RET
     run="$(h-daily-sync-run-dir)" @RET
     case "${action}" in
-        show)
-            out="$(ec "ds-conflict-show ${(qq)repo} ${(qq)machine}" | h-daily-sync-on "${machine}")" ;;
-        reopen)
-            out="$(ec "ds-conflict-show ${(qq)repo} ${(qq)machine} fresh" | h-daily-sync-on "${machine}")" ;;
+        show|reopen)
+            if ! engine="$(h-daily-sync-engine "${machine}")" ; then
+                ec "${engine}"
+                return 1
+            fi
+            out="$(ec "ds_engine=${(qq)engine}"$'\n'"ds-conflict-show ${(qq)repo} ${(qq)machine}${${action:#show}:+ fresh}" | h-daily-sync-on "${machine}")"
+            h-daily-sync-engine-forget "${machine}" "${out}" ;;
         abort-quiet)
             #: The repository was left blocked and asked about already: just close what apply-answer opened.
             out="$(ec "ds-conflict-abort ${(qq)repo}" | h-daily-sync-on "${machine}")"
@@ -947,11 +1120,16 @@ For apply-answer: [reopen] refuses a conflict that is already open, [abort-quiet
 
 function h-daily-sync-resolve {
     : "usage: daily-sync resolve <machine> <repo> [<file> <hunk>=<choice>...]"
-    local machine="$1" repo="$2" run out
+    local machine="$1" repo="$2" run out engine
     assert-args machine repo @RET
     shift 2
     run="$(h-daily-sync-run-dir)" @RET
-    out="$(ec "ds-conflict-resolve ${(qq)repo} ${(qq)machine} ${(j: :)${(qq)@}}" | h-daily-sync-on "${machine}")"
+    if ! engine="$(h-daily-sync-engine "${machine}")" ; then
+        ec "${engine}"
+        return 1
+    fi
+    out="$(ec "ds_engine=${(qq)engine}"$'\n'"ds-conflict-resolve ${(qq)repo} ${(qq)machine} ${(j: :)${(qq)@}}" | h-daily-sync-on "${machine}")"
+    h-daily-sync-engine-forget "${machine}" "${out}"
     ec "${out}"
     #: Only a call that changed something is recorded; a repeat says NOT-IN-PROGRESS.
     if (( $# )) && [[ "${out}" != *(NOT-IN-PROGRESS|ERROR)* ]] ; then
