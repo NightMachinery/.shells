@@ -421,10 +421,10 @@ function agy-account-hook {
 #: subscription. Each profile is the hidden account api_NAME with its own
 #: Gemini root; rules, skills and conversation history are shared as for the
 #: other accounts. Credentials come from variables named after the profile,
-#: which belong in ~/.privateShell, never here. See docs/agy_status.md,
-#: "API-billed profiles".
+#: which belong in ~/.privateShell, never here, or from a browser sign-in
+#: ([agfi:agy-api-login]). See docs/agy_status.md, "API-billed profiles".
 function agy-api-refresh {
-    : "generates agy-api-<name> and agy-api-<name>-t from AGY_API_PROFILES"
+    : "generates agy-api-<name>, agy-api-<name>-t and agy-api-<name>-login from AGY_API_PROFILES"
     local name
     for name in ${=AGY_API_PROFILES:-personal work} ; do
         if [[ "${name}" != [a-z][a-z0-9_]# ]] ; then
@@ -433,7 +433,71 @@ function agy-api-refresh {
         fi
         aliasfn "agy-api-${name}" agy-api "${name}"
         aliasfn "agy-api-${name}-t" h-tmuxnewsh2-attach-z-with-cmd "agy-api-${name}"
+        aliasfn "agy-api-${name}-login" agy-api-login "${name}"
     done
+}
+
+function h-agy-api-gcloud-dir {
+    #: Where [agfi:agy-api-login] keeps profile NAME's Google sign-in and
+    #: project: a gcloud configuration directory of its own, inside gcloud's,
+    #: which the agy driver's deny rules already keep from agy children.
+    ec "${AGY_API_GCLOUD_DIR:-${HOME}/.config/gcloud/agy-api}/${1}"
+}
+
+function agy-api-login {
+    : "usage: agy-api-login NAME [PROJECT]; signs profile NAME in to Vertex AI through Google in the browser"
+    local name="${1}" project="${2}"
+    if [[ "${name}" != [a-z][a-z0-9_]# ]] ; then
+        ecerr "$0: invalid profile name: ${name:-<none>}"
+        return 2
+    fi
+    local up="${(U)name}"
+    local key_var="AGY_API_KEY_${up}" project_var="AGY_API_PROJECT_${up}"
+    if test -n "${(P)key_var}" ; then
+        ecerr "$0: ${key_var} is set, so agy-api-${name} bills that Gemini API key; remove it from ~/.privateShell to use Vertex AI"
+        return 2
+    fi
+    local dir
+    dir="$(h-agy-api-gcloud-dir "${name}")" @RET
+    if test -z "${project}" ; then
+        project="${(P)project_var}"
+    fi
+    if test -z "${project}" && test -r "${dir}/project" ; then
+        project="$(<"${dir}/project")"
+    fi
+    if [[ "${project}" != [a-z][-a-z0-9.:]# ]] ; then
+        ecerr "usage: agy-api-${name}-login PROJECT_ID   (the Google Cloud project that pays for Vertex AI)"
+        return 2
+    fi
+    if ! (( ${+commands[gcloud]} )) ; then
+        ecerr "$0: gcloud is not installed"
+        return 127
+    fi
+    command mkdir -p -m 700 -- "${dir}" @RET
+    #: The quota project comes from the core project, so the sign-in records it.
+    CLOUDSDK_CONFIG="${dir}" CLOUDSDK_CORE_PROJECT="${project}" \
+        command gcloud auth application-default login @RET
+    print -r -- "${project}" >| "${dir}/project" @RET
+
+    local token state
+    token="$(CLOUDSDK_CONFIG="${dir}" command gcloud auth application-default print-access-token 2>/dev/null)"
+    if test -z "${token}" ; then
+        ecerr "$0: ${name}: the sign-in left no working credentials in ${dir}"
+        return 1
+    fi
+    #: Most first runs fail on a project without the Vertex AI API, so check
+    #: it now. The token goes to curl on stdin, never on its command line.
+    state="$(print -r -- "Authorization: Bearer ${token}" | command curl --silent --max-time 20 --header @- \
+        --header "x-goog-user-project: ${project}" \
+        "https://serviceusage.googleapis.com/v1/projects/${project}/services/aiplatform.googleapis.com" |
+        command jq -r '.state // .error.message // empty' 2>/dev/null)"
+    case "${state}" in
+        ENABLED) ec "agy-api-${name}: signed in; Vertex AI is enabled in ${project}. Start it with agy-api-${name}." ;;
+        DISABLED) ecerr "agy-api-${name}: signed in, but the Vertex AI API is off in ${project}. Turn it on:"
+                  ecerr "  https://console.cloud.google.com/apis/library/aiplatform.googleapis.com?project=${project}"
+                  return 1 ;;
+        *) ecerr "agy-api-${name}: signed in; could not check the Vertex AI API in ${project}: ${state:-no answer}" ;;
+    esac
 }
 
 function h-agy-api-settings {
@@ -476,11 +540,21 @@ function agy-api {
     local key_var="AGY_API_KEY_${up}" project_var="AGY_API_PROJECT_${up}"
     local location_var="AGY_API_LOCATION_${up}" credentials_var="AGY_API_CREDENTIALS_${up}"
     local key="${(P)key_var}" project="${(P)project_var}" credentials="${(P)credentials_var}"
+    #: A browser sign-in (agy-api-NAME-login) supplies what the variables do
+    #: not; the variables win.
+    local gcloud_dir
+    gcloud_dir="$(h-agy-api-gcloud-dir "${name}")" @RET
+    if test -z "${project}" && test -r "${gcloud_dir}/project" ; then
+        project="$(<"${gcloud_dir}/project")"
+    fi
+    if test -z "${credentials}" && test -r "${gcloud_dir}/application_default_credentials.json" ; then
+        credentials="${gcloud_dir}/application_default_credentials.json"
+    fi
     if test -n "${key}" && test -n "${project}" ; then
-        ecerr "$0: ${name}: set ${key_var} or ${project_var}, not both"
+        ecerr "$0: ${name}: ${key_var} and a Vertex AI project (${project_var} or agy-api-${name}-login) are both set; keep one"
         return 2
     elif test -z "${key}" && test -z "${project}" ; then
-        ecerr "$0: ${name}: no credentials; set ${key_var} (Gemini API key) or ${project_var} (Vertex AI)"
+        ecerr "$0: ${name}: no credentials; run agy-api-${name}-login PROJECT_ID (Vertex AI), or set ${key_var} (Gemini API key)"
         return 2
     elif test -n "${credentials}" && ! test -r "${credentials}" ; then
         ecerr "$0: ${name}: ${credentials_var} is not a readable file: ${credentials}"

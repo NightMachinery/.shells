@@ -106,8 +106,29 @@ file credentials from a live verified sign-in.
 
 `agy-api NAME` runs agy billed to a Google API key or a Google Cloud project
 instead of a subscription. The shell generates `agy-api-personal`,
-`agy-api-work` and their `-t` tmux variants. For other names, set
-`AGY_API_PROFILES` (default `personal work`) and run `agy-api-refresh`.
+`agy-api-work`, their `-t` tmux variants and their `-login` commands. For
+other names, set `AGY_API_PROFILES` (default `personal work`) and run
+`agy-api-refresh`.
+
+The quickest start is Vertex AI with a browser sign-in:
+
+```zsh
+agy-api-work-login my-project-id   # opens Google; pick the account to bill
+agy-api-work
+```
+
+`agy-api-login NAME [PROJECT]` runs `gcloud auth application-default login`
+with a gcloud configuration directory of the profile's own,
+`~/.config/gcloud/agy-api/NAME`. The browser asks the chosen Google account to
+grant Google Cloud access (the `cloud-platform` scope, which covers Vertex
+AI); the resulting `authorized_user` credentials and the project ID stay in
+that directory, so each profile can sign in as a different account and none
+touches the machine's default gcloud sign-in. Keeping it under
+`~/.config/gcloud` puts it inside the paths the agy driver already denies its
+children. The project becomes the credentials' quota project, and the command
+then asks the Service Usage API whether Vertex AI is enabled there, printing
+the console link to enable it if not. The project is needed only on the first
+sign-in; a later `agy-api-work-login` reuses the stored one.
 
 Each profile is a hidden account, `api_NAME`, with its own root
 `~/.agy-accounts/api_NAME`, prepared like any other account (shared rules,
@@ -116,9 +137,10 @@ skills and history). It is never in `AGY_ACCOUNTS`, so `agy-status` and
 conversations it starts are recorded as owned by `api_NAME`, and the resume
 helpers bring them back through `agy-api-NAME`.
 
-Credentials are variables named after the profile. Put them in
+Otherwise, credentials are variables named after the profile. Put them in
 `~/.privateShell`. They need not be exported: the launcher reads them and
-exports them only to the agy it starts, never on its command line.
+exports them only to the agy it starts, never on its command line. A variable
+wins over the sign-in's stored value.
 
 ```zsh
 AGY_API_KEY_PERSONAL='...'          # route 1: a Gemini API key
@@ -136,13 +158,12 @@ A profile sets exactly one route:
   `generativelanguage.googleapis.com` and are billed to the key's Cloud
   project. Create the key in Google AI Studio, or in the Cloud console on a
   project with the Generative Language API enabled.
-- **Vertex AI** (`AGY_API_PROJECT_<NAME>`). The launcher removes
-  `modelProvider` and sets `AGY_ADC_AUTH=1`, `GOOGLE_CLOUD_PROJECT` and
-  `GOOGLE_CLOUD_LOCATION`. agy then signs in with Application Default
-  Credentials: the file named by `AGY_API_CREDENTIALS_<NAME>` (a
-  service-account key, or the `authorized_user` file that
-  `gcloud auth application-default login` writes), else the machine's default
-  ADC. Two Vertex profiles with different identities each need their own file.
+- **Vertex AI** (`AGY_API_PROJECT_<NAME>`, or the sign-in's project). The
+  launcher removes `modelProvider` and sets `AGY_ADC_AUTH=1`,
+  `GOOGLE_CLOUD_PROJECT` and `GOOGLE_CLOUD_LOCATION`. agy then signs in with
+  Application Default Credentials: the file named by
+  `AGY_API_CREDENTIALS_<NAME>` (a service-account key, or any `authorized_user`
+  file), else the profile's sign-in, else the machine's default ADC.
 
 agy 1.5.12 cannot use a Vertex AI express-mode API key. Its key route always
 calls the Gemini API endpoint, even with `GOOGLE_GENAI_USE_VERTEXAI=true`, and

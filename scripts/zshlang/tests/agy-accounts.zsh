@@ -49,6 +49,23 @@ if "--print" in sys.argv:
     print("Gemini Models\tWeekly Limit Remaining\t93%\t2030-01-01T00:00:00Z")
 PY
 command chmod +x "${test_tmp}/bin/agy"
+#: Stand-ins for the browser sign-in and the Vertex AI API check.
+typeset -gx AGY_API_GCLOUD_DIR="${test_tmp}/gcloud-agy-api" AGY_TEST_GCLOUD_CALLS="${test_tmp}/gcloud-calls"
+command cat > "${test_tmp}/bin/gcloud" <<'SH'
+#!/bin/sh
+printf '%s|%s|%s\n' "${CLOUDSDK_CONFIG}" "${CLOUDSDK_CORE_PROJECT}" "$*" >> "${AGY_TEST_GCLOUD_CALLS}"
+case "$*" in
+    'auth application-default login') printf '{"type":"authorized_user"}\n' > "${CLOUDSDK_CONFIG}/application_default_credentials.json" ;;
+    'auth application-default print-access-token') echo fixture-token ;;
+esac
+SH
+command cat > "${test_tmp}/bin/curl" <<'SH'
+#!/bin/sh
+printf '%s\n' "$*" > "${AGY_TEST_GCLOUD_CALLS}.curl-argv"
+cat > "${AGY_TEST_GCLOUD_CALLS}.curl-stdin"
+echo "{\"state\":\"${AGY_TEST_VERTEX_STATE:-ENABLED}\"}"
+SH
+command chmod +x "${test_tmp}/bin/gcloud" "${test_tmp}/bin/curl"
 typeset -gx PATH="${test_tmp}/bin:${PATH}"
 source "${test_root}/zshlang/auto-load/others/antigravity.zsh"
 source "${test_root}/zshlang/auto-load/others/agent-quotas.zsh"
@@ -286,4 +303,41 @@ api_rc=0
 AGY_ACCOUNTS='acc1 api_x' h-agy-accounts >/dev/null 2>&1 || api_rc=$?
 (( api_rc == 2 )) || fail 'api_ account name accepted'
 
-print -r -- 'ok: launch isolation, named accounts, configuration, status JSON, best, cache-only, login recovery and API profiles'
+# Vertex AI through a browser sign-in: agy-api-NAME-login keeps the
+# credentials and project in the profile's own gcloud directory.
+(( ${+functions[agy-api-work-login]} )) || fail 'generated login command'
+for api_case in no-project key-set ; do
+    api_rc=0
+    case "${api_case}" in
+        no-project) agy-api-work-login 2>/dev/null || api_rc=$? ;;
+        key-set) AGY_API_KEY_WORK=k agy-api-work-login fixture-login-project 2>/dev/null || api_rc=$? ;;
+    esac
+    (( api_rc == 2 )) || fail "login ${api_case} went ahead"
+done
+[[ ! -e "${AGY_TEST_GCLOUD_CALLS}" ]] || fail 'refused login still ran gcloud'
+agy-api-work-login fixture-login-project >/dev/null
+typeset -g api_gcloud="${AGY_API_GCLOUD_DIR}/work"
+[[ "$(command head -n 1 "${AGY_TEST_GCLOUD_CALLS}")" == "${api_gcloud}|fixture-login-project|auth application-default login" ]] ||
+    fail 'login did not use the profile gcloud directory and project'
+[[ "$(<"${api_gcloud}/project")" == fixture-login-project ]] || fail 'login project not stored'
+[[ "$(<"${AGY_TEST_GCLOUD_CALLS}.curl-argv")" != *fixture-token* &&
+   "$(<"${AGY_TEST_GCLOUD_CALLS}.curl-stdin")" == 'Authorization: Bearer fixture-token' ]] ||
+    fail 'access token on the curl command line'
+agy-api work models
+command jq --exit-status --arg adc "${api_gcloud}/application_default_credentials.json" '
+    .account == "api_work" and .env.AGY_ADC_AUTH == "1" and
+    .env.GOOGLE_CLOUD_PROJECT == "fixture-login-project" and
+    .env.GOOGLE_APPLICATION_CREDENTIALS == $adc' "${AGY_TEST_CALLS}" >/dev/null || fail 'login-based Vertex route'
+AGY_API_PROJECT_WORK=override-project agy-api work models
+command jq --exit-status '.env.GOOGLE_CLOUD_PROJECT == "override-project"' "${AGY_TEST_CALLS}" >/dev/null ||
+    fail 'project variable did not win over the login'
+api_rc=0
+AGY_API_KEY_WORK=k agy-api work models 2>/dev/null || api_rc=$?
+(( api_rc == 2 )) || fail 'key and login together launched'
+api_rc=0
+AGY_TEST_VERTEX_STATE=DISABLED agy-api-work-login 2>/dev/null >&2 || api_rc=$?
+(( api_rc == 1 )) || fail 'disabled Vertex AI API not reported'
+[[ "$(command tail -n 2 "${AGY_TEST_GCLOUD_CALLS}" | command head -n 1)" == "${api_gcloud}|fixture-login-project|auth application-default login" ]] ||
+    fail 'second login did not reuse the stored project'
+
+print -r -- 'ok: launch isolation, named accounts, configuration, status JSON, best, cache-only, login recovery, API profiles and Vertex sign-in'
