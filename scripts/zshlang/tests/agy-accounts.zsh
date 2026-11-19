@@ -18,6 +18,9 @@ function isDeus { return 1 }
 function h-color-mode-p { [[ "${1}" == always ]] }
 function date-unix-to-3339 { command gdate --date="@${1}" --iso-8601=seconds }
 function silent { "$@" >/dev/null 2>&1 }
+#: Launchers keep a real SSH session's SSH_CONNECTION; run over ssh, the file
+#: authentication checks below would see that instead of agy-file-auth.
+unset SSH_CONNECTION
 typeset -gx NIGHTDIR="${test_root}"
 typeset -gx AGY_ACCOUNTS='acc1 acc2 acc3'
 typeset -gx AGY_ACCOUNT_DIR_ACC1="${test_tmp}/shared"
