@@ -237,6 +237,18 @@ if [[ "${PT_SSH_MODE:-}" == slow ]] ; then
         print -r -- '25 read 1 4' > "${agent_session_progress_file}"
         wait
     }
+elif [[ "${PT_SSH_MODE:-}" == fail ]] ; then
+    function h-agent-session-render-document {
+        print -r -- 'partially rendered output'
+        print -ru2 -- 'Synthetic renderer failure'
+        return 2
+    }
+elif [[ "${PT_SSH_MODE:-}" == incomplete ]] ; then
+    function h-agent-session-render-document {
+        print -r -- 'partially rendered output'
+        print -ru2 -- 'flag provided but not defined: -progress-file'
+        return 0
+    }
 fi
 EOF
 cat > "${t}/ssh-bin/ssh" <<'EOF'
@@ -302,6 +314,13 @@ err="$(PT_SSH_MODE=old paseo-view-transcript --host example-host "${a_claude}" 2
 expect-match "${err}" 'Remote transcript renderer is missing' 'old remote error'
 err="$(paseo-view-transcript --host example-host abcd 2>&1)" && exit 1
 expect-match "${err}" 'no Paseo agent matches' 'missing agent error'
+opened="$(<"${t}/opened")"
+err="$(PT_SSH_MODE=fail paseo-view-transcript-md --host example-host "${a_claude}" 2>&1)" && exit 1
+expect-match "${err}" 'Synthetic renderer failure' 'remote renderer error'
+expect-eq "$(<"${t}/opened")" "${opened}" 'remote rendering errors open no partial output'
+err="$(PT_SSH_MODE=incomplete paseo-view-transcript-md --host example-host "${a_claude}" 2>&1)" && exit 1
+expect-match "${err}" 'Remote transcript renderer is too old' 'reject incomplete render with zero exit status'
+expect-eq "$(<"${t}/opened")" "${opened}" 'incomplete remote renders open no partial output'
 
 : > "${t}/banners"
 PT_SSH_MODE=slow agent_view_progress=hs \

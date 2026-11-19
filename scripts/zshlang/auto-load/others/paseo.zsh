@@ -982,6 +982,11 @@ function h-paseo-transcript-over-ssh {
     #: A remote native-session takeover may come through another alias or
     #: prefix. It has its own band, unlike a local takeover of this request.
     (( result == 3 )) && return 75
+    if (( result == 0 )) && [[ "${format}" != jsonl ]] ; then
+        if [[ ! -r "${agent_session_progress_file}" || "$(<"${agent_session_progress_file}")" != '100 done '* ]] ; then
+            return 1
+        fi
+    fi
     return "${result}"
 }
 
@@ -1014,6 +1019,9 @@ function h-paseo-view-remote-transcript {
             255) reason="Could not reach ${host} over SSH (${ssh_alias})." ;;
             *)
                 [[ -s "${tmp}/error" ]] && reason="$(<"${tmp}/error")"
+                if [[ "${reason}" == 'flag provided but not defined: -progress-file' ]] ; then
+                    reason='Remote transcript renderer is too old. Update ~/scripts on that host.'
+                fi
                 reason="${host}: ${reason:-Remote transcript conversion failed.}"
                 ;;
         esac

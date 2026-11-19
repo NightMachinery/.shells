@@ -585,6 +585,12 @@ newer run for the same transcript cancelled this one."
     fi
     wait "${cpid}" || ret=$?
     [[ "${mode}" == tty ]] && printf '\r\e[K' >&2
+    #: Short renders can finish between polls. Forward the renderer's final
+    #: record so the SSH client can tell a complete document from a header.
+    if [[ "${mode}" == wire && -r "${progress_file}" ]] ; then
+        line="$(<"${progress_file}")"
+        [[ "${line}" == '100 done '* ]] && print -ru2 -- "YPASEO-PROGRESS ${line}" || true
+    fi
     command rm -f -- "${progress_file}"
 
     zsystem flock -t 30 -f fd "${claim}.flock" @RET
