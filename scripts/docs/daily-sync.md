@@ -13,7 +13,8 @@ Source: `zshlang/auto-load/others/daily-sync.zsh`.
 ## Roles
 
 - The **local machine** runs the job and is the only one that needs this code
-  (and Go, to build the answer helper `golang/daily_sync`).
+  (and Go, to build `golang/daily_sync`: the answer helper and the conflict
+  engine).
 - **Peers** are other full clones of every repository.
 - The **server** has real clones of some notes repositories, read-only clones
   of the public repositories (they only fast-forward there), and **mirrors**:
@@ -21,8 +22,9 @@ Source: `zshlang/auto-load/others/daily-sync.zsh`.
   over ssh.
 
 Peers and the server are driven over ssh with scripts generated locally. They
-need `zsh`, `git`, `vcsh` and `git-commit-own`, but not this file, so a change
-here takes effect everywhere on the next run.
+need `zsh`, `git`, `vcsh` and `git-commit-own`, but not this file, and neither
+Go nor perl: the conflict engine is shipped to them (see The conflict engine).
+So a change here takes effect everywhere on the next run.
 
 ## Commands
 
@@ -144,6 +146,47 @@ copy of it elsewhere does not swallow local's. `both-local-first` puts local's
 additions first. The result is never lossy, but can be untidy: an extra blank
 line, or a stub left by an editor in a file both sides created.
 
+### The conflict engine
+
+The classes, the listing and the picks come from `daily_sync conflict
+show|resolve`, a Go program in `golang/daily_sync` (`conflict.go`). The prelude
+calls it through `ds-engine`, at the path the generated script puts in
+`ds_engine`. Every machine runs the local machine's build:
+
+- Before `conflict` (show or reopen) and `resolve`, `h-daily-sync-engine
+  <machine>` makes the engine available there. Nothing else calls it, so a run
+  without conflicts never ships anything.
+- On the local machine it is `daily_sync` from `PATH`, rebuilt by
+  `go-local-dep` when older than its source. A build that stays older (a
+  failed rebuild) is refused rather than used.
+- On another machine, one ssh call reads `uname -s -m`, its home and the
+  version of the engine there. When that is not the local build's version, the
+  local machine cross-builds a static binary (`CGO_ENABLED=0`; Darwin or Linux,
+  arm64 or amd64) into `~/.cache/daily-sync/build/` and uploads it with a
+  second ssh call: written to a temporary file, made executable and renamed
+  into place as `~/.cache/daily-sync/bin/daily_sync-<version>`. That call keeps
+  the three newest binaries there and runs the new one's `version`, which must
+  match. The run records what it found in `engine-<machine>` in the run
+  directory, so later conflict commands in the run cost no extra ssh call.
+- `daily_sync version` prints a hash of the source the build came from (the
+  module's `go.mod` and non-test `.go` files, embedded in the binary), the
+  same on every platform. To check a machine, compare
+  `ssh <machine> '~/.cache/daily-sync/bin/daily_sync-<version> version'` with
+  the local `daily_sync version`.
+- When the engine cannot be built, reached, uploaded or run, the command
+  prints an `ERROR:` line and opens nothing; `apply-answer` treats that as a
+  doubt. There is no fallback. If the prelude finds no engine at `ds_engine`
+  (the binary was removed mid-run), it prints `ERROR: no conflict engine at
+  ...`, and the run forgets `engine-<machine>`, so the next command ships it
+  again.
+
+The engine replaced a perl script that ran on every machine, and gives exactly
+its outputs. `testdata/corpus` holds 115 conflict files, real ones from staged
+repositories and handmade edge cases, each shown and resolved under both
+orders with 16 sets of picks; the perl outputs of those 3910 calls are the
+goldens that `TestCorpus` checks. The perl is kept as `testdata/reference.pl`
+to check or regenerate them (`corpus_test.go` says how).
+
 ### Asking the user
 
 A blocked repository becomes one agent-desk question, filed under the project
@@ -200,12 +243,16 @@ every call is `answer-<machine>-<repo>.log` in the run directory.
 Run the helper's tests with `go test ./...` in `golang/daily_sync`. The
 end-to-end tests stage real rebase conflicts between two clones of a bare
 repository under `$TMPDIR` and drive the real zsh functions with a scratch
-configuration and a stub `agent-desk`; `go test -short ./...` skips them.
+configuration and a stub `agent-desk`; `go test -short ./...` skips them. The
+shipping tests reach "another machine" through a fake `ssh` that runs the
+command locally, with `HOME` pointed at a scratch home and a `PATH` without Go
+or perl; it knows one host name and never contacts a real one.
 
 ## State
 
 A run keeps its state in `~/.agents/runs/daily-sync/<date>/`: `stage`, `agent`,
 the ids of its heartbeats, `converge.log`, `status.log`, `held`, `commits.log`,
+`engine-<machine>` (the conflict engine shipped there),
 `conflicts.log`, the conflict questions' `hunks-*`, `choices-*` and `answer-*`
 files, the updater's `rc-*` files and `DONE`, the pending slow step
 (`step.*`), and `stderr.log` with the stderr of every generated script. Set
