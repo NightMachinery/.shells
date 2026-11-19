@@ -28,4 +28,4 @@
 The user doesn't want to proceed with this tool use. The tool use was rejected (eg. If it was a file edit, the new_string was NOT written to the file). STOP what you are doing and wait for the user to tell you how to proceed.
 ```
 
-This is a Paseo bug, any steers mid-task causes this message.
+This is a Paseo bug, any interrupts mid-task cause this message.
