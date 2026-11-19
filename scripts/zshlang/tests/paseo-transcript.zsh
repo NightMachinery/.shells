@@ -5,7 +5,7 @@
 # HOME points there too, so nothing outside it can be read or deleted.
 # Run with: zsh -f zshlang/tests/paseo-transcript.zsh
 
-setopt errexit pipefail typesetsilent
+setopt errexit pipefail typesetsilent nobgnice
 
 typeset -gr pt_root="${0:A:h:h:h}"
 typeset -g pt_tmp
@@ -185,6 +185,164 @@ agent_view_progress=tty agent_view_progress_interval=0.02 \
     h-agent-view-transcript-run band-big hint pt-render-md "${t}/big.jsonl" "${t}/out1/big.md" 2> "${t}/big.err"
 expect-match "$(<"${t}/big.err")" '[0-9]+%  (read|render)' 'renderer progress reaches the line'
 expect-match "$(command head -c 200000 "${t}/out1/big.md")" 'answer 0' 'big transcript rendered'
+
+# --- Remote viewer: fake SSH executes the real endpoint in a separate process
+# tree so only closing the SSH stream can stop the remote worker.
+export PT_ROOT="${pt_root}" PT_TMP="${t}"
+typeset -g remote="${t}/remote" ssh_hosts="${HOME}/.config/ypaseo/transcript-hosts"
+typeset -g remote_jsonl="${remote}/home/.claude/projects/example/${s_claude}.jsonl"
+command mkdir -p -- "${remote_jsonl:h}" "${remote}/paseo/agents/example" \
+    "${remote}/startup" "${remote}/tmp" "${t}/ssh-bin" "${ssh_hosts:h}"
+print -r -- '  Label With Spaces  label-alias  # comment' > "${ssh_hosts}"
+printf '%s\t%s' srv_example id-alias >> "${ssh_hosts}"
+expect-eq "$(h-paseo-transcript-ssh-alias 'Label With Spaces' '')" label-alias 'map a spaced label'
+expect-eq "$(h-paseo-transcript-ssh-alias 'Label With Spaces' srv_example)" id-alias 'server-id entry wins'
+expect-eq "$(h-paseo-transcript-ssh-alias EXAMPLE-HOST '')" example-host 'lowercase unmapped host'
+print -r -- $'\nInvalid Alias -oProxyCommand' >> "${ssh_hosts}"
+err="$(h-paseo-transcript-ssh-alias 'Invalid Alias' '' 2>&1)" && exit 1
+expect-match "${err}" 'Configure a valid SSH alias' 'reject SSH options in map'
+print -r -- srv_local > "${paseo_home}/server-id"
+h-paseo-transcript-local-host 'Any label' srv_local
+h-paseo-transcript-local-host srv_local ''
+agent_view_progress=none PASEO_HOST=foreign paseo-view-transcript-raw --host srv_local "${a_claude}"
+expect-eq "$(command tail -n 1 "${t}/opened")" "${t_claude}" 'local server id opens native file'
+
+printf '{"id":"%s","provider":"claude","persistence":{"sessionId":"%s"}}\n' \
+    "${a_claude}" "${s_claude}" > "${remote}/paseo/agents/example/${a_claude}.json"
+print -r -- '{"type":"user","message":{"role":"user","content":"Synthetic remote prompt"}}' > "${remote_jsonl}"
+cat > "${remote}/startup/.zshenv" <<'EOF'
+setopt nobgnice
+[[ "${PT_SSH_MODE:-}" == old ]] && return 0
+HOME="${PT_TMP}/remote/home"
+TMPDIR="${PT_TMP}/remote/tmp"
+paseo_home="${PT_TMP}/remote/paseo"
+agent_view_lock_dir="${PT_TMP}/remote/locks"
+unset night_basic_plugin_loaded_p
+source "${PT_ROOT}/zshlang/basic/basic.plugin.zsh"
+function aliasfn { :; }
+function aliasfnq { :; }
+source "${PT_ROOT}/zshlang/auto-load/others/processes.zsh"
+source "${PT_ROOT}/zshlang/auto-load/others/agent-session.zsh"
+source "${PT_ROOT}/zshlang/auto-load/others/paseo.zsh"
+unalias ecerr 2>/dev/null || true
+function ecerr { print -ru2 -- "$@"; }
+function h-agent-session-agent-of { print -r -- claude; }
+function h-agent-session-call { [[ "${2}" == id-of ]] && print -r -- "${3:t:r}"; }
+function h-agent-session-title { print -r -- '# Synthetic transcript'; }
+function h-agent-session-dep { :; }
+if [[ "${PT_SSH_MODE:-}" == slow ]] ; then
+    function h-agent-session-render-document {
+        sleep 30 &
+        print -r -- "$!" > "${PT_TMP}/remote-grandchild"
+        print -r -- '25 read 1 4' > "${agent_session_progress_file}"
+        wait
+    }
+fi
+EOF
+cat > "${t}/ssh-bin/ssh" <<'EOF'
+#!/usr/bin/env python3
+import os
+import subprocess
+import sys
+
+args = sys.argv[1:]
+host, script = args[args.index("--") + 1:]
+assert "-T" in args and "BatchMode=yes" in args and "ConnectTimeout=10" in args
+tmp = os.environ["PT_TMP"]
+with open(f"{tmp}/ssh-log", "a") as log:
+    print(host, file=log)
+if os.environ.get("PT_SSH_MODE") == "unreachable":
+    sys.exit(255)
+
+remote_in, client_out = os.pipe()
+client_in, remote_out = os.pipe()
+pid = os.fork()
+if pid == 0:
+    # Reparent the remote supervisor outside the client process tree.
+    if os.fork() != 0:
+        os._exit(0)
+    os.close(client_out)
+    os.close(client_in)
+    env = {**os.environ, "ZDOTDIR": f"{tmp}/remote/startup"}
+    result = subprocess.run(["/bin/sh", "-c", script], stdin=remote_in, env=env)
+    os.write(remote_out, str(result.returncode).encode())
+    os._exit(0)
+os.close(remote_in)
+os.close(remote_out)
+os.waitpid(pid, 0)
+status = os.read(client_in, 10)
+sys.exit(int(status) if status else 255)
+EOF
+command chmod +x "${t}/ssh-bin/ssh"
+typeset -gx PATH="${t}/ssh-bin:${PATH}"
+typeset -gx agent_view_progress=none agent_view_progress_interval=0.05
+
+paseo_transcript_server_id=srv_example paseo-view-transcript --host 'Label With Spaces' "${a_claude}"
+expect-eq "$(command tail -n 1 "${t}/ssh-log")" id-alias 'server-id alias is the SSH destination'
+file="$(command tail -n 1 "${t}/opened")"
+expect-match "$(<"${file}")" 'Synthetic remote prompt' 'remote org output'
+h-agent-view-rm-tmp "${file:h}"
+paseo-view-transcript-md --host 'Label With Spaces' "${a_claude}"
+file="$(command tail -n 1 "${t}/opened")"
+expect-eq "${file:e}" md 'markdown opens a local markdown file'
+expect-match "$(<"${file}")" 'Synthetic remote prompt' 'remote markdown output'
+h-agent-view-rm-tmp "${file:h}"
+paseo-view-transcript-raw --host EXAMPLE-HOST "${a_claude}"
+file="$(command tail -n 1 "${t}/opened")"
+expect-eq "$(<"${file}")" "$(<"${remote_jsonl}")" 'raw transcript is unchanged'
+h-agent-view-rm-tmp "${file:h}"
+
+calls="$(<"${t}/ssh-log")"
+err="$(paseo-view-transcript --host 'example; printf sentinel' "${a_claude}" 2>&1)" && exit 1
+expect-match "${err}" 'Invalid host label' 'reject host shell syntax'
+err="$(paseo-view-transcript --host example-host 'aaaa; printf sentinel' 2>&1)" && exit 1
+expect-match "${err}" 'Expected a Paseo agent id' 'reject remote id shell syntax'
+expect-eq "$(<"${t}/ssh-log")" "${calls}" 'invalid arguments did not reach SSH'
+err="$(PT_SSH_MODE=old paseo-view-transcript --host example-host "${a_claude}" 2>&1)" && exit 1
+expect-match "${err}" 'Remote transcript renderer is missing' 'old remote error'
+err="$(paseo-view-transcript --host example-host abcd 2>&1)" && exit 1
+expect-match "${err}" 'no Paseo agent matches' 'missing agent error'
+
+: > "${t}/banners"
+PT_SSH_MODE=slow agent_view_progress=hs \
+    paseo-view-transcript-md --host example-host "${a_claude}" 2> "${t}/remote-first.err" &
+remote_run=$!
+for i in {1..120} ; do
+    command grep -q '25%  read' "${t}/banners" && break
+    sleep 0.05
+done
+expect-match "$(<"${t}/banners")" 'Connecting to example-host' 'connecting band'
+expect-match "$(<"${t}/banners")" '25%  read' 'remote progress reached the band'
+remote_grandchild="$(<"${t}/remote-grandchild")"
+# The replacement SSH cannot connect, so it cannot cancel the first request
+# from the remote end. EOF must stop that isolated process tree on its own.
+err="$(PT_SSH_MODE=unreachable paseo-view-transcript-md --host example-host "${a_claude}" 2>&1)" && exit 1
+expect-match "${err}" 'Could not reach example-host over SSH' 'unreachable error'
+wait "${remote_run}"
+for i in {1..120} ; do kill -0 "${remote_grandchild}" 2>/dev/null || break; sleep 0.05; done
+if kill -0 "${remote_grandchild}" 2>/dev/null ; then
+    print -ru2 -- 'FAIL: SSH cancellation left the remote renderer child running'
+    exit 1
+fi
+
+command rm -- "${t}/remote-grandchild"
+PT_SSH_MODE=slow paseo-view-transcript-md --host example-host "${a_claude}" \
+    2> "${t}/remote-alias-first.err" &
+remote_run=$!
+for i in {1..120} ; do test -s "${t}/remote-grandchild" && break; sleep 0.05; done
+remote_grandchild="$(<"${t}/remote-grandchild")"
+opened="$(<"${t}/opened")"
+paseo-view-transcript-md --host 'Label With Spaces' "${a_claude[1,12]}"
+wait "${remote_run}"
+file="$(command tail -n 1 "${t}/opened")"
+expect-eq "$(<"${t}/opened")" "${opened}"$'\n'"${file}" 'only the new remote conversion opens'
+expect-match "$(<"${file}")" 'Synthetic remote prompt' 'restart by another alias and ID prefix'
+h-agent-view-rm-tmp "${file:h}"
+if kill -0 "${remote_grandchild}" 2>/dev/null ; then
+    print -ru2 -- 'FAIL: remote native-session takeover left its renderer child running'
+    exit 1
+fi
+unset agent_view_progress agent_view_progress_interval
 
 # --- Deleting archived sessions
 typeset -g d_claude=dddddddd-0000-4000-8000-000000000001 ds_claude=55555555-5555-4555-8555-555555555555

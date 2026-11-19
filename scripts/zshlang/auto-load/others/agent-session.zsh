@@ -171,6 +171,13 @@ function h-agent-session-render {
     assert agent_session "${agent}" render "${render_args[@]}" "${input}" @RET
 }
 
+function h-agent-session-render-document {
+    #: Write the document header and rendered transcript to stdout.
+    local syntax="${1}" format="${2}" input="${3}"
+    h-agent-session-title "${syntax}" "${input}" @RET
+    h-agent-session-render "${format}" "${input}"
+}
+
 function h-agent-session-to-md {
     #: Converts a session transcript into a markdown file.
     ##
@@ -182,10 +189,7 @@ function h-agent-session-to-md {
         return 1
     fi
 
-    {
-        h-agent-session-title md "${input}" @RET
-        h-agent-session-render md "${input}" @RET
-    } > "${out}"
+    h-agent-session-render-document md md "${input}" > "${out}"
 }
 
 function h-agent-session-to-org-native {
@@ -201,10 +205,7 @@ function h-agent-session-to-org-native {
         return 1
     fi
 
-    {
-        h-agent-session-title org "${input}" @RET
-        h-agent-session-render org "${input}" @RET
-    } > "${out}"
+    h-agent-session-render-document org org "${input}" > "${out}"
 }
 
 function h-agent-session-to-org-pandoc {
@@ -222,10 +223,7 @@ function h-agent-session-to-org-pandoc {
 
     #: The pandoc run happens inside the renderer, split across processes;
     #: see "Performance" in =golang/agent_session/readme.org=.
-    {
-        h-agent-session-title org "${input}" @RET
-        h-agent-session-render org-pandoc "${input}" @RET
-    } > "${out}"
+    h-agent-session-render-document org org-pandoc "${input}" > "${out}"
 }
 aliasfn h-agent-session-to-org h-agent-session-to-org-pandoc
 ##
@@ -483,7 +481,7 @@ function h-agent-view-progress-text {
     ##
     local -a f
     f=( ${=1} )
-    (( ${#f} == 4 )) || return 1
+    (( ${#f} == 4 )) && [[ "${f[1]}" == <-> && "${f[3]}" == <-> && "${f[4]}" == <-> ]] || return 1
     case "${f[2]}" in
         done) ec "100%  finishing" ;;
         render) ec "${f[1]}%  render ${f[3]}/${f[4]} turns" ;;
@@ -508,7 +506,9 @@ newer run for the same transcript cancelled this one."
     #:
     #: The mode is `agent_view_progress': tty (a line on stderr, redrawn in
     #: place), hs (the band named <band>, through [agfi:h-agent-view-banner]),
-    #: none, or auto, which picks tty when stderr is a terminal.
+    #: none, or auto, which picks tty when stderr is a terminal. The SSH
+    #: endpoint uses wire mode and treats readable stdin as a disconnect:
+    #: the client holds the stream open for the duration of the request.
     ##
     local mode="${agent_view_progress:-auto}"
     local band="${1}" hint="${2}" converter="${3}" transcript="${4}" out="${5}"
@@ -523,12 +523,18 @@ newer run for the same transcript cancelled this one."
     zmodload zsh/system zsh/datetime @RET
 
     local key dir claim
-    key="$(h-agent-view-transcript-key "${transcript}")" @RET
+    key="${agent_view_key:-$(h-agent-view-transcript-key "${transcript}")}" @RET
     dir="$(h-agent-view-lock-dir)" @RET
     claim="${dir}/${key}.pid"
     local token="${sysparams[pid]}-${EPOCHREALTIME}"
     local progress_file="${out:h}/.${out:t}.progress"
-    local label="$(h-agent-session-label-of "${transcript}") → ${out:e}: *${out:t:r}*"
+    local label="${agent_view_label:-$(h-agent-session-label-of "${transcript}") → ${out:e}: *${out:t:r}*}"
+    if [[ "${mode}" == wire ]] ; then
+        zmodload zsh/zselect @RET
+        #: The SSH peer can close stderr between polling stdin and reporting
+        #: progress. Keep the supervisor alive to reap the converter.
+        trap '' PIPE
+    fi
 
     local fd cpid=''
     #: zsystem opens, never creates, the file it locks.
@@ -548,32 +554,50 @@ newer run for the same transcript cancelled this one."
     }
 
     #: Interrupted (Ctrl-C, a killed caller): the conversion is ours to stop.
-    trap 'silent kill-withchildren -KILL "${cpid}" ; [[ "$(<"${claim}")" == "${cpid} ${token} "* ]] && command rm -f -- "${claim}" ; return 130' INT TERM HUP
+    local interrupted=0
+    trap 'interrupted=1' INT TERM HUP
 
     local line last='' text
     while kill -0 "${cpid}" 2>/dev/null ; do
-        line=''
+        (( interrupted )) && break
+        line="${agent_view_initial_progress:-}"
         test -r "${progress_file}" && line="$(<"${progress_file}")"
         if test -n "${line}" && [[ "${line}" != "${last}" ]] ; then
             last="${line}"
-            text="$(h-agent-view-progress-text "${line}")" || text=''
+            text="$(h-agent-view-progress-text "${line}")" || text="${agent_view_initial_progress:-}"
             case "${mode}" in
                 tty) printf '\r\e[K%s' "${out:t:r}: ${text}" >&2 ;;
                 hs) h-agent-view-banner "${band}" notice 600 0 "**${label}**   ${text}   (${hint})" ;;
+                wire) print -ru2 -- "YPASEO-PROGRESS ${line}" || true ;;
             esac
         fi
-        sleep "${interval}"
+        if [[ "${mode}" == wire ]] ; then
+            if zselect -t 20 -r 0 ; then
+                interrupted=1
+            fi
+        else
+            sleep "${interval}"
+        fi
     done
     local ret=0 now=''
+    if (( interrupted )) ; then
+        silent kill-withchildren -KILL "${cpid}" || true
+    fi
     wait "${cpid}" || ret=$?
     [[ "${mode}" == tty ]] && printf '\r\e[K' >&2
     command rm -f -- "${progress_file}"
 
-    test -r "${claim}" && now="$(<"${claim}")"
-    if [[ "${now}" != "${cpid} ${token} "* ]] ; then
-        return 3
-    fi
-    command rm -f -- "${claim}"
+    zsystem flock -t 30 -f fd "${claim}.flock" @RET
+    {
+        test -r "${claim}" && now="$(<"${claim}")"
+        if [[ "${now}" != "${cpid} ${token} "* ]] ; then
+            return 3
+        fi
+        command rm -f -- "${claim}"
+    } always {
+        zsystem flock -u "${fd}"
+    }
+    (( interrupted )) && return 130
     return "${ret}"
 }
 

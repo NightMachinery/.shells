@@ -857,20 +857,223 @@ transcript that is not on disk."
     return 1
 }
 
+function h-paseo-transcript-error {
+    local band="${1}" message="${2}"
+    ecerr "Paseo transcript: ${message}"
+    if [[ "${agent_view_progress:-auto}" == hs || ( "${agent_view_progress:-auto}" == auto && ! -t 2 ) ]] ; then
+        h-agent-view-banner "${band}" crit 8 0.35 "**Paseo transcript**: ${message}"
+    fi
+}
+
+function h-paseo-transcript-local-host {
+    local host="${1}" server_id="${2}" local_id="${PASEO_SERVER_ID:-}"
+    local id_file="${paseo_home:-${PASEO_HOME:-${HOME}/.paseo}}/server-id"
+    if [[ -z "${local_id}" && -r "${id_file}" ]] ; then
+        local_id="$(<"${id_file}")"
+    fi
+    if [[ -n "${server_id}" ]] ; then
+        [[ "${server_id}" == "${local_id}" ]]
+        return
+    fi
+    [[ "${host}" == "${local_id}" ]] && return 0
+
+    local name
+    if [[ -x /usr/sbin/scutil ]] ; then
+        name="$(/usr/sbin/scutil --get ComputerName 2>/dev/null)" || name=''
+    fi
+    [[ -n "${name}" ]] || name="$(command hostname)" @RET
+    [[ "${(L)host}" == "${(L)name}" ]]
+}
+
+function h-paseo-transcript-ssh-alias {
+    setopt localoptions extendedglob
+    local host="${1}" server_id="${2}" config="${HOME}/.config/ypaseo/transcript-hosts"
+    local line label alias mapped=''
+    if [[ -r "${config}" ]] ; then
+        while IFS= read -r line || [[ -n "${line}" ]] ; do
+            line="${line%%\#*}"
+            line="${${line##[[:blank:]]#}%%[[:blank:]]#}"
+            [[ "${line}" == *[[:blank:]]* ]] || continue
+            alias="${line##*[[:blank:]]}"
+            label="${line%${alias}}"
+            label="${label%%[[:blank:]]#}"
+            if [[ -n "${server_id}" && "${label}" == "${server_id}" ]] ; then
+                mapped="${alias}"
+                break
+            elif [[ -z "${mapped}" && "${(L)label}" == "${(L)host}" ]] ; then
+                mapped="${alias}"
+            fi
+        done < "${config}"
+    fi
+    alias="${mapped:-${(L)host}}"
+    if [[ ! "${alias}" =~ '^[A-Za-z0-9][A-Za-z0-9._-]{0,62}$' ]] ; then
+        ecerr "Configure a valid SSH alias for ${host} in ~/.config/ypaseo/transcript-hosts."
+        return 64
+    fi
+    print -r -- "${alias}"
+}
+
+function h-paseo-transcript-stream {
+    local transcript="${1}" format="${2:e}"
+    case "${format}" in
+        org) h-agent-session-render-document org org-pandoc "${transcript}" ;;
+        md) h-agent-session-render-document md md "${transcript}" ;;
+        jsonl) command cat -- "${transcript}" ;;
+    esac
+}
+
+function paseo-transcript-render {
+    : "usage: paseo-transcript-render ID org|md|jsonl
+SSH endpoint. Streams a transcript on stdout and progress on stderr while
+stdin remains open."
+    local id="${(L)1}" format="${2}"
+    if [[ ! "${id}" =~ '^[0-9a-f][0-9a-f-]{0,35}$' || "${format}" != (org|md|jsonl) ]] ; then
+        ecerr "Invalid transcript id or format."
+        return 64
+    fi
+    local -x PASEO_HOST=''
+    local agent_view_key='' agent_view_label='' agent_view_initial_progress=''
+    local transcript tmp
+    transcript="$(paseo-transcript-path "${id}")" @RET
+    tmp="$(gmktemp --directory)" @TRET
+    {
+        #: The native session key also covers short IDs and multiple records
+        #: referring to the same provider session on this host.
+        agent_view_progress=wire h-agent-view-transcript-run paseo-transcript-render '' \
+            h-paseo-transcript-stream "${transcript}" "${tmp}/transcript.${format}"
+    } always {
+        h-agent-view-rm-tmp "${tmp}"
+    }
+}
+
+function h-paseo-transcript-ssh-status {
+    local progress="${1}" error_file="${2}" line payload
+    while IFS= read -r line || [[ -n "${line}" ]] ; do
+        if [[ "${line}" == 'YPASEO-PROGRESS '* ]] ; then
+            payload="${line#YPASEO-PROGRESS }"
+            if [[ "${payload}" =~ '^[0-9]{1,3} (read|render|pandoc|done) [0-9]{1,16} [0-9]{1,16}$' ]] ; then
+                print -r -- "${payload}" > "${progress}.next"
+                command mv -f -- "${progress}.next" "${progress}"
+            fi
+        elif [[ -n "${line}" && ! -s "${error_file}" ]] ; then
+            print -r -- "${line}" > "${error_file}"
+        fi
+    done
+}
+
+function h-paseo-transcript-over-ssh {
+    local host="${1}" out="${2}" format="${2:e}"
+    local input="${out:h}/ssh.in" status_pipe="${out:h}/ssh.err"
+    local fd reader result=0
+    command mkfifo -- "${input}" "${status_pipe}" @RET
+    #: Keep SSH stdin open without a writer process. The remote endpoint uses
+    #: EOF to stop its worker even if the local SSH process was SIGKILLed.
+    exec {fd}<> "${input}" @RET
+    h-paseo-transcript-ssh-status "${agent_session_progress_file}" "${out:h}/error" < "${status_pipe}" &
+    reader=$!
+    #: Only the validated hex id/prefix and format enter the remote command.
+    command ssh -T -S none -o BatchMode=yes -o ConnectTimeout=10 -o StdinNull=no \
+        -o ServerAliveInterval=5 -o ServerAliveCountMax=2 -- "${host}" \
+        'exec zsh -c '\''if (( $+functions[paseo-transcript-render] )); then paseo-transcript-render "$1" "$2"; else print -ru2 -- "Remote transcript renderer is missing. Update ~/scripts on that host."; exit 127; fi'\'' ypaseo-transcript '"${paseo_transcript_id} ${format}" \
+        <&${fd} > "${out}" 2> "${status_pipe}" || result=$?
+    exec {fd}>&-
+    wait "${reader}"
+    command rm -f -- "${input}" "${status_pipe}"
+    #: A remote native-session takeover may come through another alias or
+    #: prefix. It has its own band, unlike a local takeover of this request.
+    (( result == 3 )) && return 75
+    return "${result}"
+}
+
+function h-paseo-view-remote-transcript {
+    local host="${1}" ssh_alias="${2}" ext="${3}" paseo_transcript_id="${4}"
+    local key tmp band out result=0 reason
+    #: Use the effective destination and full input together. The remote
+    #: endpoint resolves prefixes and also claims the underlying session.
+    key="$(printf '%s\n%s\n' "${(L)ssh_alias}" "${paseo_transcript_id}" | command shasum -a 256)" @RET
+    key="paseo-remote-${key%% *}"
+    band="$(h-agent-view-name-of "${key}")" @RET
+    tmp="$(gmktemp --directory)" @TRET
+    out="${tmp}/${paseo_transcript_id}.${ext}"
+    local agent_view_key="${key}" agent_view_label="Paseo transcript from ${host}"
+    local agent_view_initial_progress="Connecting to ${host}…"
+    {
+        h-agent-view-transcript-run "${band}" 'run again to restart' \
+            h-paseo-transcript-over-ssh "${ssh_alias}" "${out}" || result=$?
+        case "${result}" in
+            0)
+                if emc-open "${out}" ; then
+                    h-agent-view-dismiss "${band}"
+                    return 0
+                fi
+                result=1
+                reason="Emacs did not open the transcript from ${host}."
+                ;;
+            3) return 0 ;;
+            75) h-agent-view-dismiss "${band}"; return 0 ;;
+            255) reason="Could not reach ${host} over SSH (${ssh_alias})." ;;
+            *)
+                [[ -s "${tmp}/error" ]] && reason="$(<"${tmp}/error")"
+                reason="${host}: ${reason:-Remote transcript conversion failed.}"
+                ;;
+        esac
+        h-paseo-transcript-error "${band}" "${reason}"
+        return "${result}"
+    } always {
+        if (( result != 0 )) ; then
+            h-agent-view-rm-tmp "${tmp}"
+        fi
+    }
+}
+
 function h-paseo-view-transcript {
-    #: Usage: h-paseo-view-transcript <converter> <ext> [ID]
-    local converter="${1}" ext="${2}" transcript
-    if ! transcript="$(paseo-transcript-path "${3:-}" 2>&1)" ; then
-        #: Launched from the desktop app, stderr goes nowhere a person looks.
-        ecerr "${transcript}"
-        [[ -t 2 ]] || h-agent-view-banner paseo-view-transcript crit 8 0.35 "**Paseo transcript**: ${transcript#*: }"
+    #: Usage: h-paseo-view-transcript <converter> <ext> [--host HOST] [ID]
+    local converter="${1}" ext="${2}" host='' id transcript ssh_alias
+    local server_id="${paseo_transcript_server_id:-}"
+    shift 2
+    if [[ "${1:-}" == --host ]] ; then
+        host="${2:-}"
+        if [[ ! "${host}" =~ '^[A-Za-z0-9][A-Za-z0-9._ -]{0,62}$' ]] ; then
+            h-paseo-transcript-error paseo-view-transcript 'Invalid host label or server id.'
+            return 64
+        fi
+        shift 2
+    fi
+    id="${1:-${PASEO_AGENT_ID:-}}"
+    if (( $# > 1 )) ; then
+        h-paseo-transcript-error paseo-view-transcript 'Expected one Paseo agent id.'
+        return 64
+    fi
+    local -x PASEO_HOST="${PASEO_HOST:-}"
+    if [[ -n "${host}" ]] ; then
+        if ! h-paseo-transcript-local-host "${host}" "${server_id}" ; then
+            id="${(L)id}"
+            if [[ ! "${id}" =~ '^[0-9a-f][0-9a-f-]{0,35}$' ]] ; then
+                h-paseo-transcript-error paseo-view-transcript 'Expected a Paseo agent id or unique prefix.'
+                return 64
+            fi
+            if ! ssh_alias="$(h-paseo-transcript-ssh-alias "${host}" "${server_id}" 2>&1)" ; then
+                h-paseo-transcript-error paseo-view-transcript "${ssh_alias}"
+                return 64
+            fi
+            h-paseo-view-remote-transcript "${host}" "${ssh_alias}" "${ext}" "${id}"
+            return
+        fi
+        PASEO_HOST=''
+    fi
+    if ! transcript="$(paseo-transcript-path "${id}" 2>&1)" ; then
+        h-paseo-transcript-error paseo-view-transcript "${transcript#*: }"
         return 1
     fi
-    h-agent-view-session-transcript "${converter}" "${ext}" "${transcript}"
+    if [[ "${ext}" == jsonl ]] ; then
+        emc-open "${transcript}"
+    else
+        h-agent-view-session-transcript "${converter}" "${ext}" "${transcript}"
+    fi
 }
 
 function paseo-view-transcript {
-    : "usage: paseo-view-transcript [ID]
+    : "usage: paseo-view-transcript [--host HOST] [ID]
 Converts a Paseo agent's native transcript to org and opens it in emacs, with
 progress; running it again for the same session restarts it. ID defaults to
 \$PASEO_AGENT_ID."
@@ -878,17 +1081,15 @@ progress; running it again for the same session restarts it. ID defaults to
 }
 
 function paseo-view-transcript-md {
-    : "usage: paseo-view-transcript-md [ID]
+    : "usage: paseo-view-transcript-md [--host HOST] [ID]
 Like paseo-view-transcript, as markdown."
     h-paseo-view-transcript h-agent-session-to-md md "$@"
 }
 
 function paseo-view-transcript-raw {
-    : "usage: paseo-view-transcript-raw [ID]
+    : "usage: paseo-view-transcript-raw [--host HOST] [ID]
 Opens a Paseo agent's native transcript itself in emacs."
-    local transcript
-    transcript="$(paseo-transcript-path "$@")" @RET
-    emc-open "${transcript}"
+    h-paseo-view-transcript '' jsonl "$@"
 }
 
 function paseo-view-transcript-fz {
