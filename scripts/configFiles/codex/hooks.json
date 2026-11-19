@@ -43,21 +43,21 @@
         ]
       },
       {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "if [ -x \"$HOME/go/bin/agent-desk\" ]; then \"$HOME/go/bin/agent-desk\" hook prompt --agent codex >/dev/null 2>&1; fi",
+            "timeout": 10
+          }
+        ]
+      },
+      {
         "matcher": "",
         "hooks": [
           {
             "type": "command",
             "command": "if [ -n \"$PASEO_TERMINAL_ID\" ]; then \"${PASEO_HOOK_CLI:-paseo}\" hooks codex UserPromptSubmit; fi",
             "commandWindows": "if defined PASEO_TERMINAL_ID (if defined PASEO_HOOK_CLI (\"%PASEO_HOOK_CLI%\" hooks codex UserPromptSubmit) else (paseo hooks codex UserPromptSubmit)) else (exit /b 0)",
-            "timeout": 10
-          }
-        ]
-      },
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "if [ -x \"$HOME/go/bin/agent-desk\" ]; then \"$HOME/go/bin/agent-desk\" hook prompt --agent codex >/dev/null 2>&1; fi",
             "timeout": 10
           }
         ]

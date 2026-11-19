@@ -154,20 +154,20 @@
         ]
       },
       {
-        "matcher": "",
         "hooks": [
           {
             "type": "command",
-            "command": "if [ -n \"$PASEO_TERMINAL_ID\" ]; then \"${PASEO_HOOK_CLI:-paseo}\" hooks claude UserPromptSubmit; fi",
+            "command": "if [ -x \"$HOME/go/bin/agent-desk\" ]; then \"$HOME/go/bin/agent-desk\" hook prompt --agent claude >/dev/null 2>&1; fi",
             "timeout": 10
           }
         ]
       },
       {
+        "matcher": "",
         "hooks": [
           {
             "type": "command",
-            "command": "if [ -x \"$HOME/go/bin/agent-desk\" ]; then \"$HOME/go/bin/agent-desk\" hook prompt --agent claude >/dev/null 2>&1; fi",
+            "command": "if [ -n \"$PASEO_TERMINAL_ID\" ]; then \"${PASEO_HOOK_CLI:-paseo}\" hooks claude UserPromptSubmit; fi",
             "timeout": 10
           }
         ]
