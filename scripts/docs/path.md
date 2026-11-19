@@ -19,7 +19,8 @@ shell picks up the update. A lock serializes writers and the completed file
 replaces the old one atomically. Keep the cache on local storage for shared
 home directories.
 
-Run `path-rebuild-install-hooks` once on each `vcsh night.sh` checkout to
+New machines get the hooks from bootstrap stage 30 (`setup/bootstrap/stages/30-zsh.sh`).
+On an existing machine, run `path-rebuild-install-hooks` once per `vcsh night.sh` checkout to
 refresh after a checkout, merge, commit or rewrite. If a hook already exists
 or the checkout uses `core.hooksPath`, add the following line to the relevant
 hooks using the checkout's scripts path.

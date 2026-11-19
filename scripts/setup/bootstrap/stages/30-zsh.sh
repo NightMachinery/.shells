@@ -52,6 +52,23 @@ else
 fi
 
 ##
+#: --- PATH cache hooks ---
+#: zsh puts only the `~/scripts' directories holding executables on PATH, from a
+#: per-host cache (docs/path.md). These vcsh night.sh hooks refresh it after a
+#: pull, checkout, commit or rewrite; without them it refreshes only when the
+#: shell finds it stale. Idempotent; leaves existing hooks alone.
+if [ -f "${NIGHTDIR}/zshlang/basic/auto-load/path-cache.zsh" ] ; then
+    if run zsh -fc 'source "$1/zshlang/basic/auto-load/path-cache.zsh" && path-rebuild-install-hooks && path-rebuild' \
+        bootstrap-path-hooks "${NIGHTDIR}" ; then
+        ok "PATH cache hooks installed"
+    else
+        warn "PATH cache hooks not installed (continuing); run path-rebuild-install-hooks"
+    fi
+else
+    warn "path-cache.zsh missing; skipping the PATH cache hooks"
+fi
+
+##
 #: --- first load ---
 #: Bounded, and with a process cap: a broken config can recurse through
 #: command_not_found_handler and fork until the host notices. (That is a real
