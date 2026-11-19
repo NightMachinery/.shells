@@ -508,9 +508,7 @@ newer run for the same transcript cancelled this one."
     #:
     #: The mode is `agent_view_progress': tty (a line on stderr, redrawn in
     #: place), hs (the band named <band>, through [agfi:h-agent-view-banner]),
-    #: none, or auto, which picks tty when stderr is a terminal. The SSH
-    #: endpoint uses wire mode and treats readable stdin as a disconnect:
-    #: the client holds the stream open for the duration of the request.
+    #: none, or auto, which picks tty when stderr is a terminal.
     ##
     local mode="${agent_view_progress:-auto}"
     local band="${1}" hint="${2}" converter="${3}" transcript="${4}" out="${5}"
@@ -531,13 +529,6 @@ newer run for the same transcript cancelled this one."
     local token="${sysparams[pid]}-${EPOCHREALTIME}"
     local progress_file="${out:h}/.${out:t}.progress"
     local label="${agent_view_label:-$(h-agent-session-label-of "${transcript}") → ${out:e}: *${out:t:r}*}"
-    if [[ "${mode}" == wire ]] ; then
-        zmodload zsh/zselect @RET
-        #: The SSH peer can close stderr between polling stdin and reporting
-        #: progress. Keep the supervisor alive to reap the converter.
-        trap '' PIPE
-    fi
-
     local fd cpid=''
     #: zsystem opens, never creates, the file it locks.
     : >> "${claim}.flock"
@@ -570,16 +561,9 @@ newer run for the same transcript cancelled this one."
             case "${mode}" in
                 tty) printf '\r\e[K%s' "${out:t:r}: ${text}" >&2 ;;
                 hs) h-agent-view-banner "${band}" notice 600 0 "**${label}**   ${text}   (${hint})" ;;
-                wire) print -ru2 -- "YPASEO-PROGRESS ${line}" || true ;;
             esac
         fi
-        if [[ "${mode}" == wire ]] ; then
-            if zselect -t 20 -r 0 ; then
-                interrupted=1
-            fi
-        else
-            sleep "${interval}"
-        fi
+        sleep "${interval}"
     done
     local ret=0 now=''
     if (( interrupted )) ; then
@@ -587,12 +571,6 @@ newer run for the same transcript cancelled this one."
     fi
     wait "${cpid}" || ret=$?
     [[ "${mode}" == tty ]] && printf '\r\e[K' >&2
-    #: Short renders can finish between polls. Forward the renderer's final
-    #: record so the SSH client can tell a complete document from a header.
-    if [[ "${mode}" == wire && -r "${progress_file}" ]] ; then
-        line="$(<"${progress_file}")"
-        [[ "${line}" == '100 done '* ]] && print -ru2 -- "YPASEO-PROGRESS ${line}" || true
-    fi
     command rm -f -- "${progress_file}"
 
     zsystem flock -t 30 -f fd "${claim}.flock" @RET
