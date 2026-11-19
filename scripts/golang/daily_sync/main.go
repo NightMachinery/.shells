@@ -14,7 +14,10 @@
 // nonzero, and the desk hands the answer and this output to the sync agent.
 //
 // Invoked as `daily-sync apply-answer', which builds it with go-local-dep.
-// See scripts/docs/daily-sync.md. Stdlib only.
+//
+// conflict show|resolve ...: the conflict engine (conflict.go), which the
+// local machine ships to the other machines; version prints the hash of the
+// source it was built from. See scripts/docs/daily-sync.md. Stdlib only.
 package main
 
 import (
@@ -34,9 +37,13 @@ import (
 )
 
 const usageText = `usage: daily_sync apply-answer <sidecar.json>   (the answer on stdin)
+       daily_sync conflict show|resolve <rebase|merge> <label> <path> <name> [<hunk>=<choice>...]
+       daily_sync version
 
-Applies the user's answer to a blocked-conflict question of daily-sync, or
-explains why not and exits nonzero so the sync agent takes over.
+apply-answer applies the user's answer to a blocked-conflict question of
+daily-sync, or explains why not and exits nonzero so the sync agent takes over.
+conflict lists or resolves the hunks of one conflicted file; version prints the
+hash of the source this build came from.
 See scripts/docs/daily-sync.md.
 `
 
@@ -58,6 +65,10 @@ func main() {
 	switch os.Args[1] {
 	case "apply-answer":
 		os.Exit(applyAnswer(os.Args[2:], os.Stdin, os.Stdout))
+	case "conflict":
+		os.Exit(runConflict(os.Args[2:], os.Stdout, os.Stderr))
+	case "version":
+		fmt.Println(sourceHash())
 	default:
 		fmt.Fprintf(os.Stderr, "daily_sync: unknown command %q\n%s", os.Args[1], usageText)
 		os.Exit(64)
