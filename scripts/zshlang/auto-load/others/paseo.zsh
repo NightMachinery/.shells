@@ -946,15 +946,20 @@ stdin remains open."
     }
 }
 
-function h-paseo-transcript-ssh-status {
-    local progress="${1}" error_file="${2}" line payload
+function h-paseo-transcript-copy-status {
+    local progress="${1}" error_file="${2}" unsupported="${3:-}" metadata="${4:-}" line payload
     while IFS= read -r line || [[ -n "${line}" ]] ; do
         if [[ "${line}" == 'YPASEO-PROGRESS '* ]] ; then
             payload="${line#YPASEO-PROGRESS }"
-            if [[ "${payload}" =~ '^[0-9]{1,3} (read|render|pandoc|done) [0-9]{1,16} [0-9]{1,16}$' ]] ; then
+            if [[ "${payload}" =~ '^[0-9]{1,3} (download|read|render|pandoc|done) [0-9]{1,16} [0-9]{1,16}$' ]] ; then
                 print -r -- "${payload}" > "${progress}.next"
                 command mv -f -- "${progress}.next" "${progress}"
             fi
+        elif [[ -n "${metadata}" && "${line}" == 'YPASEO-TRANSCRIPT-FILE '* ]] ; then
+            print -r -- "${line#YPASEO-TRANSCRIPT-FILE }" > "${metadata}"
+        elif [[ -n "${unsupported}" && ( "${line}" == 'YPASEO-TRANSCRIPT-UNSUPPORTED' ||
+            "${line}" == "error: unknown command 'transcript'" ) ]] ; then
+            : > "${unsupported}"
         elif [[ -n "${line}" && ! -s "${error_file}" ]] ; then
             print -r -- "${line}" > "${error_file}"
         fi
@@ -969,7 +974,7 @@ function h-paseo-transcript-over-ssh {
     #: Keep SSH stdin open without a writer process. The remote endpoint uses
     #: EOF to stop its worker even if the local SSH process was SIGKILLed.
     exec {fd}<> "${input}" @RET
-    h-paseo-transcript-ssh-status "${agent_session_progress_file}" "${out:h}/error" < "${status_pipe}" &
+    h-paseo-transcript-copy-status "${agent_session_progress_file}" "${out:h}/error" < "${status_pipe}" &
     reader=$!
     #: Only the validated hex id/prefix and format enter the remote command.
     command ssh -T -S none -o BatchMode=yes -o ConnectTimeout=10 -o StdinNull=no \
@@ -990,12 +995,66 @@ function h-paseo-transcript-over-ssh {
     return "${result}"
 }
 
+function h-paseo-transcript-from-host {
+    local host="${1}" out="${2}" native="${2:r}.jsonl"
+    local status_pipe="${out:h}/daemon.err" unsupported="${out:h}/unsupported"
+    local error_file="${out:h}/error" metadata="${out:h}/metadata"
+    local destination="${paseo_transcript_server_id:-${host}}"
+    local home="${paseo_home:-${PASEO_HOME:-${HOME}/.paseo}}"
+    local reader result=0 ssh_alias
+    command mkfifo -- "${status_pipe}" @RET
+    h-paseo-transcript-copy-status "${agent_session_progress_file}" "${error_file}" "${unsupported}" "${metadata}" < "${status_pipe}" &
+    reader=$!
+    command paseo agent transcript "${paseo_transcript_id}" --home "${home}" \
+        --destination "${destination}" --progress --output "${native}" 2> "${status_pipe}" || result=$?
+    wait "${reader}"
+    command rm -f -- "${status_pipe}"
+    if (( result == 0 )) ; then
+        [[ "${out:e}" == jsonl ]] && return 0
+        local info filename
+        if ! info="$(command jq -er '
+            select(type == "array" and length == 2)
+            | select(.[0] == "claude" or .[0] == "codex")
+            | select(.[1] | test("^[A-Za-z0-9][A-Za-z0-9._ -]*\\.jsonl$"))
+            | join(" ")
+        ' "${metadata}" 2>/dev/null)" ; then
+            print -r -- 'The daemon did not identify the downloaded transcript file.' > "${error_file}"
+            return 1
+        fi
+        filename="${info#* }"
+        local agent_session_provider_hint="${info%% *}"
+        local agent_session_provider_hint_path="${out:h}/native/${filename}"
+        command mkdir -- "${agent_session_provider_hint_path:h}" @RET
+        command mv -- "${native}" "${agent_session_provider_hint_path}" @RET
+        print -r -- '0 render 0 0' > "${agent_session_progress_file}"
+        h-paseo-transcript-stream "${agent_session_provider_hint_path}" "${out:e}" > "${out}" 2> "${error_file}" || return $?
+        command rm -f -- "${agent_session_provider_hint_path}" "${metadata}"
+        command rmdir -- "${agent_session_provider_hint_path:h}"
+        return 0
+    fi
+
+    [[ -f "${unsupported}" ]] || return "${result}"
+    print -ru2 -- "Paseo transcript: daemon download unavailable for ${host}. Falling back to SSH."
+    command rm -f -- "${error_file}" "${agent_session_progress_file}"
+    if ! ssh_alias="$(h-paseo-transcript-ssh-alias "${host}" "${paseo_transcript_server_id:-}" 2>&1)" ; then
+        print -r -- "${ssh_alias}" > "${error_file}"
+        return 64
+    fi
+    result=0
+    h-paseo-transcript-over-ssh "${ssh_alias}" "${out}" || result=$?
+    if (( result == 255 )) ; then
+        print -r -- "Could not reach ${host} over SSH (${ssh_alias})." > "${error_file}"
+    fi
+    return "${result}"
+}
+
 function h-paseo-view-remote-transcript {
-    local host="${1}" ssh_alias="${2}" ext="${3}" paseo_transcript_id="${4}"
+    local host="${1}" ext="${2}" paseo_transcript_id="${3}"
     local key tmp band out result=0 reason
-    #: Use the effective destination and full input together. The remote
-    #: endpoint resolves prefixes and also claims the underlying session.
-    key="$(printf '%s\n%s\n' "${(L)ssh_alias}" "${paseo_transcript_id}" | command shasum -a 256)" @RET
+    #: Desktop requests carry the server ID. Use it for the claim so a host
+    #: label change still cancels the download of the same agent.
+    local destination="${paseo_transcript_server_id:-${(L)host}}"
+    key="$(printf '%s\n%s\n' "${destination}" "${paseo_transcript_id}" | command shasum -a 256)" @RET
     key="paseo-remote-${key%% *}"
     band="$(h-agent-view-name-of "${key}")" @RET
     tmp="$(gmktemp --directory)" @TRET
@@ -1004,7 +1063,7 @@ function h-paseo-view-remote-transcript {
     local agent_view_initial_progress="Connecting to ${host}…"
     {
         h-agent-view-transcript-run "${band}" 'run again to restart' \
-            h-paseo-transcript-over-ssh "${ssh_alias}" "${out}" || result=$?
+            h-paseo-transcript-from-host "${host}" "${out}" || result=$?
         case "${result}" in
             0)
                 if emc-open "${out}" ; then
@@ -1016,7 +1075,6 @@ function h-paseo-view-remote-transcript {
                 ;;
             3) return 0 ;;
             75) h-agent-view-dismiss "${band}"; return 0 ;;
-            255) reason="Could not reach ${host} over SSH (${ssh_alias})." ;;
             *)
                 [[ -s "${tmp}/error" ]] && reason="$(<"${tmp}/error")"
                 if [[ "${reason}" == 'flag provided but not defined: -progress-file' ]] ; then
@@ -1036,7 +1094,7 @@ function h-paseo-view-remote-transcript {
 
 function h-paseo-view-transcript {
     #: Usage: h-paseo-view-transcript <converter> <ext> [--host HOST] [ID]
-    local converter="${1}" ext="${2}" host='' id transcript ssh_alias
+    local converter="${1}" ext="${2}" host='' id transcript
     local server_id="${paseo_transcript_server_id:-}"
     shift 2
     if [[ "${1:-}" == --host ]] ; then
@@ -1060,11 +1118,7 @@ function h-paseo-view-transcript {
                 h-paseo-transcript-error paseo-view-transcript 'Expected a Paseo agent id or unique prefix.'
                 return 64
             fi
-            if ! ssh_alias="$(h-paseo-transcript-ssh-alias "${host}" "${server_id}" 2>&1)" ; then
-                h-paseo-transcript-error paseo-view-transcript "${ssh_alias}"
-                return 64
-            fi
-            h-paseo-view-remote-transcript "${host}" "${ssh_alias}" "${ext}" "${id}"
+            h-paseo-view-remote-transcript "${host}" "${ext}" "${id}"
             return
         fi
         PASEO_HOST=''

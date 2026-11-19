@@ -96,6 +96,13 @@ function h-agent-session-agent-of {
     local transcript="${1}"
     assert-args transcript @RET
 
+    #: Daemon downloads carry the provider for this exact temporary file.
+    if [[ "${transcript}" == "${agent_session_provider_hint_path:-}" &&
+        -n "${agent_session_provider_hint:-}" ]] ; then
+        ec "${agent_session_provider_hint}"
+        return 0
+    fi
+
     local agent
     for agent in ${(f)"$(h-agents)"} ; do
         if h-agent-session-call "${agent}" owns-p "${transcript}" ; then

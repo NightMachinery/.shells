@@ -17,12 +17,18 @@ Progress and failures appear in a Hammerspoon band when launched from the app,
 or on stderr in a terminal. Pressing the shortcut again for the same agent
 restarts the conversion. [Transcript progress](agent-sessions.md)
 
-## Hosts reached over SSH
+## Registered hosts and SSH fallback
 
 Run `paseo-view-transcript --host example-host <agent-id>` from the shell.
-YPaseo supplies the host's label and server ID from its host list. The default
-SSH destination is the lowercased label. For a custom SSH alias, add a line to
-your local `~/.config/ypaseo/transcript-hosts`. Each line ends with the SSH alias.
+YPaseo supplies the host's label and server ID from its host list. The CLI
+downloads the native file over the local daemon's connection to the registered host
+and the viewer renders it locally. The progress display shows download and render
+progress. Restarting the same request cancels the previous download or render.
+
+If the CLI or either daemon is too old for this download, the viewer prints a
+notice and uses SSH. The default SSH destination is the lowercased label. For a
+custom SSH alias, add a line to `~/.config/ypaseo/transcript-hosts`. Each line ends
+with the SSH alias.
 Labels with spaces need a mapping. The key can be a label or a server ID, and
 `#` starts a comment. A matching server ID takes precedence when YPaseo supplies one.
 
@@ -33,7 +39,7 @@ srv_example                  example-host
 ```
 
 Use `--host` with the local Paseo host name or server ID to read from disk.
-For another host, both machines need a current copy of the scripts. SSH
+The SSH fallback requires the renderer on both machines. SSH
 connects in batch mode. The remote host resolves and converts the transcript,
 then streams it into a local temporary file for Emacs. The viewer shows a
 connection message and then the remote renderer's progress. Restarting a

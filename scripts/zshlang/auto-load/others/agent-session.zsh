@@ -78,14 +78,16 @@ function h-agent-session-title {
     local agent
     agent="$(h-agent-session-agent-of "${input}")" @RET
 
-    local label id name account
+    local label id name account=''
     label="$(h-agent-field "${agent}" label)" @RET
     id="$(h-agent-session-call "${agent}" id-of "${input}")" @RET
     name="$(h-agent-session-name "${input}")" @RET
     #: Which seat this session came from: the Claude Code profile, or the
     #: signed-in account for an agent that has one. Two profiles are two
     #: accounts, and a rendered document said nothing about which was which.
-    account="$(h-agent-session-call "${agent}" account "${input}" 2>/dev/null)" || account=''
+    if [[ "${input}" != "${agent_session_provider_hint_path:-}" ]] ; then
+        account="$(h-agent-session-call "${agent}" account "${input}" 2>/dev/null)" || account=''
+    fi
 
     #: Which session this is and who ran it are two different facts, so they
     #: get two lines rather than one run-on string: `Codex session <uuid> ·

@@ -26,6 +26,8 @@ source "${pt_root}/zshlang/auto-load/others/processes.zsh"
 source "${pt_root}/zshlang/auto-load/others/agents.zsh"
 source "${pt_root}/zshlang/auto-load/others/agent-session.zsh"
 source "${pt_root}/zshlang/auto-load/others/paseo.zsh"
+setopt nobgnice
+function silent { "$@" >/dev/null 2>&1; }
 unalias ecerr 2>/dev/null || true
 function ecerr { print -ru2 -- "$@"; }
 typeset -g color_p="" isColor_override=n
@@ -227,6 +229,8 @@ source "${PT_ROOT}/zshlang/auto-load/others/paseo.zsh"
 unalias ecerr 2>/dev/null || true
 function ecerr { print -ru2 -- "$@"; }
 function h-agent-session-agent-of { print -r -- claude; }
+function silent { "$@" >/dev/null 2>&1; }
+setopt nobgnice
 function h-agent-session-call { [[ "${2}" == id-of ]] && print -r -- "${3:t:r}"; }
 function h-agent-session-title { print -r -- '# Synthetic transcript'; }
 function h-agent-session-dep { :; }
@@ -289,7 +293,92 @@ command chmod +x "${t}/ssh-bin/ssh"
 typeset -gx PATH="${t}/ssh-bin:${PATH}"
 typeset -gx agent_view_progress=none agent_view_progress_interval=0.05
 
-paseo_transcript_server_id=srv_example paseo-view-transcript --host 'Label With Spaces' "${a_claude}"
+cat > "${t}/ssh-bin/paseo" <<'EOF'
+#!/bin/zsh -f
+setopt errexit
+[[ "${1}" == agent && "${2}" == transcript && "${4}" == --home &&
+    "${6}" == --destination && "${8}" == --progress && "${9}" == --output ]]
+print -r -- "${7}" >> "${PT_TMP}/daemon-log"
+case "${PT_DAEMON_MODE:-unsupported}" in
+    unsupported) print -ru2 -- 'YPASEO-TRANSCRIPT-UNSUPPORTED'; exit 1 ;;
+    old-cli) print -ru2 -- "error: unknown command 'transcript'"; exit 1 ;;
+    fail) print -ru2 -- 'Synthetic daemon download failed.'; exit 1 ;;
+    slow)
+        print -ru2 -- 'YPASEO-PROGRESS 25 download 1 4'
+        print -r -- "$$" > "${PT_TMP}/daemon-pid"
+        command sleep 30 ;;
+esac
+command cat -- "${PT_TRANSCRIPT}" > "${10}"
+print -ru2 -- "YPASEO-TRANSCRIPT-FILE [\"claude\",\"${PT_TRANSCRIPT:t}\"]"
+print -ru2 -- 'YPASEO-PROGRESS 100 download 4 4'
+EOF
+command chmod +x "${t}/ssh-bin/paseo"
+export PT_TRANSCRIPT="${remote_jsonl}"
+
+PT_DAEMON_MODE=success paseo_transcript_server_id=srv_example \
+    paseo-view-transcript-raw --host 'Label With Spaces' "${a_claude}"
+file="$(command tail -n 1 "${t}/opened")"
+expect-eq "$(<"${t}/daemon-log")" srv_example 'daemon route uses the registered server ID'
+expect-eq "$(<"${file}")" "$(<"${remote_jsonl}")" 'daemon download preserves the raw transcript'
+[[ ! -e "${t}/ssh-log" ]]
+h-agent-view-rm-tmp "${file:h}"
+
+(
+    function h-agent-field { print -r -- 'Claude'; }
+    function h-agent-session-name { print -r -- 'Synthetic title'; }
+    function h-agent-session-call {
+        case "${2}" in
+            id-of) print -r -- "${3:t:r}" ;;
+            account) print -r -- 'Synthetic local account' ;;
+        esac
+    }
+    function h-paseo-transcript-stream {
+        expect-eq "${2}" md 'download rendered in the requested format'
+        expect-eq "${1:t}" "${remote_jsonl:t}" 'renderer receives the native filename'
+        expect-eq "$(h-agent-session-agent-of "${1}")" claude 'renderer receives the provider'
+        local heading="$(h-agent-session-title md "${1}")"
+        expect-match "${heading}" 'Synthetic title' 'rendering retained its document heading'
+        if [[ "${heading}" == *'Synthetic local account'* ]] ; then
+            print -ru2 -- 'FAIL: downloaded transcript was attributed to a local account'
+            return 1
+        fi
+        command cat -- "${1}"
+    }
+    PT_DAEMON_MODE=success paseo-view-transcript-md --host 'Label With Spaces' "${a_claude}"
+)
+file="$(command tail -n 1 "${t}/opened")"
+expect-eq "${file:e}" md 'daemon route opens the rendered file'
+expect-eq "$(command tail -n 1 "${t}/daemon-log")" 'Label With Spaces' 'daemon route accepts a label as a single argument'
+expect-eq "$(<"${file}")" "$(<"${remote_jsonl}")" 'the renderer receives the downloaded contents'
+[[ ! -e "${t}/ssh-log" ]]
+h-agent-view-rm-tmp "${file:h}"
+
+err="$(PT_DAEMON_MODE=fail paseo-view-transcript-raw --host example-host "${a_claude}" 2>&1)" && exit 1
+expect-match "${err}" 'Synthetic daemon download failed' 'ordinary download errors are reported'
+[[ ! -e "${t}/ssh-log" ]]
+
+: > "${t}/banners"
+PT_DAEMON_MODE=slow agent_view_progress=hs paseo-view-transcript-raw --host example-host "${a_claude}" &
+daemon_run=$!
+for i in {1..120} ; do
+    [[ -s "${t}/daemon-pid" ]] && command grep -q '25%  download' "${t}/banners" && break
+    command sleep 0.05
+done
+expect-match "$(<"${t}/banners")" '25%  download' 'daemon progress reaches the band'
+daemon_pid="$(<"${t}/daemon-pid")"
+PT_DAEMON_MODE=success paseo-view-transcript-raw --host example-host "${a_claude}"
+wait "${daemon_run}"
+for i in {1..120} ; do kill -0 "${daemon_pid}" 2>/dev/null || break; command sleep 0.05; done
+if kill -0 "${daemon_pid}" 2>/dev/null ; then
+    print -ru2 -- 'FAIL: restarted viewer left the previous daemon download running'
+    exit 1
+fi
+file="$(command tail -n 1 "${t}/opened")"
+h-agent-view-rm-tmp "${file:h}"
+
+PT_DAEMON_MODE=old-cli paseo_transcript_server_id=srv_example \
+    paseo-view-transcript --host 'Label With Spaces' "${a_claude}" 2> "${t}/fallback.err"
+expect-match "$(<"${t}/fallback.err")" 'Falling back to SSH' 'old CLI fallback prints a note'
 expect-eq "$(command tail -n 1 "${t}/ssh-log")" id-alias 'server-id alias is the SSH destination'
 file="$(command tail -n 1 "${t}/opened")"
 expect-match "$(<"${file}")" 'Synthetic remote prompt' 'remote org output'
