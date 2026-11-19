@@ -14,6 +14,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"agent_session/internal/progress"
 )
 
 const (
@@ -156,6 +158,14 @@ type renderer struct {
 // process startup (~70ms each) than it saves.
 const minPandocChunk = 96 << 10
 
+// Up to this many chunks per worker, run at most `jobs` at a time. One chunk
+// per worker made every chunk finish at about the same moment, so a progress
+// report sat at the start of the pandoc phase and then jumped to the end;
+// several per worker let it move, and balance the load better besides, since
+// pandoc's time is not exactly proportional to bytes. The extra process
+// starts are measured in the Performance section of the readme.
+const pandocChunksPerJob = 8
+
 // Render writes the document in the requested format.
 func Render(doc *Document, o Options) (string, error) {
 	switch o.Format {
@@ -178,6 +188,12 @@ func Render(doc *Document, o Options) (string, error) {
 	// The skeleton Go emits is in the *output* syntax, which for org-pandoc is
 	// org even though the bodies it wraps are still markdown.
 	orgOut := o.Format != "md"
+
+	nturns := len(doc.Turns)
+	for _, s := range doc.Subagents {
+		nturns += len(s.Turns)
+	}
+	progress.Begin("render", int64(nturns))
 
 	var segs []segment
 	// Skeleton, not body: it is already in the output syntax and has no
@@ -309,6 +325,7 @@ func RenderTurns(turns []Turn, results map[string]ToolResult, st Style, jobs int
 				r.out.Reset()
 				r.renderTurn(turns[i])
 				parts[i] = r.out.String()
+				progress.Add(1)
 			}
 		}()
 	}
@@ -326,6 +343,14 @@ func RenderTurns(turns []Turn, results map[string]ToolResult, st Style, jobs int
 // fragment that starts mid-structure.
 func convertSegments(segs []segment, jobs int, bin string) ([]string, error) {
 	out := make([]string, len(segs))
+
+	var body int64
+	for _, s := range segs {
+		if s.body {
+			body += int64(len(s.text))
+		}
+	}
+	progress.Begin("pandoc", body)
 
 	for i := 0; i < len(segs); {
 		if !segs[i].body {
@@ -369,8 +394,8 @@ func pandocChunks(parts []string, jobs int, bin string) ([]string, error) {
 	}
 
 	n := total / minPandocChunk
-	if n > jobs {
-		n = jobs
+	if n > jobs*pandocChunksPerJob {
+		n = jobs * pandocChunksPerJob
 	}
 	if n < 1 {
 		n = 1
@@ -408,11 +433,15 @@ func pandocChunks(parts []string, jobs int, bin string) ([]string, error) {
 	errs := make([]error, len(chunks))
 
 	var wg sync.WaitGroup
+	slots := make(chan struct{}, jobs)
 	for i := range chunks {
 		wg.Add(1)
 		go func(i int) {
 			defer wg.Done()
+			slots <- struct{}{}
+			defer func() { <-slots }()
 			out[i], errs[i] = runPandoc(bin, chunks[i])
+			progress.Add(int64(len(chunks[i])))
 		}(i)
 	}
 	wg.Wait()

@@ -7,6 +7,7 @@ import (
 	"bufio"
 	"bytes"
 	"encoding/json"
+	"io"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -137,7 +138,7 @@ func lastContextUsage(lines []line) turns.ContextUsage {
 	return turns.ContextUsage{}
 }
 
-func readLines(fh *os.File) []line {
+func readLines(fh io.Reader) []line {
 	var out []line
 	sc := bufio.NewScanner(fh)
 	sc.Buffer(make([]byte, 0, 64<<10), session.MaxLineBytes)

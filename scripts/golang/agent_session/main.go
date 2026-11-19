@@ -29,6 +29,7 @@ import (
 	"agent_session/internal/claude"
 	"agent_session/internal/codex"
 	"agent_session/internal/handoff"
+	"agent_session/internal/progress"
 	"agent_session/internal/session"
 	"agent_session/internal/turns"
 )
@@ -182,6 +183,9 @@ render flags:
   -subagents                  inline the transcripts of spawned subagents (default true)
   -jobs N                     worker count (default: CPU count)
   -pandoc PATH                pandoc binary for org-pandoc (default "pandoc")
+  -progress-file PATH         keep "<percent> <phase> <done> <total>" in PATH
+                              while rendering, replaced atomically; phases
+                              are read, render, pandoc, then done
 
 preview flags:
   -bytes N              how much of the transcript's tail to read (default 409600)
@@ -224,11 +228,21 @@ func cmdRender(ad session.Adapter, argv []string) error {
 	jobs := fs.Int("jobs", runtime.NumCPU(), "worker count")
 	pandocBin := fs.String("pandoc", "pandoc", "pandoc binary, for -format=org-pandoc")
 	subagentsP := fs.Bool("subagents", true, "inline the transcripts of spawned subagents")
+	progressFile := fs.String("progress-file", "", "keep `<percent> <phase> <done> <total>` in this file while rendering")
 	fs.Parse(session.GuardPathArgs(fs, argv))
 
 	input := fs.Arg(0)
 	if input == "" {
 		return errors.New("no input file given")
+	}
+
+	if *progressFile != "" {
+		progress.Enable(*progressFile, renderPhases(*format))
+		var size int64
+		if st, err := os.Stat(input); err == nil {
+			size = st.Size()
+		}
+		progress.Begin("read", size)
 	}
 
 	doc, err := ad.Document(input, session.DocOpts{Subagents: *subagentsP})
@@ -247,9 +261,27 @@ func cmdRender(ad session.Adapter, argv []string) error {
 	}
 
 	w := bufio.NewWriter(os.Stdout)
-	defer w.Flush()
-	_, err = w.WriteString(out)
-	return err
+	if _, err = w.WriteString(out); err != nil {
+		return err
+	}
+	if err = w.Flush(); err != nil {
+		return err
+	}
+	progress.Finish()
+	return nil
+}
+
+// The phases of a render and their shares of its time, measured on a 40MB
+// synthetic Claude transcript on 8 cores: reading and decoding took 1.8s and
+// rendering the turns 0.2s, and for org-pandoc pandoc took about 11s more.
+// See "Progress" in the readme.
+func renderPhases(format string) []progress.Phase {
+	read := progress.Phase{Name: "read", Weight: 1.8}
+	render := progress.Phase{Name: "render", Weight: 0.2}
+	if format == "org-pandoc" {
+		return []progress.Phase{read, render, {Name: "pandoc", Weight: 11}}
+	}
+	return []progress.Phase{read, render}
 }
 
 // A repeatable path flag: `-only <transcript>`, once per transcript.

@@ -1283,6 +1283,34 @@ glob of =<config-home>/sessions/= and a =kill(pid, 0)=; the head scan for the
 abandoned unread whenever the tail answered. Measured by hand, a live session's
 preview is about 20ms and the largest local transcript (383MB) the same.
 
+* Progress
+
+=render -progress-file PATH= keeps one line in PATH while it works:
+=<percent> <phase> <done> <total>=, replaced atomically (written beside it, then
+renamed), at most every 200ms while something changes, and =100 done 1 1= at the
+end. The zsh side polls it to draw a progress line or a Hammerspoon band; see
+"Progress, and one conversion per session" in =docs/agent-sessions.md=. A file
+rather than stderr, because stderr carries the errors and the reader wants the
+latest state, not a stream. =internal/progress= is the whole of it, and every
+call is a no-op without the flag.
+
+The phases are =read= (bytes of the main transcript, counted through the
+adapter's reader; Claude and Codex only, Antigravity reports the phase without
+movement), =render= (turns, subagents' included) and, for =org-pandoc=,
+=pandoc= (bytes of markdown converted, counted as each chunk finishes). Their
+shares of the percentage come from a 40MB synthetic Claude transcript on 8
+cores: reading and decoding 1.8s, rendering 0.2s, pandoc about 11s.
+
+Counting pandoc by finished chunk needed more chunks than workers. With one
+chunk per worker every chunk finished at about the same moment, so the
+percentage sat at the start of the phase and then jumped to the end. =org-pandoc=
+now cuts up to eight chunks per worker (=pandocChunksPerJob=, still never below
+=minPandocChunk=) and runs =jobs= of them at a time, so the report moves every
+second or two. Measured on the 40MB transcript, under heavy machine load: user
+CPU 43.8s with one chunk per worker, 45.3s with eight (+3.5%), 50s with sixteen;
+wall time was within the noise of the load. The output is byte-identical, as the
+seams were already chunk-count independent.
+
 * Why the session time is not the file mtime
 
 The picker used to show each file's mtime, which drifts from the conversation:

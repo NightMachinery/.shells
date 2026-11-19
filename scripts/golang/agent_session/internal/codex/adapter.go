@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"agent_session/internal/progress"
 	"agent_session/internal/session"
 	"agent_session/internal/turns"
 )
@@ -48,7 +49,7 @@ func (a Adapter) Document(path string, o session.DocOpts) (*turns.Document, erro
 	}
 	defer fh.Close()
 
-	lines := readLines(fh)
+	lines := readLines(progress.Reader(fh))
 	doc := &turns.Document{}
 	doc.Turns, doc.Results = buildTurns(lines)
 	doc.Context = lastContextUsage(lines)

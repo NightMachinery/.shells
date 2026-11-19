@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"regexp"
 	"strings"
@@ -328,7 +329,7 @@ type compactMetadata struct {
 	PostTokens int    `json:"postTokens"`
 }
 
-func readRecords(fh *os.File) []record {
+func readRecords(fh io.Reader) []record {
 	var out []record
 	sc := bufio.NewScanner(fh)
 	sc.Buffer(make([]byte, 0, 64<<10), session.MaxLineBytes)

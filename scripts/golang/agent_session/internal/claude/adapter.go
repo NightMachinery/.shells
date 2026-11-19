@@ -14,6 +14,7 @@ import (
 	"regexp"
 	"strings"
 
+	"agent_session/internal/progress"
 	"agent_session/internal/session"
 	"agent_session/internal/turns"
 )
@@ -68,7 +69,7 @@ func (Adapter) Document(path string, o session.DocOpts) (*turns.Document, error)
 	// The unfiltered list is kept: the `model` attachment that names the seat
 	// is one of the types `conversationRecords` drops, and the context line
 	// needs it.
-	all := readRecords(fh)
+	all := readRecords(progress.Reader(fh))
 	records := conversationRecords(all)
 
 	// Decoded once: the result index, the turn grouping and the subagent
