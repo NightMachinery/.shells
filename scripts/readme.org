@@ -11,6 +11,12 @@ There are some non-FOSS resources in this repo that I have included only for my 
 
 ** =/scripts/resources/= unless otherwise specified
 
+* Shell command lookup
+
+Zsh caches the scripts directories that contain executables. Use
+[agfi:path-rebuild] after adding a command to a new directory. See
+[[NIGHTDIR:docs/path.md][cache behavior and Git hook setup]].
+
 * Podcast library
 
 =python/podcast-web= browses a channel's full episode history and playlists,

@@ -231,10 +231,11 @@ export BOOT_CLOJURE_VERSION='1.9.0'
 addToPATH "/usr/local/opt/curl/bin"
 
 if test -z "$NIGHTDIR_PATH_MODE" ; then
-    #: Not `run-on-each addToPATH': addToPATH already loops over its arguments,
-    #: so run-on-each only added a gquote-to and an eval per directory - 253 of
-    #: each - to reach the same loop.
-    addToPATH "$NIGHTDIR"/**/
+    if isZsh && typeset -f h-night-path-apply >/dev/null ; then
+        h-night-path-apply
+    else
+        addToPATH "${NIGHTDIR}"/**/
+    fi
 
     if isZsh ; then
         #: Collapse `//' to `/'. NIGHTDIR used to carry a trailing slash, which
@@ -281,4 +282,7 @@ if isZsh ; then
     path=( ${${path%/}:#} )
 
     typeset -Ug path
+    if typeset -f h-night-path-drop-missing >/dev/null ; then
+        h-night-path-drop-missing
+    fi
 fi
