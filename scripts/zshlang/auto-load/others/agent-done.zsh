@@ -373,7 +373,7 @@ function h-agent-done-resume-native {
         agy)
             local account
             if test -n "${transcript}" && account="$(h-agy-account-of-transcript "${transcript}" 2>/dev/null)" ; then
-                launcher="agy-${account}"
+                launcher="$(h-agy-account-launcher "${account}")"
             fi
             ;;
     esac

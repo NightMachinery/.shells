@@ -36,7 +36,10 @@ import json, os, sys
 json.dump({"argv":sys.argv[1:], "root":os.environ.get("ANTIGRAVITY_GEMINI_DIR"),
            "ssh":os.environ.get("SSH_CONNECTION"), "home":os.environ["HOME"],
            "account":os.environ.get("AGY_ACCOUNT_ID"),
-           "cache":os.environ.get("agy_status_cache_file")},open(os.environ["AGY_TEST_CALLS"],"w"))
+           "cache":os.environ.get("agy_status_cache_file"),
+           "env":{k:os.environ.get(k) for k in ("GEMINI_API_KEY", "GOOGLE_API_KEY", "AGY_ADC_AUTH",
+               "GOOGLE_CLOUD_PROJECT", "GOOGLE_CLOUD_LOCATION", "GOOGLE_APPLICATION_CREDENTIALS")}},
+          open(os.environ["AGY_TEST_CALLS"],"w"))
 if sys.argv[-1] == "models":
     print("gemini-fixture\tGemini fixture\nclaude-fixture\tClaude fixture")
     sys.exit(int(os.environ.get("AGY_TEST_MODELS_EXIT", "0")))
@@ -238,4 +241,49 @@ for AGY_TEST_TMUX_CASE in missing dead live mixed query-failed invalid empty res
     fi
 done
 
-print -r -- 'ok: launch isolation, named accounts, configuration, status JSON, best, cache-only and login recovery'
+# API-billed profiles: credentials reach agy only through its environment.
+(( ${+functions[agy-api-personal]} && ${+functions[agy-api-work-t]} )) || fail 'generated API launchers'
+typeset -g api_rc=0
+typeset -gx GOOGLE_API_KEY=ambient-google-key   # agy would prefer it to the profile key
+agy-api personal models 2>/dev/null || api_rc=$?
+(( api_rc == 2 )) || fail 'API profile without credentials launched'
+AGY_API_KEY_PERSONAL=fixture-key agy-api personal models
+command jq --exit-status --arg root "${AGY_ACCOUNTS_DIR}/api_personal" '
+    .account == "api_personal" and .root == $root and .ssh == "agy-file-auth" and
+    .env.GEMINI_API_KEY == "fixture-key" and .env.GOOGLE_API_KEY == null and
+    .env.AGY_ADC_AUTH == null and (.argv | index("fixture-key") | not)' \
+    "${AGY_TEST_CALLS}" >/dev/null || fail 'API key route'
+command jq --exit-status '.modelProvider == "gemini" and .statusLine.command == "fixture-statusline"' \
+    "${AGY_ACCOUNTS_DIR}/api_personal/antigravity-cli/settings.json" >/dev/null || fail 'API key settings'
+[[ -z "${GEMINI_API_KEY-}" ]] || fail 'API key leaked into the caller'
+print -r -- '{}' > "${test_tmp}/adc.json"
+AGY_API_PROJECT_WORK=fixture-project AGY_API_CREDENTIALS_WORK="${test_tmp}/adc.json" agy-api work models
+command jq --exit-status --arg adc "${test_tmp:A}/adc.json" '
+    .account == "api_work" and .env.AGY_ADC_AUTH == "1" and
+    .env.GOOGLE_CLOUD_PROJECT == "fixture-project" and .env.GOOGLE_CLOUD_LOCATION == "global" and
+    .env.GOOGLE_APPLICATION_CREDENTIALS == $adc and
+    .env.GEMINI_API_KEY == null and .env.GOOGLE_API_KEY == null' \
+    "${AGY_TEST_CALLS}" >/dev/null || fail 'Vertex ADC route'
+#: A profile moved from a key to Vertex loses its modelProvider.
+AGY_API_PROJECT_PERSONAL=fixture-project AGY_API_LOCATION_PERSONAL=europe-west4 agy-api personal models
+command jq --exit-status '.env.GOOGLE_CLOUD_LOCATION == "europe-west4"' "${AGY_TEST_CALLS}" >/dev/null || fail 'Vertex location'
+command jq --exit-status '(has("modelProvider") | not) and .statusLine.command == "fixture-statusline"' \
+    "${AGY_ACCOUNTS_DIR}/api_personal/antigravity-cli/settings.json" >/dev/null || fail 'Vertex settings kept modelProvider'
+for api_case in both missing-file bad-name ; do
+    api_rc=0
+    case "${api_case}" in
+        both) AGY_API_KEY_WORK=k AGY_API_PROJECT_WORK=p agy-api work models 2>/dev/null || api_rc=$? ;;
+        missing-file) AGY_API_PROJECT_WORK=p AGY_API_CREDENTIALS_WORK="${test_tmp}/none.json" agy-api work models 2>/dev/null || api_rc=$? ;;
+        bad-name) AGY_API_KEY_WORK=k agy-api Work models 2>/dev/null || api_rc=$? ;;
+    esac
+    (( api_rc == 2 )) || fail "API profile ${api_case} launched"
+done
+unset GOOGLE_API_KEY
+[[ "$(h-agy-account-launcher api_work)" == agy-api-work && "$(h-agy-account-launcher acc2)" == agy-acc2 ]] || fail 'resume launcher'
+h-agy-account-info api_work
+[[ "${reply[2]}" == api-work && "${reply[3]}" == "${AGY_ACCOUNTS_DIR}/api_work" ]] || fail 'API profile identity'
+api_rc=0
+AGY_ACCOUNTS='acc1 api_x' h-agy-accounts >/dev/null 2>&1 || api_rc=$?
+(( api_rc == 2 )) || fail 'api_ account name accepted'
+
+print -r -- 'ok: launch isolation, named accounts, configuration, status JSON, best, cache-only, login recovery and API profiles'

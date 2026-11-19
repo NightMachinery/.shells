@@ -102,6 +102,60 @@ Status tests file existence without opening token contents. Cached quota
 cannot establish whether a token is still valid: output distinguishes stored
 file credentials from a live verified sign-in.
 
+## API-billed profiles
+
+`agy-api NAME` runs agy billed to a Google API key or a Google Cloud project
+instead of a subscription. The shell generates `agy-api-personal`,
+`agy-api-work` and their `-t` tmux variants. For other names, set
+`AGY_API_PROFILES` (default `personal work`) and run `agy-api-refresh`.
+
+Each profile is a hidden account, `api_NAME`, with its own root
+`~/.agy-accounts/api_NAME`, prepared like any other account (shared rules,
+skills and history). It is never in `AGY_ACCOUNTS`, so `agy-status` and
+`agy-best` leave it out: an API profile has no quota buckets to report. The
+conversations it starts are recorded as owned by `api_NAME`, and the resume
+helpers bring them back through `agy-api-NAME`.
+
+Credentials are variables named after the profile. Put them in
+`~/.privateShell`. They need not be exported: the launcher reads them and
+exports them only to the agy it starts, never on its command line.
+
+```zsh
+AGY_API_KEY_PERSONAL='...'          # route 1: a Gemini API key
+AGY_API_PROJECT_WORK='a-project'    # route 2: Vertex AI in this Cloud project
+AGY_API_CREDENTIALS_WORK="$HOME/.config/gcloud/work-adc.json"  # optional
+AGY_API_LOCATION_WORK=global        # optional; global is the default
+```
+
+A profile sets exactly one route:
+
+- **Gemini API key** (`AGY_API_KEY_<NAME>`). The launcher writes
+  `"modelProvider": "gemini"` into the profile's own `settings.json` and
+  passes the key as `GEMINI_API_KEY`. It removes any ambient `GOOGLE_API_KEY`,
+  which agy would otherwise prefer. Requests go to
+  `generativelanguage.googleapis.com` and are billed to the key's Cloud
+  project. Create the key in Google AI Studio, or in the Cloud console on a
+  project with the Generative Language API enabled.
+- **Vertex AI** (`AGY_API_PROJECT_<NAME>`). The launcher removes
+  `modelProvider` and sets `AGY_ADC_AUTH=1`, `GOOGLE_CLOUD_PROJECT` and
+  `GOOGLE_CLOUD_LOCATION`. agy then signs in with Application Default
+  Credentials: the file named by `AGY_API_CREDENTIALS_<NAME>` (a
+  service-account key, or the `authorized_user` file that
+  `gcloud auth application-default login` writes), else the machine's default
+  ADC. Two Vertex profiles with different identities each need their own file.
+
+agy 1.5.12 cannot use a Vertex AI express-mode API key. Its key route always
+calls the Gemini API endpoint, even with `GOOGLE_GENAI_USE_VERTEXAI=true`, and
+its Vertex route needs ADC plus a project and location.
+
+Both routes were checked on 2026-11-19 with agy 1.5.12 and fake credentials. A
+fake key reached the Gemini API and came back `API key not valid`. An empty
+credentials file reached agy's `adcAuth`, which rejected it (`missing 'type'
+field`) and fell back to sign-in. Which models a route offers is agy's choice
+(its changelog lists Hydrogen and Carbon for API keys, Hydrogen for ADC), so
+check `/model` in the profile. API-billed accounts count as pay-as-you-go,
+which gives them Auto mode.
+
 ## Shared local history
 
 New profiles link the `conversations`, `brain`, and `annotations` directories

@@ -6,7 +6,7 @@ function h-agy-accounts {
     local -a ids=( ${=accounts} )
     local -A seen=() roots=() names=()
     for id in "${ids[@]}" ; do
-        if [[ "${id}" != [a-z][a-z0-9_]# || "${id}" == (best|status|account|accounts|t) ]] ; then
+        if [[ "${id}" != [a-z][a-z0-9_]# || "${id}" == (best|status|account|accounts|t|api|api_*) ]] ; then
             ecerr "$0: invalid or reserved account name: ${id}"
             return 2
         fi
@@ -16,7 +16,7 @@ function h-agy-accounts {
         name="${(P)name_var}"
         if test -n "${name}" ; then
             if [[ "${name}" != [a-z][a-z0-9_]# || "${name}" == acc<-> ||
-                  "${name}" == (best|status|account|accounts|t) || -n "${names[$name]}" ]] ||
+                  "${name}" == (best|status|account|accounts|t|api|api_*) || -n "${names[$name]}" ]] ||
                 (( ${ids[(Ie)$name]} )) ; then
                 ecerr "$0: duplicate, reserved or invalid account name: ${name}"
                 return 2
@@ -41,7 +41,9 @@ function h-agy-account-info {
         local -a numbered=( ${=AGY_ACCOUNTS:-m cave fm2} )
         id="${numbered[$id]}"
     fi
-    if [[ "${check}" == check ]] ; then
+    #: API-billed profiles ([agfi:agy-api]) are named api_NAME and are never
+    #: in AGY_ACCOUNTS, so quota reports and agy-best leave them out.
+    if [[ "${check}" == check && "${id}" != api_[a-z][a-z0-9_]# ]] ; then
         local ids
         ids="$(h-agy-accounts)" @RET
         local -a known=( "${(@f)ids}" )
@@ -73,7 +75,18 @@ function h-agy-account-info {
             cache="${agy_status_cache_file:-${cache}}"
         fi
     fi
-    reply=( "${id}" "${(P)label_var:-${(P)name_var:-${id}}}" "${root}" "${root}/antigravity-cli" "${cache}" )
+    local default_label="${id}"
+    [[ "${id}" != api_* ]] || default_label="api-${id#api_}"
+    reply=( "${id}" "${(P)label_var:-${(P)name_var:-${default_label}}}" "${root}" "${root}/antigravity-cli" "${cache}" )
+}
+
+function h-agy-account-launcher {
+    #: The launcher that resumes a conversation owned by account ID.
+    if [[ "${1}" == api_* ]] ; then
+        ec "agy-api-${1#api_}"
+    else
+        ec "agy-${1}"
+    fi
 }
 
 function agy-accounts-refresh {
@@ -402,6 +415,111 @@ function agy-account-hook {
     h-agy-account-info "${id}" >/dev/null 2>&1 || return 0
     "$@" || return 0
 }
+##
+#: API-billed profiles: `agy-api NAME' runs agy on a Gemini API key, or on
+#: Vertex AI through Application Default Credentials, instead of a Google
+#: subscription. Each profile is the hidden account api_NAME with its own
+#: Gemini root; rules, skills and conversation history are shared as for the
+#: other accounts. Credentials come from variables named after the profile,
+#: which belong in ~/.privateShell, never here. See docs/agy_status.md,
+#: "API-billed profiles".
+function agy-api-refresh {
+    : "generates agy-api-<name> and agy-api-<name>-t from AGY_API_PROFILES"
+    local name
+    for name in ${=AGY_API_PROFILES:-personal work} ; do
+        if [[ "${name}" != [a-z][a-z0-9_]# ]] ; then
+            ecerr "$0: invalid profile name: ${name}"
+            return 2
+        fi
+        aliasfn "agy-api-${name}" agy-api "${name}"
+        aliasfn "agy-api-${name}-t" h-tmuxnewsh2-attach-z-with-cmd "agy-api-${name}"
+    done
+}
 
+function h-agy-api-settings {
+    #: Usage: SETTINGS_FILE [PROVIDER]; sets "modelProvider", or removes it
+    #: when PROVIDER is empty. Only that key changes.
+    local settings="${1}" provider="${2}"
+    ensure-cmd jq @RET
+    if test -L "${settings}" ; then
+        ecerr "$0: refusing a symlinked profile settings file: ${settings}"
+        return 1
+    fi
+    local current='{}' updated tmp
+    if test -s "${settings}" ; then
+        current="$(command jq --compact-output . "${settings}")" @RET
+    fi
+    if test -n "${provider}" ; then
+        updated="$(print -r -- "${current}" | command jq --compact-output --arg p "${provider}" '.modelProvider = $p')" @RET
+    else
+        updated="$(print -r -- "${current}" | command jq --compact-output 'del(.modelProvider)')" @RET
+    fi
+    [[ "${updated}" != "${current}" ]] || return 0
+    tmp="$(command mktemp "${settings:h}/.settings-XXXXXX")" @RET
+    if print -r -- "${updated}" | command jq . > "${tmp}" ; then
+        command mv -f -- "${tmp}" "${settings}"
+    else
+        command rm -f -- "${tmp}"
+        return 1
+    fi
+}
+
+function agy-api {
+    : "usage: agy-api NAME [agy arguments...]; agy billed to an API key or a Vertex AI project"
+    local name="${1}"
+    if [[ "${name}" != [a-z][a-z0-9_]# ]] ; then
+        ecerr "$0: invalid profile name: ${name:-<none>}"
+        return 2
+    fi
+    shift
+    local up="${(U)name}"
+    local key_var="AGY_API_KEY_${up}" project_var="AGY_API_PROJECT_${up}"
+    local location_var="AGY_API_LOCATION_${up}" credentials_var="AGY_API_CREDENTIALS_${up}"
+    local key="${(P)key_var}" project="${(P)project_var}" credentials="${(P)credentials_var}"
+    if test -n "${key}" && test -n "${project}" ; then
+        ecerr "$0: ${name}: set ${key_var} or ${project_var}, not both"
+        return 2
+    elif test -z "${key}" && test -z "${project}" ; then
+        ecerr "$0: ${name}: no credentials; set ${key_var} (Gemini API key) or ${project_var} (Vertex AI)"
+        return 2
+    elif test -n "${credentials}" && ! test -r "${credentials}" ; then
+        ecerr "$0: ${name}: ${credentials_var} is not a readable file: ${credentials}"
+        return 2
+    fi
+    local -a reply
+    h-agy-account-info "api_${name}" @RET
+    local id="${reply[1]}" label="${reply[2]}" cli="${reply[4]}"
+    if ! test -d "${cli}" ; then
+        agy-account-prepare "${id}" @RET
+    fi
+    #: The credentials travel as exported locals: they reach only this agy,
+    #: and never appear on a command line. `env -u' drops ambient values that
+    #: would win over them (agy prefers GOOGLE_API_KEY to GEMINI_API_KEY).
+    local -a drop
+    if test -n "${key}" ; then
+        h-agy-api-settings "${cli}/settings.json" gemini @RET
+        local -x GEMINI_API_KEY="${key}"
+        drop=( GOOGLE_API_KEY AGY_ADC_AUTH GOOGLE_GENAI_USE_VERTEXAI )
+    else
+        h-agy-api-settings "${cli}/settings.json" '' @RET
+        local -x AGY_ADC_AUTH=1 GOOGLE_CLOUD_PROJECT="${project}"
+        local -x GOOGLE_CLOUD_LOCATION="${(P)location_var:-global}"
+        if test -n "${credentials}" ; then
+            local -x GOOGLE_APPLICATION_CREDENTIALS="${credentials:A}"
+        fi
+        drop=( GEMINI_API_KEY GOOGLE_API_KEY GOOGLE_GENAI_USE_VERTEXAI )
+    fi
+    h-agy-account-argv "${id}" "$@" @RET
+    local -a unset_args=()
+    local var
+    for var in "${drop[@]}" ; do
+        unset_args+=( -u "${var}" )
+    done
+    reply=( "${reply[1]}" "${unset_args[@]}" "${(@)reply[2,-1]}" )
+    agent_launch_glyph="🪐/${label} " agent_launch_echo_p=y \
+        h-agent-launch agy "${reply[@]}"
+}
+
+agy-api-refresh
 agy-accounts-refresh
 ##
