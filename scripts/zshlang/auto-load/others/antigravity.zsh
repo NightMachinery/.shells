@@ -444,8 +444,26 @@ function h-agy-api-gcloud-dir {
     ec "${AGY_API_GCLOUD_DIR:-${HOME}/.config/gcloud/agy-api}/${1}"
 }
 
+function h-agy-api-projects {
+    #: Usage: ACCESS_TOKEN; prints "PROJECT_ID<TAB>NAME" for each active project
+    #: the token's account can see. The token reaches curl on stdin only.
+    local token="${1}" page='' out
+    while true ; do
+        out="$(print -r -- "Authorization: Bearer ${token}" | command curl --silent --show-error --max-time 30 --header @- \
+            "https://cloudresourcemanager.googleapis.com/v1/projects?pageSize=500&filter=lifecycleState:ACTIVE${page:+&pageToken=${page}}")" @RET
+        if ! print -r -- "${out}" | command jq --exit-status 'has("error") | not' >/dev/null 2>&1 ; then
+            ecerr "$0: could not list projects: $(print -r -- "${out}" | command jq -r '.error.message? // .' 2>/dev/null)"
+            return 1
+        fi
+        print -r -- "${out}" | command jq -r '.projects[]? | "\(.projectId)\t\(.name // "")"'
+        page="$(print -r -- "${out}" | command jq -r '.nextPageToken // empty')"
+        test -n "${page}" || break
+    done
+}
+
 function agy-api-login {
-    : "usage: agy-api-login NAME [PROJECT]; signs profile NAME in to Vertex AI through Google in the browser"
+    : "usage: agy-api-login NAME [PROJECT]; signs profile NAME in to Vertex AI through Google in the browser.
+Without PROJECT, and with none saved, it offers the signed-in account's projects in fzf."
     local name="${1}" project="${2}"
     if [[ "${name}" != [a-z][a-z0-9_]# ]] ; then
         ecerr "$0: invalid profile name: ${name:-<none>}"
@@ -465,8 +483,8 @@ function agy-api-login {
     if test -z "${project}" && test -r "${dir}/project" ; then
         project="$(<"${dir}/project")"
     fi
-    if [[ "${project}" != [a-z][-a-z0-9.:]# ]] ; then
-        ecerr "usage: agy-api-${name}-login PROJECT_ID   (the Google Cloud project that pays for Vertex AI)"
+    if test -n "${project}" && [[ "${project}" != [a-z][-a-z0-9.:]# ]] ; then
+        ecerr "usage: agy-api-${name}-login [PROJECT_ID]   (the Google Cloud project that pays for Vertex AI)"
         return 2
     fi
     if ! (( ${+commands[gcloud]} )) ; then
@@ -474,10 +492,11 @@ function agy-api-login {
         return 127
     fi
     command mkdir -p -m 700 -- "${dir}" @RET
-    #: The quota project comes from the core project, so the sign-in records it.
-    CLOUDSDK_CONFIG="${dir}" CLOUDSDK_CORE_PROJECT="${project}" \
-        command gcloud auth application-default login @RET
-    print -r -- "${project}" >| "${dir}/project" @RET
+    #: The quota project comes from the core project, so a known project is
+    #: recorded by the sign-in itself.
+    local -a gcloud_env=( CLOUDSDK_CONFIG="${dir}" )
+    test -z "${project}" || gcloud_env+=( CLOUDSDK_CORE_PROJECT="${project}" )
+    command env "${gcloud_env[@]}" gcloud auth application-default login @RET
 
     local token state
     token="$(CLOUDSDK_CONFIG="${dir}" command gcloud auth application-default print-access-token 2>/dev/null)"
@@ -485,6 +504,22 @@ function agy-api-login {
         ecerr "$0: ${name}: the sign-in left no working credentials in ${dir}"
         return 1
     fi
+    if test -z "${project}" ; then
+        #: Listed with the new sign-in, so these are that account's projects.
+        local -a picked
+        picked=( "${(@f)$(h-agy-api-projects "${token}" | command sort |
+            fz_no_preview=y fz --delimiter=$'\t' --prompt="agy-api-${name} project> " \
+                --header='The Google Cloud project that pays for Vertex AI')}" )
+        project="${picked[1]%%$'\t'*}"
+        if [[ "${project}" != [a-z][-a-z0-9.:]# ]] ; then
+            ecerr "$0: ${name}: no project chosen; rerun as agy-api-${name}-login PROJECT_ID"
+            return 2
+        fi
+        if ! CLOUDSDK_CONFIG="${dir}" command gcloud auth application-default set-quota-project "${project}" ; then
+            ecerr "$0: ${name}: ${project} is not the quota project (see gcloud's message); Vertex AI still bills it"
+        fi
+    fi
+    print -r -- "${project}" >| "${dir}/project" @RET
     #: Most first runs fail on a project without the Vertex AI API, so check
     #: it now. The token goes to curl on stdin, never on its command line.
     state="$(print -r -- "Authorization: Bearer ${token}" | command curl --silent --max-time 20 --header @- \

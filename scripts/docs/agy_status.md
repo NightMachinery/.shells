@@ -113,7 +113,7 @@ other names, set `AGY_API_PROFILES` (default `personal work`) and run
 The quickest start is Vertex AI with a browser sign-in:
 
 ```zsh
-agy-api-work-login my-project-id   # opens Google; pick the account to bill
+agy-api-work-login   # opens Google, then fzf over that account's projects
 agy-api-work
 ```
 
@@ -125,10 +125,15 @@ AI); the resulting `authorized_user` credentials and the project ID stay in
 that directory, so each profile can sign in as a different account and none
 touches the machine's default gcloud sign-in. Keeping it under
 `~/.config/gcloud` puts it inside the paths the agy driver already denies its
-children. The project becomes the credentials' quota project, and the command
-then asks the Service Usage API whether Vertex AI is enabled there, printing
-the console link to enable it if not. The project is needed only on the first
-sign-in; a later `agy-api-work-login` reuses the stored one.
+children.
+
+The project to bill is the argument, else `AGY_API_PROJECT_<NAME>`, else the
+one a previous sign-in stored. With none of them, the command lists the active
+projects the newly signed-in account can see (Cloud Resource Manager, every
+page) and offers them in `fz`. A user ADC token lists them without a quota
+project; checked on 2026-11-19. The chosen project becomes the credentials'
+quota project, and the command then asks the Service Usage API whether Vertex
+AI is enabled there, printing the console link to enable it if not.
 
 Each profile is a hidden account, `api_NAME`, with its own root
 `~/.agy-accounts/api_NAME`, prepared like any other account (shared rules,

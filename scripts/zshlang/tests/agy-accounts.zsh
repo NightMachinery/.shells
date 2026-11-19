@@ -61,9 +61,13 @@ esac
 SH
 command cat > "${test_tmp}/bin/curl" <<'SH'
 #!/bin/sh
-printf '%s\n' "$*" > "${AGY_TEST_GCLOUD_CALLS}.curl-argv"
+printf '%s\n' "$*" >> "${AGY_TEST_GCLOUD_CALLS}.curl-argv"
 cat > "${AGY_TEST_GCLOUD_CALLS}.curl-stdin"
-echo "{\"state\":\"${AGY_TEST_VERTEX_STATE:-ENABLED}\"}"
+case "$*" in
+    *cloudresourcemanager*pageToken=p2*) echo '{"projects":[{"projectId":"fixture-picked","name":"Picked"}]}' ;;
+    *cloudresourcemanager*) echo '{"projects":[{"projectId":"fixture-other","name":"Other"}],"nextPageToken":"p2"}' ;;
+    *) echo "{\"state\":\"${AGY_TEST_VERTEX_STATE:-ENABLED}\"}" ;;
+esac
 SH
 command chmod +x "${test_tmp}/bin/gcloud" "${test_tmp}/bin/curl"
 typeset -gx PATH="${test_tmp}/bin:${PATH}"
@@ -306,15 +310,30 @@ AGY_ACCOUNTS='acc1 api_x' h-agy-accounts >/dev/null 2>&1 || api_rc=$?
 # Vertex AI through a browser sign-in: agy-api-NAME-login keeps the
 # credentials and project in the profile's own gcloud directory.
 (( ${+functions[agy-api-work-login]} )) || fail 'generated login command'
-for api_case in no-project key-set ; do
+for api_case in bad-project key-set ; do
     api_rc=0
     case "${api_case}" in
-        no-project) agy-api-work-login 2>/dev/null || api_rc=$? ;;
+        bad-project) agy-api-work-login 'Not A Project' 2>/dev/null || api_rc=$? ;;
         key-set) AGY_API_KEY_WORK=k agy-api-work-login fixture-login-project 2>/dev/null || api_rc=$? ;;
     esac
     (( api_rc == 2 )) || fail "login ${api_case} went ahead"
 done
 [[ ! -e "${AGY_TEST_GCLOUD_CALLS}" ]] || fail 'refused login still ran gcloud'
+#: With no project given or saved, the signed-in account's projects (every
+#: page) go to fzf; the stand-in picks the one on the second page.
+function fz { command grep -F fixture-picked }
+agy-api-personal-login >/dev/null
+[[ "$(<"${AGY_API_GCLOUD_DIR}/personal/project")" == fixture-picked ]] || fail 'picked project not stored'
+[[ "$(command head -n 1 "${AGY_TEST_GCLOUD_CALLS}")" == "${AGY_API_GCLOUD_DIR}/personal||auth application-default login" ]] ||
+    fail 'login without a project set one'
+command grep -q -x -F "${AGY_API_GCLOUD_DIR}/personal||auth application-default set-quota-project fixture-picked" "${AGY_TEST_GCLOUD_CALLS}" ||
+    fail 'picked project not made the quota project'
+function fz { return 130 }
+api_rc=0
+agy-api-login spare 2>/dev/null >&2 || api_rc=$?
+(( api_rc == 2 )) && [[ ! -e "${AGY_API_GCLOUD_DIR}/spare/project" ]] || fail 'cancelled picker stored a project'
+unfunction fz
+command rm -f -- "${AGY_TEST_GCLOUD_CALLS}"
 agy-api-work-login fixture-login-project >/dev/null
 typeset -g api_gcloud="${AGY_API_GCLOUD_DIR}/work"
 [[ "$(command head -n 1 "${AGY_TEST_GCLOUD_CALLS}")" == "${api_gcloud}|fixture-login-project|auth application-default login" ]] ||
