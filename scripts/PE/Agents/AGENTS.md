@@ -27,7 +27,7 @@
 
 - We are usually pushing to public git remotes. Be deliberate about what personal information we put into commits. Ask the user if in doubt. See **Private Information** below.
 
-- Keep a checklist in `TASKS.org` (this file should be gitignored in each repo locally). Tick each item when it’s done, and add anything new you find.
+- Keep your checklist on the desk with `agent-desk task` (the `agent-desk` skill shows how: types such as `bug`, tags, subtasks), so the user sees it on the Tasks page. Start each item when you begin it, mark it done when it is, and add anything new you find. Only where `agent-desk` is missing, keep the checklist in `TASKS.org` instead (gitignored in each repo locally).
   - Shorthand names for items, milestones, etc., should be clear, easy to understand, and follow consistent, systematic naming conventions.
 
 ## `~/scripts`
