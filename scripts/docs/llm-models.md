@@ -3,7 +3,10 @@
 The models are defined in `zshlang/auto-load/others/openai.zsh` (`## * Models`). Each `define-llm-model-v2` call takes a short name and generates `with-<short>` (prefix a command to use that model), `llm-<short>`, `llm-<short>-chat` and `reval-to-<short>`, plus the aliases listed with it. Prefix any prompt function to pick a model: `with-sol 2en '...'`.
 
 - `flash`: Gemini 3.8 Flash on Vertex AI. **The default** (`llm_default_model`).
-- `argon`: Gemini 4 Argon on Vertex AI.
+- `argon`: Gemini 4 Argon on Vertex AI, Google's flagship reasoning model.
+- `carbon`: Gemini 4 Carbon on Vertex AI, a frontier model for coding and agentic work.
+- `neon`: Gemini 4 Neon on Vertex AI, a fast mid-priced model for coding and agentic work.
+- `hydrogen`: Gemini 4 Hydrogen on Vertex AI, the low-latency workhorse of Gemini 4 (`rhy`, `lhy`).
 - `luna`, `terra`, `sol`, `astra`: GPT-6 Luna, 6.1 Terra, 6.1 Sol and 6 Astra through the Codex subscription (`llm-openai-via-codex`). `codex-models-ls` lists what it offers.
 - `opus`: Claude Opus 5.5 through OpenRouter, billed per token.
 
@@ -26,6 +29,10 @@ llm uninstall llm-vertex   #: same model ids, so remove it first
 llm install https://github.com/NightMachinery/llm-vertex-genai/archive/refs/heads/main.zip
 ```
 
+To pick up a new commit, add `--force-reinstall --no-cache-dir`. Rerunning the same URL without them silently keeps the old version, and `llm install` has no `--no-deps`.
+
 It authenticates with `gcloud auth application-default login`. `llm-m` sets `VERTEX_PROJECT_ID` to `gcp_pa_project` (the purple-aura project, from `~/.night-gcp/config.zsh`) unless it is already set. The `gemini-purple-aura` API key does not work here: it is restricted to the AI Studio API. Use `with-purple-aura-gemini` with an AI Studio model (`llm_model=gemini-3.8-flash`) for that route.
 
 Add a new Vertex model either to the plugin's default list or with `LLM_VERTEX_MODELS=id1,id2`; each becomes `vertex-<id>`.
+
+As of 2026-11-20, Gemini 4 calls on Vertex (Argon, Carbon, Neon, Hydrogen) mostly fail with 429 `RESOURCE_EXHAUSTED`, while 3.8 Flash answers reliably. That is why Flash stays the default although Hydrogen is Gemini 4's low-latency model. Hydrogen also costs about 1.8 times as much as Flash per token.

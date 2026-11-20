@@ -643,6 +643,33 @@ typeset -gA gemini_argon_obj=(
     send_aliases 'largon'
 )
 define-llm-model-v2 gemini_argon_obj
+
+typeset -gA gemini_carbon_obj=(
+    model_name 'vertex-gemini-4-carbon'
+    long_name 'gemini_carbon'
+    short_name 'carbon'
+    reval_to_aliases 'rcarbon'
+    send_aliases 'lcarbon'
+)
+define-llm-model-v2 gemini_carbon_obj
+
+typeset -gA gemini_neon_obj=(
+    model_name 'vertex-gemini-4-neon'
+    long_name 'gemini_neon'
+    short_name 'neon'
+    reval_to_aliases 'rneon'
+    send_aliases 'lneon'
+)
+define-llm-model-v2 gemini_neon_obj
+
+typeset -gA gemini_hydrogen_obj=(
+    model_name 'vertex-gemini-4-hydrogen'
+    long_name 'gemini_hydrogen'
+    short_name 'hydrogen'
+    reval_to_aliases 'rhydrogen rhy'
+    send_aliases 'lhydrogen lhy'
+)
+define-llm-model-v2 gemini_hydrogen_obj
 ## ** OpenAI via the Codex subscription
 #: `codex-models-ls` lists what the subscription offers. Effort `max` needs
 #: [[https://github.com/simonw/llm-openai-via-codex/pull/6][llm-openai-via-codex#6]]; until it merges, install from the fork (see docs/llm-models.md).
