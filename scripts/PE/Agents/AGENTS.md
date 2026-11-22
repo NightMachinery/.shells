@@ -81,6 +81,11 @@ build step, never by hand; hash the filename instead where a layer ignores the
 query. Keep stable names for the HTML page (served `no-cache`), service
 workers, manifests and their icons.
 
+## Pin Hugging Face Models to a Commit
+
+Load models, tokenizers and datasets with `revision="<commit sha>"`, and set `HF_HUB_OFFLINE=1` on machines with a
+shared cache: a bare name follows `refs/main`, which any online call can move to a newer upstream version.
+
 ## VPS / Local Machine Detection
 
 - Only check whether the machine is a VPS if you actually need to know.
