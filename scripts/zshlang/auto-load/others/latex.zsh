@@ -331,6 +331,47 @@ function h-pdflatex-emacs-async {
     awaysh-bnamed "${marker}" log-to "${log}" h-pdflatex-emacs "$@"
 }
 
+function org-beamer-export-to-pdf {
+    #: Usage: `org-beamer-export-to-pdf [file.org] ...`
+    #: Exports each org-beamer file to LaTeX through the running Emacs server, then compiles it here with [agfi:pdflatex-m], so the LaTeX output shows in this terminal. Without arguments, it exports the file of Emacs's selected buffer.
+    #: The buffer is reverted first, so save your edits before calling this.
+    local files=("$@")
+
+    if (( ${#files} == 0 )) ; then
+        local current
+        current="$(emc-eval '(or (buffer-file-name) "")')" @RET
+        if [[ "${current}" != *.org ]] ; then
+            ecerr "$0: no file given, and Emacs's selected buffer is not an org file: ${current}"
+            return 1
+        fi
+        files=("${current}")
+    fi
+
+    local f tex ret=0
+    for f in "${files[@]}" ; do
+        f="${f:A}"
+        if [[ "${f}" != *.org || ! -f "${f}" ]] ; then
+            ecerr "$0: not an existing org file: ${f}"
+            ret=1
+            continue
+        fi
+
+        tex="${f:r}.tex"
+        command rm -f -- "${tex}"
+        #: A failed export is silent and would otherwise leave the previous .tex to be compiled.
+        emc-eval "(with-current-buffer (find-file-noselect \"${f}\") (revert-buffer t t t) (org-beamer-export-to-latex))" > /dev/null
+        if [[ ! -f "${tex}" ]] ; then
+            ecerr "$0: Emacs did not export ${f}"
+            ret=1
+            continue
+        fi
+
+        pdflatex_autodir=y pdflatex_keep_p=y pdflatex-m -shell-escape -interaction=nonstopmode "${tex}" || ret=$?
+    done
+
+    return "${ret}"
+}
+
 function pdflatex-full {
     #: @deprecated Use [agfi:pdflatex-m].
     ##
