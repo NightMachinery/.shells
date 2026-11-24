@@ -84,6 +84,42 @@ function h-agy-account-info {
     reply=( "${id}" "${(P)label_var:-${(P)name_var:-${default_label}}}" "${root}" "${root}/antigravity-cli" "${cache}" )
 }
 
+function h-agy-stored-auth {
+    : "usage: h-agy-stored-auth ACCOUNT
+Prints where ACCOUNT's sign-in is stored: file-present, keychain or missing. Fails when missing."
+    #: agent-quotas owns the rule (=agent-quotas agy-auth=): the token file,
+    #: then, on macOS, agy's keychain item for the account in the default
+    #: ~/.gemini, which agy 1.5 uses even in file mode. Passing the root
+    #: resolved here keeps the answer right for accounts its config lacks.
+    #: Without the binary, with =agent_quotas_p=n=, or with a binary too old to
+    #: know the command (exit 2), only the token file counts. Neither path
+    #: opens a credential.
+    ##
+    local enabled="${agent_quotas_p:-auto}"
+    local -a reply
+    h-agy-account-info "${1}" @RET
+    local root="${reply[3]}" agy_home="${reply[4]}"
+    if [[ "${enabled}" != n ]] && whence -p agent-quotas >/dev/null ; then
+        local out ret=0
+        out="$(command agent-quotas agy-auth --dir "${root}" 2>/dev/null)" || ret=$?
+        if (( ret <= 1 )) && [[ "${out}" == (file-present|keychain|missing) ]] ; then
+            ec "${out}"
+            return "${ret}"
+        fi
+    fi
+    if test -s "${agy_home}/antigravity-oauth-token" ; then
+        ec file-present
+    else
+        ec missing
+        return 1
+    fi
+}
+
+function h-agy-signed-in-p {
+    : "usage: h-agy-signed-in-p ACCOUNT ; succeeds when ACCOUNT's sign-in is stored ([agfi:h-agy-stored-auth])"
+    h-agy-stored-auth "$@" >/dev/null
+}
+
 function h-agy-account-launcher {
     #: The launcher that resumes a conversation owned by account ID.
     if [[ "${1}" == api_*_light ]] ; then
@@ -214,7 +250,7 @@ function h-agy-model-catalog {
     local -a reply catalog_args
     h-agy-account-info "${id}" @RET
     id="${reply[1]}"
-    if ! test -s "${reply[4]}/antigravity-oauth-token" ; then
+    if ! h-agy-signed-in-p "${id}" ; then
         ecerr "$0: ${id}: not signed in; run agy-acc-login ${id}"
         return 1
     fi
@@ -390,8 +426,9 @@ function agy-acc-login {
 function h-agy-account-login-run {
     local -a reply
     h-agy-account-info "${AGY_ACCOUNT_ID}" @RET
-    if test -s "${reply[4]}/antigravity-oauth-token" ; then
-        ec "File credentials already exist; verifying without signing out."
+    local stored
+    if stored="$(h-agy-stored-auth "${AGY_ACCOUNT_ID}")" ; then
+        ec "Already signed in (${stored/file-present/token file}); verifying without signing out."
     else
         antigravity --mode plan @RET
     fi

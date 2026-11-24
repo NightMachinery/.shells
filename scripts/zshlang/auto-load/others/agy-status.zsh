@@ -98,7 +98,7 @@ function h-agy-status-run {
     h-agy-account-info "${account}" @RET
     #: An unattended report must never start browser sign-in. Token contents
     #: are deliberately not opened here, even to guess at identity/expiry.
-    if ! test -s "${reply[4]}/antigravity-oauth-token" ; then
+    if ! h-agy-signed-in-p "${account}" ; then
         ecerr "$0: ${account}: signed out; run agy-acc-login ${account}"
         return 1
     fi
@@ -1047,17 +1047,17 @@ function h-agy-status-account-json {
     local -x agy_status_cache_file="${reply[5]}"
     local agy_status_json_p=y
     local buckets='[]' error='' message='' auth_status=missing signed_in=false ret=0
-    local metadata='{}'
+    local metadata='{}' stored='file credentials exist'
     if test -r "${agy_status_cache_file}" ; then
         metadata="$(command jq --compact-output '.account | if type == "object" then . else {} end' "${agy_status_cache_file}" 2>/dev/null)" || metadata='{}'
     fi
-    if test -s "${reply[4]}/antigravity-oauth-token" ; then
-        auth_status=file-present
+    if auth_status="$(h-agy-stored-auth "${id}")" ; then
         signed_in=null
+        [[ "${auth_status}" != keychain ]] || stored='a keychain sign-in exists'
         buckets="$(h-agy-status-one)" || ret=$?
         if (( ret != 0 )) ; then
             buckets='[]'
-            error="Quota check failed (exit ${ret}); file credentials exist, validity unverified"
+            error="Quota check failed (exit ${ret}); ${stored}, validity unverified"
         elif ! ec "${buckets}" | command jq --exit-status 'type == "array" and length > 0' >/dev/null 2>&1 ; then
             buckets='[]'
             error='Quota check returned no buckets'
@@ -1070,6 +1070,7 @@ function h-agy-status-account-json {
             fi
         fi
     else
+        auth_status=missing
         message="Not signed in; run agy-acc-login ${id}"
     fi
     command jq --null-input --arg account "${id}" --arg label "${label}" \

@@ -42,7 +42,8 @@ agy-acc-login --tmux cave  # or: agy-acc-login -t cave
 
 The helper runs sign-in in the current terminal. Complete Google sign-in, then
 exit agy; the helper runs `models` to verify the account and returns its status.
-If a token already exists it verifies without signing out. No argument selects
+If the account is already signed in (a token file, or `m`'s keychain sign-in),
+it verifies without signing out. No argument selects
 the current account (or `m` outside an account shell).
 
 Use `-t` or `--tmux` to keep sign-in in a detached session. The helper prints a
@@ -98,9 +99,20 @@ message selecting file token storage. These controls are not documented in
 so recheck them after a native CLI update.
 
 The token remains `<Gemini root>/antigravity-cli/antigravity-oauth-token`.
-Status tests file existence without opening token contents. Cached quota
-cannot establish whether a token is still valid: output distinguishes stored
-file credentials from a live verified sign-in.
+agy 1.5 still accepts a keychain sign-in when that file is missing: it tries
+the file, then the keychain, even in file mode. The keychain item is one per
+macOS user, so it counts only for the account in the default `~/.gemini`
+(normally `m`).
+
+[agfi:h-agy-stored-auth] decides whether an account is signed in, for
+`agy-best`, `agy-acc-login` and the `agy-status` fallback. It asks
+`agent-quotas agy-auth --dir <Gemini root>`, which prints `file-present`,
+`keychain` or `missing`, so the rule lives only in agent-quotas. Where that
+binary is missing, too old to know the command, or switched off with
+`agent_quotas_p=n`, only the token file counts. Neither path opens a
+credential. Cached quota cannot establish whether a sign-in still works:
+output distinguishes stored credentials (`file-present`, `keychain`) from a
+live verified sign-in (`verified`).
 
 ## API-billed profiles
 
@@ -283,7 +295,7 @@ Bars and percentages are green below 70%, yellow at 70 through 89%, and red at
 with `agy_status_color=always`; `agy_status_color=never` disables it explicitly.
 Each failed account keeps its own error and never hides other accounts. Exit
 status is 1 when any account has an error; stdout is still a complete report.
-An account without a token is a normal `not signed in` status, with a login hint,
+An account with no stored sign-in is a normal `not signed in` status, with a login hint,
 not a measurement error. It does not trigger quota-watcher error alerts.
 
 `agy-status --json` emits an array of account objects with `account`, `label`,

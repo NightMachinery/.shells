@@ -143,6 +143,40 @@ AGY_ACCOUNT_ID=acc1 agy_status_json_p=y agy-status | command jq --exit-status '.
 [[ "$(agy-status --bogus 2>&1)" != AQ* ]] || fail 'unknown flag reached agent-quotas'
 agent_quotas_p=n
 
+# Sign-in is agent-quotas agy-auth's answer (a keychain sign-in has no token
+# file); the token file decides only where that binary is missing, switched
+# off, or too old to know the command.
+command cat > "${test_tmp}/bin/agent-quotas" <<'SH'
+#!/bin/sh
+[ "$1" = agy-auth ] || exit 2
+printf '%s\n' "$*" > "${AGY_TEST_AQ_ARGV}"
+[ -n "${AGY_TEST_AQ_AUTH}" ] || { echo 'agent-quotas: unknown command "agy-auth"' >&2; exit 2; }
+echo "${AGY_TEST_AQ_AUTH}"
+[ "${AGY_TEST_AQ_AUTH}" != missing ]
+SH
+typeset -gx AGY_TEST_AQ_ARGV="${test_tmp}/aq-argv" AGY_TEST_AQ_AUTH=keychain
+command mv -- "${AGY_SHARED_GEMINI_DIR}/antigravity-cli/antigravity-oauth-token" "${test_tmp}/acc1-token"
+agent_quotas_p=auto
+[[ "$(h-agy-stored-auth acc1)" == keychain ]] || fail 'agy-auth answer ignored'
+[[ "$(<"${AGY_TEST_AQ_ARGV}")" == "agy-auth --dir ${AGY_SHARED_GEMINI_DIR:A}" ]] || fail 'agy-auth not given the resolved root'
+h-agy-model-catalog acc1 >/dev/null || fail 'catalog refused a keychain sign-in'
+agy-status --account acc1 --json | command jq --exit-status '
+ .[0].auth_status == "keychain" and .[0].message == null and (.[0].buckets | length > 0)
+' >/dev/null || fail 'status fallback ignored a keychain sign-in'
+login_output="$(agy-acc-login acc1 </dev/null)"
+[[ "${login_output}" == 'Already signed in (keychain);'* ]] || fail 'login did not see the keychain sign-in'
+command jq --exit-status '.argv[-1] == "models"' "${AGY_TEST_CALLS}" >/dev/null || fail 'login started a sign-in'
+AGY_TEST_AQ_AUTH=missing
+if h-agy-signed-in-p acc1 ; then fail 'agy-auth missing ignored'; fi
+AGY_TEST_AQ_AUTH=''
+[[ "$(h-agy-stored-auth acc1)" == missing ]] || fail 'an old agent-quotas must fall back to the token file'
+if h-agy-model-catalog acc1 >/dev/null 2>&1 ; then fail 'catalog accepted no sign-in'; fi
+AGY_TEST_AQ_AUTH=keychain agent_quotas_p=n
+[[ "$(h-agy-stored-auth acc1)" == missing ]] || fail 'agent_quotas_p=n still asked agent-quotas'
+command mv -- "${test_tmp}/acc1-token" "${AGY_SHARED_GEMINI_DIR}/antigravity-cli/antigravity-oauth-token"
+[[ "$(h-agy-stored-auth acc1)" == file-present ]] || fail 'token file fallback'
+unset AGY_TEST_AQ_AUTH
+
 # Best account considers the minimum known window; only Gemini prefers acc2.
 agy-best --model 'Gemini fixture' models
 command jq --exit-status '.account == "acc2"' "${AGY_TEST_CALLS}" >/dev/null
@@ -435,4 +469,4 @@ AGY_TEST_PASEO_APPLIED='' agy-api-work-add-to-paseo >/dev/null 2>&1 || api_rc=$?
 (( api_rc == 1 )) || fail 'unapplied reload not reported'
 unset PASEO_HOME AGY_REAL_BIN
 
-print -r -- 'ok: launch isolation, named accounts, configuration, status JSON, best, cache-only, login recovery, API profiles, Vertex sign-in, light profiles and Paseo providers'
+print -r -- 'ok: launch isolation, named accounts, configuration, status JSON, sign-in via agent-quotas, best, cache-only, login recovery, API profiles, Vertex sign-in, light profiles and Paseo providers'
