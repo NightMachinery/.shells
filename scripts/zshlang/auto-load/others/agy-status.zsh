@@ -2,51 +2,35 @@
 #: Antigravity's remaining quota, and picking a conversation back up when it
 #: resets.
 #:
-#: Two implementations of the same report, chosen by
-#: [agfi:agy_status_method]:
-#:
-#: - =statusline= ([agfi:h-agy-status-statusline]) reads a cache that agy
-#:   itself fills. agy pipes a JSON payload to a configured statusline command
-#:   on every render, and that payload carries all four quota buckets; our hook
-#:   =zshlang/wrappers/agy_statusline.dash= merges them into
-#:   [agfi:agy_status_cache_file] as it goes. The report is then a file read,
-#:   with no `agy' start-up and no HTTP at all. [agfi:agy-statusline-install]
-#:   is what puts the hook in agy's settings.
-#: - =slow= ([agfi:h-agy-status-slow]) runs =agy -p /usage= (alias =/quota=),
-#:   which prints one tab separated row per model group. Per the vendor's
-#:   changelog it spends no quota and leaves no conversation behind, which is
-#:   what makes it safe to call from a report you run all day. It is still a
-#:   full CLI start-up plus five sequential backend round trips, so it runs
-#:   under a timeout and in a throwaway directory -- Antigravity reads the
-#:   cwd's project context, and a report must not attach itself to whatever
-#:   repository you happen to be standing in.
-#:
-#: =statusline= falls back to =slow= when its cache has nothing to say, and
-#: never silently: the reason is always printed. An empty cache is not a
-#: breakage being hidden -- it only means the hook has not run, which is a
-#: fact about whether agy has been open. See =docs/agy_status.md=.
+#: The report is agent-quotas' (=agent-quotas agy-status=,
+#: https://github.com/NightMachinery/agent-quotas): it reads the cache agy's
+#: own statusline hook fills (=zshlang/wrappers/agy_statusline.dash=), and runs
+#: =agy -p /usage= when that cache has nothing to say or under =deus=.
+#: [agfi:agy-status] only maps this file's knobs onto its flags, so the
+#: quota rules live in one place. What stays here is the shell's side:
+#: installing the hook into agy's settings ([agfi:agy-statusline-install]),
+#: and arming a job for when the quota comes back
+#: ([agfi:agy-status-notify]).
 #:
 #: Everything after "when does it reset" -- arming the job, waiting the clock
 #: out, deciding whether resuming is safe, delivering the resume text -- is
 #: agent-neutral and lives in =agent-usage.zsh=. See =docs/agy_status.md= and
 #: =docs/agent-usage-armed.md=.
 ##
-#: Which implementation [agfi:agy-status] runs. An enum rather than a
-#: =_p= switch, because "which implementation" is not a yes/no question, and
-#: a third one has already come and gone here.
+#: =statusline= serves the cache; =slow= runs =agy -p /usage= now
+#: (=agent-quotas agy-status --refresh=). An enum rather than a =_p= switch,
+#: because "which way to read" is not a yes/no question.
 typeset -g agy_status_method="${agy_status_method:-statusline}"
-#: The cache the statusline hook writes and the =statusline= path reads. Two
-#: writers share it, so both merge per bucket; see
-#: [agfi:h-agy-status-cache-merge].
+#: The cache the statusline hook writes. agent-quotas reads each account's
+#: from its own config; this is what the hook and the launchers use.
 #:
 #: =zshlang/wrappers/agy_statusline.dash= reads this same name out of its
 #: *environment*, so overriding it for a test has to be an assignment the hook
 #: can see, not merely a shell-local one.
 typeset -g agy_status_cache_file="${agy_status_cache_file:-${HOME}/tmp/.agy-status/quota-cache.json}"
-#: How old a cached bucket may be and still be reported. A NEGATIVE value means
-#: "never drop on age": serve the cache however old it is. An absent cache is a
-#: different question -- there is nothing to serve at any age -- so it falls
-#: back to the slow path whatever this says.
+#: With =agy_status_cache_only_p=y=: how old a cached bucket may be and still
+#: be reported, in seconds; negative means any age. Other reads use
+#: =statusline_max_age_s= from agent-quotas' config.
 typeset -g agy_status_statusline_max_age_s="${agy_status_statusline_max_age_s:-3600}"
 #: Where agy keeps the settings [agfi:agy-statusline-install] writes into. A
 #: knob mostly so the installer can be exercised against a copy.
@@ -54,284 +38,84 @@ typeset -g agy_statusline_settings_file="${agy_statusline_settings_file:-${HOME}
 #: Whether to keep agy's own statusline and stack ours under it, rather than
 #: replacing it. agy's own key, =stack_with_default=.
 typeset -g agy_statusline_stack_with_default_p="${agy_statusline_stack_with_default_p:-y}"
-#: How long =agy -p= gets before we give up on it. Sized for a cold CLI
-#: start-up followed by five sequential backend round trips, so it is far more
-#: generous than a status check would otherwise want.
-typeset -g agy_status_timeout_s="${agy_status_timeout_s:-60}"
-#: Whether the report is run inside the brish garden rather than here; see
-#: [agfi:h-agy-status-garden-p] for what =auto= decides and why.
-typeset -g agy_status_garden_p="${agy_status_garden_p:-auto}"
-#: Emit the report as a JSON array instead of prose, for a caller that parses
-#: it ([agfi:h-agy-status-arm-deadline] is one).
+#: Print the current account's flat bucket array instead of the report, for a
+#: caller that parses it ([agfi:h-agy-status-arm-deadline] is one). An
+#: explicit =--json= still means the account objects.
 typeset -g agy_status_json_p="${agy_status_json_p:-n}"
-#: Also show the pay-as-you-go credit balance. There is no endpoint of ours
-#: for it, so it costs an `agy' start-up on either path -- hence off by
-#: default.
+#: Also show each account's pay-as-you-go credit balance. Nothing caches it,
+#: so it costs an `agy' start-up per account -- hence off by default.
 typeset -g agy_status_credits_p="${agy_status_credits_p:-n}"
+#: Read only the caches, never starting agy, requesting authentication or
+#: contacting a backend: a missing or stale cache is that account's error.
+#: For pollers (the quota watchers).
+typeset -g agy_status_cache_only_p="${agy_status_cache_only_p:-n}"
 #: Utilization at or above which a model group counts as blocking us. The only
 #: knob of the armed job that is Antigravity's own.
 typeset -g agy_status_arm_full_pct="${agy_status_arm_full_pct:-100}"
-#: Human account blocks use colour only on a terminal and without NO_COLOR.
-#: Legacy engine callers retain [agfi:h-color-mode-p]. JSON never gets colour.
+#: =auto= colours a terminal without NO_COLOR; =always= and =never= force it.
 typeset -g agy_status_color="${agy_status_color:-auto}"
 ##
-function h-agy-status-run {
-    #: Runs one of Antigravity's print-mode slash commands and prints its
-    #: output verbatim. The slow path's engine, and the only way to the
-    #: credits, which have no endpoint of their own here.
-    #: Usage: h-agy-status-run </usage|/credits>
+function agy-status {
+    : "all configured accounts; --json for account objects, --account N to select one"
+    #: =agent-quotas agy-status= with this file's knobs as flags. It asks the
+    #: daemon, or reads in this process (=--direct=) when the daemon does not
+    #: answer or =agent_quotas_p=n=. The accounts are those in agent-quotas'
+    #: config. See =docs/agy_status.md=.
     ##
-    local timeout_s="${agy_status_timeout_s:-60}"
+    local method="${agy_status_method:-statusline}"
+    local columns="${agy_status_columns:-${COLUMNS:-80}}"
 
-    local slash_cmd="${1}"
-    assert-args slash_cmd @RET
-
-    if bool "${agy_status_cache_only_p:-n}" ; then
-        ecerr "$0: no usable cached quota; cache-only mode skips agy/network"
+    if ! whence -p agent-quotas >/dev/null ; then
+        ecerr "$0: needs agent-quotas: go install github.com/NightMachinery/agent-quotas/cmd/agent-quotas@latest"
         return 1
     fi
 
-    ensure-cmd agy @RET
-
-    local account="${AGY_ACCOUNT_ID:-m}"
-    local -a reply
-    h-agy-account-info "${account}" @RET
-    #: An unattended report must never start browser sign-in. Token contents
-    #: are deliberately not opened here, even to guess at identity/expiry.
-    if ! h-agy-signed-in-p "${account}" ; then
-        ecerr "$0: ${account}: signed out; run agy-acc-login ${account}"
-        return 1
-    fi
-
-    #: GNU coreutils first, since that is what the rest of zshlang assumes;
-    #: plain =timeout= where the system ships it unprefixed. Running without
-    #: one is still better than refusing to report at all.
-    local -a runner=()
-    if isdefined-cmd gtimeout ; then
-        runner=(gtimeout --kill-after=5 "${timeout_s}")
-    elif isdefined-cmd timeout ; then
-        runner=(timeout --kill-after=5 "${timeout_s}")
-    fi
-
-    local tmp_dir
-    tmp_dir="$(gmktemp -d)" @TRET
-
-    #: `builtin cd' in the subshell only: the caller's directory is never
-    #: touched, and no wrapper of `cd' gets a say. There are no chpwd hooks in
-    #: zshlang, so nothing prints into the output we are capturing.
-    local out='' ret=0
-    local -a process_argv
-    h-agy-account-argv "${account}" --mode plan --print "${slash_cmd}" @RET
-    process_argv=( "${reply[@]}" )
-    out="$(builtin cd -- "${tmp_dir}" && \
-        command "${runner[@]}" "${process_argv[@]}" </dev/null)" || ret=$?
-
-    silent command rm -rf -- "${tmp_dir}" || true
-
-    if (( ret != 0 )) ; then
-        if (( ret == 124 )) ; then
-            ecerr "$0: \`agy -p ${slash_cmd}' timed out after ${timeout_s}s"
-        else
-            ecerr "$0: \`agy -p ${slash_cmd}' failed (${ret})"
-        fi
-
-        return "${ret}"
-    fi
-
-    ec "${out}"
-}
-
-function h-agy-status-bucket-id {
-    #: The cache bucket id for one of [agfi:h-agy-status-rows]' rows.
-    #: Usage: h-agy-status-bucket-id <group> <label>
-    #:
-    #: agy's own ids -- =gemini-5h=, =gemini-weekly=, =3p-5h=, =3p-weekly= --
-    #: are what the statusline payload carries, so the slow path's rows are
-    #: mapped onto them. New per-model pools use their own group slug and window.
-    ##
-    local group="${1}" label="${2}"
-    assert-args group label @RET
-
-    #: Case-insensitively throughout: these are upstream's display strings, and
-    #: "Claude and GPT models" has already changed case once.
-    local group_l="${group:l}" label_l="${label:l}"
-
-    local family='' window=''
-    case "${group_l}" in
-        'gemini models'|'gemini') family=gemini ;;
-        'claude and gpt models'|'claude and gpt'|'claude/gpt models') family=3p ;;
+    local -a args=()
+    case "${method}" in
+        statusline) ;;
+        slow) args+=(--refresh) ;;
         *)
-            #: A model-specific pool is not the family-wide pool. Use its
-            #: group slug, independent of the quota label/window wording.
-            family="${group_l//[^a-z0-9]/-}"
-            family="${family//-(#c2,)/-}"
-            family="${${family#-}%-}"
+            ecerr "$0: unknown agy_status_method: ${method} (statusline, slow)"
+            return 2
             ;;
     esac
 
-    if [[ "${label_l}" == *weekly* ]] ; then
-        window=weekly
-    elif [[ "${label_l}" == (*5h*|*hour*) ]] ; then
-        window=5h
+    local json_p=n
+    (( ${@[(Ie)--json]} )) && json_p=y
+    if bool "${agy_status_json_p:-n}" && ! bool "${json_p}" ; then
+        args+=(--flat)
+    elif bool "${agy_status_credits_p:-n}" && ! bool "${json_p}" ; then
+        args+=(--credits)
     fi
 
-    if test -n "${family}" && test -n "${window}" ; then
-        ec "${family}-${window}"
-        return 0
+    if bool "${agy_status_cache_only_p:-n}" ; then
+        args+=(--cache-only --max-age "${agy_status_statusline_max_age_s:-3600}")
+    elif ! h-agent-quotas-p ; then
+        args+=(--direct)
     fi
 
-    #: A row we do not recognize is neither dropped nor guessed at: it gets a
-    #: stable id derived from its own text, so a group upstream invents
-    #: survives the merge and shows up in the report instead of silently
-    #: vanishing between two writers.
-    local derived="${group_l}-${label_l}"
-    derived="${derived//[^a-z0-9]/-}"
-    #: `extendedglob' is set repo-wide, so `(#c2,)' is "two or more".
-    derived="${derived//-(#c2,)/-}"
-    ec "${${derived#-}%-}"
+    [[ "${columns}" == <1-> ]] || columns=80
+    args+=(--columns "${columns}" --color "${agy_status_color:-auto}"
+        --absolute "${agy_status_absolute_p:-auto}")
+
+    command agent-quotas agy-status "${args[@]}" "$@"
 }
+aliasfn ags agy-status
+aliasfn agys agy-status
 
-function h-agy-status-bucket-names {
-    #: The friendly =<group>\t<label>= for a cache bucket id: the inverse of
-    #: [agfi:h-agy-status-bucket-id], so that the cache-backed report says the
-    #: same words the slow path does.
-    #: Usage: h-agy-status-bucket-names <bucket-id>
-    ##
-    local bucket_id="${1}"
-    assert-args bucket_id @RET
-
-    local group label
-    case "${bucket_id}" in
-        gemini-5h|gemini-weekly) group='Gemini Models' ;;
-        3p-5h|3p-weekly) group='Claude and GPT models' ;;
-        *-5h|*-weekly) group="${(C)${${bucket_id%-*}//-/ }}" ;;
-        #: An id we did not coin; showing it verbatim is more honest than
-        #: inventing a display name for it.
-        *) group="${bucket_id}" ;;
-    esac
-
-    case "${bucket_id}" in
-        *-5h) label='5h Limit Remaining' ;;
-        *-weekly) label='Weekly Limit Remaining' ;;
-        *) label='Limit Remaining' ;;
-    esac
-
-    printf '%s\t%s\n' "${group}" "${label}"
-}
-
-function h-agy-status-rows {
-    #: One normalized row per model group:
-    #:   group \t label \t remaining_percent \t reset_epoch \t reset_iso \t bucket_id
-    #:
-    #: The upstream percent is what is LEFT, not what is spent -- the opposite
-    #: of Claude Code's =utilization_percent= -- and the name here says so, so
-    #: that nobody reads 98% as "nearly exhausted".
-    ##
-    ensure-cmd gdate @RET
-
-    local raw
-    raw="$(h-agy-status-run /usage)" @TRET
-
-    local line pct iso epoch bucket_id
-    local -a f
-    for line in "${(@f)raw}" ; do
-        test -n "${line}" || continue
-
-        #: `(ps:\t:)' rather than `read': tab is IFS whitespace, so `read'
-        #: would collapse an empty field rather than keep the columns lined up.
-        f=( "${(@ps:\t:)line}" )
-        if (( ${#f} < 4 )) ; then
-            #: A banner, a warning, an upsell line: anything that is not a
-            #: quota row. Skipped rather than fatal, so one new line of chrome
-            #: upstream does not take the report down with it.
-            ecgray "$0: skipping unrecognized row: ${line}"
-            continue
-        fi
-
-        pct="${f[3]%\%}"
-        if [[ "${pct}" != <->(|.<->) ]] ; then
-            ecgray "$0: skipping row with a non-numeric percent: ${line}"
-            continue
-        fi
-
-        iso="${f[4]}"
-        #: `gdate' because BSD date cannot read an ISO-8601 string without
-        #: being told its format first.
-        epoch="$(gdate -d "${iso}" +%s)" @TRET
-
-        #: The bucket id is carried here rather than recomputed by each
-        #: consumer, because both the cache merge and the JSON want it and they
-        #: must not be able to disagree.
-        bucket_id="$(h-agy-status-bucket-id "${f[1]}" "${f[2]}")" @TRET
-
-        printf '%s\t%s\t%s\t%s\t%s\t%s\n' \
-            "${f[1]}" "${f[2]}" "${pct}" "${epoch}" "${iso}" "${bucket_id}"
-    done
-}
-
-function h-agy-status-json {
-    #: Turns [agfi:h-agy-status-rows] on stdin into the JSON array
-    #: =agy_status_json_p= promises.
-    ##
-    ensure-cmd jq @RET
-
-    local line obj
-    local -a f objects=()
-    while IFS= read -r line ; do
-        test -n "${line}" || continue
-        f=( "${(@ps:\t:)line}" )
-
-        #: `--arg'/`--argjson' throughout: a group name is upstream's text and
-        #: must not be able to reach the jq program as syntax.
-        obj="$(jq -n \
-            --arg group "${f[1]}" \
-            --arg label "${f[2]}" \
-            --argjson remaining "${f[3]}" \
-            --argjson resets "${f[4]}" \
-            --arg iso "${f[5]}" \
-            --arg bucket_id "${f[6]:-}" \
-            --arg source "${agy_status_report_source:-unknown}" \
-            '{group: $group, label: $label, remaining_percent: $remaining, resets_at: $resets, resets_at_iso: $iso, source: $source}
-             + (if $bucket_id == "" then {} else {bucket_id: $bucket_id} end)')" @TRET
-        objects+=("${obj}")
-    done
-
-    #: `-s' rather than building the array in zsh, so the result is jq's own
-    #: idea of well-formed rather than ours.
-    ec "${(F)objects}" | jq -s .
-}
-
-function h-agy-status-credits {
-    #: The pay-as-you-go balance, as `Label: value' lines. Its rows are
-    #: two-column (`Remaining credits', `Upgrade'), so they do not go through
-    #: [agfi:h-agy-status-rows].
-    ##
-    local raw
-    raw="$(h-agy-status-run /credits)" @TRET
-
-    local line
-    local -a f
-    for line in "${(@f)raw}" ; do
-        test -n "${line}" || continue
-
-        f=( "${(@ps:\t:)line}" )
-        if (( ${#f} < 2 )) ; then
-            ec "${line}"
-            continue
-        fi
-
-        ec "${f[1]}: ${f[2]}"
-    done
-}
-
+#: Named methods, so a caller can demand one without knowing the knob. The
+#: slow one is what to reach for when you need the number =agy= itself would
+#: print.
+aliasfnq agy-status-statusline agy_status_method=statusline agy-status
+aliasfnq agy-status-slow agy_status_method=slow agy-status
+##
 function h-agy-status-write-atomic {
     #: Writes $2 into $1 through a temp file in the same directory.
     #: Usage: h-agy-status-write-atomic <file> <content>
     #:
-    #: Shared by the cache merge and the settings installer. Both files have a
-    #: reader that may show up at any instant -- the statusline hook renders
-    #: constantly, and agy re-reads its settings -- and a half-written file
-    #: would be read as a broken one rather than as an old one.
+    #: For the settings installer: agy re-reads its settings, and a
+    #: half-written file would be read as a broken one rather than as an old
+    #: one.
     ##
     local dest="${1}" content="${2}"
     assert-args dest content @RET
@@ -356,459 +140,6 @@ function h-agy-status-write-atomic {
         silent command rm -f -- "${tmp}" || true
         return "${retcode}"
     }
-}
-
-function h-agy-status-cache-merge {
-    #: Merges rows into the shared quota cache, one bucket at a time.
-    #: Usage: h-agy-status-cache-merge <source-name> <rows>
-    #:
-    #: Per bucket, never wholesale. The two writers know different things: the
-    #: statusline hook sees all four buckets, while =agy -p /usage= prints only
-    #: the two weekly ones, so a slow run that replaced the whole file would
-    #: throw away five-hour windows the hook had recorded minutes earlier.
-    #: Read-modify-write, and the write is atomic.
-    ##
-    local cache_file="${agy_status_cache_file:-${HOME}/tmp/.agy-status/quota-cache.json}"
-
-    local source_name="${1}" rows="${2}"
-    assert-args source_name rows @RET
-
-    ensure-cmd jq @RET
-
-    zmodload zsh/datetime 2>/dev/null
-
-    local old=''
-    if test -r "${cache_file}" ; then
-        old="$(command cat -- "${cache_file}")" || old=''
-    fi
-
-    #: `fromjson?' rather than reading the file as JSON: a truncated cache must
-    #: cost us the old buckets, not the write we are in the middle of.
-    local merged
-    merged="$(jq -n \
-        --arg src "${source_name}" \
-        --arg rows "${rows}" \
-        --arg old "${old}" \
-        --argjson now "${EPOCHSECONDS}" \
-        '
-def capture:
-          if type == "object" then (.captured_at | if type == "number" then . else -1 end) else -1 end;
-        def canonical_buckets:
-          to_entries | reduce .[] as $entry ({};
-            ($entry.key | if . == "gemini-argon-wtu-weekly" then "gemini-4-argon-weekly"
-                          elif . == "gemini-argon-5h" then "gemini-4-argon-5h" else . end) as $key
-            | if (. | has($key) | not) or (($entry.value | capture) >= (.[$key] | capture))
-              then .[$key] = $entry.value else . end);
-                ( ($old | fromjson?) // {} ) as $prevraw
-        | ( if ($prevraw | type) == "object" then $prevraw else {} end ) as $prev
-        | ( $rows
-            | split("\n")
-            | map(select(length > 0) | split("\t"))
-            | map(select((.[5] // "") != ""))
-            | map({ key: .[5],
-                    value: { remaining_percent: (.[2] | tonumber),
-                             resets_at: (.[3] | tonumber),
-                             group: .[0], label: .[1],
-                             captured_at: $now,
-                             source: $src } })
-            | from_entries ) as $fresh
-        | $prev + { buckets: ((($prev.buckets // {}) | canonical_buckets) + $fresh) }')" @TRET
-
-    h-agy-status-write-atomic "${cache_file}" "${merged}" @RET
-}
-
-function h-agy-status-render {
-    #: The prose report, from [agfi:h-agy-status-rows]-shaped rows in $1.
-    #:
-    #: Shared by both implementations, so that the answer reads identically
-    #: whether it came from =agy= itself or from the statusline cache.
-    #: Usage: h-agy-status-render <rows>
-    ##
-    local rows="${1}"
-    assert-args rows @RET
-
-    zmodload zsh/datetime 2>/dev/null
-
-    #: Decided once, here, rather than per line: `auto' has to test the stdout
-    #: of the report as a whole. Note the call is *not* in a command
-    #: substitution -- see [agfi:h-color-mode-p] for why that matters.
-    local color=never
-    h-color-mode-p "${agy_status_color:-auto}" && color=always
-
-    #: Raw SGR strings from zsh's own `colors', not [agfi:colorfg]: that one
-    #: re-decides for itself from the environment ([agfi:isColor],
-    #: [agfi:true-color-p]), which is the decision the knob above exists to
-    #: take away from it.
-    local c_group='' c_when='' c_off='' c_pct=''
-    local -A pct_colors=()
-    if [[ "${color}" == always ]] ; then
-        c_group="${fg_bold[white]}"
-        c_when="${fg[blue]}"
-        c_off="${reset_color}"
-        pct_colors=(
-            low "${fg_bold[red]}"
-            mid "${fg[yellow]}"
-            high "${fg[green]}"
-        )
-    fi
-
-    local line when
-    local -a f
-    integer remaining_s
-    for line in "${(@f)rows}" ; do
-        test -n "${line}" || continue
-        f=( "${(@ps:\t:)line}" )
-
-        remaining_s=$(( f[4] - EPOCHSECONDS ))
-        if (( remaining_s > 0 )) ; then
-            when="resets $(date-unix-to-3339 "${f[4]}") (in $(seconds-fmt-short ${remaining_s}))"
-        else
-            #: `agy' reports a window's end even after it has passed, until
-            #: the next call refreshes it.
-            when="reset $(seconds-fmt-short $(( -remaining_s ))) ago"
-        fi
-
-        #: Presentation only, so deliberately not knobs: nothing branches on
-        #: these but the escape codes, and [agfi:agy_status_arm_full_pct] is
-        #: the one threshold that actually decides anything.
-        if (( f[3] <= 10 )) ; then
-            c_pct="${pct_colors[low]}"
-        elif (( f[3] <= 33 )) ; then
-            c_pct="${pct_colors[mid]}"
-        else
-            c_pct="${pct_colors[high]}"
-        fi
-
-        ec "${c_group}${f[1]}${c_off} (${f[2]}): ${c_pct}${f[3]}% remaining${c_off}, ${c_when}${when}${c_off}"
-    done
-}
-
-function h-agy-status-slow {
-    #: What is left of Antigravity's quota, per model group, and when it comes
-    #: back, by asking =agy= itself. Reachable as =agy-status-slow=.
-    #: See =docs/agy_status.md=.
-    ##
-    local json_p="${agy_status_json_p:-n}"
-    local credits_p="${agy_status_credits_p:-n}"
-    local agy_status_report_source=live
-
-    if (( $# > 0 )) ; then
-        #: This path is driven entirely by knobs, so there is nothing an
-        #: argument could mean here. Said out loud rather than dropped, so an
-        #: argument aimed at something else is visible rather than swallowed.
-        ecgray "$0: ignoring arguments: $*"
-    fi
-
-    local rows
-    rows="$(h-agy-status-rows)" @TRET
-    if test -z "${rows}" ; then
-        ecerr "$0: no quota rows in \`agy -p /usage'"
-        return 1
-    fi
-
-    #: The slow path is the authority on the two weekly buckets, so what it
-    #: learns is worth keeping for the fast path to serve. Non-fatal: a cache
-    #: we could not update must never cost us a report we already have in hand.
-    h-agy-status-cache-merge slow "${rows}" @STRUE
-
-    if bool "${json_p}" ; then
-        #: Credits are deliberately not in the JSON: they are a different
-        #: currency from the quota windows, and nothing parses them.
-        ec "${rows}" | h-agy-status-json
-        return $?
-    fi
-
-    h-agy-status-render "${rows}" @RET
-
-    if bool "${credits_p}" ; then
-        h-agy-status-credits
-    fi
-}
-##
-#: The statusline path
-##
-function h-agy-status-statusline-raw {
-    #: One line per cache bucket fresh enough to report:
-    #:   bucket_id \t remaining_percent \t resets_at \t captured_at \t source
-    #:
-    #: Fails (jq's own "no output" status) when nothing survives the age
-    #: filter, which is what tells [agfi:h-agy-status-statusline] to fall back.
-    ##
-    local cache_file="${agy_status_cache_file:-${HOME}/tmp/.agy-status/quota-cache.json}"
-    local max_age_s="${agy_status_statusline_max_age_s:-3600}"
-
-    ensure-cmd jq @RET
-
-    if [[ "${max_age_s}" != (-|)<-> ]] ; then
-        ecerr "$0: agy_status_statusline_max_age_s is not an integer: ${max_age_s}"
-        return 1
-    fi
-
-    test -r "${cache_file}" || return 1
-
-    zmodload zsh/datetime 2>/dev/null
-
-    #: A negative max age is "never drop on age", so the whole `captured_at'
-    #: test is skipped rather than compared against a negative number -- a
-    #: bucket with no `captured_at' at all has to survive that setting too.
-    #: Such a bucket comes out with =-1= for its capture time rather than 0,
-    #: because "unknown" and "captured at the epoch" are different things and
-    #: the second one renders as an age of half a million hours.
-    #:
-    #: jq's own stderr is dropped: a corrupt cache is answered by the caller's
-    #: fallback, with a sentence that says so, not by a parse error from a
-    #: program the user did not run.
-    jq -er \
-        --argjson now "${EPOCHSECONDS}" \
-        --argjson max_age "${max_age_s}" \
-        '
-def capture:
-          if type == "object" then (.captured_at | if type == "number" then . else -1 end) else -1 end;
-        def canonical_buckets:
-          to_entries | reduce .[] as $entry ({};
-            ($entry.key | if . == "gemini-argon-wtu-weekly" then "gemini-4-argon-weekly"
-                          elif . == "gemini-argon-5h" then "gemini-4-argon-5h" else . end) as $key
-            | if (. | has($key) | not) or (($entry.value | capture) >= (.[$key] | capture))
-              then .[$key] = $entry.value else . end);
-        ( .buckets // {} )
-        | canonical_buckets | to_entries
-        | map(select((.value | type) == "object"))
-        | map(select((.value.remaining_percent | type) == "number"))
-        | map(select($max_age < 0
-                     or (((.value.captured_at // null) | type) == "number"
-                         and ($now - .value.captured_at) <= $max_age)))
-        | .[]
-        | [ .key,
-            (.value.remaining_percent | tostring),
-            ((.value.resets_at // 0) | tostring),
-            ((if (.value.captured_at | type) == "number" then .value.captured_at else -1 end) | tostring),
-            (.value.source // "unknown"),
-            (.value.group // ""), (.value.label // "") ]
-        | @tsv' "${cache_file}" 2>/dev/null
-}
-
-function h-agy-status-age-fmt {
-    #: A duration at one unit of precision, for the source note.
-    #:
-    #: [agfi:seconds-fmt-short] always prints all three units (=0h:1m:37s=),
-    #: which is what a reset the reader is waiting on deserves and far more
-    #: than a staleness note nobody acts on to the second.
-    #: Usage: h-agy-status-age-fmt <seconds>
-    ##
-    integer s="${1:-0}"
-    (( s < 0 )) && s=0
-
-    if (( s < 60 )) ; then
-        ec "${s}s"
-    elif (( s < 3600 )) ; then
-        ec "$(( s / 60 ))m"
-    elif (( s < 86400 )) ; then
-        ec "$(( s / 3600 ))h"
-    else
-        ec "$(( s / 86400 ))d"
-    fi
-}
-
-function h-agy-status-writer-desc {
-    #: What a cache writer *is*, rather than the id it files itself under.
-    #: =slow= and =statusline= name our two implementations to each other; to
-    #: somebody reading a status report they say nothing at all, and =slow= in
-    #: particular reads as a complaint about the numbers rather than as their
-    #: provenance.
-    #:
-    #: The command is spelled the way [agfi:h-agy-status-run]'s own error
-    #: messages spell it, so the line names something you can actually run.
-    #: Usage: h-agy-status-writer-desc <source>
-    ##
-    case "${1}" in
-        slow)
-            ec "\`agy -p /usage'"
-            ;;
-        statusline)
-            ec "agy's statusline hook"
-            ;;
-        *)
-            ec "${1:-unknown}"
-            ;;
-    esac
-}
-
-function h-agy-status-source-line {
-    #: Where the numbers below came from, in the report's own colours.
-    #:
-    #: Not [agfi:ecgray] with a function name in front of it. That put
-    #: =h-agy-status-statusline: nothing in the cache is newer than 3600s;
-    #: falling back to the slow path= above the report, which reads as a stray
-    #: debug line rather than part of the answer. The claim has to be made --
-    #: a cached number that does not say so reads as a live one -- so it is
-    #: made briefly, styled like the rows it introduces.
-    #:
-    #: On **stdout**, with the rows, and not on stderr where the gray line
-    #: was. The note is part of the prose report, and two streams cannot be
-    #: ordered against each other: [agfi:agent-status] runs us under
-    #: [agfi:parallelm], which collects each job's stderr separately from its
-    #: stdout, so a note written there surfaces outside the section it belongs
-    #: to -- and under =--keep-order=, possibly before any section at all.
-    #: That function's own error line carries the same reasoning.
-    #:
-    #: Machine-readable output is =agy_status_json_p=, which is asked for
-    #: explicitly; that caller redirects this note to stderr itself, because
-    #: there stdout is a document. Keeping the prose stream clean for a parser
-    #: that should have asked for JSON buys nothing and costs the ordering.
-    #:
-    #: The colour decision reads whichever stream we are actually writing to,
-    #: since a redirect moves fd 1 with us.
-    #:
-    #: Usage: h-agy-status-source-line <label> [detail]
-    ##
-    bool "${agy_status_source_quiet_p:-n}" && return 0
-    local label="${1}" detail="${2:-}"
-    assert-args label @RET
-
-    #: Dim, and deliberately not bold. It is provenance, not a finding: it
-    #: should be legible when looked for and invisible when the rows are what
-    #: you came for. Bold white put it *above* the numbers it annotates.
-    #:
-    #: `\e[2m' rather than a grey foreground, because dim is an attribute:
-    #: it composes with the blue below, and it recedes against whatever the
-    #: terminal's own background and palette happen to be -- a fixed grey only
-    #: recedes against the themes it was picked for.
-    local c_dim='' c_detail='' c_off=''
-    if h-color-mode-p "${agy_status_color:-auto}" ; then
-        c_dim=$'\e[2m'
-        #: No attribute reset in `$fg[blue]' (it is a bare `\e[34m'), so the
-        #: dim above survives into the detail and one reset closes both.
-        c_detail="${fg[blue]}"
-        c_off="${reset_color}"
-    fi
-
-    if bool "${agy_status_json_p}" ; then
-        ec "${c_dim}${label}${detail:+ ${c_detail}(${detail})}${c_off}" >&2
-    else
-        ec "${c_dim}${label}${detail:+ ${c_detail}(${detail})}${c_off}"
-    fi
-}
-
-function h-agy-status-statusline {
-    #: The same report as [agfi:h-agy-status-slow], read from the cache agy's
-    #: own statusline hook keeps up to date. Reachable as
-    #: =agy-status-statusline=. See =docs/agy_status.md=.
-    ##
-    local json_p="${agy_status_json_p:-n}"
-    local credits_p="${agy_status_credits_p:-n}"
-    local cache_file="${agy_status_cache_file:-${HOME}/tmp/.agy-status/quota-cache.json}"
-    local max_age_s="${agy_status_statusline_max_age_s:-3600}"
-    local agy_status_report_source=cache
-
-    #: Before the `deus' branch, so that an argument aimed at the wrong
-    #: implementation is visible whichever way we go from here.
-    if (( $# > 0 )) ; then
-        ecgray "$0: ignoring arguments: $*"
-    fi
-
-    if isDeus ; then
-        #: The established "force, bypass the memo" convention: asking under
-        #: `deus' is asking to distrust what we have lying around, so the cache
-        #: is not even opened.
-        h-agy-status-source-line agy deus
-        h-agy-status-slow
-        return $?
-    fi
-
-    if ! test -r "${cache_file}" ; then
-        #: An absent cache is not a staleness question: there is nothing to
-        #: serve however generous [agfi:agy_status_statusline_max_age_s] is, so
-        #: this fallback ignores the knob entirely. It is not a breakage being
-        #: hidden either -- nothing is broken, the hook has simply never run.
-        h-agy-status-source-line agy "no cache; run \`agy-statusline-install'"
-        h-agy-status-slow
-        return $?
-    fi
-
-    local raw=''
-    raw="$(h-agy-status-statusline-raw)" || raw=''
-
-    if test -z "${raw}" ; then
-        #: The validity check is here, in the failure branch, rather than in
-        #: front of every successful read: it exists only to pick the right
-        #: sentence, and the happy path should not pay a second jq for it.
-        if ! silent jq -e . "${cache_file}" ; then
-            h-agy-status-source-line agy "cache not valid JSON: ${cache_file}"
-        else
-            h-agy-status-source-line agy \
-                "cache older than $(h-agy-status-age-fmt ${max_age_s})"
-        fi
-
-        h-agy-status-slow
-        return $?
-    fi
-
-    zmodload zsh/datetime 2>/dev/null
-
-    local line names iso
-    local -a f rows=() sources=()
-    integer age oldest_age=0 unknown_age_seen=0
-    for line in "${(@f)raw}" ; do
-        test -n "${line}" || continue
-        f=( "${(@ps:\t:)line}" )
-
-        names="$(h-agy-status-bucket-names "${f[1]}")" @TRET
-        if test -n "${f[6]}" && test -n "${f[7]}" ; then
-            names="${f[6]}"$'\t'"${f[7]}"
-        fi
-        iso="$(date-unix-to-3339 "${f[3]}")" @TRET
-
-        #: The very row contract the slow path emits, bucket id included, so
-        #: [agfi:h-agy-status-arm-deadline] and [agfi:agent-status] never learn
-        #: which implementation answered them.
-        rows+=( "${names%%$'\t'*}"$'\t'"${names#*$'\t'}"$'\t'"${f[2]}"$'\t'"${f[3]}"$'\t'"${iso}"$'\t'"${f[1]}" )
-
-        if (( f[4] < 0 )) ; then
-            #: See [agfi:h-agy-status-statusline-raw]: -1 is "no capture time
-            #: in the cache at all", which is a different claim from "captured
-            #: a long time ago" and must not be averaged in as one.
-            unknown_age_seen=1
-        else
-            age=$(( EPOCHSECONDS - f[4] ))
-            (( age < 0 )) && age=0
-            (( age > oldest_age )) && oldest_age=${age}
-        fi
-
-        sources+=( "${f[5]}" )
-    done
-
-    #: The worst age rather than the best, and the writers named: a number that
-    #: came out of the cache has to say so, or the report reads as live when it
-    #: is not.
-    local label detail source
-    label="Cache $(h-agy-status-age-fmt ${oldest_age}) old" @TRET
-
-    local -a descs=()
-    for source in "${(@u)sources}" ; do
-        descs+=( "$(h-agy-status-writer-desc "${source}")" ) @TRET
-    done
-    detail="via ${(j:, :)descs}"
-    if (( unknown_age_seen )) ; then
-        detail+="; some rows undated"
-    fi
-
-    if bool "${json_p}" ; then
-        #: The one place the note does *not* belong on stdout: that is a JSON
-        #: document somebody is about to parse.
-        h-agy-status-source-line "${label}" "${detail}" >&2
-
-        ec "${(F)rows}" | h-agy-status-json
-        return $?
-    fi
-
-    h-agy-status-source-line "${label}" "${detail}"
-    h-agy-status-render "${(F)rows}" @RET
-
-    if bool "${credits_p}" ; then
-        #: Credits have no endpoint and no cache, so asking for them is still
-        #: asking for an `agy' start-up, exactly as on the slow path.
-        h-agy-status-credits
-    fi
 }
 ##
 #: Installing the hook into agy's settings
@@ -997,213 +328,6 @@ function agy-statusline-uninstall {
 
     ecgray "$0: uninstalled"
 }
-##
-#: The brish garden guard
-##
-function h-agy-status-garden-p {
-    #: Compatibility predicate: file auth no longer needs a GUI/keychain garden.
-    return 1
-}
-
-function agy-status-run-garden {
-    #: What the garden runs on our behalf; see [agfi:h-agy-status-run]. It
-    #: forces the guard off, so a garden worker can never bounce the command
-    #: back to another worker -- the worker is already where the keychain is
-    #: readable.
-    ##
-    local slash_cmd="${1}"
-    assert-args slash_cmd @RET
-
-    agy_status_garden_p=n h-agy-status-run "${slash_cmd}"
-}
-##
-function h-agy-status-one {
-    #: What is left of Antigravity's quota, per bucket, and when it comes back.
-    #: The gateway: [agfi:agy_status_method] picks the implementation.
-    #: See =docs/agy_status.md=.
-    ##
-    local method="${agy_status_method:-statusline}"
-
-    case "${method}" in
-        statusline)
-            h-agy-status-statusline "$@"
-            ;;
-        slow)
-            h-agy-status-slow "$@"
-            ;;
-        *)
-            ecerr "$0: unknown agy_status_method: ${method} (statusline, slow)"
-            return 1
-            ;;
-    esac
-}
-
-function h-agy-status-account-json {
-    #: Isolate each cache, command and error. Never emit raw CLI login output.
-    local -a reply
-    h-agy-account-info "${1}" @RET
-    local id="${reply[1]}" label="${reply[2]}" root="${reply[3]}"
-    local -x AGY_ACCOUNT_ID="${id}"
-    local -x agy_status_cache_file="${reply[5]}"
-    local agy_status_json_p=y
-    local buckets='[]' error='' message='' auth_status=missing signed_in=false ret=0
-    local metadata='{}' stored='file credentials exist'
-    if test -r "${agy_status_cache_file}" ; then
-        metadata="$(command jq --compact-output '.account | if type == "object" then . else {} end' "${agy_status_cache_file}" 2>/dev/null)" || metadata='{}'
-    fi
-    if auth_status="$(h-agy-stored-auth "${id}")" ; then
-        signed_in=null
-        [[ "${auth_status}" != keychain ]] || stored='a keychain sign-in exists'
-        buckets="$(h-agy-status-one)" || ret=$?
-        if (( ret != 0 )) ; then
-            buckets='[]'
-            error="Quota check failed (exit ${ret}); ${stored}, validity unverified"
-        elif ! ec "${buckets}" | command jq --exit-status 'type == "array" and length > 0' >/dev/null 2>&1 ; then
-            buckets='[]'
-            error='Quota check returned no buckets'
-        else
-            #: Cache success proves only that the file exists, not that its
-            #: current refresh token still works. Live rows do prove sign-in.
-            if ec "${buckets}" | command jq --exit-status 'any(.[]; .source == "live")' >/dev/null ; then
-                signed_in=true
-                auth_status=verified
-            fi
-        fi
-    else
-        auth_status=missing
-        message="Not signed in; run agy-acc-login ${id}"
-    fi
-    command jq --null-input --arg account "${id}" --arg label "${label}" \
-        --arg auth_status "${auth_status}" --argjson signed_in "${signed_in}" \
-        --arg error "${error}" --arg message "${message}" --argjson metadata "${metadata}" \
-        --argjson buckets "${buckets}" '
-        {account: $account, label: $label, signed_in: $signed_in,
-         auth_status: $auth_status, tier: ($metadata.tier // null),
-         email: ($metadata.email // null),
-         message: (if $message == "" then null else $message end),
-         error: (if $error == "" then null else $error end),
-         buckets: ($buckets | map(. + {used_percent: (100 - .remaining_percent)}))}'
-}
-
-function h-agy-status-agent-quotas-p {
-    #: Whether this =agy-status= call can be answered by the agent-quotas
-    #: daemon. Not for what only this file does: the flat bucket array
-    #: (=agy_status_json_p=y= without =--json=), the credit balance, the
-    #: cache-only switch, =--help=, or an unknown flag.
-    #: Usage: h-agy-status-agent-quotas-p [user-arg...]
-    ##
-    local flat_p="${agy_status_json_p:-n}"
-    local credits_p="${agy_status_credits_p:-n}"
-    local cache_only_p="${agy_status_cache_only_p:-n}"
-
-    if bool "${flat_p}" && (( ! ${@[(Ie)--json]} )) ; then
-        return 1
-    fi
-    bool "${credits_p}" && return 1
-    bool "${cache_only_p}" && return 1
-
-    h-agent-quotas-args-ok '--json --account=' "$@" &&
-        h-agent-quotas-p
-}
-
-function h-agy-status-agent-quotas {
-    #: =agent-quotas agy-status= with this file's knobs. The daemon serves its
-    #: statusline cache; =deus= (=deusvult=) and =agy_status_method=slow= make
-    #: it run the slow path, as they do here.
-    #: Usage: h-agy-status-agent-quotas [--json] [--account N]
-    ##
-    local method="${agy_status_method:-statusline}"
-    local columns="${agy_status_columns:-${COLUMNS:-80}}"
-    local color="${agy_status_color:-auto}"
-    local absolute="${agy_status_absolute_p:-auto}"
-
-    [[ "${columns}" == <1-> ]] || columns=80
-    local args=(--columns "${columns}" --color "${color}" --absolute "${absolute}")
-    [[ "${method}" == slow ]] && args+=(--refresh)
-
-    command agent-quotas agy-status "${args[@]}" "$@"
-}
-
-function agy-status {
-    : "all configured accounts; --json for account objects, --account N to select one"
-    #: Asks the agent-quotas daemon when it answers
-    #: ([agfi:h-agy-status-agent-quotas-p]); everything below is the fallback.
-    if h-agy-status-agent-quotas-p "$@" ; then
-        h-agy-status-agent-quotas "$@"
-        return $?
-    fi
-
-    ensure-cmd jq @RET
-    local json_p=n account='' arg
-    while (( $# )) ; do
-        arg="${1}"; shift
-        case "${arg}" in
-            --json) json_p=y ;;
-            --account)
-                (( $# )) || { ecerr "$0: --account requires N"; return 2; }
-                account="${1}"; shift ;;
-            --help)
-                ec 'agy-status [--json] [--account N]'
-                return 0 ;;
-            *) ecerr "$0: unknown option: ${arg}"; return 2 ;;
-        esac
-    done
-    local -a reply ids objects=()
-    #: Existing notifier/quota-watch callers explicitly request this old flat
-    #: bucket array. Keep it scoped to the current account, never mix quotas.
-    if bool "${agy_status_json_p}" && ! bool "${json_p}" ; then
-        h-agy-account-info "${account:-${AGY_ACCOUNT_ID:-m}}" @RET
-        local -x AGY_ACCOUNT_ID="${reply[1]}" agy_status_cache_file="${reply[5]}"
-        h-agy-status-one
-        return $?
-    fi
-    if test -n "${account}" ; then
-        h-agy-account-info "${account}" @RET
-        ids=( "${reply[1]}" )
-    else
-        local configured
-        configured="$(h-agy-accounts)" @RET
-        ids=( "${(@f)configured}" )
-    fi
-    local id obj ret=0
-    local agy_status_source_quiet_p=n
-    bool "${json_p}" || agy_status_source_quiet_p=y
-    for id in "${ids[@]}" ; do
-        if bool "${json_p}" ; then
-            obj="$(h-agy-status-account-json "${id}")" @RET
-        else
-            #: The block carries provenance and its own error row. Engine
-            #: diagnostics/source notes must not float above other accounts.
-            obj="$(h-agy-status-account-json "${id}" 2>/dev/null)" @RET
-            h-agy-account-info "${id}" @RET
-            obj="$(ec "${obj}" | command jq --arg cache "${reply[5]}" \
-                '. + {_display_cache_file: $cache}')" @RET
-        fi
-        objects+=( "${obj}" )
-        ec "${obj}" | command jq --exit-status '.error == null' >/dev/null || ret=1
-    done
-    local combined
-    combined="$(ec "${(F)objects}" | command jq --slurp '.')" @RET
-    if bool "${json_p}" ; then
-        ec "${combined}"
-    else
-        ensure-cmd python3 @RET
-        local columns="${agy_status_columns:-${COLUMNS:-80}}"
-        [[ "${columns}" == <1-> ]] || columns=80
-        ec "${combined}" | command python3 "${NIGHTDIR:-${HOME}/scripts}/python/agy_status_render.py" \
-            --columns "${columns}" --color "${agy_status_color:-auto}" \
-            --absolute "${agy_status_absolute_p:-auto}" @RET
-    fi
-    return "${ret}"
-}
-aliasfn ags agy-status
-aliasfn agys agy-status
-
-#: Named implementations, so a caller can demand one without knowing the knob.
-#: The slow one is what the statusline path falls back to, and what to reach
-#: for when you need the number =agy= itself would print.
-aliasfnq agy-status-statusline agy_status_method=statusline agy-status
-aliasfnq agy-status-slow agy_status_method=slow agy-status
 ##
 #: Waiting the quota out
 ##

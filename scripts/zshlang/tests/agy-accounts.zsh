@@ -77,8 +77,29 @@ typeset -gx PATH="${test_tmp}/bin:${PATH}"
 source "${test_root}/zshlang/auto-load/others/antigravity.zsh"
 source "${test_root}/zshlang/auto-load/others/agent-quotas.zsh"
 source "${test_root}/zshlang/auto-load/others/agy-status.zsh"
-#: The zsh engine is what this file tests; the agent-quotas route has its own block.
 typeset -g agent_quotas_p=n
+#: agy-status is `agent-quotas agy-status' with its knobs as flags, and the
+#: sign-in check asks `agent-quotas agy-auth'. This stub stands in for both,
+#: so the owner's real binary and config are never reached: `health' answers
+#: when AGY_TEST_AQ_UP is set, `agy-status' records its argv and prints
+#: AGY_TEST_AQ_STATUS, and `agy-auth' prints AGY_TEST_AQ_AUTH (unset: an old
+#: binary that does not know the command).
+typeset -gx AGY_TEST_AQ_ARGV="${test_tmp}/aq-argv" AGY_TEST_AQ_STATUS="${test_tmp}/aq-status.json"
+command cat > "${test_tmp}/bin/agent-quotas" <<'SH'
+#!/bin/sh
+case "$1" in
+    health) [ -n "${AGY_TEST_AQ_UP}" ] ;;
+    agy-status) printf '%s\n' "$*" > "${AGY_TEST_AQ_ARGV}"; cat "${AGY_TEST_AQ_STATUS}" ;;
+    agy-auth)
+        printf '%s\n' "$*" > "${AGY_TEST_AQ_ARGV}"
+        [ -n "${AGY_TEST_AQ_AUTH}" ] || { echo 'agent-quotas: unknown command "agy-auth"' >&2; exit 2; }
+        echo "${AGY_TEST_AQ_AUTH}"
+        [ "${AGY_TEST_AQ_AUTH}" != missing ] ;;
+    *) exit 2 ;;
+esac
+SH
+command chmod +x "${test_tmp}/bin/agent-quotas"
+rehash
 function h-agent-launch { shift; command "$@" }
 
 function fail { print -ru2 -- "$*"; exit 1 }
@@ -104,65 +125,41 @@ AGY_ACCOUNT_ID=acc2 agy_status_cache_file="${test_tmp}/wrong-cache.json" h-agy-a
 
 print -r -- 'inert fixture' > "${AGY_SHARED_GEMINI_DIR}/antigravity-cli/antigravity-oauth-token"
 print -r -- 'inert fixture' > "${AGY_ACCOUNTS_DIR}/acc2/antigravity-cli/antigravity-oauth-token"
-typeset -g now="$(command date +%s)"
-command jq --null-input --argjson now "${now}" '{account:{tier:"fixture"}, buckets:{"gemini-weekly":{remaining_percent:45,resets_at:2000000000,captured_at:$now,source:"fixture"},"3p-weekly":{remaining_percent:50,resets_at:2000000000,captured_at:$now,source:"fixture"}}}' > "${agy_status_cache_file}"
-command jq --null-input --argjson now "${now}" '{buckets:{"gemini-weekly":{remaining_percent:88,resets_at:2000000000,captured_at:$now,source:"fixture"},"gemini-5h":{remaining_percent:72,resets_at:2000000000,captured_at:$now,source:"fixture"},"3p-weekly":{remaining_percent:6,resets_at:2000000000,captured_at:$now,source:"fixture"}}}' > "${AGY_ACCOUNTS_DIR}/acc2/antigravity-cli/quota-cache.json"
-typeset -g json='' rc=0
-json="$(agy-status --json)" || rc=$?
-(( rc == 0 )) || fail 'signed-out account is a status, not measurement failure'
-print -r -- "${json}" | command jq --exit-status '
- length == 3 and .[0].buckets[0].used_percent == 55
- and all(.[]; keys == ["account","auth_status","buckets","email","error","label","message","signed_in","tier"])
- and all(.[].buckets[]; keys == ["bucket_id","group","label","remaining_percent","resets_at","resets_at_iso","source","used_percent"])
- and .[1].label == "cave" and .[1].buckets[0].used_percent != 55
- and .[2].signed_in == false and .[2].error == null and .[2].message != null
-' >/dev/null
-json="$(AGY_ACCOUNT_ID=acc1 agy_status_json_p=y agy-status)"
-print -r -- "${json}" | command jq --exit-status '.[0].remaining_percent == 45 and .[0].source == "cache"' >/dev/null
+# The accounts' readings, as agent-quotas prints them (agy-best reads these).
+command jq --null-input '[
+ {account:"acc1", label:"acc1", signed_in:null, auth_status:"file-present", tier:"fixture", email:null, message:null, error:null,
+  buckets:[{bucket_id:"gemini-weekly", group:"Gemini Models", label:"Weekly Limit Remaining", remaining_percent:45, used_percent:55, resets_at:2000000000, resets_at_iso:"x", source:"cache"},
+           {bucket_id:"3p-weekly", group:"Claude and GPT models", label:"Weekly Limit Remaining", remaining_percent:50, used_percent:50, resets_at:2000000000, resets_at_iso:"x", source:"cache"}]},
+ {account:"acc2", label:"cave", signed_in:null, auth_status:"file-present", tier:null, email:null, message:null, error:null,
+  buckets:[{bucket_id:"gemini-weekly", group:"Gemini Models", label:"Weekly Limit Remaining", remaining_percent:88, used_percent:12, resets_at:2000000000, resets_at_iso:"x", source:"cache"},
+           {bucket_id:"gemini-5h", group:"Gemini Models", label:"5h Limit Remaining", remaining_percent:72, used_percent:28, resets_at:2000000000, resets_at_iso:"x", source:"cache"},
+           {bucket_id:"3p-weekly", group:"Claude and GPT models", label:"Weekly Limit Remaining", remaining_percent:6, used_percent:94, resets_at:2000000000, resets_at_iso:"x", source:"cache"}]},
+ {account:"acc3", label:"acc3", signed_in:false, auth_status:"missing", tier:null, email:null, message:"Not signed in; run agy-acc-login acc3", error:null, buckets:[]}]' > "${AGY_TEST_AQ_STATUS}"
 
-# The human report consumes the same data without floating source diagnostics.
-agy_status_columns=80 agy-status > "${test_tmp}/human.txt" 2> "${test_tmp}/human.err"
-[[ ! -s "${test_tmp}/human.err" ]] || fail 'human diagnostics escaped account blocks'
-command rg --quiet 'resets in|reset .* ago' "${test_tmp}/human.txt" || fail 'relative resets missing'
-print -r -- "${json}" | command jq --exit-status 'all(.[]; has("_display_cache_file") | not)' >/dev/null
-
-# With the agent-quotas daemon answering, the account report comes from it;
-# the flat bucket array and cache-only mode stay with the zsh engine.
-command cat > "${test_tmp}/bin/agent-quotas" <<'SH'
-#!/bin/sh
-[ "$1" = health ] && exit 0
-printf 'AQ %s\n' "$*"
-SH
-command chmod +x "${test_tmp}/bin/agent-quotas"
-#: The directory was hashed before the stub existed.
-rehash
-agent_quotas_p=auto
-[[ "$(agy_status_columns=90 agy-status --account cave --json)" == 'AQ agy-status --columns 90 --color auto --absolute auto --account cave --json' ]] || fail 'agent-quotas route'
-[[ "$(agy_status_method=slow agy_status_columns=90 agy-status)" == 'AQ agy-status --columns 90 --color auto --absolute auto --refresh' ]] || fail 'slow method lost on the agent-quotas route'
-AGY_ACCOUNT_ID=acc1 agy_status_json_p=y agy-status | command jq --exit-status '.[0].source == "cache"' >/dev/null || fail 'flat array left the zsh engine'
-[[ "$(agy-status --bogus 2>&1)" != AQ* ]] || fail 'unknown flag reached agent-quotas'
-agent_quotas_p=n
+# The knobs become flags; with no daemon answering, the read is in-process.
+function aq-argv { agy-status "$@" >/dev/null; print -r -- "$(<"${AGY_TEST_AQ_ARGV}")" }
+typeset -g common='--columns 90 --color auto --absolute auto'
+typeset -gx agy_status_columns=90
+[[ "$(aq-argv --json)" == "agy-status --direct ${common} --json" ]] || fail 'account objects'
+[[ "$(AGY_TEST_AQ_UP=y agent_quotas_p=auto aq-argv --account cave --json)" == "agy-status ${common} --account cave --json" ]] || fail 'daemon route'
+[[ "$(agy_status_method=slow aq-argv)" == "agy-status --refresh --direct ${common}" ]] || fail 'slow method'
+[[ "$(agy_status_json_p=y aq-argv)" == "agy-status --flat --direct ${common}" ]] || fail 'flat array'
+[[ "$(agy_status_json_p=y aq-argv --json)" == "agy-status --direct ${common} --json" ]] || fail 'explicit --json lost to the flat array'
+[[ "$(agy_status_credits_p=y aq-argv)" == "agy-status --credits --direct ${common}" ]] || fail 'credits'
+[[ "$(agy_status_credits_p=y aq-argv --json)" == "agy-status --direct ${common} --json" ]] || fail 'credits reached JSON'
+[[ "$(AGY_TEST_AQ_UP=y agent_quotas_p=auto agy_status_cache_only_p=y aq-argv --json)" == "agy-status --cache-only --max-age 3600 ${common} --json" ]] || fail 'cache-only'
+if agy_status_method=bogus agy-status 2>/dev/null ; then fail 'unknown method accepted'; fi
+unset agy_status_columns
 
 # Sign-in is agent-quotas agy-auth's answer (a keychain sign-in has no token
 # file); the token file decides only where that binary is missing, switched
 # off, or too old to know the command.
-command cat > "${test_tmp}/bin/agent-quotas" <<'SH'
-#!/bin/sh
-[ "$1" = agy-auth ] || exit 2
-printf '%s\n' "$*" > "${AGY_TEST_AQ_ARGV}"
-[ -n "${AGY_TEST_AQ_AUTH}" ] || { echo 'agent-quotas: unknown command "agy-auth"' >&2; exit 2; }
-echo "${AGY_TEST_AQ_AUTH}"
-[ "${AGY_TEST_AQ_AUTH}" != missing ]
-SH
-typeset -gx AGY_TEST_AQ_ARGV="${test_tmp}/aq-argv" AGY_TEST_AQ_AUTH=keychain
+typeset -gx AGY_TEST_AQ_AUTH=keychain
 command mv -- "${AGY_SHARED_GEMINI_DIR}/antigravity-cli/antigravity-oauth-token" "${test_tmp}/acc1-token"
 agent_quotas_p=auto
 [[ "$(h-agy-stored-auth acc1)" == keychain ]] || fail 'agy-auth answer ignored'
 [[ "$(<"${AGY_TEST_AQ_ARGV}")" == "agy-auth --dir ${AGY_SHARED_GEMINI_DIR:A}" ]] || fail 'agy-auth not given the resolved root'
 h-agy-model-catalog acc1 >/dev/null || fail 'catalog refused a keychain sign-in'
-agy-status --account acc1 --json | command jq --exit-status '
- .[0].auth_status == "keychain" and .[0].message == null and (.[0].buckets | length > 0)
-' >/dev/null || fail 'status fallback ignored a keychain sign-in'
 login_output="$(agy-acc-login acc1 </dev/null)"
 [[ "${login_output}" == 'Already signed in (keychain);'* ]] || fail 'login did not see the keychain sign-in'
 command jq --exit-status '.argv[-1] == "models"' "${AGY_TEST_CALLS}" >/dev/null || fail 'login started a sign-in'
@@ -182,16 +179,6 @@ agy-best --model 'Gemini fixture' models
 command jq --exit-status '.account == "acc2"' "${AGY_TEST_CALLS}" >/dev/null
 agy-best --model 'Claude fixture' models
 command jq --exit-status '.account == "acc1"' "${AGY_TEST_CALLS}" >/dev/null
-
-# A live fallback must remain valid JSON and use the selected account/env.
-command rm "${AGY_ACCOUNTS_DIR}/acc2/antigravity-cli/quota-cache.json"
-json="$(agy-status --account cave --json)"
-print -r -- "${json}" | command jq --exit-status '.[0].signed_in == true and .[0].buckets[0].used_percent == 7' >/dev/null
-command jq --exit-status '.account == "acc2" and (.argv | index("--mode") != null)' "${AGY_TEST_CALLS}" >/dev/null
-command rm "${AGY_ACCOUNTS_DIR}/acc2/antigravity-cli/quota-cache.json" "${AGY_TEST_CALLS}"
-if agy_status_cache_only_p=y agy-status --account cave --json > "${test_tmp}/cache-only.json"; then fail 'missing cache must fail'; fi
-[[ ! -e "${AGY_TEST_CALLS}" ]] || fail 'cache-only invoked agy'
-command jq --exit-status '.[0].error != null' "${test_tmp}/cache-only.json" >/dev/null
 
 source "${test_root}/zshlang/plugins/agent-session/session.zsh"
 source "${test_root}/zshlang/auto-load/others/agy-session.zsh"
@@ -469,4 +456,4 @@ AGY_TEST_PASEO_APPLIED='' agy-api-work-add-to-paseo >/dev/null 2>&1 || api_rc=$?
 (( api_rc == 1 )) || fail 'unapplied reload not reported'
 unset PASEO_HOME AGY_REAL_BIN
 
-print -r -- 'ok: launch isolation, named accounts, configuration, status JSON, sign-in via agent-quotas, best, cache-only, login recovery, API profiles, Vertex sign-in, light profiles and Paseo providers'
+print -r -- 'ok: launch isolation, named accounts, configuration, agy-status flags, sign-in via agent-quotas, best, login recovery, API profiles, Vertex sign-in, light profiles and Paseo providers'

@@ -260,15 +260,15 @@ account for an explicit ID. `--continue` stays account/workspace-specific.
 ## Status and choosing an account
 
 `agy-status` (`agys`) reports every configured account in a separate block.
-When the [agent-quotas](https://github.com/NightMachinery/agent-quotas) daemon
-answers, `agy-status` and `agy-status --json` come from it
-(`agent-quotas agy-status`, the same report and JSON, read from the statusline
-cache; `deus` or `agy_status_method=slow` make it run the slow path) and the
-zsh engine below is the fallback. The flat bucket array
-(`agy_status_json_p=y` without `--json`), the credit balance and
-`agy_status_cache_only_p=y` always use the zsh engine; `agent_quotas_p=n`
-forces it for any call. The daemon lists the accounts in its own config, which
-`agent-quotas config init` copied from `AGY_ACCOUNTS`. The
+The report is [agent-quotas](https://github.com/NightMachinery/agent-quotas)'
+(`agent-quotas agy-status`): [agfi:agy-status] only turns the knobs below
+into its flags, so the quota rules live in one place, and it needs that binary
+installed. It asks the agent-quotas daemon, or reads in its own process
+(`--direct`) when the daemon does not answer or `agent_quotas_p=n`. Either way
+it serves the statusline cache, and `deus` or `agy_status_method=slow` make it
+run the slow path. The accounts are those in agent-quotas' config, which
+`agent-quotas config init` copied from `AGY_ACCOUNTS`; an account added to
+`AGY_ACCOUNTS` later needs adding there too. The
 header carries its name, sign-in state, known plan tier, cache age or live
 provenance, and email (dim in a terminal). `auth stored` means file credentials
 exist but this cached reading has not verified them. Each aligned row shows a
@@ -305,17 +305,27 @@ not a measurement error. It does not trigger quota-watcher error alerts.
 `agy-status --account cave [--json]` selects one. Tier/email are shown only if
 known from the statusline cache; token contents are never mined for identity.
 
-The older `agy_status_json_p=y agy-status` interface retains the flat bucket
-array for the current account, so existing reset notifiers keep their contract.
-The notifier still arms only that account and its existing delivery pickers;
-all-account resume scheduling is a separate follow-up.
+The older `agy_status_json_p=y agy-status` interface (`--flat`) retains the
+flat bucket array for the current account (`--account`, else
+`AGY_ACCOUNT_ID`, else `m`), so existing reset notifiers keep their contract:
+the account object's buckets without `used_percent`. An account with an error,
+no sign-in or no buckets exits 1 instead. The notifier still arms only that
+account and its existing delivery pickers; all-account resume scheduling is a
+separate follow-up.
+
+`agy_status_credits_p=y` (`--credits`) appends each signed-in account's
+pay-as-you-go balance from `agy -p /credits`, one line per row. Nothing caches
+it, so it costs an agy start-up per account (they run in parallel), though no
+quota. It is not in the JSON.
 
 For quota-watch, use `agy_status_method=statusline agy_status_cache_only_p=y
-agy-status --json`. Missing/stale caches then report errors without starting
-agy, requesting authentication, or contacting a backend. The quota-management
-watcher consumes every account/bucket, preserves stale readings with a marker,
-and uses the existing alert thresholds. Run agy with its statusline configured
-to keep these cache readings fresh.
+agy-status --json` (`--cache-only --max-age 3600`). It reads the caches in its
+own process and never starts agy, requests authentication or contacts a
+backend, even under `deus`. A missing cache, or one with nothing younger than
+`agy_status_statusline_max_age_s` (default an hour), is that account's error.
+The quota-management watcher consumes every account/bucket, preserves stale
+readings with a marker, and uses the existing alert thresholds. Run agy with
+its statusline configured to keep these cache readings fresh.
 
 `agy-best --model '<model ID or full name from agy models>' [other arguments]`
 first checks each account's model catalog. Accounts that do not offer the exact
@@ -422,13 +432,13 @@ source is an immediate installed change. Never restart the garden automatically.
 
 ## Two implementations, one report
 
-`agy-status` (alias `agys`) is a gateway. The knob `agy_status_method`, an
-enum with the values `statusline` and `slow`, picks which implementation
-runs, and the two named forms `agy-status-statusline` and `agy-status-slow`
-force one without the caller having to know the knob. It is an enum rather
-than a `_p` switch because "which implementation" is not a yes/no question:
-a third value lived here for a while and was removed again, and neither its
-arrival nor its departure disturbed the shape.
+Both ways of reading are in agent-quotas' Antigravity reader
+(`internal/agy`); this file and the hook's settings installer are the shell's
+side. The knob `agy_status_method`, an enum with the values `statusline` and
+`slow`, picks the way, and the two named forms `agy-status-statusline` and
+`agy-status-slow` force one without the caller having to know the knob
+(`slow` is `agent-quotas agy-status --refresh`). It is an enum rather than a
+`_p` switch because "which way" is not a yes/no question.
 
 `statusline` is the one that answers by default. It is built on something
 Antigravity documents -- a hook it invites you to configure -- rather than on
@@ -456,7 +466,7 @@ The snapshot carries the quota table, including five-hour buckets that
 context window and a good deal else.
 
 So the fast path is not a fetch at all. It is a cache that agy fills for us
-while we are working anyway, and reading it costs a `jq` over one small file.
+while we are working anyway, and reading it is one small file read.
 
 Our hook is `zshlang/wrappers/agy_statusline.dash`, and it does two things on
 every render: merges the quota into the shared cache, and prints one short
@@ -500,8 +510,9 @@ had been sitting there, and wrong silently.
 Two writers share this file: the hook, and the slow path, which merges its own
 rows in after every successful run so that what `agy` itself said is not
 thrown away. Both merge **per bucket**, and that is the whole reason the merge
-exists. The hook sees five-hour and weekly buckets; `agy -p /usage` can print
-only weekly ones, including additional model-specific pools. A writer that
+exists. The hook sees five-hour and weekly buckets; `agy -p /usage` prints the
+weekly ones, including additional model-specific pools, and a five-hour one
+only some of the time. A writer that
 replaced the file wholesale would therefore delete the five-hour windows every time the slow path ran, and the report would
 lose rows for reasons nobody could see from the outside. Each writer stamps
 its rows with a `source`, so a row's provenance is readable rather than
@@ -523,11 +534,20 @@ so separate pools remain separate across repeated reads and reset checks.
 
 ### Staleness, and what falls back
 
-`agy_status_statusline_max_age_s` is how old a cached bucket may be and still
-be reported. Anything older is dropped from the report; if *nothing* is left,
-the read falls back to the slow path and says so. A **negative** value means
-"never drop on age" -- serve the cache however old it is, which is what you
-want when agy has not been open for a while and you only need the reset times.
+agent-quotas' `statusline_max_age_s` is how old a cached bucket may be and
+still be reported (`agy_status_statusline_max_age_s` for cache-only reads).
+Anything older is dropped from the report; if *nothing* is left, the read
+falls back to the slow path and says so. A **negative** value, agent-quotas'
+default, means "never drop on age" -- serve the cache however old it is,
+which is what you want when agy has not been open for a while and you only
+need the reset times. A reading taken before a window's reset no longer
+counts that window as blocking, and the account is marked stale.
+
+agent-quotas also runs the slow path when the account was used after the
+cache's newest capture (agy run without its TUI, such as Paseo's `agy acp`,
+never renders the statusline), at most once per `active_refresh_s` (default
+five minutes) per account. A fallback runs at most once per `slow_fallback_s`
+(default an hour) per account; see agent-quotas' `docs/design.md`.
 
 An absent or unreadable cache always falls back, whatever the knob says,
 because that is a different question: there is nothing to serve at any age.
@@ -542,9 +562,10 @@ been using agy, not about whether anything works -- but the reason is printed
 either way, so the two cases are told apart by reading rather than by
 guessing.
 
-`isDeus` forces the slow path and does not open the cache at all, the same
-"force, bypass the memo" convention the rest of zshlang uses. Asking under
-`deus` is asking to distrust what is lying around.
+`deus` (agent-quotas reads its `deusvult` variable) forces the slow path and
+does not open the cache at all, the same "force, bypass the memo" convention
+the rest of zshlang uses. Asking under `deus` is asking to distrust what is
+lying around.
 
 ### Provenance in the account header
 
@@ -554,7 +575,7 @@ one. Missing capture timestamps show `cache age unknown` (or `some undated`
 when mixed with dated rows). Source diagnostics do not float above account
 blocks; each failed account has one error row while the others stay visible.
 
-The legacy flat-array engine and public `--json` keep source diagnostics on
+The flat array (`--flat`) and public `--json` keep source diagnostics on
 stderr and JSON on stdout. Their document shapes are unchanged. Human-only
 cache paths used to calculate header ages are never added to public JSON.
 
@@ -619,12 +640,15 @@ model group:
 
     <group>	<label>	<remaining>%	<reset, ISO-8601 UTC>
 
-Two groups exist today, `Gemini Models` and `Claude and GPT models`, both
-labelled `Weekly Limit Remaining`. The percentage is what *remains*, the
-opposite sense from the used-percent that Claude Code and Codex report, and
-the reset is a UTC instant, not a duration. Only the weekly buckets are
-printed; the backend knows about five-hour windows too, but `/usage` does not
-show them.
+The general groups are `Gemini Models` and `Claude and GPT models`, labelled
+`Weekly Limit Remaining`, plus model-specific pools such as `Gemini 4 Argon`.
+The percentage is what *remains*, the opposite sense from the used-percent
+that Claude Code and Codex report, and the reset is a UTC instant, not a
+duration. Five-hour windows appear only some of the time: on 2026-11-25 a run
+printed `Five Hour Limit Remaining` for Claude and GPT but not for Gemini,
+whose five-hour row a run the day before had printed. It looks as though
+`/usage` shows a five-hour window only while it is in use, but that is
+inferred from those runs, not documented.
 
 It is called the slow path for a reason. Every call is a full CLI start-up
 followed by five sequential backend round trips, and measured end to end it
@@ -633,8 +657,8 @@ this was being written took thirteen. That is tolerable for a command you
 type once and intolerable for anything that polls, which is what the
 statusline cache is for.
 
-The slow path is kept as `h-agy-status-slow` (reachable as
-`agy-status-slow`), and the reason it stays is that it guesses at nothing.
+The slow path lives in agent-quotas (`agy-status-slow` forces it), and the
+reason it stays is that it guesses at nothing.
 Asking the backend ourselves would mean guessing at agy's login, its headers
 and its response shape, and then keeping pace with agy as those change; an
 attempt at exactly that was made here once and never worked. `agy -p /usage`
@@ -652,26 +676,25 @@ It runs the command from a fresh temporary directory rather than wherever you
 happen to be. Antigravity pairs conversations to their working directory, and
 a status check should not be able to leave any trace against a real project,
 nor pick up that project's configuration. It runs under a timeout,
-`agy_status_timeout_s`, because the answer comes from a backend and a status
-check that hangs is worse than one that fails and says so. The timeout is
+agent-quotas' `timeout_s` (default 90 s), because the answer comes from a
+backend and a status check that hangs is worse than one that fails and says
+so. The timeout is
 sized for a cold CLI start-up followed by five sequential round trips, which
 makes it far more generous than a status check would otherwise want.
 
 ### No GUI dependency
 
-The slow path uses the selected account's file credentials directly. It no
-longer delegates authentication or quota calls to BrishGarden, so tmux and
-background processes use the same auth path. `agy-status-run-garden` remains a
-compatibility entry point; the old GUI/keychain guard is disabled.
+The slow path uses the selected account's file credentials directly, never
+BrishGarden, so tmux and background processes use the same auth path.
 
 ## The bucket engine
 
-Both implementations feed the all-account report described above. Internally
-the engine retains remaining percentages, the source note, and the legacy flat
-bucket JSON. Cache notes go to stderr in JSON mode, including slow fallbacks,
-so a cache miss cannot corrupt a JSON document with prose. Credits remain an
-optional `agy_status_credits_p=y` per-account engine addendum; they have no reset
-and are not quota buckets.
+agent-quotas' `internal/agy` is the only engine: bucket ids, the cache merge,
+staleness, fallbacks, sign-in and the documents all live there, with tests
+whose golden files came from the zsh engine it replaced. Cache notes go to
+stderr in JSON mode, including slow fallbacks, so a cache miss cannot corrupt
+a JSON document with prose. Credits are an optional addendum to the human
+report; they have no reset and are not quota buckets.
 
 ## Reset notifications
 

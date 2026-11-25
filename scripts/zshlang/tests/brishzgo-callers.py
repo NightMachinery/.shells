@@ -170,7 +170,6 @@ function brishz-alive-p() { return 0 }
 function isDarwin() { return 0 }
 function isSSH() { return 0 }
 function h-claude-code-usage-garden-p() { return 0 }
-function h-agy-status-garden-p() { return 0 }
 function brishz() { command "$BRISHZGO_BIN" -- "$@" }
 ''')
     for path, name, args, command in [

@@ -3,17 +3,20 @@
 #: runs Paseo auto-continue (https://github.com/NightMachinery/agent-quotas).
 #:
 #: The quota readers ([agfi:claude-code-usage], [agfi:codex-status],
-#: [agfi:agy-status], [agfi:agent-status]) and the Paseo auto-continue entry
-#: points ([agfi:paseo-auto-continue-on] and its siblings) ask it when it
-#: answers, and run their old Python/zsh path otherwise. A host without the
-#: daemon (or with it stopped) therefore behaves exactly as before.
+#: [agfi:agent-status]) and the Paseo auto-continue entry points
+#: ([agfi:paseo-auto-continue-on] and its siblings) ask it when it answers,
+#: and run their old Python/zsh path otherwise. A host without the daemon (or
+#: with it stopped) therefore behaves exactly as before. [agfi:agy-status] has
+#: no old path left: without the daemon it runs agent-quotas in its own
+#: process (=--direct=).
 #:
 #: The decision is made on every call, never cached in a global: the daemon
 #: can be installed, stopped or restarted while a garden shell lives on, and a
 #: stale "yes" would turn every report into an error.
 ##
-#: =n= forces the old path, which is how the tests pin it and how to compare
-#: the two by hand: =agent_quotas_p=n ccu=. Anything else means "use the daemon
+#: =n= forces the old path (for [agfi:agy-status], an in-process read), which
+#: is how the tests pin it and how to compare the two by hand:
+#: =agent_quotas_p=n ccu=. Anything else means "use the daemon
 #: when it answers".
 typeset -g agent_quotas_p="${agent_quotas_p:-auto}"
 ##
