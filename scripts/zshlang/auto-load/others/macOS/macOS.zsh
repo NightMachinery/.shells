@@ -135,10 +135,27 @@ function os-lock {
     pmset displaysleepnow @RET
 }
 ##
-function finder-hide-desktop-icons {
+function finder-hide-desktop-icons-v1 {
     defaults write com.apple.finder CreateDesktop false
     killall Finder
 }
+
+function finder-hide-desktop-icons-v2 {
+    : "Hides desktop icons in both modes and disables wallpaper-click reveal outside Stage Manager."
+
+    @darwinOnly
+    local macos_major
+    macos_major="$(macos-version-major)" @RET
+    if (( macos_major < 14 )); then
+        ecerr "finder-hide-desktop-icons requires macOS 14 or newer; use finder-hide-desktop-icons-v1 on older versions."
+        return 1
+    fi
+
+    command defaults write com.apple.WindowManager StandardHideDesktopIcons -bool true @RET
+    command defaults write com.apple.WindowManager HideDesktop -bool true @RET
+    command defaults write com.apple.WindowManager EnableStandardClickToShowDesktop -bool false
+}
+aliasfn finder-hide-desktop-icons finder-hide-desktop-icons-v2
 ##
 function macos-version {
     if isDarwin ; then

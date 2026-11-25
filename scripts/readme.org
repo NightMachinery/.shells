@@ -93,6 +93,7 @@ Luna skips while mpv is frontmost, and Night Shift shares the same predicate.
 
 For a new Mac, [[NIGHTDIR:docs/macos-workstation.md][macOS workstation setup]] covers the opt-in startup profile,
 shell dependencies, login services and portable app configuration.
+Run [agfi:finder-hide-desktop-icons] to hide desktop icons without restarting Finder.
 
 * Hammerspoon
 

@@ -25,6 +25,25 @@ Install BrishGarden as an isolated uv tool as described in
 [python-envs.md](python-envs.md). The old `setup.basic` and `setup_macOS.zsh`
 include large optional and obsolete installs; review them before running.
 
+## Hide desktop icons
+
+On macOS 14 or later, run [agfi:finder-hide-desktop-icons]. It hides icons on
+the regular desktop and in Stage Manager, and stops wallpaper clicks from
+revealing the desktop outside Stage Manager. Deliberate Show Desktop actions
+can still reveal the icons. The helper does not restart Finder or change
+its `CreateDesktop` preference.
+
+To undo these changes, use **System Settings → Desktop & Dock → Desktop &
+Stage Manager**. Re-enable **Show Items** for the modes you want and set
+**Show Desktop** to **Always on Wallpaper Click** if you want click-to-reveal
+back.
+
+[agfi:finder-hide-desktop-icons-v1] is the old, more disruptive method: it
+disables the Finder desktop and restarts Finder. If you previously ran it and
+want the Finder desktop back, run
+`defaults delete com.apple.finder CreateDesktop && /usr/bin/killall Finder`
+before switching to the new helper.
+
 ## SSH aliases and workstation identity
 
 Reconcile `~/.ssh/config` separately from the shared shell repository. Tailnet
