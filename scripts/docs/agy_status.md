@@ -269,8 +269,10 @@ it serves the statusline cache, and `deus` or `agy_status_method=slow` make it
 run the slow path. The accounts are those in agent-quotas' config, which
 `agent-quotas config init` copied from `AGY_ACCOUNTS`; an account added to
 `AGY_ACCOUNTS` later needs adding there too. The
-header carries its name, sign-in state, known plan tier, cache age or live
-provenance, and email (dim in a terminal). `auth stored` means file credentials
+header carries its name, sign-in state, known plan tier, the age of its newest
+cached reading or live provenance, and email (dim in a terminal). A row read
+over an hour before that newest reading ends with its own age, `read 2d 14h
+ago`. `auth stored` means file credentials
 exist but this cached reading has not verified them. Each aligned row shows a
 short model family, window, usage bar, percent **used**, and relative reset:
 
@@ -515,7 +517,11 @@ weekly pools, but `/usage` lists a model-specific pool (Gemini 4 Argon) only
 some of the time. A writer that replaced the file wholesale would therefore
 delete such a pool whenever a run left it out, and the report would lose rows
 for reasons nobody could see from the outside. For the same reason a slow
-read keeps, in its report, the cached pools its run did not print. Each writer stamps
+read keeps, in its report, the cached pools its run did not print, with one
+exception: a model pool that an earlier slow run printed and this one leaves
+out has ended (/usage lists it only while the model is in use), so the slow
+path drops it from the cache and the report. The general pools, and pools only
+the hook reports, are never dropped this way. Each writer stamps
 its rows with a `source`, so a row's provenance is readable rather than
 guessed at.
 
