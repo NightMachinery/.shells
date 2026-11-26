@@ -140,11 +140,9 @@ func TestTerminalPublicApprovalCommitsOnlyReviewedPatch(t *testing.T) {
 	e := newE2E(t)
 	e.git(e.a, "fetch", "--quiet")
 	e.git(e.a, "reset", "--hard", "origin/main")
-	e.configureTerminal(fmt.Sprintf(`daily_sync_public=( %q )
-daily_sync_notes=()
-daily_sync_min_age_hours=0
+	e.configureTerminal(fmt.Sprintf(`nightNotesPublic=%q
 export TEST_EDIT=%q
-`, e.rel, filepath.Join(e.a, "a.org")))
+`, e.a, filepath.Join(e.a, "a.org")))
 	fzf := filepath.Join(e.tmp, "bin", "fzf")
 	must(t, os.WriteFile(fzf, []byte("#!/bin/sh\nawk -F '\\t' '$1 == \"skip\" {print}'\n"), 0o700))
 	e.write(e.a, "a.org", "approved version\n")

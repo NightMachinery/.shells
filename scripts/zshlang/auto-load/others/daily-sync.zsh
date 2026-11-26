@@ -226,7 +226,7 @@ function ds-why {
 function ds-edit-patch {
     #: Snapshot eligible paths in a private index. The same patch is used for
     #: preview and commit, even if a file changes while a person is reviewing it.
-    local repo="$1" kind="$2" min_age="$3" file xy entry entries top revision tmp
+    local repo="$1" kind="$2" min_age="$3" scope="${4:-all}" file xy entry entries top revision tmp
     local -a G files removals
     local -i tracked=0 probed=0 age
     ds-exists "${repo}" && ! ds-inprog "${repo}" || return 0
@@ -239,6 +239,9 @@ function ds-edit-patch {
     for entry in "${(@0)entries}" ; do
         [[ -n "${entry}" ]] || continue
         xy="${entry[1,2]}" file="${entry[4,-1]}"
+        if [[ "${scope}" == org && ( "${file}" != *.org || "${xy}" == '??' ) ]] ; then
+            continue
+        fi
         case "${xy}" in
             DD|AU|UD|UA|DU|AA|UU) return 1 ;;
             '??')
@@ -623,7 +626,7 @@ function h-daily-sync-config {
     [[ "${GIT_SSH_COMMAND:-}" == *ServerAliveInterval* ]] \
         || export GIT_SSH_COMMAND="${GIT_SSH_COMMAND:-ssh} -o BatchMode=yes -o ConnectTimeout=20 -o ServerAliveInterval=15 -o ServerAliveCountMax=4"
     typeset -gi daily_sync_min_age_hours="${daily_sync_min_age_hours:-7}"
-    ensure-array daily_sync_peers daily_sync_notes daily_sync_private_code daily_sync_public \
+    ensure-array daily_sync_peers daily_sync_notes daily_sync_private_code daily_sync_public daily_sync_public_notes \
         daily_sync_server_notes daily_sync_server_no_mirror daily_sync_extra_push
 }
 
@@ -825,6 +828,14 @@ function h-daily-sync-mirrors {
             ${(@)daily_sync_private_code:|daily_sync_server_no_mirror} )
 }
 
+function h-daily-sync-public-repo-p {
+    local repo="$1" location="${HOME}/$1"
+    if (( ${daily_sync_public[(Ie)${repo}]} || ${daily_sync_public_notes[(Ie)${repo}]} )) ; then
+        return 0
+    fi
+    [[ -n "${nightNotesPublic:-}" && "${location:A}" == "${nightNotesPublic:A}" ]]
+}
+
 function h-daily-sync-plan {
     : "usage: h-daily-sync-plan <machine> <st|edits|rw|ff> ; prints the commands for that machine"
     local machine="$1" op="$2"
@@ -856,8 +867,10 @@ function h-daily-sync-plan {
             fi
             if [[ "${op}" == st ]] ; then
                 ec "ds-job ds-status ${(qq)repo} ${kind} ${daily_sync_min_age_hours}"
-            elif [[ "${kind}" != (read-only|mirror) && ( "${kind}" != public-code || "${approve_edits}" != yes ) ]] ; then
-                ec "ds-job ds-commit-edits ${(qq)repo} ${kind} ${daily_sync_min_age_hours}"
+            elif [[ "${kind}" != (read-only|mirror) ]] ; then
+                if [[ "${approve_edits}" != yes ]] || ! h-daily-sync-public-repo-p "${repo}" ; then
+                    ec "ds-job ds-commit-edits ${(qq)repo} ${kind} ${daily_sync_min_age_hours}"
+                fi
             fi
         else
             mode="${op}" extra=()
@@ -1865,9 +1878,9 @@ function h-daily-sync-terminal-menu {
 }
 
 function h-daily-sync-terminal-approve {
-    local machine="$1" repo="$2" run="$3" patch REPLY
+    local machine="$1" repo="$2" run="$3" kind="$4" scope="${5:-all}" patch REPLY
     local preview="${run}/terminal-preview"
-    if ! patch="$(ec "ds-edit-patch ${(qq)repo} public-code ${daily_sync_min_age_hours}" | h-daily-sync-on "${machine}")" ; then
+    if ! patch="$(ec "ds-edit-patch ${(qq)repo} ${kind} ${daily_sync_min_age_hours} ${scope}" | h-daily-sync-on "${machine}")" ; then
         ec "COMMIT-FAILED ${repo}: could not prepare the edits"
         return 0
     fi
@@ -1891,7 +1904,7 @@ function h-daily-sync-terminal-approve {
 }
 
 function h-daily-sync-terminal-commits {
-    local run="$1" machine repo out
+    local run="$1" machine repo kind out
     for machine in "${daily_sync_local}" ${daily_sync_peers} ${daily_sync_server:-} ; do
         h-daily-sync-up-p "${machine}" || continue
         ec "## ${machine} (commit edits)"
@@ -1899,9 +1912,15 @@ function h-daily-sync-terminal-commits {
         out="$(h-daily-sync-plan "${machine}" edits | h-daily-sync-on "${machine}")" ||
             out+=$'\n'"COMMIT-FAILED ${machine}: the commit pass stopped early"
         [[ -z "${out}" ]] || ec "${out}"
-        if [[ "${approve_edits}" == yes && "${machine}" != "${daily_sync_server:-}" ]] ; then
-            for repo in "${daily_sync_public[@]}" ; do
-                h-daily-sync-terminal-approve "${machine}" "${repo}" "${run}" || return 1
+        if [[ "${approve_edits}" == yes ]] ; then
+            for repo in ${daily_sync_notes} ${daily_sync_public} ; do
+                h-daily-sync-public-repo-p "${repo}" || continue
+                if [[ "${machine}" == "${daily_sync_server:-}" ]] && (( ! ${daily_sync_server_notes[(Ie)${repo}]} )) ; then
+                    continue
+                fi
+                kind=public-code
+                (( ${daily_sync_notes[(Ie)${repo}]} )) && kind=notes
+                h-daily-sync-terminal-approve "${machine}" "${repo}" "${run}" "${kind}" || return 1
             done
         fi
     done
@@ -2001,7 +2020,7 @@ function h-daily-sync-terminal-resolve {
 }
 
 function h-daily-sync-terminal-metadata {
-    local run="$1" repo rc log before after
+    local run="$1" repo rc log before after out
     local -i incomplete=0
     local -a reply
     h-daily-sync-metadata-repos "${run}"
@@ -2021,7 +2040,13 @@ function h-daily-sync-terminal-metadata {
         #: outside that set goes through the normal commit/approval pass later.
         (( ${daily_sync_notes[(Ie)${repo}]} )) || continue
         before="$(command git -C "${HOME}/${repo}" rev-parse HEAD)"
-        h-daily-sync-metadata-commit "${repo}" || incomplete=1
+        if [[ "${approve_edits}" == yes ]] && h-daily-sync-public-repo-p "${repo}" ; then
+            out="$(h-daily-sync-terminal-approve "${daily_sync_local}" "${repo}" "${run}" notes org)" || incomplete=1
+            [[ -z "${out}" ]] || ec "${out}"
+            [[ "${out}" != (COMMIT-FAILED|EDITS-DEFERRED)' '* ]] || incomplete=1
+        else
+            h-daily-sync-metadata-commit "${repo}" || incomplete=1
+        fi
         after="$(command git -C "${HOME}/${repo}" rev-parse HEAD)"
         [[ "${before}" == "${after}" ]] || metadata_committed=yes
     done

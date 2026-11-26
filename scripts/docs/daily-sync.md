@@ -29,7 +29,7 @@ daily-sync interactive --approve-edits --metadata-update
   the run. Other checkouts continue. Both modes exit 1 when work is left
   outstanding, for example because of a conflict, skipped approval, or
   unreachable machine.
-- `--approve-edits` asks you to review the selected patch for each public code
+- `--approve-edits` asks you to review the selected patch for each public
   repository before committing it. A skipped patch stays uncommitted and the
   repository can still sync existing commits. The flag is off by default, so
   eligible public edits can be committed and pushed without a privacy review.
@@ -305,6 +305,9 @@ relative to `~`; `NIGHTDIR` is the vcsh repository rooted at `~`.
 - `daily_sync_peers`, `daily_sync_server`: ssh names.
 - `daily_sync_notes`, `daily_sync_private_code`, `daily_sync_public`: the
   repositories, by kind.
+- `daily_sync_public_notes`: any additional entries from `daily_sync_notes`
+  that need approval with `--approve-edits`. The repository at
+  `nightNotesPublic` is recognised automatically.
 - `daily_sync_server_notes`: the notes the server has real clones of.
 - `daily_sync_server_no_mirror`: private repositories that never go to the
   server.
