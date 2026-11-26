@@ -17,6 +17,12 @@ Zsh caches the scripts directories that contain executables. Use
 [agfi:path-rebuild] after adding a command to a new directory. See
 [[NIGHTDIR:docs/path.md][cache behavior and Git hook setup]].
 
+* Daily repository sync
+
+=daily-sync interactive= commits eligible edits and syncs repositories,
+with terminal conflict choices. =daily-sync auto= skips conflicted
+checkouts and syncs the rest. See [[NIGHTDIR:docs/daily-sync.md][configuration and edit approval]].
+
 * Podcast library
 
 =python/podcast-web= browses a channel's full episode history and playlists,

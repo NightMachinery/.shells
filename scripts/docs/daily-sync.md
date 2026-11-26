@@ -1,14 +1,47 @@
 # daily-sync
 
-`daily-sync` is the mechanical half of a scheduled agent job that commits and
-synchronises a set of git repositories across several machines every day, and
-then refreshes paper metadata in the notes. The agent keeps the parts that need
-judgement: grouping changes into commits, checking public repositories for
-private information, resolving trivial conflicts and repairing paper links.
-Everything else is a command here, so a whole run is about ten tool calls
-instead of ninety, and a weaker model can carry it.
+`daily-sync` commits and synchronises configured Git repositories across
+machines. Run it directly from a terminal or use the scheduled agent workflow.
+The scheduled agent groups changes, reviews public diffs for private
+information, resolves conflicts and repairs paper links.
 
 Source: `zshlang/auto-load/others/daily-sync.zsh`.
+
+## Run it from a terminal
+
+```sh
+daily-sync interactive
+daily-sync auto
+daily-sync interactive --approve-edits --metadata-update
+```
+
+- Both modes commit eligible working-tree edits in one commit per repository
+  and machine, then run the usual pull and push passes. Notes include new
+  files. Code uses the configured age threshold (seven hours by default) and
+  the 100-tracked-change limit. Untracked code files qualify only if a
+  tracked file names them. The vcsh repository considers only tracked files.
+- `interactive` syncs the other repositories before asking about conflicts.
+  Each `fzf` prompt shows the upstream, base and local versions. Use the
+  arrow keys and Enter to pick a version or combine them. Esc or **Skip this
+  repository** aborts that checkout's rebase or merge. Resolved checkouts are
+  synced again.
+- `auto` aborts conflicting pulls and skips those checkouts for the rest of
+  the run. Other checkouts continue. Both modes exit 1 when work is left
+  outstanding, for example because of a conflict, skipped approval, or
+  unreachable machine.
+- `--approve-edits` asks you to review the selected patch for each public code
+  repository before committing it. A skipped patch stays uncommitted and the
+  repository can still sync existing commits. The flag is off by default, so
+  eligible public edits can be committed and pushed without a privacy review.
+  This flag needs a terminal and `fzf` in either mode.
+- `--metadata-update` refreshes paper metadata in clean local notes after
+  syncing. The terminal run commits successful tracked Org updates and
+  syncs again if they changed. A failed updater leaves its edits for review.
+  The refresh can take hours. It is skipped by default.
+
+Both modes need `flock` on the machine running daily sync. Terminal runs
+print their log directory under `~/.agents/runs/daily-sync/`. They share the
+configured checkouts with the scheduled workflow and keep their own run state.
 
 ## Roles
 

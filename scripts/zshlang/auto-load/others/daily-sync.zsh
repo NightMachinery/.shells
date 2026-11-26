@@ -1,8 +1,6 @@
 ##
-#: Daily repository sync across several machines, driven by a scheduled agent.
-#: The agent keeps what needs judgement (grouping commits, the privacy check,
-#: conflicts, repairing paper links); everything mechanical is here, so a run
-#: is a handful of commands. See =docs/daily-sync.md=.
+#: Daily repository sync across several machines, from a terminal or through
+#: the scheduled agent. See =docs/daily-sync.md=.
 #:
 #: Which repositories and machines are synced is private and lives in
 #: `daily_sync_config', outside this repository.
@@ -225,6 +223,93 @@ function ds-why {
     print -r -- "${m[1]}"
 }
 
+function ds-edit-patch {
+    #: Snapshot eligible paths in a private index. The same patch is used for
+    #: preview and commit, even if a file changes while a person is reviewing it.
+    local repo="$1" kind="$2" min_age="$3" file xy entry entries top revision tmp
+    local -a G files removals
+    local -i tracked=0 probed=0 age
+    ds-exists "${repo}" && ! ds-inprog "${repo}" || return 0
+    ds-repo "${repo}"
+    revision="$(command "${G[@]}" rev-parse --verify HEAD 2>/dev/null)" || return 1
+    top="$(command "${G[@]}" rev-parse --show-toplevel)" || return 1
+    local -a untracked=(--untracked-files=all)
+    [[ "${repo}" != NIGHTDIR ]] || untracked=(--untracked-files=no)
+    entries="$(command "${G[@]}" status --porcelain -z --no-renames "${untracked[@]}")" || return 1
+    for entry in "${(@0)entries}" ; do
+        [[ -n "${entry}" ]] || continue
+        xy="${entry[1,2]}" file="${entry[4,-1]}"
+        case "${xy}" in
+            DD|AU|UD|UA|DU|AA|UU) return 1 ;;
+            '??')
+                if [[ "${kind}" == *code ]] ; then
+                    (( probed < 20 )) || continue
+                    probed+=1
+                    command "${G[@]}" grep --quiet --fixed-strings -e "${file}" || continue
+                fi ;;
+            *) tracked+=1 ;;
+        esac
+        if [[ "${kind}" == *code && -e "${top}/${file}" ]] ; then
+            age=$(( (EPOCHSECONDS - $(zstat +mtime -- "${top}/${file}")) / 3600 ))
+            (( age >= min_age )) || continue
+        fi
+        #: Honor staged removals even when the file still exists on disk.
+        if [[ "${xy}" == D* ]] ; then
+            removals+=( "${file}" )
+        else
+            files+=( "${file}" )
+        fi
+    done
+    if [[ "${kind}" == *code ]] && (( tracked > 100 )) ; then
+        print -r -- "EDITS-DEFERRED ${repo}: ${tracked} tracked changes exceed the limit of 100"
+        return 0
+    fi
+    (( ${#files} || ${#removals} )) || return 0
+    files=( "${(@)files:|removals}" )
+    tmp="$(command mktemp -d)" || return 1
+    local -x GIT_INDEX_FILE="${tmp}/index" GIT_LITERAL_PATHSPECS=1
+    {
+        command "${G[@]}" read-tree "${revision}" || return 1
+        if (( ${#files} )) ; then
+            printf '%s\0' "${files[@]}" | command "${G[@]}" add --all --pathspec-from-file=- --pathspec-file-nul || return 1
+        fi
+        if (( ${#removals} )) ; then
+            printf '%s\0' "${removals[@]}" | command "${G[@]}" update-index --force-remove -z --stdin || return 1
+        fi
+        command "${G[@]}" diff --cached --binary --no-color --no-ext-diff --no-textconv --no-relative \
+            --src-prefix=a/ --dst-prefix=b/ "${revision}" --
+    } always {
+        command rm -rf -- "${tmp}"
+    }
+}
+
+function ds-commit-patch {
+    local repo="$1" patch="$2" out msg="daily-sync: save edits in $1" signed=''
+    ds-inprog "${repo}" && { print -r -- "COMMIT-FAILED ${repo}: a rebase or merge is in progress"; return 0; }
+    if ! out="$(print -r -- "${patch}"$'\n' | ds-git "${repo}" commit-own --patch - -m "${msg}")" ; then
+        if [[ "${out}" == *'signing failed (commit.gpgSign is set)'* ]] &&
+            out="$(print -r -- "${patch}"$'\n' | ds-git "${repo}" commit-own --no-gpg-sign --patch - -m "${msg}")" ; then
+            signed=' (unsigned: gpg failed)'
+        else
+            print -r -- "COMMIT-FAILED ${repo}: ${out}"
+            return 0
+        fi
+    fi
+    print -r -- "COMMITTED ${repo}${signed}: ${out}"
+}
+
+function ds-commit-edits {
+    local repo="$1" patch
+    if ! patch="$(ds-edit-patch "$@")" ; then
+        print -r -- "COMMIT-FAILED ${repo}: could not prepare the edits"
+    elif [[ "${patch}" == 'EDITS-DEFERRED '* ]] ; then
+        print -r -- "${patch}"
+    elif [[ -n "${patch}" ]] ; then
+        ds-commit-patch "${repo}" "${patch}"
+    fi
+    return 0
+}
+
 function ds-sync {
     #: ds-sync <repo> <rw|ff> [<remote>[:<branch>]]...: pull, and in rw mode push,
     #: also to the extra remotes. Never leaves a rebase or merge half done: a
@@ -266,8 +351,9 @@ function ds-sync {
                 break
             fi
             files="$(command "${G[@]}" diff --name-only --diff-filter=U 2>/dev/null | command tr '\n' ' ')" || true
-            if ds-inprog "${repo}" ; then
-                command "${G[@]}" merge --abort &>/dev/null || command "${G[@]}" rebase --abort &>/dev/null || true
+            if ds-inprog "${repo}" && ! ds-conflict-abort "${repo}" >/dev/null ; then
+                print -r -- "ABORT-FAILED ${repo}: check the rebase or merge on this machine"
+                return 0
             fi
             if [[ ${try} -eq 1 && "${out}" == *'failed to sign'* ]] ; then
                 nosign=(-c commit.gpgsign=false -c rebase.gpgSign=false)
@@ -413,7 +499,10 @@ function ds-conflict-show {
             fi
             if [[ ${try} -eq 1 && "${out}" == *'failed to sign'* ]] ; then
                 if ds-inprog "${repo}" ; then
-                    command "${G[@]}" rebase --abort &>/dev/null || command "${G[@]}" merge --abort &>/dev/null || true
+                    ds-conflict-abort "${repo}" >/dev/null || {
+                        print -r -- "CONFLICT-OPEN ${repo}: could not abort after a signing failure"
+                        return 0
+                    }
                 fi
                 nosign=(-c commit.gpgsign=false -c rebase.gpgSign=false)
                 continue
@@ -508,7 +597,12 @@ function ds-conflict-resolve {
 
 function ds-conflict-abort {
     if ds-inprog "$1" ; then
-        ds-git "$1" rebase --abort >/dev/null || ds-git "$1" merge --abort >/dev/null || true
+        local order
+        order="$(ds-conflict-order "$1")"
+        if ! ds-git "$1" "${order}" --abort >/dev/null ; then
+            print -r -- "ABORT-FAILED $1: check the ${order} on this machine"
+            return 1
+        fi
         print -r -- "ABORTED $1"
     else
         print -r -- "NOT-IN-PROGRESS $1"
@@ -548,6 +642,9 @@ function h-daily-sync-on {
     {
         ec "${h_daily_sync_prelude}"
         bool "${trace_p}" && ec 'setopt SOURCE_TRACE XTRACE'
+        if [[ -n "${daily_sync_terminal_mode:-}" ]] ; then
+            ec 'export GIT_TERMINAL_PROMPT=0 GIT_EDITOR=true GIT_MERGE_AUTOEDIT=no'
+        fi
         command cat
     } | if [[ "${machine}" == "${daily_sync_local}" ]] ; then
         command zsh -s 2>> "${run}/stderr.log"
@@ -729,7 +826,7 @@ function h-daily-sync-mirrors {
 }
 
 function h-daily-sync-plan {
-    : "usage: h-daily-sync-plan <machine> <st|rw|ff> ; prints the commands for that machine"
+    : "usage: h-daily-sync-plan <machine> <st|edits|rw|ff> ; prints the commands for that machine"
     local machine="$1" op="$2"
     local repo kind mode
     local -a repos extra
@@ -741,7 +838,11 @@ function h-daily-sync-plan {
         repos=( ${daily_sync_notes} ${daily_sync_private_code} ${daily_sync_public} )
     fi
     for repo in ${repos} ; do
-        if [[ "${op}" == st ]] ; then
+        if [[ "${op}" != st && -n "${daily_sync_terminal_mode:-}" && -n "${sync_skipped[${machine}:${repo}]:-}" ]] ; then
+            ec "print -r -- SKIPPED ${(qq)repo}"
+            continue
+        fi
+        if [[ "${op}" == (st|edits) ]] ; then
             if (( ${daily_sync_notes[(Ie)${repo}]} )) ; then
                 kind=notes
             elif (( ${daily_sync_public[(Ie)${repo}]} )) ; then
@@ -753,7 +854,11 @@ function h-daily-sync-plan {
                 (( ${daily_sync_server_notes[(Ie)${repo}]} )) || kind=read-only
                 (( ${reply[(Ie)${repo}]} )) && kind=mirror
             fi
-            ec "ds-job ds-status ${(qq)repo} ${kind} ${daily_sync_min_age_hours}"
+            if [[ "${op}" == st ]] ; then
+                ec "ds-job ds-status ${(qq)repo} ${kind} ${daily_sync_min_age_hours}"
+            elif [[ "${kind}" != (read-only|mirror) && ( "${kind}" != public-code || "${approve_edits}" != yes ) ]] ; then
+                ec "ds-job ds-commit-edits ${(qq)repo} ${kind} ${daily_sync_min_age_hours}"
+            fi
         else
             mode="${op}" extra=()
             #: On the server only its own notes are writable; the rest follows its remote.
@@ -782,9 +887,21 @@ function h-daily-sync-pass {
         ec "## ${machine}: UNREACHABLE, skipped"
         return 0
     fi
-    local out
+    local out line repo
+    [[ -n "${daily_sync_terminal_mode:-}" ]] && ecerr "Syncing ${machine} (${op})"
     out="$(h-daily-sync-plan "${machine}" "${op}" | h-daily-sync-on "${machine}")" || out+=$'\n'"ERROR: the script on ${machine} stopped early; see $(h-daily-sync-run-dir)/stderr.log"
     local -a lines=( "${(@f)out}" ) quiet
+    if [[ -n "${daily_sync_terminal_mode:-}" && "${op}" != st ]] ; then
+        for line in "${lines[@]}" ; do
+            case "${line}" in
+                'CONFLICT '*) repo="${${line#CONFLICT }%%' (pull '*}"
+                    sync_skipped[${machine}:${repo}]=conflict
+                    sync_conflicts+=( "${machine}:${repo}" ) ;;
+                (BLOCKED|ABORT-FAILED)' '*) repo="${${line#* }%%: *}"
+                    sync_skipped[${machine}:${repo}]=blocked ;;
+            esac
+        done
+    fi
     quiet=( ${${(M)lines:#(CLEAN|SAME) *}#* } )
     lines=( "${(@)lines:#(CLEAN|SAME) *}" )
     ec "## ${machine} ($( [[ "${op}" == st ]] && ec status || ec "sync ${op}" ))"
@@ -959,11 +1076,13 @@ For apply-answer: [reopen] refuses a conflict that is already open, [abort-quiet
             h-daily-sync-engine-forget "${machine}" "${out}" ;;
         abort-quiet)
             #: The repository was left blocked and asked about already: just close what apply-answer opened.
-            out="$(ec "ds-conflict-abort ${(qq)repo}" | h-daily-sync-on "${machine}")"
-            ec "${out}"
-            return 0 ;;
+            ec "ds-conflict-abort ${(qq)repo}" | h-daily-sync-on "${machine}"
+            return $? ;;
         abort)
-            out="$(ec "ds-conflict-abort ${(qq)repo}" | h-daily-sync-on "${machine}")"
+            if ! out="$(ec "ds-conflict-abort ${(qq)repo}" | h-daily-sync-on "${machine}")" ; then
+                ec "${out}"
+                return 1
+            fi
             ec "LEFT-BLOCKED ${machine} ${repo}" >> "${run}/conflicts.log"
             #: The desk asks the user hunk by hunk; without it, a notification says to look.
             h-daily-sync-desk-ask "${machine}" "${repo}" ||
@@ -973,7 +1092,7 @@ For apply-answer: [reopen] refuses a conflict that is already open, [abort-quiet
             return 64 ;;
     esac
     ec "${out}"
-    h-daily-sync-conflict-hint "${machine}" "${repo}" "${out}"
+    [[ -n "${daily_sync_terminal_mode:-}" ]] || h-daily-sync-conflict-hint "${machine}" "${repo}" "${out}"
 }
 
 function h-daily-sync-resolve {
@@ -997,7 +1116,7 @@ function h-daily-sync-resolve {
         ec "RESOLVED ${machine} ${repo}: $(command sed -e 's/^[^:]*: //' "${run}/resolutions.log" 2>/dev/null | command tr '\n' ';' )" >> "${run}/conflicts.log"
         command rm -f -- "${run}/resolutions.log"
     fi
-    h-daily-sync-conflict-hint "${machine}" "${repo}" "${out}"
+    [[ -n "${daily_sync_terminal_mode:-}" ]] || h-daily-sync-conflict-hint "${machine}" "${repo}" "${out}"
 }
 
 function h-daily-sync-conflict-hint {
@@ -1156,7 +1275,10 @@ function h-daily-sync-abort-open {
     for pair in "${(@)pairs:#}" ; do
         machine="${pair%% *}" repo="${pair#* }"
         h-daily-sync-up-p "${machine}" || continue
-        out="$(ec "ds-conflict-abort ${(qq)repo}" | h-daily-sync-on "${machine}")"
+        if ! out="$(ec "ds-conflict-abort ${(qq)repo}" | h-daily-sync-on "${machine}")" ; then
+            ec "${machine} ${out}"
+            continue
+        fi
         [[ "${out}" == ABORTED* ]] && ec "${machine} ${out}: ${why}"
         ec "LEFT-BLOCKED ${machine} ${repo} (${why})" >> "${run}/conflicts.log"
         h-daily-sync-notify conflict "Notes sync needs you: a merge conflict is blocking at least one repository."
@@ -1208,24 +1330,27 @@ function h-daily-sync-todo {
     done
 }
 
+function h-daily-sync-passes {
+    local machine
+    h-daily-sync-pass "${daily_sync_local}" rw
+    for machine in ${daily_sync_peers} ; do
+        h-daily-sync-up-p "${machine}" || { ec "## ${machine}: UNREACHABLE, skipped" ; continue }
+        h-daily-sync-clone-missing "${machine}"
+        h-daily-sync-pass "${machine}" rw
+    done
+    [[ -n "${daily_sync_server:-}" ]] && h-daily-sync-pass "${daily_sync_server}" rw
+    #: Second local pass: takes in what the others pushed, and repeats the extra pushes.
+    h-daily-sync-pass "${daily_sync_local}" rw
+    for machine in ${daily_sync_peers} ${daily_sync_server:-} ; do
+        h-daily-sync-up-p "${machine}" && h-daily-sync-pass "${machine}" ff
+    done
+    h-daily-sync-push-mirrors
+}
+
 function h-daily-sync-converge {
-    local machine run out
+    local run out
     run="$(h-daily-sync-run-dir)" @RET
-    out="$(
-        h-daily-sync-pass "${daily_sync_local}" rw
-        for machine in ${daily_sync_peers} ; do
-            h-daily-sync-up-p "${machine}" || { ec "## ${machine}: UNREACHABLE, skipped" ; continue }
-            h-daily-sync-clone-missing "${machine}"
-            h-daily-sync-pass "${machine}" rw
-        done
-        [[ -n "${daily_sync_server:-}" ]] && h-daily-sync-pass "${daily_sync_server}" rw
-        #: Second local pass: takes in what the others pushed, and repeats the extra pushes.
-        h-daily-sync-pass "${daily_sync_local}" rw
-        for machine in ${daily_sync_peers} ${daily_sync_server:-} ; do
-            h-daily-sync-up-p "${machine}" && h-daily-sync-pass "${machine}" ff
-        done
-        h-daily-sync-push-mirrors
-    )"
+    out="$(h-daily-sync-passes)"
     ec "${out}"
     ec "${out}" > "${run}/converge.log"
     local -a blocked=( ${(M)${(@f)out}:#(CONFLICT|BLOCKED) *} )
@@ -1270,6 +1395,10 @@ function h-daily-sync-push-mirrors {
     fi
     local -a same
     for repo in ${reply} ; do
+        if [[ -n "${daily_sync_terminal_mode:-}" && -n "${sync_skipped[${daily_sync_local}:${repo}]:-}" ]] ; then
+            ec "SKIPPED ${repo} mirror: the local checkout is blocked"
+            continue
+        fi
         [[ -e "${HOME}/${repo}/.git" ]] || { ec "MISSING ${repo} here" ; continue }
         branch="$(command git -C "${HOME}/${repo}" rev-parse --abbrev-ref HEAD)"
         ec "ds-exists ${(qq)repo} || { command git init --quiet --initial-branch=${(qq)branch} \"\${HOME}/\"${(qq)repo} && ds-git ${(qq)repo} config receive.denyCurrentBranch updateInstead && print -r -- CREATED-MIRROR ${(qq)repo} }" \
@@ -1334,23 +1463,12 @@ function h-daily-sync-metadata-job {
 }
 
 function h-daily-sync-metadata-start {
-    local run repo
-    local -a repos skipped
+    local run
+    local -a reply repos
     run="$(h-daily-sync-run-dir)" @RET
     h-daily-sync-abort-open "still unsettled when the metadata updater started"
-    #: Only this machine's own sync lines matter: the updater runs here.
-    local here
-    here="$(command perl -ne 'BEGIN { $m = shift } if (/^## (\S+)[ :]/) { $on = $1 eq $m ; next } print if $on' \
-        "${daily_sync_local}" "${run}/converge.log" 2>/dev/null)" || true
-    for repo in ${daily_sync_metadata:-${daily_sync_notes}} ; do
-        if [[ -z "$(command git -C "${HOME}/${repo}" status --porcelain 2>&1)" ]] \
-            && ! print -r -- "${here}" | command grep --quiet --extended-regexp "^(CONFLICT|BLOCKED|PULL-FAILED) ${repo}[ :]" ; then
-            repos+=( "${repo}" )
-        else
-            skipped+=( "${repo}" )
-        fi
-    done
-    (( ${#skipped} )) && ec "not clean or blocked, so no metadata update: ${(j:, :)skipped}"
+    h-daily-sync-metadata-repos "${run}"
+    repos=( "${reply[@]}" )
     if (( ${#repos} == 0 )) ; then
         ec "No repository is eligible for the metadata update."
         h-daily-sync-stage metadata-done
@@ -1367,6 +1485,31 @@ function h-daily-sync-metadata-start {
     h-daily-sync-stage metadata
     ec "Metadata updater started for: ${(j:, :)repos}"
     h-daily-sync-next-hint
+}
+
+function h-daily-sync-metadata-repos {
+    local run="$1" repo line here
+    local -a skipped
+    #: Only this machine's own sync lines matter: the updater runs here.
+    here="$(command perl -ne 'BEGIN { $m = shift } if (/^## (\S+)[ :]/) { $on = $1 eq $m ; next } print if $on' \
+        "${daily_sync_local}" "${run}/converge.log" 2>/dev/null)" || true
+    reply=()
+    for repo in ${daily_sync_metadata:-${daily_sync_notes}} ; do
+        for line in "${(@f)here}" ; do
+            if [[ "${line}" == (CONFLICT|BLOCKED|PULL-FAILED)' '"${repo}"[\ :]* ]] ||
+                [[ -n "${daily_sync_terminal_mode:-}" && "${line}" == (SKIPPED|ABORT-FAILED|NO-UPSTREAM|PUSH-FAILED)' '"${repo}"([\ :]*|) ]] ; then
+                skipped+=( "${repo}" )
+                continue 2
+            fi
+        done
+        if [[ -z "$(command git -C "${HOME}/${repo}" status --porcelain 2>&1)" ]] ; then
+            reply+=( "${repo}" )
+        else
+            skipped+=( "${repo}" )
+        fi
+    done
+    (( ${#skipped} )) && ec "not clean or blocked, so no metadata update: ${(j:, :)skipped}"
+    return 0
 }
 
 function h-daily-sync-metadata-status {
@@ -1709,8 +1852,264 @@ function h-daily-sync-step {
     return 0
 }
 
+function h-daily-sync-terminal-menu {
+    local -x DAILY_SYNC_PREVIEW="$1"
+    local header="$2"; shift 2
+    local pick
+    pick="$(print -rl -- "$@" |
+        FZF_DEFAULT_OPTS='' FZF_DEFAULT_OPTS_FILE='' SHELL=/bin/sh command fzf \
+            --no-sort --layout=reverse --delimiter=$'\t' --with-nth=2.. \
+            --header="${header}" --preview='command cat -- "$DAILY_SYNC_PREVIEW"' --preview-window='up:75%:wrap')" || return 1
+    REPLY="${pick%%$'\t'*}"
+    [[ "${REPLY}" != skip && -n "${REPLY}" ]]
+}
+
+function h-daily-sync-terminal-approve {
+    local machine="$1" repo="$2" run="$3" patch REPLY
+    local preview="${run}/terminal-preview"
+    if ! patch="$(ec "ds-edit-patch ${(qq)repo} public-code ${daily_sync_min_age_hours}" | h-daily-sync-on "${machine}")" ; then
+        ec "COMMIT-FAILED ${repo}: could not prepare the edits"
+        return 0
+    fi
+    [[ -n "${patch}" ]] || return 0
+    if [[ "${patch}" == 'EDITS-DEFERRED '* ]] ; then
+        ec "${patch}"
+        return 0
+    fi
+    {
+        print -r -- "${machine} / ${repo}"$'\n\n'"${patch}" >| "${preview}" || return 1
+        if h-daily-sync-terminal-menu "${preview}" 'Review public edits. Enter selects. Esc skips these edits.' \
+            $'skip\tSkip these edits' $'approve\tCommit these edits' && [[ "${REPLY}" == approve ]] ; then
+            ec "ds-commit-patch ${(qq)repo} ${(qq)patch}" | h-daily-sync-on "${machine}" ||
+                ec "COMMIT-FAILED ${repo}: could not confirm the commit"
+        else
+            ec "EDITS-DEFERRED ${repo}: approval skipped"
+        fi
+    } always {
+        command rm -f -- "${preview}"
+    }
+}
+
+function h-daily-sync-terminal-commits {
+    local run="$1" machine repo out
+    for machine in "${daily_sync_local}" ${daily_sync_peers} ${daily_sync_server:-} ; do
+        h-daily-sync-up-p "${machine}" || continue
+        ec "## ${machine} (commit edits)"
+        ecerr "Checking edits on ${machine}"
+        out="$(h-daily-sync-plan "${machine}" edits | h-daily-sync-on "${machine}")" ||
+            out+=$'\n'"COMMIT-FAILED ${machine}: the commit pass stopped early"
+        [[ -z "${out}" ]] || ec "${out}"
+        if [[ "${approve_edits}" == yes && "${machine}" != "${daily_sync_server:-}" ]] ; then
+            for repo in "${daily_sync_public[@]}" ; do
+                h-daily-sync-terminal-approve "${machine}" "${repo}" "${run}" || return 1
+            done
+        fi
+    done
+    return 0
+}
+
+function h-daily-sync-terminal-choice {
+    local heading="$1" body="$2" hint="$3" whole="$4" run="$5"
+    local -a choices=( $'skip\tSkip this repository' )
+    choices+=( $'upstream\tKeep upstream' $'local\tKeep local' )
+    if [[ "${whole}" != yes ]] ; then
+        choices+=( $'both\tKeep both, upstream first' $'both-local-first\tKeep both, local first' )
+    fi
+    if [[ "${hint}" == (upstream|local|both|both-local-first) ]] ; then
+        local -i i
+        for (( i = 2; i <= ${#choices}; i++ )) ; do
+            [[ "${choices[i]}" == "${hint}"$'\t'* ]] && choices[i]+=' (suggested)'
+        done
+    fi
+    print -r -- "${heading}"$'\n\n'"${body}" >| "${run}/terminal-preview" || return 1
+    h-daily-sync-terminal-menu "${run}/terminal-preview" 'Enter selects. Esc skips this repository.' "${choices[@]}"
+}
+
+function h-daily-sync-terminal-picks {
+    #: Read a single rebase step's listing and collect every choice before applying.
+    local machine="$1" repo="$2" listing="$3" run="$4" title head body file hunk hint whole
+    local hunk_re='^### (.+), hunk ([0-9]+) of ([0-9]+), near line [0-9]+: [^ ]+ \(suggested: [0-9]+=(.+)\)$'
+    local whole_re='^### (.+): no conflict markers'
+    local title_re=': ([0-9]+) file\(s\),'
+    local MATCH MBEGIN MEND REPLY
+    local -a match mbegin mend files
+    local -A picks
+    title="${listing%%$'\n'*}"
+    [[ "${title}" == 'CONFLICT-OPEN '* && "${title}" =~ "${title_re}" ]] || return 2
+    local -i file_count=${match[1]}
+    listing="${listing#*$'\n'}"$'\n### '
+    while [[ "${listing}" == '### '*$'\n### '* ]] ; do
+        head="${listing%%$'\n'*}"
+        body="${${listing#*$'\n'}%%$'\n### '*}"
+        listing="### ${listing#*$'\n### '}"
+        hint='' whole=no
+        if [[ "${head}" =~ "${hunk_re}" ]] ; then
+            file="${match[1]}" hunk="${match[2]}" hint="${match[4]}"
+        elif [[ "${head}" =~ "${whole_re}" ]] ; then
+            file="${match[1]}" hunk=all whole=yes
+            body='Choose a whole file when both versions exist, or skip this repository.'
+        else
+            return 2
+        fi
+        h-daily-sync-terminal-choice "${machine} / ${repo}"$'\n'"${head#\#\#\# }" "${body}" "${hint}" "${whole}" "${run}" || return 1
+        [[ -n "${picks[${file}]:-}" ]] || files+=( "${file}" )
+        picks[${file}]+=" ${hunk}=${REPLY}"
+    done
+    if (( ! file_count || ${#files} != file_count )) ; then
+        return 2
+    fi
+    local resolved
+    for file in "${files[@]}" ; do
+        resolved="$(h-daily-sync-resolve "${machine}" "${repo}" "${file}" ${=picks[${file}]})" || return 2
+        print -r -- "${resolved}" >> "${run}/terminal-conflicts.log"
+        case "${resolved}" in
+            (*$'\n'RESOLVED\ *|RESOLVED\ *) ec "${machine}: ${resolved##*$'\n'}" >&2 ; return 0 ;;
+            (*$'\n'NEXT-COMMIT-CONFLICTS\ *|NEXT-COMMIT-CONFLICTS\ *)
+                print -r -- "CONFLICT-OPEN ${resolved#*$'\n'CONFLICT-OPEN }"
+                return 0 ;;
+            ((|*$'\n')(ERROR[': ']*|CONTINUE-FAILED\ *|NOT-IN-PROGRESS\ *)) return 2 ;;
+        esac
+    done
+    return 2
+}
+
+function h-daily-sync-terminal-resolve {
+    local machine="$1" repo="$2" run="$3" listing opened='' rc
+    {
+        listing="$(h-daily-sync-conflict "${machine}" "${repo}" reopen)" || return 2
+        print -r -- "${listing}" >> "${run}/terminal-conflicts.log"
+        case "${listing}" in
+            NO-CONFLICT\ *) ec "${machine}: ${listing}" ; return 0 ;;
+            CONFLICT-OPEN\ *) opened=yes ;;
+            *) ec "${machine}: ${listing}" ; return 2 ;;
+        esac
+        while [[ -n "${listing}" ]] ; do
+            listing="$(h-daily-sync-terminal-picks "${machine}" "${repo}" "${listing}" "${run}")"
+            rc=$?
+            (( rc == 0 )) || return ${rc}
+        done
+        opened=''
+        return 0
+    } always {
+        if [[ -n "${opened}" ]] ; then
+            h-daily-sync-conflict "${machine}" "${repo}" abort-quiet ||
+                ecerr "Could not confirm the abort of ${repo} on ${machine}."
+            command rm -f -- "${run}/resolutions.log"
+        fi
+        command rm -f -- "${run}/terminal-preview"
+    }
+}
+
+function h-daily-sync-terminal-metadata {
+    local run="$1" repo rc log before after
+    local -i incomplete=0
+    local -a reply
+    h-daily-sync-metadata-repos "${run}"
+    log="$(h-daily-sync-metadata-log)"
+    for repo in "${reply[@]}" ; do
+        ec "Updating paper metadata in ${repo} (log ${log})"
+        log-to "${log}" h-daily-sync-updater "${run}/rc-${repo:t}" "${HOME}/${repo}"
+        rc='unknown'
+        [[ -r "${run}/rc-${repo:t}" ]] && rc="$(<"${run}/rc-${repo:t}")"
+        ec "${repo}: metadata updater exit ${rc}"
+        if [[ "${rc}" != 0 ]] ; then
+            incomplete=1
+            command git -C "${HOME}/${repo}" diff --stat
+            continue
+        fi
+        #: Treat the configured notes as writable. A custom metadata target
+        #: outside that set goes through the normal commit/approval pass later.
+        (( ${daily_sync_notes[(Ie)${repo}]} )) || continue
+        before="$(command git -C "${HOME}/${repo}" rev-parse HEAD)"
+        h-daily-sync-metadata-commit "${repo}" || incomplete=1
+        after="$(command git -C "${HOME}/${repo}" rev-parse HEAD)"
+        [[ "${before}" == "${after}" ]] || metadata_committed=yes
+    done
+    return ${incomplete}
+}
+
+function h-daily-sync-terminal-sync {
+    local pair machine repo
+    local -i progress
+    while true ; do
+        sync_conflicts=()
+        h-daily-sync-passes >| "${daily_sync_run}/converge.log" @RET
+        command tee -a "${daily_sync_run}/sync-passes.log" < "${daily_sync_run}/converge.log" @RET
+        [[ "${daily_sync_terminal_mode}" == interactive ]] || break
+        progress=0
+        for pair in "${sync_conflicts[@]}" ; do
+            machine="${pair%%:*}" repo="${pair#*:}"
+            if h-daily-sync-terminal-resolve "${machine}" "${repo}" "${daily_sync_run}" ; then
+                unset "sync_skipped[${pair}]"
+                progress=1
+            else
+                ec "Skipped ${repo} on ${machine}; see the conflict log in ${daily_sync_run}."
+            fi
+        done
+        (( progress )) || break
+    done
+    return 0
+}
+
+function h-daily-sync-terminal {
+    local daily_sync_terminal_mode="$1"; shift
+    local metadata=no approve_edits=no metadata_committed=no opt busy daily_sync_run
+    for opt in "$@" ; do
+        case "${opt}" in
+            --metadata-update) metadata=yes ;;
+            --no-metadata-update) metadata=no ;;
+            --approve-edits) approve_edits=yes ;;
+            *) ecerr "usage: daily-sync ${daily_sync_terminal_mode} [--metadata-update|--no-metadata-update] [--approve-edits]" ; return 64 ;;
+        esac
+    done
+    if [[ "${daily_sync_terminal_mode}" == interactive || "${approve_edits}" == yes ]] ; then
+        if ! { : </dev/tty; } 2>/dev/null ; then
+            ecerr 'daily-sync interactive and --approve-edits need a terminal. Use daily-sync auto for unattended runs.'
+            return 64
+        fi
+        ensure-cmd fzf @RET
+    fi
+    busy="$(h-daily-sync-busy)"
+    if [[ "${busy}" != IDLE ]] ; then
+        ecerr "Cannot start daily-sync: ${busy}"
+        return 75
+    fi
+    daily_sync_run="$(command mktemp -d "${daily_sync_runs}/terminal-$(command date +%Y-%m-%d).XXXXXX")" @RET
+    ec "Daily sync log directory is ${daily_sync_run}"
+    local -A sync_skipped h_daily_sync_up
+    local -a sync_conflicts
+    local -i incomplete=0
+    (
+        setopt multios
+        exec {visible}>&1
+        h-daily-sync-terminal-commits "${daily_sync_run}" >| "${daily_sync_run}/commits.log" >&${visible}
+    ) || incomplete=1
+    if command grep -Eq '^(COMMIT-FAILED|EDITS-DEFERRED) ' "${daily_sync_run}/commits.log" ; then
+        incomplete=1
+    fi
+    h-daily-sync-terminal-sync @RET
+    if [[ "${metadata}" == yes ]] ; then
+        h-daily-sync-terminal-metadata "${daily_sync_run}" || incomplete=1
+        if [[ "${metadata_committed}" == yes ]] ; then
+            h-daily-sync-terminal-sync @RET
+        fi
+    fi
+    if (( ${#sync_skipped} )) || command grep -Eq \
+        '^(ABORT-FAILED|BLOCKED|CONFLICT|ERROR:|FF-REFUSED|MIRROR-REFUSED|MISSING|NO-UPSTREAM|PULL-FAILED|PUSH-FAILED|UNREACHABLE)( |$)|^## .*: UNREACHABLE' \
+        "${daily_sync_run}/converge.log" ; then
+        incomplete=1
+    fi
+    if (( incomplete )) ; then
+        ec "Daily sync finished with outstanding work. See ${daily_sync_run}."
+    else
+        ec 'Daily sync complete.'
+    fi
+    return ${incomplete}
+}
+
 function daily-sync {
-    : "usage: daily-sync begin|next|status|converge|finish
+    : "usage: daily-sync interactive|auto [--metadata-update|--no-metadata-update] [--approve-edits]
+       daily-sync begin|next|status|converge|finish
        daily-sync git <machine> <repo> <git arguments...>
        daily-sync hold <machine> <repo> <file> <what was found>
        daily-sync conflict <machine> <repo> [abort]
@@ -1725,6 +2124,33 @@ The mechanical half of the daily multi-machine sync; see docs/daily-sync.md."
     if ! bool "${inner_p}" ; then
         h-daily-sync-preflight || return 77
     fi
+    #: The foreground modes and the scheduled workflow share these checkouts.
+    #: Legacy commands share a lock so a tmux launch can call its inner step.
+    local lock_mode=--shared lock_fd
+    if [[ "${cmd}" == (interactive|auto) ]] ; then
+        ensure-cmd flock @RET
+        lock_mode=--exclusive
+    fi
+    if ! whence -p flock >/dev/null ; then
+        h-daily-sync-dispatch "${cmd}" "${inner_p}" "$@"
+        return $?
+    fi
+    zmodload zsh/system @RET
+    sysopen -w -o create -u lock_fd -- "${daily_sync_runs}/terminal.lock" @RET
+    {
+        if ! command flock "${lock_mode}" --nonblock "${lock_fd}" ; then
+            ecerr 'Another daily-sync command is active. Try again when it finishes.'
+            return 75
+        fi
+        h-daily-sync-dispatch "${cmd}" "${inner_p}" "$@"
+    } always {
+        command flock --unlock "${lock_fd}"
+        exec {lock_fd}>&-
+    }
+}
+
+function h-daily-sync-dispatch {
+    local cmd="$1" inner_p="$2"; shift 2
     if [[ "${cmd}" == begin ]] && ! bool "${inner_p}" && [[ "$(h-daily-sync-stage)" == finished ]] ; then
         #: A second run on the same day starts afresh; the finished one is kept aside.
         local done_run
@@ -1740,6 +2166,7 @@ The mechanical half of the daily multi-machine sync; see docs/daily-sync.md."
         return $?
     fi
     case "${cmd}" in
+        interactive|auto) h-daily-sync-terminal "${cmd}" "$@" ;;
         begin) h-daily-sync-begin ;;
         next) h-daily-sync-next ;;
         status) h-daily-sync-status ; h-daily-sync-next-hint ;;
@@ -1779,7 +2206,7 @@ The mechanical half of the daily multi-machine sync; see docs/daily-sync.md."
             h-daily-sync-stage finished
             h-daily-sync-next-hint ;;
         *)
-            ecerr "usage: daily-sync begin|next|status|git|hold|conflict|resolve|apply-answer|converge|metadata|finish"
+            ecerr "usage: daily-sync interactive|auto|begin|next|status|git|hold|conflict|resolve|apply-answer|converge|metadata|finish"
             return 64 ;;
     esac
 }
