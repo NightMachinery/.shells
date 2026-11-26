@@ -510,11 +510,12 @@ had been sitting there, and wrong silently.
 Two writers share this file: the hook, and the slow path, which merges its own
 rows in after every successful run so that what `agy` itself said is not
 thrown away. Both merge **per bucket**, and that is the whole reason the merge
-exists. The hook sees five-hour and weekly buckets; `agy -p /usage` prints the
-weekly ones, including additional model-specific pools, and a five-hour one
-only some of the time. A writer that
-replaced the file wholesale would therefore delete the five-hour windows every time the slow path ran, and the report would
-lose rows for reasons nobody could see from the outside. Each writer stamps
+exists. The hook and `agy -p /usage` both see the general five-hour and
+weekly pools, but `/usage` lists a model-specific pool (Gemini 4 Argon) only
+some of the time. A writer that replaced the file wholesale would therefore
+delete such a pool whenever a run left it out, and the report would lose rows
+for reasons nobody could see from the outside. For the same reason a slow
+read keeps, in its report, the cached pools its run did not print. Each writer stamps
 its rows with a `source`, so a row's provenance is readable rather than
 guessed at.
 
@@ -546,8 +547,17 @@ counts that window as blocking, and the account is marked stale.
 agent-quotas also runs the slow path when the account was used after the
 cache's newest capture (agy run without its TUI, such as Paseo's `agy acp`,
 never renders the statusline), at most once per `active_refresh_s` (default
-five minutes) per account. A fallback runs at most once per `slow_fallback_s`
-(default an hour) per account; see agent-quotas' `docs/design.md`.
+five minutes) per account. `/usage` itself touches the account's
+conversations, so a slow run stamps its reading when it ends; otherwise every
+run would look like use and start the next. A fallback runs at most once per
+`slow_fallback_s` (default an hour) per account.
+
+The daemon also keeps idle accounts current, which no command run by hand
+does: it re-reads an account whose newest reading is older than
+`stale_refresh_s` (default an hour; -1 turns it off), and re-reads once after
+a pool's reset has passed since that pool was read, `blocked_grace_s` (90 s)
+after the reset. That costs one CLI start-up per account per hour and no
+quota. See agent-quotas' `docs/design.md`.
 
 An absent or unreadable cache always falls back, whatever the knob says,
 because that is a different question: there is nothing to serve at any age.
@@ -640,15 +650,14 @@ model group:
 
     <group>	<label>	<remaining>%	<reset, ISO-8601 UTC>
 
-The general groups are `Gemini Models` and `Claude and GPT models`, labelled
-`Weekly Limit Remaining`, plus model-specific pools such as `Gemini 4 Argon`.
-The percentage is what *remains*, the opposite sense from the used-percent
-that Claude Code and Codex report, and the reset is a UTC instant, not a
-duration. Five-hour windows appear only some of the time: on 2026-11-25 a run
-printed `Five Hour Limit Remaining` for Claude and GPT but not for Gemini,
-whose five-hour row a run the day before had printed. It looks as though
-`/usage` shows a five-hour window only while it is in use, but that is
-inferred from those runs, not documented.
+The general groups are `Gemini Models` and `Claude and GPT models`, each with
+a `Weekly Limit Remaining` and a `Five Hour Limit Remaining` row, plus
+model-specific pools such as `Gemini 4 Argon`, which appear only some of the
+time. The percentage is what *remains*, the opposite sense from the
+used-percent that Claude Code and Codex report, and the reset is a UTC
+instant, not a duration. A window that has not started shows 100% with a
+reset of `1970-01-01T00:00:00Z` (Claude and GPT) or one window length from
+now (Gemini).
 
 It is called the slow path for a reason. Every call is a full CLI start-up
 followed by five sequential backend round trips, and measured end to end it
@@ -668,7 +677,7 @@ cache has nothing to say.
 
 It gained one duty with the cache: after a successful run it merges its rows
 in with `source: "slow"`, per bucket, so that the numbers `agy` itself printed
-are available to the fast path afterwards and the hook's five-hour windows
+are available to the fast path afterwards, and the pools a run did not print
 survive. That merge is best-effort -- a cache we could not write must never
 cost us a report we already have in hand.
 
