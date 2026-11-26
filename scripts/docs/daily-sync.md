@@ -12,6 +12,7 @@ Source: `zshlang/auto-load/others/daily-sync.zsh`.
 ```sh
 daily-sync interactive
 daily-sync auto
+daily-sync auto --all
 daily-sync interactive --approve-edits --metadata-update
 ```
 
@@ -20,6 +21,8 @@ daily-sync interactive --approve-edits --metadata-update
   files. Code uses the configured age threshold (seven hours by default) and
   the 100-tracked-change limit. Untracked code files qualify only if a
   tracked file names them. The vcsh repository considers only tracked files.
+- `-a` or `--all` skips the age check for this run. All other eligibility
+  rules still apply, and the flag works with `--approve-edits`.
 - `interactive` syncs the other repositories before asking about conflicts.
   Each `fzf` prompt shows the upstream, base and local versions. Use the
   arrow keys and Enter to pick a version or combine them. Esc or **Skip this

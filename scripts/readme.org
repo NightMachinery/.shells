@@ -21,7 +21,8 @@ Zsh caches the scripts directories that contain executables. Use
 
 =daily-sync interactive= commits eligible edits and syncs repositories,
 with terminal conflict choices. =daily-sync auto= skips conflicted
-checkouts and syncs the rest. See [[NIGHTDIR:docs/daily-sync.md][configuration and edit approval]].
+checkouts and syncs the rest. Add =-a= or =--all= to include recent code
+edits. See [[NIGHTDIR:docs/daily-sync.md][configuration and edit approval]].
 
 * Podcast library
 

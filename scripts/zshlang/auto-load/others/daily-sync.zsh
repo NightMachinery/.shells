@@ -252,7 +252,7 @@ function ds-edit-patch {
                 fi ;;
             *) tracked+=1 ;;
         esac
-        if [[ "${kind}" == *code && -e "${top}/${file}" ]] ; then
+        if (( min_age > 0 )) && [[ "${kind}" == *code && -e "${top}/${file}" ]] ; then
             age=$(( (EPOCHSECONDS - $(zstat +mtime -- "${top}/${file}")) / 3600 ))
             (( age >= min_age )) || continue
         fi
@@ -2079,12 +2079,14 @@ function h-daily-sync-terminal-sync {
 function h-daily-sync-terminal {
     local daily_sync_terminal_mode="$1"; shift
     local metadata=no approve_edits=no metadata_committed=no opt busy daily_sync_run
+    local -i daily_sync_min_age_hours="${daily_sync_min_age_hours}"
     for opt in "$@" ; do
         case "${opt}" in
+            -a|--all) daily_sync_min_age_hours=0 ;;
             --metadata-update) metadata=yes ;;
             --no-metadata-update) metadata=no ;;
             --approve-edits) approve_edits=yes ;;
-            *) ecerr "usage: daily-sync ${daily_sync_terminal_mode} [--metadata-update|--no-metadata-update] [--approve-edits]" ; return 64 ;;
+            *) ecerr "usage: daily-sync ${daily_sync_terminal_mode} [-a|--all] [--metadata-update|--no-metadata-update] [--approve-edits]" ; return 64 ;;
         esac
     done
     if [[ "${daily_sync_terminal_mode}" == interactive || "${approve_edits}" == yes ]] ; then
@@ -2133,7 +2135,7 @@ function h-daily-sync-terminal {
 }
 
 function daily-sync {
-    : "usage: daily-sync interactive|auto [--metadata-update|--no-metadata-update] [--approve-edits]
+    : "usage: daily-sync interactive|auto [-a|--all] [--metadata-update|--no-metadata-update] [--approve-edits]
        daily-sync begin|next|status|converge|finish
        daily-sync git <machine> <repo> <git arguments...>
        daily-sync hold <machine> <repo> <file> <what was found>
@@ -2141,6 +2143,7 @@ function daily-sync {
        daily-sync resolve <machine> <repo> [<file> <hunk>=upstream|local|both|both-local-first...]
        daily-sync apply-answer <sidecar.json> (run by agent-desk, the answer on stdin)
        daily-sync metadata start|status|rerun <directory>...|commit <repo> [<held-back file>...]
+Use -a or --all to include recent code edits regardless of file age.
 The mechanical half of the daily multi-machine sync; see docs/daily-sync.md."
     local cmd="${1:-}" inner_p="${daily_sync_inner:-n}"
     (( $# )) && shift

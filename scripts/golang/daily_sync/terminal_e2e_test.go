@@ -136,6 +136,40 @@ awk -F '\t' '$1 == "local" {print}'
 	}
 }
 
+func TestTerminalAllIncludesRecentCodeEdits(t *testing.T) {
+	e := newE2E(t)
+	e.git(e.a, "fetch", "--quiet")
+	e.git(e.a, "reset", "--hard", "origin/main")
+	e.configureTerminal(fmt.Sprintf(`daily_sync_notes=()
+daily_sync_public=( %q )
+daily_sync_min_age_hours=7
+`, e.rel))
+	e.write(e.a, "a.org", "recent edit\n")
+	e.write(e.a, "unreferenced.txt", "local scratch\n")
+	before := e.git(e.a, "rev-parse", "HEAD")
+	out, rc := e.terminal(false, "auto")
+	if rc != 0 || e.git(e.a, "rev-parse", "HEAD") != before ||
+		!strings.Contains(e.git(e.a, "diff", "--", "a.org"), "+recent edit") {
+		t.Fatalf("default run did not leave the recent edit in place (exit %d):\n%s", rc, out)
+	}
+	out, rc = e.terminal(false, "auto", "--all")
+	if rc != 0 || e.git(e.a, "show", "origin/main:a.org") != "recent edit" ||
+		e.git(e.a, "status", "--porcelain") != "?? unreferenced.txt" {
+		t.Fatalf("--all did not sync only the eligible edit (exit %d):\n%s", rc, out)
+	}
+
+	e.write(e.a, "a.org", "recent reviewed edit\n")
+	fzf := filepath.Join(e.tmp, "bin", "fzf")
+	must(t, os.WriteFile(fzf, []byte(`#!/bin/sh
+grep -q '^+recent reviewed edit$' "$DAILY_SYNC_PREVIEW" || exit 1
+awk -F '\t' '$1 == "approve" {print}'
+`), 0o700))
+	out, rc = e.terminal(true, "interactive", "-a", "--approve-edits")
+	if rc != 0 || e.git(e.a, "show", "origin/main:a.org") != "recent reviewed edit" {
+		t.Fatalf("-a did not sync the reviewed edit (exit %d):\n%s", rc, out)
+	}
+}
+
 func TestTerminalPublicApprovalCommitsOnlyReviewedPatch(t *testing.T) {
 	e := newE2E(t)
 	e.git(e.a, "fetch", "--quiet")
