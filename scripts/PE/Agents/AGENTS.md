@@ -4,6 +4,7 @@
 
 - Your running shell is Zsh. Use proper Zsh. Quote everything conservatively, to avoid Zsh glob patterns etc. on literal strings. In particular, '===' should be quoted.
   - Always use full syntax for variables, e.g., `${...}`. Zsh treats `sth` in `$variable_name:sth` as modifier flags.
+  - I have many aliases defined on 2 or 3 letter names. These are enabled even for noninteractive scripts. Use distinct names for your own functions to avoid name collision.
 
 - Keep `./docs/` updated as you investigate or make changes.
   - If a `readme.org` (or `readme.md`) file exists, keep it updated AND streamlined: README files are meant for humans. These files should be concise and let humans know why this project might provide value for them and teach how to try it out quickly, with links to other docs for more details.
