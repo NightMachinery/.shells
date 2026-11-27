@@ -18,6 +18,7 @@ typeset -ga llm_focus_url_patterns=(
     '^https://chatgpt\.'
     '^https://(?:aistudio|gemini)\.google\.'
     '^https://claude\.'
+    '^https://[^/]+/ctl/desk/'
 )
 
 function llm-focus-p {
