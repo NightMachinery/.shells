@@ -101,20 +101,14 @@ shared cache: a bare name follows `refs/main`, which any online call can move to
 
 ## External Disk Disconnected
 
-When an external disk your work needs disappears mid-task (a USB drive, a network share), pause
-the work that uses it, stop any workers using it, and tell the user. Do not recreate its mount
-point or move the work to the internal disk unless the job is small. Then start a watcher that
+When an external disk your work needs disappears mid-task, pause
+the work that uses it, and tell the user. Then start a watcher that
 wakes you when the disk returns, so you resume without the user telling you and without polling
-with model turns. Run it as a harness-tracked background job (in Claude Code, Bash with
-`run_in_background`), testing a directory that exists only on the mounted disk, not the mount
-point itself (a dead mount point can linger):
+with model turns. Run it as a harness-tracked background job:
 
 ```
 until [[ -d /Volumes/<disk>/<some-dir> ]]; do sleep 30; done; echo '<disk> is back'
 ```
-
-When it fires, resume the paused work and any workers you stopped. Before rebuilding, check
-build directories for objects truncated by the I/O errors.
 
 ## Matching Processes: `pgrep -f` / `pkill -f` Match You Too
 
