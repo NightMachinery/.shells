@@ -99,6 +99,23 @@ shared cache: a bare name follows `refs/main`, which any online call can move to
 - If there is so little free disk space that you cannot continue working, stop and ask the user to handle it manually.
 - Do **not** try to clean caches, temporary files, or other disk usage yourself.
 
+## External Disk Disconnected
+
+When an external disk your work needs disappears mid-task (a USB drive, a network share), pause
+the work that uses it, stop any workers using it, and tell the user. Do not recreate its mount
+point or move the work to the internal disk unless the job is small. Then start a watcher that
+wakes you when the disk returns, so you resume without the user telling you and without polling
+with model turns. Run it as a harness-tracked background job (in Claude Code, Bash with
+`run_in_background`), testing a directory that exists only on the mounted disk, not the mount
+point itself (a dead mount point can linger):
+
+```
+until [[ -d /Volumes/<disk>/<some-dir> ]]; do sleep 30; done; echo '<disk> is back'
+```
+
+When it fires, resume the paused work and any workers you stopped. Before rebuilding, check
+build directories for objects truncated by the I/O errors.
+
 ## Matching Processes: `pgrep -f` / `pkill -f` Match You Too
 
 `-f` matches the whole command line, including your own shell's: `pkill -f
