@@ -287,6 +287,15 @@ if hs and hs.chooser then
     hs.chooser.globalCallback=S.historyGlobalCallback
 end
 
+-- Refilter the installed index when the source rows have not changed.
+function S.refresh(chooser)
+    local state=assert(stateFor(chooser),"ChooserSearch must create the chooser")
+    local query=chooser:query()
+    local rows=withDynamic(state,query,S.filter(state.choices,query,state.fields,state.index,state.limit))
+    chooser:choices(rows)
+    return rows
+end
+
 -- options.stable promises that each row's search fields never change once
 -- built, so its search text is kept across openings (keyed weakly by row).
 local stableIndex=setmetatable({}, {__mode="k"})
@@ -303,8 +312,8 @@ function S.setChoices(chooser, choices, options)
         end
         state.index[i]=cached.text
     end
-    chooser:choices(withDynamic(state,chooser:query(),S.filter(state.choices, chooser:query(), state.fields,state.index,state.limit)))
-    return chooser
+    local rows=S.refresh(chooser)
+    return chooser,rows
 end
 
 -- fn(query) returns rows to list first, or nil; nil fn removes it. Optional

@@ -51,15 +51,20 @@ function handle(request, b) {
         return state;
     }
     if (request.action === 'list') {
-        var list = windows(), tabs = [];
+        var list = windows(), tabs = [], activeTabId;
         for (var i=0;i<list.length;i++) {
             var ids = list[i].tabs.id(), titles = list[i].tabs.title(), urls = list[i].tabs.url();
+            var windowId = String(list[i].id());
+            if (i === 0) {
+                var activeId = ids[list[i].activeTabIndex()-1];
+                if (activeId != null) activeTabId = String(activeId);
+            }
             for (var j=0;j<ids.length;j++) {
-                tabs.push({tabId:String(ids[j]), windowId:String(list[i].id()),
+                tabs.push({tabId:String(ids[j]), windowId:windowId,
                     windowNumber:i+1, index:j+1, title:titles[j] || '', url:urls[j] || ''});
             }
         }
-        return {ok:true,tabs:tabs,activeTabId:snapshot(list[0]).tabId};
+        return {ok:true,tabs:tabs,activeTabId:activeTabId};
     }
     if (request.action === 'selectTab') {
         if (request.requireActiveTabId && (!b.frontmost() || snapshot(windows()[0]).tabId!==request.requireActiveTabId))

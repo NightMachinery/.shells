@@ -9,6 +9,9 @@ environment variable, so a single set of generic functions covers every
 Chromium browser and picking one is just a matter of setting that variable.
 macOS only. The code is `zshlang/auto-load/others/browsers/chrome, gen.zsh`.
 
+For interactive tab, bookmark and history search, press **Cmd+.** in Brave.
+See the [Hammerspoon browser shortcuts](../hammerspoon/docs/browser-shortcuts.md).
+
 ## The generic layer
 
 These act on whatever browser is currently selected:

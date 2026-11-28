@@ -2,6 +2,8 @@
 nightdir='..'
 local pending, opened, selected = {}, {}, {}
 local front=true
+local pid,now=1234,0
+local app={pid=function()return pid end}
 local activeChooser
 local field={setTimeout=function(self)return self end}
 function field:attributeValue(k)
@@ -21,7 +23,7 @@ hs={
    assert(key=='AXFocusedUIElement');return activeChooser and field
   end}
  end},
- timer={doAfter=function(_,fn)
+ timer={absoluteTime=function()return now end,doAfter=function(_,fn)
   local t={fn=fn,stop=function(self)self.stopped=true end}
   pending[#pending+1]=t;return t
  end},
@@ -57,7 +59,7 @@ end
 local function typeQuery(c,q)c:query(q);c.changed(q) end
 local function make()
  return dofile('brave/omni-prompt.lua')({
-  braveInFront=function()return front end,
+  braveInFront=function()return front and app end,
   bookmarks={read=function()return {{text='Bookmark',url='https://example.org/bookmark'}} end},
   searchAliases={apply=function(rows)return rows end},unavailable=error,
   engine={
@@ -115,7 +117,7 @@ tabReads,historyReads,bookmarkReads=0,0,0
 local function variant(sources,features)
  return dofile('brave/omni-prompt.lua')({
   sources=sources,name='Test',magic=not features or features.magic,queryActions=not features or features.actions,
-  braveInFront=function()return front end,
+  braveInFront=function()return front and app end,
   bookmarks={read=function()bookmarkReads=bookmarkReads+1;return {{text='Saved',url='https://example.org/saved'}} end},
   history={search=function(query,options,fn)
    historyReads=historyReads+1;historyCallback=fn
@@ -128,7 +130,7 @@ local function variant(sources,features)
  })
 end
 local v=variant({tabs=true,bookmarks=true,history=true})
-assert(v.show());assert(not v.chooser.visible and historyReads==0)
+assert(v.show());assert(v.chooser.visible and v.chooser.items[1].kind=='bookmark' and historyReads==0)
 tabCallback({ok=true,tabs={{title='Current',url='https://example.org/',index=1,windowNumber=1,tabId='9'}}})
 assert(v.chooser.visible and #v.chooser.items==2 and v.historyPending)
 historyCallback({ok=true,total=5000,history={{title='Historical paper',url='https://archive.example.org/paper'}}})
@@ -157,6 +159,24 @@ stale.cancel();old({ok=true,history={{title='Old',url='https://example.org/old'}
 stale.show();old=historyCallback;typeQuery(stale.chooser,'new');flush()
 old({ok=true,history={{title='Wrong new',url='https://example.org/wrong'}}});assert(#stale.chooser.items==0)
 historyCallback({ok=false,error='History unavailable'});assert(stale.chooser.visible and #warnings==1)
+-- The browser can answer after typing, accepting, cancelling or reopening.
+local slow=variant({tabs=true})
+local live={ok=true,activeTabId='fresh',tabs={{title='Late tab',url='https://example.org/late',index=1,windowNumber=1,tabId='fresh'}}}
+slow.show();typeQuery(slow.chooser,'Late');assert(slow.queryActions.key(36,{}))
+tabCallback(live);flush()
+assert(selected[#selected]=='fresh' and slow.chooser:query()=='Late')
+slow.show();assert(slow.chooser.items[1].tabId=='fresh' and slow.queryActions.targetTabId==nil)
+slow.queryActions.toggleMode()
+local options
+slow.queryActions.captureAction(function(opts) options=opts end)()
+assert(not options);tabCallback({ok=true,activeTabId='different',tabs={}})
+assert(options.replace and options.tabId=='different')
+slow.show();tabCallback(live);slow.cancel()
+now=16e9;slow.show();assert(#slow.chooser.items==0);tabCallback(live);slow.cancel()
+pid=pid+1;slow.show();assert(#slow.chooser.items==0)
+local obsolete=tabCallback
+slow.cancel();slow.show();obsolete(live);assert(#slow.chooser.items==0)
+slow.stop()
 v.stop();b.stop();h.stop();no.stop();stale.stop()
 print('Omni asynchronous variants, stale responses and pending Enter tests passed')
 

@@ -104,7 +104,8 @@ Run [agfi:finder-hide-desktop-icons] to hide desktop icons without restarting Fi
 
 * Hammerspoon
 
-Hammerspoon shortcut notes are tracked in =./hammerspoon/docs/hammerspoon.md=.
+In Brave, press =Cmd+.= to search tabs, bookmarks and history. See the
+[[NIGHTDIR:hammerspoon/docs/browser-shortcuts.md][browser shortcuts]] for other browsers and search actions.
 
 =~/.hammerspoon/init.lua= points at =./hammerspoon/boot.lua=. Lua files in
 =./hammerspoon/auto-load/= are loaded alphabetically.

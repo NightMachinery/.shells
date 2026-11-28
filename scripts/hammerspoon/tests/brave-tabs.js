@@ -15,7 +15,14 @@ const browser={windows:()=>[a,b],frontmost:()=>true,activate(){activation++}};
 let state=context.handle({action:'activeState'},browser);
 assert.equal(state.tabId,'10'); assert.equal(state.url,'https://example.org/');
 assert.equal(state.frontmost,true);
+let windowReads=0;
+for(const w of [a,b]) {
+    const id=w.id;
+    w.id=()=>{ windowReads++;return id(); };
+}
 let result=context.handle({action:'list'},browser);
+assert.equal(windowReads,2);
+assert.equal(result.activeTabId,'10');
 assert.equal(result.tabs.length,3);
 assert.equal(new Set(result.tabs.map(t=>t.tabId)).size,3);
 assert.equal(result.tabs[2].windowNumber,2);

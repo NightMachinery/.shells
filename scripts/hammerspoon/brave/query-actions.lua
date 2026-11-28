@@ -92,6 +92,15 @@ return function(config)
         return base and base .. encode(query) or nil
     end
 
+    -- Capture the opening and its replace mode before cancel restores focus.
+    function Q.captureAction(action)
+        local options={replace=Q.replace,tabId=Q.targetTabId}
+        if options.replace and not options.tabId and config.captureTarget then
+            return config.captureTarget(action)
+        end
+        return function() action(options) end
+    end
+
     function Q.submit(destination, query)
         if config.enabled==false then return false end
         query=query or chooser:query()
@@ -104,8 +113,7 @@ return function(config)
         end
         if #requests==0 then return false end
         if ChooserSearch then ChooserSearch.recordQuery(chooser) end
-        local options={replace=Q.replace,tabId=Q.targetTabId}
-        defer(function()
+        defer(Q.captureAction(function(options)
             if config.engine.openQueries then config.engine.openQueries(requests,options);return end
             -- Compatibility for simple embedders without the batch engine.
             for _,request in ipairs(requests) do
@@ -115,7 +123,7 @@ return function(config)
                 elseif name=="claude" then config.engine.openClaude(request.url,query,options)
                 else config.engine.openURL(request.url,options) end
             end
-        end)
+        end))
         return true
     end
 

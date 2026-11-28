@@ -81,6 +81,20 @@ entries per chooser purpose. Browser instances share a purpose's input history;
 `historyId=false` opts a chooser out. No queries, clipboard values or history
 records are written to logs or source control.
 
+Cmd+. accepts typing while tab discovery runs. A recent tab snapshot and the
+local bookmarks populate the first results. The chooser reuses the lowercase
+search index as you type. The Chromium bridge reads the window ID once per
+window. On one Mac, seven live Brave openings took 255 ms median before these
+changes (247 to 271 ms) and 43 ms after (28 to 66 ms). This timed the shortcut
+handler until Hammerspoon reported the chooser visible. Keyboard dispatch,
+display scanout and fresh tab arrival are outside that measurement.
+
+For Brave, an extension could maintain a current tab list between openings
+with tab events. That would improve the first tab results after an idle period
+and require installation per profile plus a local bridge to Hammerspoon. A
+resident Swift helper could move slow browser calls off the Hammerspoon thread.
+A Swift UI that still waits for a fresh browser snapshot would retain that wait.
+
 ## Verification
 
 Focused Lua/Node fixtures cover native dictionary differences, Safari URL

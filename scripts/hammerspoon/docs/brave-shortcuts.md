@@ -163,8 +163,9 @@ opens native Tab Search. The action implementations stay the same.
 
 ## Omni Prompt and local matching
 
-Omni Prompt snapshots tabs across all Brave windows when opened, then appends
-bookmarks from the same private file as Cmd+, and recent browser history. Each
+Omni Prompt opens with bookmarks from the same private file as Cmd+, and any
+recently cached tab rows. It refreshes tabs across all Brave windows on each
+opening. The final order is tabs, bookmarks, then matching browser history. Each
 row identifies its source. Cmd+, is a bookmarks-only instance of the same chooser.
 Tab subtitles show the position within their window, the window number, and URL
 (for example, `Tab 3 · Window 1 · https://example.org/`).
@@ -264,8 +265,12 @@ represented by tabs/bookmarks. Go uses precomputed searchable strings and return
 at most 200 unique matching rows. History never crosses the process stdout pipe.
 Typing is debounced by 40 ms; generations and query serials discard stale replies.
 
-Tabs and bookmarks appear immediately after the native tab snapshot. History
-matches append asynchronously, preserving a highlighted local result. The chooser
+Cmd+. shows the input before requesting a tab snapshot. Bookmarks are immediately
+searchable. Reopening within 15 seconds can also show tab rows from the last
+successful refresh in the same browser process. Every opening fetches the current
+list. Selecting a tab resolves its identity again, and replacement waits for the
+current opening's active tab ID. Refreshing leaves the typed query intact.
+History matches append asynchronously, preserving a highlighted local result. The chooser
 transfers at most 200 matching rows to its native UI; all source entries remain
 searchable by refining the query. Plain no-match Enter waits for an outstanding
 history query before deciding between a result and Google search. Modified
