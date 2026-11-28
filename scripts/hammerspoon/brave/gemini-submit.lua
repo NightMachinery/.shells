@@ -46,13 +46,14 @@ return function(config)
                     if role=="AXPopUpButton" and label:match("^Open mode picker, currently ") then
                         out.picker=e
                         local current=label:match("^Open mode picker, currently (.+)$")
-                        out.argonHigh=current=="Argon High" or current=="4 Argon High"
+                        out.neonHigh=current=="Neon High" or current=="4 Neon High"
                     end
                     if role=="AXButton" and (label=="Send message" or label=="Send prompt" or label=="Submit") then out.send=e end
                     if role=="AXMenuItem" and e:attributeValue("AXEnabled")~=false then
                         out.menus[#out.menus+1]=e
-                        if label:match("^Selected 4 Argon ") then out.argonSelected=true end
-                        if label:match("^4 Argon ") then out.argon=e end
+                        if (" " .. label .. " "):match("%s4 Neon%s") then
+                            if label:match("^Selected ") then out.neonSelected=true else out.neon=e end
+                        end
                         if label=="Thinking level" then out.thinking=e end
                         if label:match("^Selected High ") then out.highSelected=true end
                         if label:match("^High ") then out.high=e end
@@ -81,7 +82,7 @@ return function(config)
         local started=hs.timer.secondsSinceEpoch()
         local deadline=started+45
         local stage,activation="picker",nil
-        local choseArgon,choseHigh=false,false
+        local choseNeon,choseHigh=false,false
         local checks,usedFastPath=0,false
         local function current() return generation==C.generation end
         local function result(status,reason)
@@ -100,7 +101,7 @@ return function(config)
         local check
         local function again(delay)
             if hs.timer.secondsSinceEpoch()>=deadline then
-                return finish("timeout","Gemini did not become ready with Argon High")
+                return finish("timeout","Gemini did not become ready with Neon High")
             end
             C.lastResult=result("waiting")
             C.timer=hs.timer.doAfter(delay or .1,check)
@@ -131,16 +132,16 @@ return function(config)
             -- that reveal new controls yield to the event loop before rescan.
             for _=1,4 do
                 if stage=="picker" then
-                    if controls.argonHigh and #controls.menus==0 then
+                    if controls.neonHigh and #controls.menus==0 then
                         usedFastPath=true;stage="fill"
                     elseif #controls.menus>0 then stage="model"
                     elseif controls.picker and controls.composer then return activate(controls.picker,"model")
                     else return again() end
                 elseif stage=="model" then
-                    if controls.argonSelected and controls.thinking then return activate(controls.thinking,"high")
-                    elseif controls.argon and not choseArgon then
-                        choseArgon=true;return activate(controls.argon,"picker")
-                    elseif #controls.menus>0 then return finish("cancelled","Gemini Argon is unavailable in this account")
+                    if controls.neonSelected and controls.thinking then return activate(controls.thinking,"high")
+                    elseif controls.neon and not choseNeon then
+                        choseNeon=true;return activate(controls.neon,"picker")
+                    elseif #controls.menus>0 then return finish("cancelled","Gemini Neon is unavailable in this account")
                     else return again() end
                 elseif stage=="high" then
                     if controls.highSelected then stage="close"
@@ -152,7 +153,9 @@ return function(config)
                     if #controls.menus>0 then
                         hs.eventtap.keyStroke({},"escape",0,app);return again(0)
                     end
-                    stage="fill"
+                    stage="picker"
+                elseif (stage=="fill" or stage=="verify") and not controls.neonHigh then
+                    return finish("cancelled","Gemini Neon High selection changed")
                 elseif stage=="fill" and controls.composer then
                     local empty=emptyComposer(controls.composer:attributeValue("AXValue"),controls.composer)
                     if empty==nil then return again() end

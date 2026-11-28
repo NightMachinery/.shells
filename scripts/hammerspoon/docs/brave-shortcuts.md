@@ -327,7 +327,7 @@ hostname keywords using the shared literal AND matcher.
   Google for the entire query.
 - Shift+Enter always searches Google, even when a result matches.
 - Cmd+Enter opens the query in a new ChatGPT tab and submits it automatically.
-- Alt+Enter opens the query in a new Gemini tab with Argon High and submits it.
+- Alt+Enter opens the query in a new Gemini tab with Neon High and submits it.
 - Ctrl+Enter opens the query in a new Claude tab and submits it.
 
 Query actions always create a fresh Brave tab. Empty or whitespace-only queries
@@ -372,7 +372,7 @@ highlighted:
 - `.k query`: Keepa search on Amazon Germany (domain 3).
 - `.c query`: a fresh ChatGPT conversation with automatic submission.
 - `.g query`: the Gemini consumer app at `https://gemini.google.com/app`,
-  selecting 4 Argon and High thinking before submitting.
+  selecting 4 Neon and High thinking before submitting.
 - `.l query`: a fresh Claude conversation with automatic submission.
 - `.s query`: Semantic Scholar.
 - `.gs query`: Google Scholar.
@@ -404,7 +404,7 @@ the full typed query, including any prefix. Additional mixed modifiers keep thei
 
 Gemini ignores a plain prompt query parameter in the tested browser, so
 `brave/gemini-submit.lua` fills its accessible composer directly. Version 1.9.0
-uses the native picker label as a fast path when it already confirms Argon High,
+uses the native picker label as a fast path when it already confirms Neon High,
 skipping both menus. Otherwise, it verifies model and thinking selections through
 the dependent menus. Focusing can open a web menu itself, so each dependency must
 be observed before a Return event that could toggle the menu closed.
@@ -419,7 +419,7 @@ LuaSkin's structured AX URL values are handled explicitly.
 
 An absent composer value means not ready, not an existing draft. Empty Unicode
 formatting and exposed placeholders are allowed; real draft text is preserved.
-Changing tabs or apps, unavailable Argon, or unconfirmed High cancels or times out
+Changing tabs or apps, unavailable Neon, or unconfirmed High cancels or times out
 without sending. Readiness expires after 45 seconds. `lastResult` includes elapsed
 time, check count, and whether the confirmed-picker fast path was used. This
 uses native scripting and Accessibility, without page JavaScript or clipboard
@@ -547,7 +547,7 @@ active tab or application changes and never activates the browser application. C
 or navigating the target away cancels it.
 
 Gemini's DOM route clicks the observed model/effort menu items and verifies that
-the picker reports Argon High before filling. Already-correct tabs skip those
+the picker reports Neon High before filling. Already-correct tabs skip those
 menus. A model-menu action is issued once and allowed three seconds to settle;
 unconfirmed selection yields to the guarded native fallback before composer
 insertion. Native fallbacks run sequentially and require the original browser/active-tab ownership
@@ -560,7 +560,7 @@ submission. Focused tests cover generic prefix composition, replacement identity
 coalesced support detection, negative-cache expiry/reload, model/effort transitions,
 no duplicate Send, navigation, and native fallback ownership. Live individual
 DOM sends succeeded for ChatGPT, Claude and Gemini without changing the frontmost
-app; Gemini selected Argon High from Flash/Low in about 2.4 seconds. A short native
+app; the former Argon picker took about 2.4 seconds from Flash/Low. A short native
 multi-open check preserved both NSWorkspace frontmost PID and selected tab.
 The longer concurrent live test was interrupted by the owner closing fixture
 tabs; it is not evidence about focus preservation across user activity.

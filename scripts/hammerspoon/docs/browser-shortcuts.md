@@ -31,7 +31,7 @@ browser. See [Omni configuration and magics](brave-shortcuts.md).
 
 Modified Enter, strict leading magics, combined destinations, literal whitespace
 AND matching, aliases, recent bookmarks and adaptive 75% width are shared.
-Shift+Enter uses Google, Cmd+Enter ChatGPT, Alt+Enter Gemini Argon High,
+Shift+Enter uses Google, Cmd+Enter ChatGPT, Alt+Enter Gemini Neon High,
 Ctrl+Enter Claude, and Ctrl+Shift+Enter Google Web. Tab replacement options are
 captured before deferred submission.
 
@@ -68,7 +68,7 @@ JavaScript from Apple Events. Where already enabled, the first real DOM request
 detects support, with independent per-browser 72-hour negative caches reset by
 HS reload. Native fallback requires the browser to remain focused. Unsupported
 or ambiguous send outcomes are not retried. Gemini submits only after confirming
-Argon High; a different account may lack that model.
+Neon High; a different account may lack that model.
 
 ## History and performance
 

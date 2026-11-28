@@ -14,7 +14,7 @@ return function(config)
         {".a", "amazon", "Amazon Germany", "Product search"},
         {".k", "keepa", "Keepa", "Amazon Germany price search"},
         {".c", "chatgpt", "ChatGPT", "New conversation, automatically submitted"},
-        {".g", "gemini", "Gemini", "Argon High, automatically submitted · Alt+Enter"},
+        {".g", "gemini", "Gemini", "Neon High, automatically submitted · Alt+Enter"},
         {".l", "claude", "Claude", "New conversation, automatically submitted · Ctrl+Enter"},
         {".s", "semanticscholar", "Semantic Scholar", "Research papers"},
         {".gs", "googlescholar", "Google Scholar", "Scholarly literature"},

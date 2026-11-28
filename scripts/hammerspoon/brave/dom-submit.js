@@ -16,7 +16,7 @@ function omniDOMSubmit(request) {
     if(request.destination==='gemini') {
         const picker=find('[aria-label^="Open mode picker, currently "]');
         if(!picker)return JSON.stringify({status:'waiting'});
-        const items=Array.from(document.querySelectorAll('[role="menuitem"],[role="option"]')).filter(visible);
+        const items=Array.from(document.querySelectorAll('[role="menuitem"],[role="menuitemradio"],[role="option"]')).filter(visible);
         const selected=e=>e.classList.contains('selected') || e.getAttribute('aria-selected')==='true' || e.getAttribute('aria-checked')==='true';
         const choose=(e,action)=>{
             // Wait for the prior click to be reflected before issuing another.
@@ -29,23 +29,23 @@ function omniDOMSubmit(request) {
             job.actions[action]=true;job.action=action;job.actionAt=Date.now();
             e.click();return JSON.stringify({status:'waiting'});
         };
-        if(/currently (?:4 )?Argon High$/.test(label(picker))) {
+        if(/currently (?:4 )?Neon High$/.test(label(picker))) {
             if(items.length)return choose(picker,'close-picker');
             job.action=null;
         } else {
-            const argon=items.find(e=>/^(?:Selected )?4 Argon(?:\s|$)/.test(label(e)));
+            const neon=items.find(e=>/(?:^|\s)4 Neon(?:\s|$)/.test(label(e)));
             const thinking=items.find(e=>label(e)==='Thinking level');
             const high=items.find(e=>/^(?:Selected )?High(?:\s|$)/.test(label(e)));
             if(high) {
                 if(selected(high))return choose(picker,'close-high');
                 return choose(high,'choose-high');
             }
-            if(argon) {
-                if(!selected(argon))return choose(argon,'choose-argon');
+            if(neon) {
+                if(!selected(neon))return choose(neon,'choose-neon');
                 if(thinking)return choose(thinking,'open-thinking');
             }
-            if(items.length)return JSON.stringify({status:'failed',reason:'Gemini Argon High is unavailable'});
-            return choose(picker,job.action==='choose-argon'?'reopen-picker':'open-picker');
+            if(items.length)return JSON.stringify({status:'failed',reason:'Gemini Neon High is unavailable'});
+            return choose(picker,job.action==='choose-neon'?'reopen-picker':'open-picker');
         }
     }
     const selectors={chatgpt:'#prompt-textarea,[contenteditable="true"][aria-label="Ask ChatGPT"],textarea[name="prompt-textarea"]',
