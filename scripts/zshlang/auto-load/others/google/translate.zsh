@@ -3,8 +3,8 @@
 #: Credentials are private and live in `~/.night-gcp/config.zsh`:
 #:   gcp_translate_project  the project billed for the calls
 #:   gcp_translate_key_file the service-account JSON (Cloud Translation user role)
-#: Tokens are minted by `gcloud` from that key and cached for an hour. Nothing
-#: identifying lives in this file.
+#: Tokens are minted by `gcloud` from that key and cached for 50 minutes by
+#: default. See `docs/gcp-translate.md`.
 
 typeset -g gcp_translate_project="${gcp_translate_project:-}"
 typeset -g gcp_translate_key_file="${gcp_translate_key_file:-}"
@@ -18,16 +18,38 @@ function gcp-translate-token {
         ecerr "$0: set gcp_translate_key_file in ${gcp_conf_file}"
         return 1
     fi
-    local cache="${XDG_CACHE_HOME:-$HOME/.cache}/gcp-translate/token"
-    if [[ -r "$cache" ]] && (( $(date +%s) - $(stat -f %m "$cache" 2>/dev/null || stat -c %Y "$cache") < gcp_translate_token_ttl )) ; then
-        cat "$cache"
-        return 0
+    local cache="${XDG_CACHE_HOME:-${HOME}/.cache}/gcp-translate/token"
+    local -a mtime
+    if [[ -f "${cache}" && -r "${cache}" && -s "${cache}" ]] &&
+        zmodload -F zsh/stat b:zstat 2>/dev/null &&
+        zmodload zsh/datetime 2>/dev/null &&
+        builtin zstat -A mtime +mtime -- "${cache}" 2>/dev/null &&
+        (( EPOCHSECONDS - mtime[1] < gcp_translate_token_ttl )) ; then
+        command cat -- "${cache}"
+        return
     fi
-    mkdir -p "${cache:h}" && chmod 700 "${cache:h}"
-    GOOGLE_APPLICATION_CREDENTIALS="${gcp_translate_key_file}" \
-        gcloud auth application-default print-access-token > "$cache" @RET
-    chmod 600 "$cache"
-    cat "$cache"
+
+    ( umask 077; command mkdir -p -- "${cache:h}" ) || return $?
+    command chmod 700 "${cache:h}" @RET
+    if [[ -d "${cache}" ]] ; then
+        ecerr "$0: token cache path is a directory: ${cache}"
+        return 1
+    fi
+
+    local temporary
+    temporary="$(command mktemp "${cache}.XXXXXXXX")" @RET
+    {
+        GOOGLE_APPLICATION_CREDENTIALS="${gcp_translate_key_file}" \
+            command gcloud auth application-default print-access-token > "${temporary}" @RET
+        if [[ ! -s "${temporary}" ]] ; then
+            ecerr "$0: gcloud returned an empty access token"
+            return 1
+        fi
+        command mv -f -- "${temporary}" "${cache}" @RET
+        command cat -- "${cache}"
+    } always {
+        command rm -f -- "${temporary}"
+    }
 }
 
 function gcp-translate {
