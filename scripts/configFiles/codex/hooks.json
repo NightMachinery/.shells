@@ -46,7 +46,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "if [ -x \"$HOME/go/bin/agent-desk\" ]; then \"$HOME/go/bin/agent-desk\" hook prompt --agent codex >/dev/null 2>&1; fi",
+            "command": "if [ -x \"$HOME/go/bin/agent-desk\" ]; then \"$HOME/go/bin/agent-desk\" hook prompt --agent codex 2>/dev/null; fi",
             "timeout": 10
           }
         ]
