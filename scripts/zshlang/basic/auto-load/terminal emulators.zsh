@@ -82,16 +82,27 @@ function tty-title {
 }
 ##
 function terminfo-set-auto {
-    # if isTmux ; then
-    #     export TERM='screen-256color'
-    #     return $?
-    # fi
+    whence -p infocmp >/dev/null 2>&1 || return 0
 
-    if isKitty ; then
-        export TERM='xterm-kitty' # You need to use kitty-terminfo-install on each new server though
-        # Idk why this gets reseted on mosh. It's inherited correctly in SSH ...
+    local terminal="${TERM:-xterm-256color}"
+    if [[ "${terminal}" != (xterm-kitty|tmux*|screen*) ]] && ! isTmux && isKitty &&
+        command infocmp -- xterm-kitty >/dev/null 2>&1 ; then
+        terminal=xterm-kitty
+    elif ! command infocmp -- "${terminal}" >/dev/null 2>&1 ; then
+        #: SSH can forward a terminal name absent from the remote database.
+        #: Check the replacement before assigning zsh's special TERM.
+        local fallback
+        for fallback in xterm-256color xterm dumb ; do
+            if command infocmp -- "${fallback}" >/dev/null 2>&1 ; then
+                export TERM="${fallback}"
+                return
+            fi
+        done
+        return 0
     fi
 
-    # export TERM="xterm-256color" # Might do a lot of damage. Added for multi-term.
+    if [[ "${terminal}" != "${TERM:-}" ]] ; then
+        export TERM="${terminal}"
+    fi
 }
 ##

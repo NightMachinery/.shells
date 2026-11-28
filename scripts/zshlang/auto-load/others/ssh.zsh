@@ -9,7 +9,9 @@ function ashL {
 }
 ##
 function kitty-terminfo-install() {
-    infocmp -x xterm-kitty | ssh "$@" tic -x -o \~/.terminfo/ /dev/stdin
+    setopt localoptions pipefail
+    command infocmp -x xterm-kitty |
+        command ssh -T "$@" 'tic -x -o "${HOME}/.terminfo" /dev/stdin'
 }
 
 function ssh {

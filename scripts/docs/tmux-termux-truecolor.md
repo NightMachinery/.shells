@@ -156,6 +156,12 @@ Redeploy with the rsync in `setup/minimal_proxy/gen.org` for the phone to pick
 this up; until then the `terminal-overrides` line above is what keeps its
 colors readable.
 
+Zsh also checks the terminfo database before changing `TERM`. If the inherited
+entry is missing, it tries `xterm-256color`, `xterm`, then `dumb`. To get
+Kitty's full capabilities on a new SSH host, run
+`kitty-terminfo-install HOST` from a machine with the Kitty entry installed.
+It compiles the entry in the remote account's `~/.terminfo`.
+
 ## Truecolor inward, to the panes
 
 `terminal-overrides` and `terminal-features` govern what tmux sends *outward*,
