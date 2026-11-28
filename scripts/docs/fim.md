@@ -32,6 +32,9 @@ fields in the Go provider table. The four shell assoc arrays
 `fim_provider_endpoint`, `fim_provider_model`, `fim_provider_key_var` and
 `fim_provider_extract` are compatibility metadata populated from
 `llm_complete fim providers --json`, rather than separate definitions.
+An explicit FIM command loads the metadata using `jq` and builds
+`llm_complete` with Go if needed. The widget does this in its background
+request, so a shell can start even on hosts that lack those tools.
 
 Configured, with measured round-trips for a one-line completion:
 

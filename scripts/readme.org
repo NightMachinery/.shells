@@ -504,8 +504,9 @@ inserting one line at the cursor. Codestral answers in about 0.3s;
 than the wait.
 
 [[agfi:fim-get]] is the request on its own, in =zshlang/auto-load/others/fim.zsh=,
-so it also works in a pipe or over brish. Only the widget and the bindings are
-interactive-only, in =zshlang/interactive/auto-load/FIM.zsh=. The Emacs twin is
+so it also works in a pipe or over brish. It looks up =jq= and =llm_complete=
+when called, after shell startup. The widget and bindings live in
+=zshlang/interactive/auto-load/FIM.zsh=. The Emacs twin is
 =night/fim-get= in =~[dom]/autoload/night-mistral-fim.el=; the two speak the same
 body to the same providers and want changing together.
 

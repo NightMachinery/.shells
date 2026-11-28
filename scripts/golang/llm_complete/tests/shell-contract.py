@@ -19,10 +19,17 @@ server = http.server.ThreadingHTTPServer(('127.0.0.1',0), Handler)
 threading.Thread(target=server.serve_forever, daemon=True).start()
 with tempfile.TemporaryDirectory(prefix='llm-complete-contract-',dir='/private/tmp') as d:
     config = pathlib.Path(d)/'providers.json'
-    config.write_text(json.dumps({'providers':{'stub':{'endpoint':f'http://127.0.0.1:{server.server_port}', 'model':'stub','key_env':'stub_key','extract':'chat'}}}))
+    config.write_text(json.dumps({'default_provider':'stub', 'providers':{'stub':{'endpoint':f'http://127.0.0.1:{server.server_port}', 'model':'stub','key_env':'stub_key','extract':'chat'}}}))
     env = dict(os.environ, LLM_COMPLETE_CONFIG=str(config), stub_key=key)
-    setup = f'''source "{root}/zshlang/basic/basic.plugin.zsh"; source "{root}/zshlang/basic/colors.zsh"; source "{root}/zshlang/basic/conditions-personal.zsh"; source "{root}/zshlang/basic/proxy.zsh"; source "{root}/zshlang/auto-load/others/fim.zsh"; fim_provider=stub; fim_proxy_p=n; local text="$(command cat)"; fim-get "$text"'''
-    p = subprocess.run(['zsh','-f','-c',setup],input=buffer.encode(),stdout=subprocess.PIPE,stderr=subprocess.PIPE,env=env,timeout=30)
+    env.pop('fim_provider', None)
+    setup = f'''source "{root}/zshlang/basic/basic.plugin.zsh"; source "{root}/zshlang/basic/colors.zsh"; source "{root}/zshlang/basic/conditions-personal.zsh"; source "{root}/zshlang/basic/proxy.zsh"'''
+    source_fim = f'''source "{root}/zshlang/auto-load/others/fim.zsh"'''
+    startup = f'''{setup}; function go-local-dep {{ print -ru2 -- "unexpected dependency check"; return 1; }}; path=(); {source_fim}; (( ! ${{+fim_provider}} ))'''
+    p = subprocess.run(['zsh','-f','-c',startup],capture_output=True,env=env,timeout=10)
+    assert (p.returncode,p.stdout,p.stderr)==(0,b'',b''), (p.returncode,p.stdout,p.stderr)
+    print('PASS: sourcing FIM with an empty PATH leaves the provider unset')
+    request = f'''{setup}; {source_fim}; fim_proxy_p=n; local text="$(command cat)"; fim-get "$text"'''
+    p = subprocess.run(['zsh','-f','-c',request],input=buffer.encode(),stdout=subprocess.PIPE,stderr=subprocess.PIPE,env=env,timeout=30)
     assert (p.returncode,p.stdout,p.stderr)==(0,b' 0',b''), (p.returncode,p.stdout,p.stderr)
     try:
         p = subprocess.run(['zsh','-f',str(root/'golang/llm_complete/tests/zpty-contract.zsh')], env=env,capture_output=True,timeout=25)

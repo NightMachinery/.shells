@@ -22,9 +22,11 @@ function h-llm-complete-dep {
 }
 
 function h-fim-providers-refresh {
+    ensure-cmd jq || return
     h-llm-complete-dep || return
-    local row name model endpoint key extract
-    local metadata="$(command llm_complete fim providers --json)" || return
+    local metadata rows name model endpoint key extract
+    metadata="$(command llm_complete fim providers --json)" || return
+    rows="$(command jq -r '.[] | [.name,.model,.endpoint,(if .key_env == "" then "-" else .key_env end),.extract] | @tsv' <<< "${metadata}")" || return
     fim_provider_endpoint=() fim_provider_model=() fim_provider_key_var=() fim_provider_extract=()
     while IFS=$'\t' read -r name model endpoint key extract ; do
         fim_provider_endpoint[$name]="$endpoint"
@@ -35,12 +37,17 @@ function h-fim-providers-refresh {
         else
             fim_provider_extract[$name]='.choices[0].text'
         fi
-    done < <(print -r -- "$metadata" | command jq -r '.[] | [.name,.model,.endpoint,(if .key_env == "" then "-" else .key_env end),.extract] | @tsv')
+    done <<< "${rows}"
 }
 
-#: The widget reads these metadata arrays; the provider definitions live in Go.
-h-fim-providers-refresh
-typeset -g fim_provider="${fim_provider:-$(command llm_complete fim default-provider)}"
+function h-fim-provider-resolve {
+    #: Load on demand, once startup has finished setting PATH.
+    h-fim-providers-refresh || return
+    REPLY="${fim_provider-}"
+    if [[ -z "${REPLY}" ]] ; then
+        REPLY="$(command llm_complete fim default-provider)" || return
+    fi
+}
 ##
 function fim-providers {
     #: Names usable as `fim_provider'.
@@ -49,7 +56,9 @@ function fim-providers {
 }
 
 function fim-provider-show {
-    ec "${fim_provider} (${fim_provider_model[${fim_provider}]})"
+    local REPLY
+    h-fim-provider-resolve || return
+    ec "${REPLY} (${fim_provider_model[${REPLY}]})"
 }
 
 function fim-provider-select {
@@ -123,7 +132,9 @@ function fim-get-v1 {
     #:   fim_strip_space_p  drop one leading space; default n, see below
     ensure-cmd curl jq @RET
 
-    local provider="${fim_provider:-codestral}"
+    local REPLY
+    h-fim-provider-resolve || return
+    local provider="${REPLY}"
     local endpoint="${fim_provider_endpoint[${provider}]}"
     if test -z "${endpoint}" ; then
         ecerr "$0: unknown provider '${provider}'; known: ${(@ok)fim_provider_endpoint}"
@@ -268,9 +279,10 @@ function h-fim-shell-request {
 
 function fim-get {
     #: [agfi:fim-get-v1] is the historical curl rollback, with argv exposure.
-    h-fim-providers-refresh || return
-    local provider="${fim_provider:-$(command llm_complete fim default-provider)}"
-    local key_var="${fim_provider_key_var[$provider]}"
+    local REPLY
+    h-fim-provider-resolve || return
+    local fim_provider="${REPLY}"
+    local key_var="${fim_provider_key_var[${fim_provider}]}"
     (
         if [[ -n "$key_var" ]] ; then
             typeset -x "$key_var=${(P)key_var}"

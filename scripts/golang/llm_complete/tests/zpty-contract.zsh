@@ -15,7 +15,7 @@ function wait-for {
 export TERM=xterm-256color
 zpty widget /bin/zsh -dfi
 wait-for $'\e[?2004h' || exit 1
-local setup="source ${(q)root}/zshlang/basic/basic.plugin.zsh; source ${(q)root}/zshlang/basic/colors.zsh; source ${(q)root}/zshlang/basic/conditions-personal.zsh; source ${(q)root}/zshlang/basic/proxy.zsh; source ${(q)root}/zshlang/auto-load/others/fim.zsh; source ${(q)root}/zshlang/interactive/auto-load/FIM.zsh; PROMPT='FIMTEST> '; RPROMPT=''; bindkey -v; fim_proxy_p=n; fim_provider=${LLM_COMPLETE_TEST_PROVIDER:-stub}; function h-test-buffer { print -r -- \"SNAPSHOT=\$BUFFER\"; zle redisplay }; zle -N h-test-buffer; bindkey '^G' h-test-buffer"
+local setup="source ${(q)root}/zshlang/basic/basic.plugin.zsh; source ${(q)root}/zshlang/basic/colors.zsh; source ${(q)root}/zshlang/basic/conditions-personal.zsh; source ${(q)root}/zshlang/basic/proxy.zsh; source ${(q)root}/zshlang/auto-load/others/fim.zsh; source ${(q)root}/zshlang/interactive/auto-load/FIM.zsh; PROMPT='FIMTEST> '; RPROMPT=''; bindkey -v; fim_proxy_p=n; fim_provider=${(q)LLM_COMPLETE_TEST_PROVIDER}; function h-test-buffer { print -r -- \"SNAPSHOT=\$BUFFER\"; zle redisplay }; zle -N h-test-buffer; bindkey '^G' h-test-buffer"
 zpty -w widget "$setup"
 wait-for 'FIMTEST> ' || exit 1
 wait-for $'\e[?2004h' || exit 1

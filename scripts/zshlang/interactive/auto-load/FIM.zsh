@@ -176,13 +176,6 @@ function zle-fim-accept {
 function zle-fim-widget {
     setopt localoptions extendedglob
 
-    local provider="${fim_provider:-codestral}"
-    local model="${fim_provider_model[${provider}]}"
-    if test -z "${model}" ; then
-        h-fim-zle-say "${fim_zle_sym_err}" "unknown provider '${provider}'"
-        return 1
-    fi
-
     h-fim-zle-cancel
 
     #: `$PREBUFFER', not just `$LBUFFER'. Once zsh is reading a continuation --
@@ -203,7 +196,7 @@ function zle-fim-widget {
             #: Tell the parent our pid, so it can cancel us.
             print -r -- "${sysparams[pid]}"
 
-            fim_provider="${provider}" h-fim-zle-child "${prefix}" "${suffix}"
+            h-fim-zle-child "${prefix}" "${suffix}"
             #: Nothing may reach the tty from here: it would land in the middle
             #: of the prompt.
         } 2>/dev/null
@@ -227,7 +220,7 @@ function zle-fim-widget {
     typeset -g fim_zle_fd="${fd}" fim_zle_pid="${pid}"
 
     zle -F "${fd}" h-fim-zle-response
-    h-fim-zle-say "${fim_zle_sym_wait}" "requesting ${model}"
+    h-fim-zle-say "${fim_zle_sym_wait}" 'requesting completion'
 }
 
 function h-fim-zle-response {
