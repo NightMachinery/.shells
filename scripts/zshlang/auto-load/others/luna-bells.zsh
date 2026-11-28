@@ -1082,16 +1082,21 @@ function bell-zsh-start {
     local skip=''
     human-interactive-p || skip='not human-interactive'
 
-    #: log starting script and invocation
+    #: Log starting script and invocation if the directory is usable.
+    local log_dir="${HOME}/logs"
     {
-        ec $'\n'"--- $(now) "
-        print -r -- "zsh:    $(ps -ww -o command= -p $$)"
-        print -r -- "parent: $(ps -ww -o command= -p $PPID)"
-        [[ -n $ZSH_EXECUTION_STRING ]] &&
-            print -r -- "exec:   ${(q)ZSH_EXECUTION_STRING}"
-        [[ -n $skip ]] &&
-            print -r -- "skip:   $skip"
-    } >> ~/logs/bell-zsh-start 2>/dev/null || true
+        if [[ -d "${log_dir}" ]] || ( umask 077; command mkdir -p -- "${log_dir}" ) ; then
+            {
+                ec $'\n'"--- $(now) "
+                print -r -- "zsh:    $(ps -ww -o command= -p $$)"
+                print -r -- "parent: $(ps -ww -o command= -p $PPID)"
+                [[ -n $ZSH_EXECUTION_STRING ]] &&
+                    print -r -- "exec:   ${(q)ZSH_EXECUTION_STRING}"
+                [[ -n $skip ]] &&
+                    print -r -- "skip:   $skip"
+            } >> "${log_dir}/bell-zsh-start"
+        fi
+    } 2>/dev/null || true
 
     if test -n "$skip" ; then
         return 0

@@ -558,6 +558,8 @@ A shell that fails the gate is still recorded in `~/logs/bell-zsh-start`, with a
 `skip:` line saying why. That log is what makes a stray bell diagnosable, which
 is why the skip is logged rather than returned silently. Agent shells are the
 exception and return before the log, since they would otherwise swamp it.
+The bell creates `~/logs` on first use and continues quietly if the log is
+unavailable.
 
 Prefer `zsh -c` over `zsh -ic` regardless: it never sources `.zshrc`, so it
 cannot reach the bell at all, and it starts in roughly a third of the time. See
